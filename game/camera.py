@@ -21,6 +21,10 @@ class Camera:
         self.map_h_px = map_h_px
         self.x = 0.0  # pixel world dell'angolo in alto a sinistra della vista
         self.y = 0.0
+        # Offset di rendering INTERO, arrotondato una volta per frame (snap()):
+        # mappa e unita lo condividono, cosi non "tremolano" di 1px tra loro.
+        self.ox = 0
+        self.oy = 0
         # Trasformazione finestra->lowres (impostata dall'App a ogni frame per il
         # mapping del mouse; tiene conto di scaling e lettera-box del fullscreen).
         self.vp_scale = config.RENDER_SCALE
@@ -69,8 +73,16 @@ class Camera:
             self.y = max(0.0, min(self.y, self.map_h_px - self.view_h))
 
     # --- trasformazioni ------------------------------------------------------
+    def snap(self) -> None:
+        """Fissa l'offset di rendering intero per il frame corrente. Da chiamare
+        una sola volta per frame, prima di disegnare mappa e unita."""
+        self.ox = round(self.x)
+        self.oy = round(self.y)
+
     def world_to_screen(self, wx: float, wy: float) -> tuple[int, int]:
-        return (int(wx - self.x), int(wy - self.y))
+        # Stesso offset intero (ox/oy) usato dai layer della mappa: un punto del
+        # mondo cade sullo stesso pixel sia per il terreno che per le unita.
+        return (round(wx) - self.ox, round(wy) - self.oy)
 
     def screen_window_to_world(self, mx: int, my: int) -> tuple[float, float]:
         """Da coordinate finestra (mouse) a coordinate pixel-world.

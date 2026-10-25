@@ -16,6 +16,7 @@ from engine.entities import Core, Pokemon, Structure, Unit
 from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
                          TILE_PUDDLE, TILE_RIVER, TILE_WALL)
 from .fx import type_color
+from .map_renderer import MapRenderer
 
 # Palette greybox (sostituita dai tileset in futuro).
 COL_BG = (18, 20, 24)
@@ -98,118 +99,34 @@ class Renderer:
     def __init__(self, tile_size: int = config.TILE_SIZE):
         self.tile_size = tile_size
         self._tile_cache: dict = {}   # (ts, tile_type, variant) -> Surface
+        # Mappa statica in layer pre-renderizzati (costruiti al primo draw).
+        self.map = MapRenderer(self, tile_size)
 
     def draw(self, surface, world, camera, animators, selected_path=None,
              selected_id=None, dens=None, respawning=None, vision=None, player_team=0,
              now=1e9):
         surface.fill(COL_BG)
-        self._draw_map(surface, world.grid, camera)
+        camera.snap()   # offset intero del frame, condiviso da mappa e unita
+        # Mappa statica: costruita una volta in layer, poi solo blit.
+        self.map.ensure_built(world.grid)
+        self.map.draw(surface, camera)            # ground, decor, ombre, muri base
         if dens:
             self._draw_dens(surface, camera, dens)
         if config.SHOW_PATH and selected_path:
             self._draw_path(surface, selected_path, camera)
         self._draw_entities(surface, camera, world, animators, selected_id,
                             vision, player_team, now)
+        self.map.draw_canopy(surface, camera)     # chiome/luce sopra le unita
         if respawning:
             self._draw_respawns(surface, camera, respawning)
         if vision is not None:
             self._draw_fog(surface, camera, world.grid, vision, player_team)
 
     # --- mappa ---------------------------------------------------------------
-    # Tile "alti": disegnati come rilievi 2.5D (estrusi verso l'alto) in una
-    # seconda passata, così i blocchi davanti coprono quelli dietro.
-    TALL_TILES = (TILE_WALL, TILE_JUNGLE_WALL, TILE_BUSH)
-
-    def _draw_map(self, surface, grid, camera):
-        ts = self.tile_size
-        H = max(6, int(ts * 0.5))   # altezza di estrusione dei rilievi
-        x0, y0, x1, y1 = camera.visible_tile_bounds(ts, grid.width, grid.height)
-
-        # Passata 1 - terreno piatto. Sotto i rilievi mettiamo erba.
-        for ty in range(y0, y1):
-            row = grid.tiles[ty]
-            for tx in range(x0, x1):
-                sx, sy = camera.world_to_screen(tx * ts, ty * ts)
-                t = row[tx]
-                h = (tx * 73856093) ^ (ty * 19349663)
-                ground = TILE_FLOOR if t in self.TALL_TILES else t
-                if ground == TILE_FLOOR:
-                    # Erba: tinta continua dai 4 angoli (condivisi coi vicini)
-                    # -> prato unico, nessun seam fra tile.
-                    c00 = self._grass_corner(tx, ty)
-                    c10 = self._grass_corner(tx + 1, ty)
-                    c01 = self._grass_corner(tx, ty + 1)
-                    c11 = self._grass_corner(tx + 1, ty + 1)
-                    surface.blit(self._grass_surf(c00, c10, c01, c11), (sx, sy))
-                else:
-                    variant = (h >> 4) & 3
-                    surface.blit(self._tile_surf(ground, variant), (sx, sy))
-                self._shore(surface, grid, tx, ty, sx, sy, ground, t)
-                if config.SHOW_GRID_LINES:
-                    pygame.draw.rect(surface, COL_GRID, pygame.Rect(sx, sy, ts, ts), 1)
-
-        # Passata ombre - un muro proietta ombra sul terreno adiacente a sud/est
-        # (luce da alto-sinistra): dà altezza e salda muro e lane/fiume/erba in un
-        # unico paesaggio, invece di due elementi piatti affiancati.
-        def is_wall(x, y):
-            return (0 <= x < grid.width and 0 <= y < grid.height
-                    and grid.tiles[y][x] in (TILE_WALL, TILE_JUNGLE_WALL))
-
-        for ty in range(y0, y1):
-            row = grid.tiles[ty]
-            for tx in range(x0, x1):
-                if row[tx] in self.TALL_TILES:
-                    continue
-                nw = ((1 if is_wall(tx, ty - 1) else 0)      # muro a nord
-                      | (2 if is_wall(tx - 1, ty) else 0))   # muro a ovest
-                if nw:
-                    sx, sy = camera.world_to_screen(tx * ts, ty * ts)
-                    surface.blit(self._shadow_surf(nw), (sx, sy))
-
-        # Passata 2 - rilievi 2.5D, dall'alto in basso (ordine di profondità).
-        W, Hg = grid.width, grid.height
-        tiles = grid.tiles
-
-        def is_jw(x, y):
-            return 0 <= x < W and 0 <= y < Hg and tiles[y][x] == TILE_JUNGLE_WALL
-
-        def is_bush(x, y):
-            return 0 <= x < W and 0 <= y < Hg and tiles[y][x] == TILE_BUSH
-
-        def sym_seed(x, y, bits):
-            # Seed simmetrico: il tile e il suo opposto a 180° (gli altri due
-            # quadranti) condividono il seme -> formazioni specchiate.
-            px, py = W - 1 - x, Hg - 1 - y
-            kx, ky = (x, y) if (x, y) <= (px, py) else (px, py)
-            return (((kx * 73856093) ^ (ky * 19349663)) >> 4) & bits
-
-        for ty in range(y0, y1):
-            row = grid.tiles[ty]
-            for tx in range(x0, x1):
-                t = row[tx]
-                if t not in self.TALL_TILES:
-                    continue
-                sx, sy = camera.world_to_screen(tx * ts, ty * ts)
-                if t == TILE_JUNGLE_WALL:
-                    # Formazione connessa: un tile = un pezzo dell'altopiano.
-                    mask = ((1 if is_jw(tx, ty - 1) else 0)          # N
-                            | (2 if is_jw(tx + 1, ty) else 0)        # E
-                            | (4 if is_jw(tx, ty + 1) else 0)        # S
-                            | (8 if is_jw(tx - 1, ty) else 0))       # W
-                    variant = sym_seed(tx, ty, 31)
-                    surface.blit(self._jwall_surf(mask, variant, H), (sx, sy - H))
-                elif t == TILE_BUSH:
-                    # Cespuglio connesso: un tile = un pezzo di un'unica chioma.
-                    mask = ((1 if is_bush(tx, ty - 1) else 0)        # N
-                            | (2 if is_bush(tx + 1, ty) else 0)      # E
-                            | (4 if is_bush(tx, ty + 1) else 0)      # S
-                            | (8 if is_bush(tx - 1, ty) else 0))     # W
-                    variant = sym_seed(tx, ty, 15)
-                    surface.blit(self._bush_surf(mask, variant, H), (sx, sy - H))
-                else:
-                    variant = (((tx * 73856093) ^ (ty * 19349663)) >> 6) & 7
-                    surface.blit(self._tall_surf(t, variant, H), (sx, sy - H))
-
+    # La composizione della mappa statica (3 passate: terreno, ombre, rilievi
+    # 2.5D) e stata spostata in MapRenderer.build, che la pre-renderizza una
+    # volta in layer separati. Qui restano solo i builder dei singoli sprite dei
+    # tile (riusati da MapRenderer), invariati.
     def _tile_surf(self, t: int, variant: int) -> pygame.Surface:
         """Superficie texturizzata del tile piatto, costruita una volta e messa in cache."""
         ts = self.tile_size
