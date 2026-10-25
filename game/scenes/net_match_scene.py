@@ -57,6 +57,7 @@ class NetMatchScene:
         mh = self.map_data.grid.height * config.TILE_SIZE
         self.camera = Camera(config.LOWRES_WIDTH, config.LOWRES_HEIGHT, mw, mh)
         self.renderer = Renderer()
+        self.renderer.map.set_camps(self.map_data.camps)   # sentieri di terra verso le lane
         self.animators = {}
         self.camera_locked = True
         self.aiming_slot = None

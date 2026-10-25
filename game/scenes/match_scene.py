@@ -65,6 +65,7 @@ class MatchScene:
                               self.player.pos.y * config.TILE_SIZE)
         self.input = InputController(self.player.id)
         self.renderer = Renderer()
+        self.renderer.map.set_camps(map_data.camps)   # sentieri di terra verso le lane
         self.fx = FXSystem()
         self._menu_seq = 0
         # Nebbia di guerra + minimappa solo nelle mappe MOBA. La visione è

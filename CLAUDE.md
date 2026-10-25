@@ -35,6 +35,24 @@ Passaggi completati:
     si alloca solo se ci si disegna dentro, e nel draw si blittano solo i
     chunk visibili (culling per chunk).
   Risultato: RAM 3v3 139->93 MB, 5v5 312->208 MB; draw() ~2-3x piu veloce.
+- Palette da giungla del suolo (game/renderer.py, _grass_corner/_build_grass):
+  il verde uniforme del prato e stato sostituito da una palette cupa e
+  desaturata (base #2E4A33, scuro #233B29, chiaro #3A5A3C, muschio #4A6B3A,
+  terra #5A4A35, fango #3E3527). La tinta varia con value-noise a DUE scale
+  (fine GRASS_CELL + larga GRASS_CELL2) campionato sugli ANGOLI dei tile ->
+  variazione organica senza griglia ne seam. Un secondo rumore a soglia aggiunge
+  chiazze larghe di muschio e fango: ogni angolo porta (tinta, muschio, fango)
+  quantizzati, interpolati nel tile (bordi sfumati) -> cache ancora per-firma.
+  Screenshot: screenshots/step_3.png.
+- Sentieri di terra battuta (game/map_renderer.py, _paint_paths; brush
+  _dirt_stamp nel Renderer): dai campi della giungla alla lane piu vicina. Una
+  BFS multi-sorgente dai tile-lane da, per ogni campo, il percorso piu corto che
+  aggira muri ed evita l'acqua (naturalmente irregolare); lungo di esso si
+  timbrano dischi di terra morbidi e dal contorno mosso, SOLO sui tile d'erba
+  (bordi sfumati, largo 1-2 tile). Puramente grafico: i tipi di tile NON
+  cambiano. I campi arrivano al MapRenderer via MapRenderer.set_camps(camps),
+  chiamato dalle scene (match/net_match) dopo aver creato il Renderer.
+  Screenshot: screenshots/step_4.png.
 
 Scelte tecniche importanti:
 - canopy e lighting_overlay sono RISERVATI e per ora VUOTI: la resa resta

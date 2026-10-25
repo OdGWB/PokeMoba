@@ -28,7 +28,8 @@ from __future__ import annotations
 import pygame
 
 import config
-from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_WALL)
+from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
+                         TILE_WALL)
 
 COL_GRID = (0, 0, 0)
 COL_BG = (18, 20, 24)            # sfondo (riempie il bordo del layer opaco)
@@ -124,6 +125,16 @@ class MapRenderer:
         self._top = 0                # margine superiore (i rilievi sporgono di H)
         self._H = 0
         self._grid_sprite = None     # sprite riga griglia di debug (cache)
+        self._camps: list[tuple[int, int]] = []   # centri dei campi (per i sentieri)
+
+    def set_camps(self, camps) -> None:
+        """Posizioni dei campi della giungla (da MapData): servono SOLO a tracciare
+        i sentieri di terra verso le lane. Cosmetico, non tocca la logica. Se
+        cambiano, i layer si ricostruiscono al prossimo draw."""
+        norm = [tuple(c["pos"]) if isinstance(c, dict) else tuple(c[:2]) for c in (camps or [])]
+        if norm != self._camps:
+            self._camps = norm
+            self.layers = {}         # forza ensure_built a ricostruire
 
     # --- costruzione (una volta) --------------------------------------------
     def ensure_built(self, grid) -> None:
@@ -179,6 +190,9 @@ class MapRenderer:
                 if config.SHOW_GRID_LINES:
                     decor.blit(self._grid_line_sprite(), (ax, ay))
 
+        # --- Sentieri di terra battuta: dai campi della giungla alle lane -----
+        self._paint_paths(grid, decor, p)
+
         # --- Passata ombre: un muro proietta ombra a sud/est sul terreno ------
         def is_wall(x, y):
             return (0 <= x < Wt and 0 <= y < Ht
@@ -233,6 +247,80 @@ class MapRenderer:
                     walls.blit(p._tall_surf(t, variant, H), (ax, ay))
 
         self._grid = grid
+
+    def _paint_paths(self, grid, decor, p) -> None:
+        """Traccia sentieri di terra battuta che collegano ogni campo alla lane
+        più vicina. Il percorso segue il terreno (aggira i muri, evita l'acqua),
+        quindi è naturalmente irregolare; la terra si timbra solo sui tile
+        d'erba, con pennelli morbidi sovrapposti (bordi sfumati, largo 1-2 tile).
+        È puramente grafico: i tipi di tile non cambiano."""
+        if not self._camps:
+            return
+        from collections import deque
+        ts = self.tile_size
+        top = self._top
+        Wt, Ht = grid.width, grid.height
+        tiles = grid.tiles
+
+        def walk(x, y):
+            # Terreno su cui un sentiero può correre: erba, lane (sorgenti),
+            # cespugli. L'acqua e i muri NO -> la terra resta sulla terra.
+            return (0 <= x < Wt and 0 <= y < Ht
+                    and tiles[y][x] in (TILE_FLOOR, TILE_LANE, TILE_BUSH))
+
+        # BFS multi-sorgente da TUTTI i tile-lane: per ogni tile raggiungibile
+        # memorizza il passo verso la lane più vicina (gradiente di distanza).
+        parent = {}
+        dq = deque()
+        has_lane = False
+        for y in range(Ht):
+            row = tiles[y]
+            for x in range(Wt):
+                if row[x] == TILE_LANE:
+                    has_lane = True
+                    parent[(x, y)] = None     # sorgente
+                    dq.append((x, y))
+        if not has_lane:
+            return
+        NB = ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1))
+        while dq:
+            cx, cy = dq.popleft()
+            for dx, dy in NB:
+                nx, ny = cx + dx, cy + dy
+                if (nx, ny) in parent or not walk(nx, ny):
+                    continue
+                if dx and dy:   # niente taglio d'angolo tra i muri
+                    if not (walk(cx + dx, cy) and walk(cx, cy + dy)):
+                        continue
+                parent[(nx, ny)] = (cx, cy)
+                dq.append((nx, ny))
+
+        hashed = 0
+        for ci, (camp_x, camp_y) in enumerate(self._camps):
+            start = (int(camp_x), int(camp_y))
+            if start not in parent:
+                continue
+            # Risali il gradiente fino a una lane: ecco il sentiero.
+            route = []
+            cur = start
+            guard = 0
+            while cur is not None and guard < Wt * Ht:
+                route.append(cur)
+                cur = parent.get(cur)
+                guard += 1
+            for tx, ty in route:
+                if tiles[ty][tx] != TILE_FLOOR:
+                    continue        # terra solo sull'erba (non su lane/cespuglio)
+                h = ((tx * 73856093) ^ (ty * 19349663)) & 0x7FFFFFFF
+                r = int(ts * (0.78 + 0.22 * ((h >> 3) & 1)))   # 0.78..1.0 tile
+                variant = (h >> 5) & 7
+                jx = ((h >> 8) & 3) - 1
+                jy = ((h >> 10) & 3) - 1
+                stamp = p._dirt_stamp(r, variant)
+                cx = tx * ts + ts // 2 + jx
+                cy = ty * ts + ts // 2 + top + jy
+                decor.blit(stamp, (cx - r, cy - r))
+                hashed += 1
 
     def _grid_line_sprite(self):
         if self._grid_sprite is None:

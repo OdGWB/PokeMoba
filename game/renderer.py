@@ -45,6 +45,7 @@ JUNGLE_LIGHT = (58, 90, 60)      # #3A5A3C dosso illuminato
 JUNGLE_MOSS = (74, 107, 58)      # #4A6B3A muschio
 JUNGLE_DIRT = (90, 74, 53)       # #5A4A35 terra/sentiero
 JUNGLE_MUD = (62, 53, 39)        # #3E3527 fango
+DIRT_DRY = (112, 93, 66)         # battuto secco e chiaro (nucleo calpestato)
 GRASS_LO = JUNGLE_DARK           # avvallamento in ombra
 GRASS_HI = JUNGLE_LIGHT          # dosso illuminato
 GRASS_CELL = 4.0                 # scala fine delle chiazze di tinta (in tile)
@@ -294,6 +295,57 @@ class Renderer:
                 x = rng.randint(1, ts - 2); y = rng.randint(1, ts - 2)
                 pygame.draw.circle(surf, MUD_SPECK, (x, y), 1)
         return surf
+
+    # --- Sentiero di terra battuta: pennello morbido e irregolare ------------
+    def _dirt_stamp(self, r: int, variant: int) -> pygame.Surface:
+        """Macchia di terra battuta con bordo IRREGOLARE e sfumato (cache per
+        (raggio, variante)). Usata a timbro lungo i sentieri camp->lane: dischi
+        sovrapposti -> una striscia continua ma dal profilo mosso, non una
+        riga retta."""
+        ts = self.tile_size
+        key = (ts, "dirt", r, variant)
+        s = self._tile_cache.get(key)
+        if s is not None:
+            return s
+        d = 2 * r + 1
+        s = pygame.Surface((d, d), pygame.SRCALPHA)
+        rng = random.Random((variant * 2654435761 ^ 0x9E) & 0xFFFFFFFF)
+        p1 = rng.uniform(0, math.tau); p2 = rng.uniform(0, math.tau)
+        for y in range(d):
+            dy = y - r
+            for x in range(d):
+                dx = x - r
+                dist = math.hypot(dx, dy)
+                if dist < 1e-3:
+                    ang = 0.0
+                else:
+                    ang = math.atan2(dy, dx)
+                # Raggio modulato dall'angolo -> contorno bitorzoluto (no cerchio).
+                rr = r * (1.0 + 0.20 * math.sin(ang * 3 + p1) + 0.12 * math.sin(ang * 5 + p2))
+                if dist > rr:
+                    continue
+                f = dist / rr                      # 0 centro .. 1 bordo
+                a = int(228 * (1 - f) ** 1.35)     # nucleo pieno, sfuma al bordo
+                if a <= 0:
+                    continue
+                # Terra battuta: nucleo secco e chiaro (calpestato), poi terra più
+                # scura verso il bordo umido -> stacca dall'erba, bordi morbidi.
+                base = DIRT_DRY if f < 0.45 else JUNGLE_DIRT
+                j = rng.randint(-7, 7)
+                col = (max(0, min(255, base[0] + j)),
+                       max(0, min(255, base[1] + j)),
+                       max(0, min(255, base[2] + j)), a)
+                s.set_at((x, y), col)
+        # Qualche sassolino/granello sul battuto.
+        for _ in range(rng.randint(3, 6)):
+            px = rng.randint(1, d - 2); py = rng.randint(1, d - 2)
+            if math.hypot(px - r, py - r) > r * 0.8:
+                continue
+            c = MUD_SPECK if rng.random() < 0.5 else (JUNGLE_DIRT[0] + 14,
+                                                      JUNGLE_DIRT[1] + 12, JUNGLE_DIRT[2] + 10)
+            s.set_at((px, py), (c[0], c[1], c[2], 150))
+        self._tile_cache[key] = s
+        return s
 
     # --- Cespuglio connesso (neighbor-aware): un blocco = un'unica chioma -----
     def _bush_surf(self, mask: int, variant: int, H: int) -> pygame.Surface:
