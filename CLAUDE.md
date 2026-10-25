@@ -35,24 +35,33 @@ Passaggi completati:
     si alloca solo se ci si disegna dentro, e nel draw si blittano solo i
     chunk visibili (culling per chunk).
   Risultato: RAM 3v3 139->93 MB, 5v5 312->208 MB; draw() ~2-3x piu veloce.
-- Palette da giungla del suolo (game/renderer.py, _grass_corner/_build_grass):
-  il verde uniforme del prato e stato sostituito da una palette cupa e
-  desaturata (base #2E4A33, scuro #233B29, chiaro #3A5A3C, muschio #4A6B3A,
-  terra #5A4A35, fango #3E3527). La tinta varia con value-noise a DUE scale
-  (fine GRASS_CELL + larga GRASS_CELL2) campionato sugli ANGOLI dei tile ->
-  variazione organica senza griglia ne seam. Un secondo rumore a soglia aggiunge
-  chiazze larghe di muschio e fango: ogni angolo porta (tinta, muschio, fango)
-  quantizzati, interpolati nel tile (bordi sfumati) -> cache ancora per-firma.
-  Screenshot: screenshots/step_3.png.
-- Sentieri di terra battuta (game/map_renderer.py, _paint_paths; brush
-  _dirt_stamp nel Renderer): dai campi della giungla alla lane piu vicina. Una
-  BFS multi-sorgente dai tile-lane da, per ogni campo, il percorso piu corto che
-  aggira muri ed evita l'acqua (naturalmente irregolare); lungo di esso si
-  timbrano dischi di terra morbidi e dal contorno mosso, SOLO sui tile d'erba
-  (bordi sfumati, largo 1-2 tile). Puramente grafico: i tipi di tile NON
-  cambiano. I campi arrivano al MapRenderer via MapRenderer.set_camps(camps),
-  chiamato dalle scene (match/net_match) dopo aver creato il Renderer.
+- Palette da giungla del suolo, rumore PER PIXEL in coord mondo
+  (game/renderer.py _floor_color/_moss_at/_mud_at; game/map_renderer.py
+  _build_floor/_scatter_detail): palette cupa e desaturata (base #2E4A33, scuro
+  #233B29, chiaro #3A5A3C, muschio #4A6B3A, terra #5A4A35, fango #3E3527). Il
+  colore NON e piu per tile: _build_floor campiona una maschera a bassa
+  risoluzione (k=2 campioni/tile) in coordinate MONDO e la scala con
+  smoothscale -> un'unica immagine continua, chiazze organiche che attraversano
+  i tile senza cuciture ne "mattonelle"; muschio/fango usano due ottave con
+  soglia -> bordi irregolari e sfumati. I dettagli (ciuffi d'erba, fiocchi,
+  granelli) si disegnano sull'immagine prima del blit, saltando i tile dei
+  sentieri e il fango nudo. Screenshot: screenshots/step_3.png.
+- Sentieri come STRISCE continue (game/map_renderer.py _compute_paths/
+  _stroke_paths/_catmull): la BFS multi-sorgente dai tile-lane da, per ogni
+  campo, il percorso piu corto che aggira muri ed evita l'acqua; i punti si
+  uniscono con una spline Catmull-Rom, deformata con rumore in perpendicolare,
+  e si disegna una striscia con profilo sfumato (cerchi concentrici dal bordo
+  trasparente al nucleo secco DIRT_DRY, largo 1-2 tile variabile). La terra
+  resta solo sui tile d'erba (gli altri tile vengono ritagliati dalla striscia)
+  e sui sentieri NON si disegnano fili d'erba. Puramente grafico. I campi
+  arrivano via MapRenderer.set_camps(camps), chiamato dalle scene.
   Screenshot: screenshots/step_4.png.
+- Cespugli ricolorati coi toni della giungla (BUSH_* in renderer.py: base
+  #1F3B24, luce #3E6B3A, cresta non-lime): armonia con la nuova palette, in
+  attesa del rifacimento completo delle chiome (passo futuro).
+- Lane desaturata (LANE_* verso il grigio-bruno) e bordo lane<->erba IRREGOLARE
+  (_shore_overlay kind path/fringe, per-tile via _edge_variant): frontiera
+  ondulata (due seni + rumore) con ciuffi d'erba che invadono la terra battuta.
 
 Scelte tecniche importanti:
 - canopy e lighting_overlay sono RISERVATI e per ora VUOTI: la resa resta

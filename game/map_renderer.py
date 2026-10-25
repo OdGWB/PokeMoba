@@ -25,6 +25,10 @@ Le prime quattro si disegnano sotto le unita (`draw`), le ultime due sopra
 """
 from __future__ import annotations
 
+import math
+import random
+from collections import deque
+
 import pygame
 
 import config
@@ -168,7 +172,22 @@ class MapRenderer:
         p = self.painter
         tiles = grid.tiles
 
-        # --- Passata 1: terreno piatto (ground) + rive/bordi/griglia (decor) --
+        # --- Sentieri: calcolati PRIMA del suolo, così i fili d'erba non si
+        #     disegnano sul tracciato (set dei tile coperti dai sentieri).
+        routes, path_tiles = self._compute_paths(grid)
+
+        # --- Passata 1a: suolo di giungla ORGANICO, calcolato per pixel in
+        #     coordinate mondo (maschera a bassa risoluzione + smoothscale):
+        #     un'unica immagine continua, senza cuciture di tile. I dettagli
+        #     (ciuffi d'erba, fiocchi di muschio, granelli di fango) si disegnano
+        #     sopra, saltando i tile dei sentieri.
+        floor_img = self._build_floor(grid, p)
+        self._scatter_detail(grid, floor_img, p, path_tiles)
+        ground.blit(floor_img, (0, top))
+
+        # --- Passata 1b: tile speciali (lane/acqua) sopra il suolo + rive/bordi/
+        #     griglia sul decor. I tile "alti" (muri/cespugli) lasciano il suolo
+        #     sotto e si disegnano dopo in walls_base.
         for ty in range(Ht):
             row = tiles[ty]
             for tx in range(Wt):
@@ -177,21 +196,15 @@ class MapRenderer:
                 t = row[tx]
                 h = (tx * 73856093) ^ (ty * 19349663)
                 g = TILE_FLOOR if t in TALL_TILES else t
-                if g == TILE_FLOOR:
-                    c00 = p._grass_corner(tx, ty)
-                    c10 = p._grass_corner(tx + 1, ty)
-                    c01 = p._grass_corner(tx, ty + 1)
-                    c11 = p._grass_corner(tx + 1, ty + 1)
-                    ground.blit(p._grass_surf(c00, c10, c01, c11), (ax, ay))
-                else:
+                if g != TILE_FLOOR:
                     variant = (h >> 4) & 3
                     ground.blit(p._tile_surf(g, variant), (ax, ay))
                 p._shore(decor, grid, tx, ty, ax, ay, g, t)
                 if config.SHOW_GRID_LINES:
                     decor.blit(self._grid_line_sprite(), (ax, ay))
 
-        # --- Sentieri di terra battuta: dai campi della giungla alle lane -----
-        self._paint_paths(grid, decor, p)
+        # --- Sentieri di terra battuta: strisce continue (spline) camp->lane --
+        self._stroke_paths(decor, grid, routes, p)
 
         # --- Passata ombre: un muro proietta ombra a sud/est sul terreno ------
         def is_wall(x, y):
@@ -248,28 +261,75 @@ class MapRenderer:
 
         self._grid = grid
 
-    def _paint_paths(self, grid, decor, p) -> None:
-        """Traccia sentieri di terra battuta che collegano ogni campo alla lane
-        più vicina. Il percorso segue il terreno (aggira i muri, evita l'acqua),
-        quindi è naturalmente irregolare; la terra si timbra solo sui tile
-        d'erba, con pennelli morbidi sovrapposti (bordi sfumati, largo 1-2 tile).
-        È puramente grafico: i tipi di tile non cambiano."""
-        if not self._camps:
-            return
-        from collections import deque
+    # --- Suolo organico (rumore per pixel in coord mondo) --------------------
+    def _build_floor(self, grid, p) -> pygame.Surface:
+        """Immagine del suolo di giungla a piena mappa: colore (verde + muschio +
+        fango) calcolato a BASSA RISOLUZIONE in coordinate mondo e poi scalato
+        con smoothscale. Così le chiazze sono organiche e attraversano i tile
+        senza cuciture; la bassa risoluzione tiene il costo basso (una volta)."""
         ts = self.tile_size
-        top = self._top
+        Wt, Ht = grid.width, grid.height
+        k = 2                              # campioni per tile (poi smoothscale)
+        sw, sh = Wt * k + 1, Ht * k + 1
+        small = pygame.Surface((sw, sh))
+        for sy in range(sh):
+            ty = sy / k
+            for sx in range(sw):
+                small.set_at((sx, sy), p._floor_color(sx / k, ty))
+        return pygame.transform.smoothscale(small, (Wt * ts, Ht * ts))
+
+    def _scatter_detail(self, grid, floor_img, p, path_tiles) -> None:
+        """Dettagli sul suolo (in coordinate MONDO, disegnati sull'immagine del
+        suolo prima del blit): ciuffi d'erba sul verde (NON sui sentieri né sul
+        fango nudo), fiocchi di muschio e granelli di fango dove le chiazze sono
+        dense."""
+        from game.renderer import (GRASS_TUFT_LIGHT, GRASS_TUFT_DARK,
+                                    MOSS_FLECK_L, MOSS_FLECK_D, MUD_SPECK)
+        ts = self.tile_size
+        Wt, Ht = grid.width, grid.height
+        tiles = grid.tiles
+        for ty in range(Ht):
+            row = tiles[ty]
+            for tx in range(Wt):
+                if row[tx] in TALL_TILES or row[tx] != TILE_FLOOR:
+                    continue
+                cx0, cy0 = tx * ts, ty * ts
+                rng = random.Random(((tx * 73856093) ^ (ty * 19349663)) & 0xFFFFFFFF)
+                mu = p._mud_at(tx + 0.5, ty + 0.5)
+                mo = p._moss_at(tx + 0.5, ty + 0.5)
+                on_path = (tx, ty) in path_tiles
+                if not on_path and mu < 0.5:    # fili d'erba (non sul sentiero)
+                    for _ in range(rng.randint(2, 4)):
+                        x = cx0 + rng.randint(2, ts - 2)
+                        y = cy0 + rng.randint(ts // 2, ts - 2)
+                        hgt = rng.randint(2, max(3, ts // 4))
+                        c = GRASS_TUFT_LIGHT if rng.random() < 0.6 else GRASS_TUFT_DARK
+                        pygame.draw.line(floor_img, c, (x, y), (x, y - hgt), 1)
+                if mo > 0.3:
+                    for _ in range(rng.randint(1, 3)):
+                        x = cx0 + rng.randint(1, ts - 2); y = cy0 + rng.randint(1, ts - 2)
+                        floor_img.set_at((x, y), MOSS_FLECK_L if rng.random() < 0.5 else MOSS_FLECK_D)
+                if mu > 0.35:
+                    for _ in range(rng.randint(1, 3)):
+                        x = cx0 + rng.randint(1, ts - 2); y = cy0 + rng.randint(1, ts - 2)
+                        floor_img.set_at((x, y), MUD_SPECK)
+
+    # --- Sentieri di terra battuta (strisce continue spline) -----------------
+    def _compute_paths(self, grid):
+        """BFS multi-sorgente dai tile-lane -> per ogni campo il percorso più
+        corto alla lane (aggira i muri, evita l'acqua). Ritorna (routes,
+        path_tiles): le rotte in tile e l'insieme dei tile coperti (centro + 1
+        anello) per non disegnarci sopra i fili d'erba."""
+        routes, path_tiles = [], set()
+        if not self._camps:
+            return routes, path_tiles
         Wt, Ht = grid.width, grid.height
         tiles = grid.tiles
 
         def walk(x, y):
-            # Terreno su cui un sentiero può correre: erba, lane (sorgenti),
-            # cespugli. L'acqua e i muri NO -> la terra resta sulla terra.
             return (0 <= x < Wt and 0 <= y < Ht
                     and tiles[y][x] in (TILE_FLOOR, TILE_LANE, TILE_BUSH))
 
-        # BFS multi-sorgente da TUTTI i tile-lane: per ogni tile raggiungibile
-        # memorizza il passo verso la lane più vicina (gradiente di distanza).
         parent = {}
         dq = deque()
         has_lane = False
@@ -278,10 +338,10 @@ class MapRenderer:
             for x in range(Wt):
                 if row[x] == TILE_LANE:
                     has_lane = True
-                    parent[(x, y)] = None     # sorgente
+                    parent[(x, y)] = None
                     dq.append((x, y))
         if not has_lane:
-            return
+            return routes, path_tiles
         NB = ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1))
         while dq:
             cx, cy = dq.popleft()
@@ -289,38 +349,116 @@ class MapRenderer:
                 nx, ny = cx + dx, cy + dy
                 if (nx, ny) in parent or not walk(nx, ny):
                     continue
-                if dx and dy:   # niente taglio d'angolo tra i muri
-                    if not (walk(cx + dx, cy) and walk(cx, cy + dy)):
-                        continue
+                if dx and dy and not (walk(cx + dx, cy) and walk(cx, cy + dy)):
+                    continue
                 parent[(nx, ny)] = (cx, cy)
                 dq.append((nx, ny))
 
-        hashed = 0
-        for ci, (camp_x, camp_y) in enumerate(self._camps):
+        for camp_x, camp_y in self._camps:
             start = (int(camp_x), int(camp_y))
             if start not in parent:
                 continue
-            # Risali il gradiente fino a una lane: ecco il sentiero.
-            route = []
-            cur = start
-            guard = 0
+            route, cur, guard = [], start, 0
             while cur is not None and guard < Wt * Ht:
                 route.append(cur)
                 cur = parent.get(cur)
                 guard += 1
-            for tx, ty in route:
-                if tiles[ty][tx] != TILE_FLOOR:
-                    continue        # terra solo sull'erba (non su lane/cespuglio)
-                h = ((tx * 73856093) ^ (ty * 19349663)) & 0x7FFFFFFF
-                r = int(ts * (0.78 + 0.22 * ((h >> 3) & 1)))   # 0.78..1.0 tile
-                variant = (h >> 5) & 7
-                jx = ((h >> 8) & 3) - 1
-                jy = ((h >> 10) & 3) - 1
-                stamp = p._dirt_stamp(r, variant)
-                cx = tx * ts + ts // 2 + jx
-                cy = ty * ts + ts // 2 + top + jy
-                decor.blit(stamp, (cx - r, cy - r))
-                hashed += 1
+            if len(route) < 2:
+                continue
+            routes.append(route)
+            for tx, ty in route:                 # centro + 1 anello -> larghezza
+                for ox in (-1, 0, 1):
+                    for oy in (-1, 0, 1):
+                        path_tiles.add((tx + ox, ty + oy))
+        return routes, path_tiles
+
+    @staticmethod
+    def _catmull(pts, spp):
+        """Curva Catmull-Rom attraverso `pts` (passa per i punti), `spp` campioni
+        per segmento -> una striscia morbida invece di una spezzata."""
+        if len(pts) < 2:
+            return list(pts)
+        P = [pts[0]] + list(pts) + [pts[-1]]
+        out = []
+        for i in range(1, len(P) - 2):
+            p0, p1, p2, p3 = P[i - 1], P[i], P[i + 1], P[i + 2]
+            for s in range(spp):
+                t = s / spp
+                t2 = t * t; t3 = t2 * t
+                x = 0.5 * (2 * p1[0] + (-p0[0] + p2[0]) * t
+                           + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2
+                           + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3)
+                y = 0.5 * (2 * p1[1] + (-p0[1] + p2[1]) * t
+                           + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2
+                           + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3)
+                out.append((x, y))
+        out.append(pts[-1])
+        return out
+
+    def _stroke_paths(self, decor, grid, routes, p) -> None:
+        """Disegna ogni rotta come una STRISCIA continua di terra battuta: spline
+        tra i punti, deformata con rumore; profilo sfumato (nucleo pieno + bordi
+        trasparenti, largo 1-2 tile). La terra resta solo sui tile d'erba (i tile
+        non-erba vengono ritagliati dalla striscia)."""
+        if not routes:
+            return
+        from game.renderer import JUNGLE_DIRT, DIRT_DRY
+        ts = self.tile_size
+        top = self._top
+        Wt, Ht = grid.width, grid.height
+        tiles = grid.tiles
+        # Profilo del pennello: (raggio in frazioni di tile, colore, alpha), dal
+        # bordo morbido al nucleo secco. Disegnati dal largo al stretto: i cerchi
+        # stretti (opachi) coprono il centro, quelli larghi restano ai bordi.
+        prof = [(0.95, JUNGLE_DIRT, 55), (0.66, JUNGLE_DIRT, 140),
+                (0.45, DIRT_DRY, 205), (0.28, DIRT_DRY, 240)]
+
+        for route in routes:
+            # Punti di controllo: centri tile, sottocampionati, + estremo lane.
+            pts = [(tx * ts + ts / 2, ty * ts + ts / 2) for (tx, ty) in route]
+            ctrl = pts[::2]
+            if ctrl[-1] != pts[-1]:
+                ctrl.append(pts[-1])
+            curve = self._catmull(ctrl, 8)
+            if len(curve) < 2:
+                continue
+            # Deformazione con rumore: sposta ogni punto in perpendicolare.
+            amp = ts * 0.45
+            samp = []
+            for i, (x, y) in enumerate(curve):
+                px, py = curve[max(0, i - 1)]
+                nx, ny = curve[min(len(curve) - 1, i + 1)]
+                tgx, tgy = nx - px, ny - py
+                tl = math.hypot(tgx, tgy) or 1.0
+                perp = (-tgy / tl, tgx / tl)
+                d = (p._vnoise(x / 34.0, y / 34.0) - 0.5) * 2.0 * amp
+                samp.append((x + perp[0] * d, y + perp[1] * d))
+            # Bounding box + margine per il pennello.
+            marg = int(ts * 1.1)
+            xs = [q[0] for q in samp]; ys = [q[1] for q in samp]
+            bx0 = max(0, int(min(xs)) - marg); by0 = max(0, int(min(ys)) - marg)
+            bx1 = min(Wt * ts, int(max(xs)) + marg); by1 = min(Ht * ts, int(max(ys)) + marg)
+            bw, bh = bx1 - bx0, by1 - by0
+            if bw <= 0 or bh <= 0:
+                continue
+            ribbon = pygame.Surface((bw, bh), pygame.SRCALPHA)
+            ph = (hash(route[0]) & 0xFFFF) / 0xFFFF * math.tau
+            for frac, col, a in prof:
+                rgba = (col[0], col[1], col[2], a)
+                for i, (x, y) in enumerate(samp):
+                    # Larghezza variabile lungo il percorso (1-2 tile).
+                    wscale = 0.8 + 0.4 * (0.5 + 0.5 * math.sin(i * 0.12 + ph))
+                    r = max(1, int(ts * frac * wscale))
+                    pygame.draw.circle(ribbon, rgba, (int(x - bx0), int(y - by0)), r)
+            # Ritaglio: la terra resta solo sui tile d'erba (via gli altri).
+            tx0, ty0 = bx0 // ts, by0 // ts
+            tx1, ty1 = (bx1 - 1) // ts + 1, (by1 - 1) // ts + 1
+            clear = (0, 0, 0, 0)
+            for ty in range(ty0, ty1):
+                for tx in range(tx0, tx1):
+                    if not (0 <= tx < Wt and 0 <= ty < Ht) or tiles[ty][tx] != TILE_FLOOR:
+                        ribbon.fill(clear, pygame.Rect(tx * ts - bx0, ty * ts - by0, ts, ts))
+            decor.blit(ribbon, (bx0, by0 + top))
 
     def _grid_line_sprite(self):
         if self._grid_sprite is None:

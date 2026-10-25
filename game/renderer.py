@@ -35,9 +35,10 @@ COL_GRID = (0, 0, 0)
 # --- Palette "texture" procedurali (strada 1): niente asset esterni, solo
 #     draw-call rese stabili con un seed per-tile e messe in cache. ------------
 # Suolo di giungla: un terreno UNICO, cupo e desaturato, verso il verde-blu.
-# Il colore varia con rumore a DUE scale campionato sugli ANGOLI dei tile
-# (condivisi coi vicini): la tinta è continua attraverso i bordi -> niente
-# "mattonelle"; a questo si sommano chiazze organiche di muschio e di fango.
+# Il colore (verde a due scale + chiazze di muschio/fango) è calcolato PER PIXEL
+# in coordinate MONDO (non per tile): il MapRenderer campiona una maschera a
+# bassa risoluzione e la scala con smoothscale -> chiazze organiche che
+# attraversano i tile senza cuciture né "mattonelle", fango dai bordi irregolari.
 # Palette giungla (cupa, desaturata).
 JUNGLE_BASE = (46, 74, 51)       # #2E4A33 base
 JUNGLE_DARK = (35, 59, 41)       # #233B29 avvallamento in ombra
@@ -48,12 +49,8 @@ JUNGLE_MUD = (62, 53, 39)        # #3E3527 fango
 DIRT_DRY = (112, 93, 66)         # battuto secco e chiaro (nucleo calpestato)
 GRASS_LO = JUNGLE_DARK           # avvallamento in ombra
 GRASS_HI = JUNGLE_LIGHT          # dosso illuminato
-GRASS_CELL = 4.0                 # scala fine delle chiazze di tinta (in tile)
+GRASS_CELL = 4.0                 # scala fine della tinta (in tile)
 GRASS_CELL2 = 9.0                # scala larga (seconda ottava) -> dossi ampi
-PATCH_CELL = 6.5                 # scala delle chiazze di muschio/fango (in tile)
-GRASS_QUANT = 9                  # livelli di tinta (passi piccoli -> no banding)
-MOSS_QUANT = 4                   # livelli di densità del muschio
-MUD_QUANT = 4                    # livelli di densità del fango
 GRASS_TUFT_LIGHT = (84, 116, 70)
 GRASS_TUFT_DARK = (30, 54, 38)
 MOSS_FLECK_L = (96, 128, 66)     # fiocco di muschio chiaro
@@ -68,20 +65,25 @@ WATER_SHALLOW = (92, 156, 170)   # bassofondo chiaro verso la riva
 SHORE_SAND = (112, 130, 96)      # fango/sabbia bagnata sulla riva (lato terra)
 SHORE_WET = (74, 104, 86)        # terra bagnata scura proprio al contatto
 # Corsia.
-LANE_BASE = (150, 134, 92)
-LANE_SPECK_L = (170, 154, 110)
-LANE_SPECK_D = (126, 110, 74)
-PATH_EDGE = (126, 116, 80)       # terra battuta sul bordo erba -> lane
-GRASS_FRINGE = (58, 98, 60)      # erba che invade il bordo della lane
+# Corsia: terra battuta DESATURATA (tirata verso il grigio-bruno) così non
+# stona con la giungla cupa; il bordo contro l'erba è reso irregolare in _shore.
+LANE_BASE = (138, 126, 99)
+LANE_SPECK_L = (156, 144, 116)
+LANE_SPECK_D = (114, 103, 80)
+PATH_EDGE = (108, 91, 65)        # terra battuta sul bordo erba -> lane
+GRASS_FRINGE = (54, 86, 52)      # erba (giungla) che invade il bordo della lane
 # Cespuglio (2.5D): chiome a cupola illuminate dall'alto-sinistra. Verdi
 # saturi, dal fondo in ombra profonda alla cresta brillante.
-BUSH_SHADOW = (10, 30, 16)       # fondo chioma, in ombra profonda
-BUSH_DARK = (18, 52, 28)         # base foglia
-BUSH_MID = (36, 84, 42)          # foglia a mezza luce
-BUSH_LIGHT = (78, 140, 66)       # foglia illuminata
-BUSH_HILITE = (134, 196, 104)    # colpo di luce sulla cupola
-BUSH_RIMLIGHT = (158, 212, 128)  # cresta brillante sul bordo alto esposto
-BUSH_RIM = (6, 22, 13)           # contorno/contatto scuro alla base
+# Chiome con toni di giungla (desaturati, niente verde-lime): dal fondo in ombra
+# profonda alla cresta appena accesa. Rifacimento completo rimandato a un passo
+# futuro; per ora si armonizzano con la nuova palette del suolo.
+BUSH_SHADOW = (13, 29, 17)       # fondo chioma, in ombra profonda
+BUSH_DARK = (31, 59, 36)         # base foglia (#1F3B24)
+BUSH_MID = (46, 83, 47)          # foglia a mezza luce
+BUSH_LIGHT = (62, 107, 58)       # foglia illuminata (#3E6B3A)
+BUSH_HILITE = (84, 128, 74)      # colpo di luce sulla cupola
+BUSH_RIMLIGHT = (104, 146, 86)   # cresta sul bordo alto esposto (giungla, non lime)
+BUSH_RIM = (8, 20, 12)           # contorno/contatto scuro alla base
 BUSH_CONTACT = (0, 0, 0, 110)    # ombra proiettata sull'erba (radica a terra)
 # Muro di confine (TILE_WALL): pietra grigia fredda (resta un muro costruito).
 STONE_WALL = ((118, 120, 130), (70, 72, 82), (40, 42, 50), (52, 54, 62))
@@ -213,139 +215,41 @@ class Renderer:
         n2 = self._vnoise((cx + 40) / GRASS_CELL2, (cy + 40) / GRASS_CELL2)
         return 0.62 * n1 + 0.38 * n2
 
-    def _grass_corner(self, cx: int, cy: int):
-        """Firma del suolo a un ANGOLO di tile: (tinta verde, muschio, fango),
-        tutte quantizzate. Gli angoli sono condivisi tra tile adiacenti ->
-        colore e chiazze continui attraverso i bordi (nessun seam); la
-        quantizzazione tiene piccola la cache degli sprite."""
-        tint = int(round(self._two_octave(cx, cy) * GRASS_QUANT))
-        # Muschio e fango: rumore a bassa frequenza con soglia -> chiazze larghe
-        # e sparse invece di una coltre uniforme; i bordi sfumano da soli grazie
-        # all'interpolazione bilineare tra gli angoli nel build.
-        m = self._vnoise((cx + 123) / PATCH_CELL, (cy + 77) / PATCH_CELL)
-        moss = int(round(max(0.0, (m - 0.56) / 0.44) * MOSS_QUANT))
-        d = self._vnoise((cx + 311) / (PATCH_CELL + 1.5), (cy + 517) / (PATCH_CELL + 1.5))
-        mud = int(round(max(0.0, (d - 0.60) / 0.40) * MUD_QUANT))
-        return (tint, moss, mud)
+    def _moss_at(self, tx: float, ty: float) -> float:
+        """Densità di muschio in coord MONDO (in tile), 0..1. Due ottave: una
+        larga per la forma della chiazza + una fine che increspa il bordo ->
+        contorni organici e irregolari (non cerchi). Campionata per pixel dal
+        MapRenderer su una maschera a bassa risoluzione, poi smoothscaled."""
+        a = self._vnoise((tx + 123) / 6.5, (ty + 77) / 6.5)
+        b = self._vnoise((tx + 123) / 2.4, (ty + 77) / 2.4)
+        n = a * 0.74 + b * 0.26
+        return max(0.0, min(1.0, (n - 0.55) / 0.22))
 
-    def _grass_surf(self, c00: int, c10: int, c01: int, c11: int) -> pygame.Surface:
-        ts = self.tile_size
-        key = (ts, "grass", c00, c10, c01, c11)
-        s = self._tile_cache.get(key)
-        if s is None:
-            s = self._build_grass(ts, c00, c10, c01, c11)
-            self._tile_cache[key] = s
-        return s
+    def _mud_at(self, tx: float, ty: float) -> float:
+        """Densità di fango in coord MONDO (in tile), 0..1, con bordi irregolari
+        e sfumati (ottava fine che deforma la soglia). Vedi _moss_at."""
+        a = self._vnoise((tx + 311) / 7.5, (ty + 517) / 7.5)
+        b = self._vnoise((tx + 311) / 2.7, (ty + 517) / 2.7)
+        n = a * 0.72 + b * 0.28
+        return max(0.0, min(1.0, (n - 0.60) / 0.17))
 
-    def _build_grass(self, ts, q00, q10, q01, q11) -> pygame.Surface:
-        """Tile di suolo: gradiente verde (tinta a due scale) + chiazze di
-        muschio e fango, il tutto interpolato dai 4 angoli -> bordi sfumati e
-        continuità coi tile vicini. Ogni angolo è (tinta, muschio, fango)."""
-        def green(q):
-            f = q / GRASS_QUANT
-            return tuple(GRASS_LO[i] + (GRASS_HI[i] - GRASS_LO[i]) * f for i in range(3))
-        g00, g10, g01, g11 = (green(q00[0]), green(q10[0]), green(q01[0]), green(q11[0]))
-        mo = (q00[1], q10[1], q01[1], q11[1])   # muschio ai 4 angoli
-        mu = (q00[2], q10[2], q01[2], q11[2])   # fango ai 4 angoli
-        surf = pygame.Surface((ts, ts))
-        den = max(1, ts - 1)
-        for y in range(ts):
-            fy = y / den
-            lr = tuple(g00[i] + (g01[i] - g00[i]) * fy for i in range(3))
-            rr = tuple(g10[i] + (g11[i] - g10[i]) * fy for i in range(3))
-            moL = mo[0] + (mo[2] - mo[0]) * fy; moR = mo[1] + (mo[3] - mo[1]) * fy
-            muL = mu[0] + (mu[2] - mu[0]) * fy; muR = mu[1] + (mu[3] - mu[1]) * fy
-            for x in range(ts):
-                fx = x / den
-                r = lr[0] + (rr[0] - lr[0]) * fx
-                g = lr[1] + (rr[1] - lr[1]) * fx
-                b = lr[2] + (rr[2] - lr[2]) * fx
-                mossf = (moL + (moR - moL) * fx) / MOSS_QUANT
-                if mossf > 0:
-                    k = mossf * 0.65
-                    r += (JUNGLE_MOSS[0] - r) * k
-                    g += (JUNGLE_MOSS[1] - g) * k
-                    b += (JUNGLE_MOSS[2] - b) * k
-                mudf = (muL + (muR - muL) * fx) / MUD_QUANT
-                if mudf > 0:
-                    k = mudf * 0.9
-                    r += (JUNGLE_MUD[0] - r) * k
-                    g += (JUNGLE_MUD[1] - g) * k
-                    b += (JUNGLE_MUD[2] - b) * k
-                surf.set_at((x, y), (int(r), int(g), int(b)))
-        rng = random.Random(hash((q00, q10, q01, q11)) & 0xFFFFFFFF)
-        avg_mud = sum(mu) / (4 * MUD_QUANT)
-        avg_moss = sum(mo) / (4 * MOSS_QUANT)
-        # Ciuffetti sottili d'erba: vita sul verde, ma spariscono sul fango nudo.
-        if avg_mud < 0.5:
-            for _ in range(rng.randint(3, 5)):
-                x = rng.randint(2, ts - 2)
-                y = rng.randint(ts // 2, ts - 2)
-                hgt = rng.randint(2, max(3, ts // 4))
-                c = GRASS_TUFT_LIGHT if rng.random() < 0.6 else GRASS_TUFT_DARK
-                pygame.draw.line(surf, c, (x, y), (x, y - hgt), 1)
-        # Fiocchi di muschio dove la chiazza è densa; granelli dove c'è fango.
-        if avg_moss > 0.25:
-            for _ in range(rng.randint(2, 4)):
-                x = rng.randint(1, ts - 2); y = rng.randint(1, ts - 2)
-                c = MOSS_FLECK_L if rng.random() < 0.5 else MOSS_FLECK_D
-                pygame.draw.circle(surf, c, (x, y), 1)
-        if avg_mud > 0.3:
-            for _ in range(rng.randint(2, 4)):
-                x = rng.randint(1, ts - 2); y = rng.randint(1, ts - 2)
-                pygame.draw.circle(surf, MUD_SPECK, (x, y), 1)
-        return surf
-
-    # --- Sentiero di terra battuta: pennello morbido e irregolare ------------
-    def _dirt_stamp(self, r: int, variant: int) -> pygame.Surface:
-        """Macchia di terra battuta con bordo IRREGOLARE e sfumato (cache per
-        (raggio, variante)). Usata a timbro lungo i sentieri camp->lane: dischi
-        sovrapposti -> una striscia continua ma dal profilo mosso, non una
-        riga retta."""
-        ts = self.tile_size
-        key = (ts, "dirt", r, variant)
-        s = self._tile_cache.get(key)
-        if s is not None:
-            return s
-        d = 2 * r + 1
-        s = pygame.Surface((d, d), pygame.SRCALPHA)
-        rng = random.Random((variant * 2654435761 ^ 0x9E) & 0xFFFFFFFF)
-        p1 = rng.uniform(0, math.tau); p2 = rng.uniform(0, math.tau)
-        for y in range(d):
-            dy = y - r
-            for x in range(d):
-                dx = x - r
-                dist = math.hypot(dx, dy)
-                if dist < 1e-3:
-                    ang = 0.0
-                else:
-                    ang = math.atan2(dy, dx)
-                # Raggio modulato dall'angolo -> contorno bitorzoluto (no cerchio).
-                rr = r * (1.0 + 0.20 * math.sin(ang * 3 + p1) + 0.12 * math.sin(ang * 5 + p2))
-                if dist > rr:
-                    continue
-                f = dist / rr                      # 0 centro .. 1 bordo
-                a = int(228 * (1 - f) ** 1.35)     # nucleo pieno, sfuma al bordo
-                if a <= 0:
-                    continue
-                # Terra battuta: nucleo secco e chiaro (calpestato), poi terra più
-                # scura verso il bordo umido -> stacca dall'erba, bordi morbidi.
-                base = DIRT_DRY if f < 0.45 else JUNGLE_DIRT
-                j = rng.randint(-7, 7)
-                col = (max(0, min(255, base[0] + j)),
-                       max(0, min(255, base[1] + j)),
-                       max(0, min(255, base[2] + j)), a)
-                s.set_at((x, y), col)
-        # Qualche sassolino/granello sul battuto.
-        for _ in range(rng.randint(3, 6)):
-            px = rng.randint(1, d - 2); py = rng.randint(1, d - 2)
-            if math.hypot(px - r, py - r) > r * 0.8:
-                continue
-            c = MUD_SPECK if rng.random() < 0.5 else (JUNGLE_DIRT[0] + 14,
-                                                      JUNGLE_DIRT[1] + 12, JUNGLE_DIRT[2] + 10)
-            s.set_at((px, py), (c[0], c[1], c[2], 150))
-        self._tile_cache[key] = s
-        return s
+    def _floor_color(self, tx: float, ty: float):
+        """Colore del suolo in un punto MONDO (coord in tile): verde a due scale
+        + chiazze di muschio e fango. Tutto continuo nello spazio mondo, quindi
+        indipendente dalla griglia dei tile (nessuna cucitura)."""
+        t = self._two_octave(tx, ty)
+        r = GRASS_LO[0] + (GRASS_HI[0] - GRASS_LO[0]) * t
+        g = GRASS_LO[1] + (GRASS_HI[1] - GRASS_LO[1]) * t
+        b = GRASS_LO[2] + (GRASS_HI[2] - GRASS_LO[2]) * t
+        mo = self._moss_at(tx, ty)
+        if mo > 0:
+            k = mo * 0.6
+            r += (JUNGLE_MOSS[0] - r) * k; g += (JUNGLE_MOSS[1] - g) * k; b += (JUNGLE_MOSS[2] - b) * k
+        mu = self._mud_at(tx, ty)
+        if mu > 0:
+            k = mu * 0.92
+            r += (JUNGLE_MUD[0] - r) * k; g += (JUNGLE_MUD[1] - g) * k; b += (JUNGLE_MUD[2] - b) * k
+        return (int(r), int(g), int(b))
 
     # --- Cespuglio connesso (neighbor-aware): un blocco = un'unica chioma -----
     def _bush_surf(self, mask: int, variant: int, H: int) -> pygame.Surface:
@@ -736,27 +640,79 @@ class Renderer:
             # Lane <-> erba: bordo sfumato (terra battuta sull'erba, erba che
             # invade la lane) -> il sentiero si fonde con la giungla.
             elif t == TILE_LANE and nb == TILE_FLOOR:
-                surface.blit(self._shore_overlay(side, "fringe"), (sx, sy))
+                surface.blit(self._shore_overlay(side, "fringe", self._edge_variant(tx, ty)), (sx, sy))
             elif ground == TILE_FLOOR and nb == TILE_LANE:
-                surface.blit(self._shore_overlay(side, "path"), (sx, sy))
+                surface.blit(self._shore_overlay(side, "path", self._edge_variant(tx, ty)), (sx, sy))
 
-    def _shore_overlay(self, side: str, kind: str) -> pygame.Surface:
+    @staticmethod
+    def _edge_variant(tx: int, ty: int) -> int:
+        """Poche varianti per tile del bordo lane<->erba: così il profilo mosso
+        cambia da un tile all'altro e la linea lunga non sembra dritta/ripetuta."""
+        return (((tx * 73856093) ^ (ty * 19349663)) >> 7) & 7
+
+    def _shore_overlay(self, side: str, kind: str, variant: int = 0) -> pygame.Surface:
         """Striscia-riva sfumata perpendicolare al bordo `side` del tile.
 
         kind='water': schiuma al contatto -> bassofondo chiaro -> trasparente.
         kind='land' : terra bagnata scura al contatto -> sabbia -> trasparente.
+        kind='path'/'fringe': bordo lane<->erba IRREGOLARE (frontiera ondulata +
+          erba a ciuffi che invade la terra), diverso per `variant`.
         """
         ts = self.tile_size
-        key = (ts, "shore", side, kind)
+        key = (ts, "shore", side, kind, variant)
         s = self._tile_cache.get(key)
         if s is not None:
             return s
         s = pygame.Surface((ts, ts), pygame.SRCALPHA)
-        deep = kind in ("water", "land")
-        depth = max(5, int(ts * (0.55 if deep else 0.42)))
-        rng = random.Random(hash((side, kind)) & 0xFFFF)
-        for i in range(depth):                 # i = distanza dal bordo
-            f = i / depth                      # 0 al bordo .. 1 all'interno
+
+        def pt(along, into):                   # coord dal bordo `side`
+            if side == "N":
+                return (along, into)
+            if side == "S":
+                return (along, ts - 1 - into)
+            if side == "W":
+                return (into, along)
+            return (ts - 1 - into, along)       # E
+
+        if kind in ("path", "fringe"):
+            # Bordo lane<->erba irregolare: per ogni colonna una profondità
+            # ondulata (seno + rumore) -> frontiera mossa, non una riga retta;
+            # dentro, terra/erba che sfuma; oltre, ciuffi d'erba che si diradano.
+            base = PATH_EDGE if kind == "path" else GRASS_FRINGE
+            amax = 150 if kind == "path" else 180
+            maxd = max(6, int(ts * (0.82 if kind == "fringe" else 0.6)))
+            rng = random.Random((hash((side, kind, variant)) & 0xFFFFFFFF))
+            ph = rng.uniform(0.0, math.tau); ph2 = rng.uniform(0.0, math.tau)
+            for along in range(ts):
+                # Frontiera molto ondulata (due seni a frequenze diverse + rumore).
+                w = (0.42 + 0.30 * math.sin(along * 0.5 + ph)
+                     + 0.16 * math.sin(along * 1.3 + ph2) + rng.random() * 0.22)
+                da = max(1, int(maxd * max(0.1, min(1.0, w))))
+                for into in range(da):
+                    a = int(amax * (1 - into / da) ** 1.3)
+                    if a <= 0:
+                        continue
+                    s.set_at(pt(along, into), (base[0], base[1], base[2], a))
+                if kind == "fringe":
+                    # Ciuffi d'erba che sconfinano oltre la frontiera (si diradano).
+                    if rng.random() < 0.65:
+                        blade = rng.randint(2, 6)
+                        c = GRASS_TUFT_LIGHT if rng.random() < 0.5 else GRASS_FRINGE
+                        for into in range(da, min(maxd, da + blade)):
+                            fade = 1 - (into - da) / max(1, blade)
+                            s.set_at(pt(along, into), (c[0], c[1], c[2], int(170 * fade)))
+                else:
+                    if rng.random() < 0.3:      # granello di terra sull'erba
+                        s.set_at(pt(along, da + rng.randint(0, 2)), (base[0], base[1], base[2], 120))
+            self._tile_cache[key] = s
+            return s
+
+        # kind water/land: fascia sfumata dritta (il contatto con l'acqua resta
+        # morbido ma regolare).
+        deep = True
+        depth = max(5, int(ts * 0.55))
+        for i in range(depth):
+            f = i / depth
             if kind == "water":
                 if i == 0:
                     col = (*WATER_FOAM, 170)
@@ -764,15 +720,11 @@ class Renderer:
                     col = (*WATER_SHALLOW, 150)
                 else:
                     col = (*WATER_SHALLOW, int(140 * (1 - f) ** 1.3))
-            elif kind == "land":
+            else:  # land
                 if i <= 1:
                     col = (*SHORE_WET, int(185 * (1 - f)))
                 else:
                     col = (*SHORE_SAND, int(165 * (1 - f) ** 1.25))
-            elif kind == "path":        # bordo erba: terra battuta che sfuma
-                col = (*PATH_EDGE, int(135 * (1 - f) ** 1.3))
-            else:                       # "fringe" -> erba che invade la lane
-                col = (*GRASS_FRINGE, int(150 * (1 - f) ** 1.4))
             if side == "N":
                 pygame.draw.line(s, col, (0, i), (ts, i))
             elif side == "S":
@@ -781,28 +733,6 @@ class Renderer:
                 pygame.draw.line(s, col, (i, 0), (i, ts))
             else:  # E
                 pygame.draw.line(s, col, (ts - 1 - i, 0), (ts - 1 - i, ts))
-
-        # Bordo irregolare lane<->erba: ciuffi/granelli che rompono la linea
-        # retta, così il passaggio sembra naturale e non una fascia netta.
-        if kind in ("path", "fringe"):
-            def pt(along, into):               # coord dal bordo `side`
-                if side == "N":
-                    return (along, into)
-                if side == "S":
-                    return (along, ts - 1 - into)
-                if side == "W":
-                    return (into, along)
-                return (ts - 1 - into, along)   # E
-            for _ in range(rng.randint(5, 8)):
-                a = rng.randint(0, ts - 1)
-                into = rng.randint(1, depth)
-                if kind == "fringe":           # ciuffo d'erba verso la lane
-                    c = GRASS_TUFT_LIGHT if rng.random() < 0.5 else GRASS_FRINGE
-                    x0, y0 = pt(a, into)
-                    x1, y1 = pt(a, max(0, into - rng.randint(2, 3)))
-                    pygame.draw.line(s, c, (x0, y0), (x1, y1), 1)
-                else:                          # granello di terra sull'erba
-                    pygame.draw.circle(s, PATH_EDGE, pt(a, into), 1)
         self._tile_cache[key] = s
         return s
 
