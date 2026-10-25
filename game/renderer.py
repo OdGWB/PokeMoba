@@ -34,16 +34,30 @@ COL_GRID = (0, 0, 0)
 
 # --- Palette "texture" procedurali (strada 1): niente asset esterni, solo
 #     draw-call rese stabili con un seed per-tile e messe in cache. ------------
-# Erba / pavimento giungla: un prato UNICO. Il colore varia con un rumore a
-# bassa frequenza campionato sugli ANGOLI dei tile (condivisi coi vicini): la
-# tinta è continua attraverso i bordi -> niente "mattonelle", dossi e
-# avvallamenti morbidi che attraversano più tile in armonia.
-GRASS_LO = (44, 80, 52)          # avvallamento in ombra
-GRASS_HI = (66, 108, 72)         # dosso illuminato
-GRASS_CELL = 3.8                 # ampiezza delle chiazze del prato (in tile)
+# Suolo di giungla: un terreno UNICO, cupo e desaturato, verso il verde-blu.
+# Il colore varia con rumore a DUE scale campionato sugli ANGOLI dei tile
+# (condivisi coi vicini): la tinta è continua attraverso i bordi -> niente
+# "mattonelle"; a questo si sommano chiazze organiche di muschio e di fango.
+# Palette giungla (cupa, desaturata).
+JUNGLE_BASE = (46, 74, 51)       # #2E4A33 base
+JUNGLE_DARK = (35, 59, 41)       # #233B29 avvallamento in ombra
+JUNGLE_LIGHT = (58, 90, 60)      # #3A5A3C dosso illuminato
+JUNGLE_MOSS = (74, 107, 58)      # #4A6B3A muschio
+JUNGLE_DIRT = (90, 74, 53)       # #5A4A35 terra/sentiero
+JUNGLE_MUD = (62, 53, 39)        # #3E3527 fango
+GRASS_LO = JUNGLE_DARK           # avvallamento in ombra
+GRASS_HI = JUNGLE_LIGHT          # dosso illuminato
+GRASS_CELL = 4.0                 # scala fine delle chiazze di tinta (in tile)
+GRASS_CELL2 = 9.0                # scala larga (seconda ottava) -> dossi ampi
+PATCH_CELL = 6.5                 # scala delle chiazze di muschio/fango (in tile)
 GRASS_QUANT = 9                  # livelli di tinta (passi piccoli -> no banding)
-GRASS_TUFT_LIGHT = (90, 134, 82)
-GRASS_TUFT_DARK = (38, 72, 46)
+MOSS_QUANT = 4                   # livelli di densità del muschio
+MUD_QUANT = 4                    # livelli di densità del fango
+GRASS_TUFT_LIGHT = (84, 116, 70)
+GRASS_TUFT_DARK = (30, 54, 38)
+MOSS_FLECK_L = (96, 128, 66)     # fiocco di muschio chiaro
+MOSS_FLECK_D = (54, 82, 46)      # fiocco di muschio scuro
+MUD_SPECK = (74, 64, 48)         # sassolino/granello sul fango
 # Acqua: fiume continuo. Colore quasi piatto (pochi seam) + corrente diagonale.
 WATER_DEEP = (40, 86, 128)
 WATER_MID = (52, 104, 146)
@@ -191,11 +205,27 @@ class Renderer:
         bot = c + (d - c) * sx
         return top + (bot - top) * sy
 
-    def _grass_corner(self, cx: int, cy: int) -> int:
-        """Tinta dell'erba a un ANGOLO di tile, quantizzata. Gli angoli sono
-        condivisi tra tile adiacenti -> colore continuo, nessun seam."""
-        n = self._vnoise(cx / GRASS_CELL, cy / GRASS_CELL)
-        return int(round(n * GRASS_QUANT))
+    def _two_octave(self, cx: int, cy: int) -> float:
+        """Rumore a due scale: una fine (dossi stretti) + una larga (ondulazioni
+        ampie). Combinate -> variazione organica, senza pattern a griglia."""
+        n1 = self._vnoise(cx / GRASS_CELL, cy / GRASS_CELL)
+        n2 = self._vnoise((cx + 40) / GRASS_CELL2, (cy + 40) / GRASS_CELL2)
+        return 0.62 * n1 + 0.38 * n2
+
+    def _grass_corner(self, cx: int, cy: int):
+        """Firma del suolo a un ANGOLO di tile: (tinta verde, muschio, fango),
+        tutte quantizzate. Gli angoli sono condivisi tra tile adiacenti ->
+        colore e chiazze continui attraverso i bordi (nessun seam); la
+        quantizzazione tiene piccola la cache degli sprite."""
+        tint = int(round(self._two_octave(cx, cy) * GRASS_QUANT))
+        # Muschio e fango: rumore a bassa frequenza con soglia -> chiazze larghe
+        # e sparse invece di una coltre uniforme; i bordi sfumano da soli grazie
+        # all'interpolazione bilineare tra gli angoli nel build.
+        m = self._vnoise((cx + 123) / PATCH_CELL, (cy + 77) / PATCH_CELL)
+        moss = int(round(max(0.0, (m - 0.56) / 0.44) * MOSS_QUANT))
+        d = self._vnoise((cx + 311) / (PATCH_CELL + 1.5), (cy + 517) / (PATCH_CELL + 1.5))
+        mud = int(round(max(0.0, (d - 0.60) / 0.40) * MUD_QUANT))
+        return (tint, moss, mud)
 
     def _grass_surf(self, c00: int, c10: int, c01: int, c11: int) -> pygame.Surface:
         ts = self.tile_size
@@ -207,30 +237,62 @@ class Renderer:
         return s
 
     def _build_grass(self, ts, q00, q10, q01, q11) -> pygame.Surface:
-        def col(q):
+        """Tile di suolo: gradiente verde (tinta a due scale) + chiazze di
+        muschio e fango, il tutto interpolato dai 4 angoli -> bordi sfumati e
+        continuità coi tile vicini. Ogni angolo è (tinta, muschio, fango)."""
+        def green(q):
             f = q / GRASS_QUANT
-            return tuple(int(GRASS_LO[i] + (GRASS_HI[i] - GRASS_LO[i]) * f)
-                         for i in range(3))
-        k00, k10, k01, k11 = col(q00), col(q10), col(q01), col(q11)
+            return tuple(GRASS_LO[i] + (GRASS_HI[i] - GRASS_LO[i]) * f for i in range(3))
+        g00, g10, g01, g11 = (green(q00[0]), green(q10[0]), green(q01[0]), green(q11[0]))
+        mo = (q00[1], q10[1], q01[1], q11[1])   # muschio ai 4 angoli
+        mu = (q00[2], q10[2], q01[2], q11[2])   # fango ai 4 angoli
         surf = pygame.Surface((ts, ts))
         den = max(1, ts - 1)
         for y in range(ts):
             fy = y / den
-            lr = tuple(k00[i] + (k01[i] - k00[i]) * fy for i in range(3))
-            rr = tuple(k10[i] + (k11[i] - k10[i]) * fy for i in range(3))
+            lr = tuple(g00[i] + (g01[i] - g00[i]) * fy for i in range(3))
+            rr = tuple(g10[i] + (g11[i] - g10[i]) * fy for i in range(3))
+            moL = mo[0] + (mo[2] - mo[0]) * fy; moR = mo[1] + (mo[3] - mo[1]) * fy
+            muL = mu[0] + (mu[2] - mu[0]) * fy; muR = mu[1] + (mu[3] - mu[1]) * fy
             for x in range(ts):
                 fx = x / den
-                surf.set_at((x, y), (int(lr[0] + (rr[0] - lr[0]) * fx),
-                                     int(lr[1] + (rr[1] - lr[1]) * fx),
-                                     int(lr[2] + (rr[2] - lr[2]) * fx)))
-        rng = random.Random((q00 * 131 + q10 * 17 + q01 * 7 + q11) & 0xFFFFFFFF)
-        # Ciuffetti sottili: danno vita senza rompere l'uniformità del prato.
-        for _ in range(rng.randint(3, 5)):
-            x = rng.randint(2, ts - 2)
-            y = rng.randint(ts // 2, ts - 2)
-            hgt = rng.randint(2, max(3, ts // 4))
-            c = GRASS_TUFT_LIGHT if rng.random() < 0.6 else GRASS_TUFT_DARK
-            pygame.draw.line(surf, c, (x, y), (x, y - hgt), 1)
+                r = lr[0] + (rr[0] - lr[0]) * fx
+                g = lr[1] + (rr[1] - lr[1]) * fx
+                b = lr[2] + (rr[2] - lr[2]) * fx
+                mossf = (moL + (moR - moL) * fx) / MOSS_QUANT
+                if mossf > 0:
+                    k = mossf * 0.65
+                    r += (JUNGLE_MOSS[0] - r) * k
+                    g += (JUNGLE_MOSS[1] - g) * k
+                    b += (JUNGLE_MOSS[2] - b) * k
+                mudf = (muL + (muR - muL) * fx) / MUD_QUANT
+                if mudf > 0:
+                    k = mudf * 0.9
+                    r += (JUNGLE_MUD[0] - r) * k
+                    g += (JUNGLE_MUD[1] - g) * k
+                    b += (JUNGLE_MUD[2] - b) * k
+                surf.set_at((x, y), (int(r), int(g), int(b)))
+        rng = random.Random(hash((q00, q10, q01, q11)) & 0xFFFFFFFF)
+        avg_mud = sum(mu) / (4 * MUD_QUANT)
+        avg_moss = sum(mo) / (4 * MOSS_QUANT)
+        # Ciuffetti sottili d'erba: vita sul verde, ma spariscono sul fango nudo.
+        if avg_mud < 0.5:
+            for _ in range(rng.randint(3, 5)):
+                x = rng.randint(2, ts - 2)
+                y = rng.randint(ts // 2, ts - 2)
+                hgt = rng.randint(2, max(3, ts // 4))
+                c = GRASS_TUFT_LIGHT if rng.random() < 0.6 else GRASS_TUFT_DARK
+                pygame.draw.line(surf, c, (x, y), (x, y - hgt), 1)
+        # Fiocchi di muschio dove la chiazza è densa; granelli dove c'è fango.
+        if avg_moss > 0.25:
+            for _ in range(rng.randint(2, 4)):
+                x = rng.randint(1, ts - 2); y = rng.randint(1, ts - 2)
+                c = MOSS_FLECK_L if rng.random() < 0.5 else MOSS_FLECK_D
+                pygame.draw.circle(surf, c, (x, y), 1)
+        if avg_mud > 0.3:
+            for _ in range(rng.randint(2, 4)):
+                x = rng.randint(1, ts - 2); y = rng.randint(1, ts - 2)
+                pygame.draw.circle(surf, MUD_SPECK, (x, y), 1)
         return surf
 
     # --- Cespuglio connesso (neighbor-aware): un blocco = un'unica chioma -----
