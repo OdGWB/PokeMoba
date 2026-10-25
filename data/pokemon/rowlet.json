@@ -1,0 +1,99 @@
+{
+  "_comment": "Rowlet->Dartrix->Decidueye: tiratore a distanza, danno fisico in auto, corpo fragile. Il tipo cambia: Rowlet/Dartrix Erba/Volante, Decidueye Erba/Spettro. hp = reale*7+200. Passiva Distacco. Range auto molto lungo (stile Jinx).",
+  "dex": 722,
+  "name": "Rowlet",
+  "types": ["Grass", "Flying"],
+  "role": "tiratore",
+  "color": [150, 110, 80],
+  "radius": 0.40,
+  "base_speed": 3.5,
+  "attack_range": 5.5,
+  "attack_cooldown": 1.0,
+  "sprite_dir": "assets/pokemon/0722",
+  "passive": "distacco",
+  "attack_fx": "arrow",
+
+  "base_stats": {"hp": 676, "attack": 55, "defense": 55, "sp_attack": 50, "sp_defense": 50, "speed": 42},
+  "growth":     {"hp": 32,  "attack": 3,  "defense": 2.5, "sp_attack": 2.5, "sp_defense": 2.5, "speed": 0},
+
+  "evolutions": [
+    {"stage": 0, "level": 1, "name": "Rowlet",    "dex": 722, "sprite_dir": "assets/pokemon/0722", "radius": 0.40,
+     "types": ["Grass", "Flying"],
+     "base_stats": {"hp": 676, "attack": 55, "defense": 55, "sp_attack": 50, "sp_defense": 50, "speed": 42},
+     "growth":     {"hp": 32,  "attack": 3,  "defense": 2.5, "sp_attack": 2.5, "sp_defense": 2.5, "speed": 0}},
+    {"stage": 1, "level": 4, "name": "Dartrix",   "dex": 723, "sprite_dir": "assets/pokemon/0723", "radius": 0.48,
+     "types": ["Grass", "Flying"],
+     "base_stats": {"hp": 746, "attack": 75, "defense": 75, "sp_attack": 70, "sp_defense": 70, "speed": 52},
+     "growth":     {"hp": 36,  "attack": 3.5, "defense": 3, "sp_attack": 3, "sp_defense": 3, "speed": 0}},
+    {"stage": 2, "level": 8, "name": "Decidueye", "dex": 724, "sprite_dir": "assets/pokemon/0724", "radius": 0.56,
+     "types": ["Grass", "Ghost"],
+     "base_stats": {"hp": 746, "attack": 107, "defense": 75, "sp_attack": 100, "sp_defense": 100, "speed": 70},
+     "growth":     {"hp": 36,  "attack": 4.5, "defense": 3, "sp_attack": 4, "sp_defense": 4, "speed": 0}}
+  ],
+
+  "moves": {
+    "Q": {
+      "base": {"id": "leafage", "name": "Fogliame", "type": "Grass", "category": "special", "shape": "projectile",
+               "fx": "arrow",
+               "target": "direction", "power": [55, 85, 115, 145], "ratio": 0.5,
+               "cooldown": [4.5, 4, 3.5, 3], "range": 8, "radius": 0.5, "speed": 12},
+      "upgrades": [
+        {"id": "leafblade", "name": "Foglielama", "type": "Grass", "category": "special", "shape": "fan",
+         "fx": "arrow",
+         "target": "direction", "power": [40, 65, 90, 115], "ratio": 0.35,
+         "cooldown": [6, 5.5, 5, 4.5], "range": 7, "radius": 0.5, "speed": 12, "spread": 16},
+        {"id": "gigadrain", "name": "Gigassorbimento", "type": "Grass", "category": "special", "shape": "projectile",
+         "fx": "drain",
+         "target": "direction", "power": [70, 110, 150, 190], "ratio": 0.55,
+         "cooldown": [7, 6.5, 6, 5.5], "range": 8, "radius": 0.6, "speed": 12,
+         "effects": {"heal_self_ratio": 0.35}}
+      ]
+    },
+    "W": {
+      "base": {"id": "astonish", "name": "Sgomento", "type": "Ghost", "category": "special", "shape": "projectile",
+               "fx": "arrow",
+               "target": "direction", "power": [40, 65, 90, 115], "ratio": 0.4,
+               "cooldown": [8, 7.5, 7, 6.5], "range": 7, "radius": 0.5, "speed": 13,
+               "effects": {"fear": {"duration": 1.0}}},
+      "upgrades": [
+        {"id": "phantomforce", "name": "Sbigoattacco", "type": "Ghost", "category": "special", "shape": "projectile",
+         "fx": "arrow",
+         "target": "direction", "power": [70, 110, 150, 190], "ratio": 0.5,
+         "cooldown": [7, 6.5, 6, 5.5], "range": 7, "radius": 0.5, "speed": 13,
+         "effects": {"bonus_vs_attacking": 1.8}},
+        {"id": "synthesis", "name": "Sintesi", "type": "Grass", "category": "none", "shape": "buff",
+         "target": "self", "cooldown": [16, 15, 14, 13],
+         "effects": {"heal": [120, 160, 200, 240], "weather_heal": true}}
+      ]
+    },
+    "E": {
+      "base": {"id": "featherdance", "name": "Danzadipiume", "type": "Grass", "category": "none", "shape": "area",
+               "target": "point", "power": [0, 0, 0, 0],
+               "cooldown": [10, 9, 8, 7], "range": 6, "radius": 2.2,
+               "effects": {"atk_debuff": {"amount": 25, "duration": 3.0}}},
+      "upgrades": [
+        {"id": "uturn", "name": "Retromarcia", "type": "Bug", "category": "physical", "shape": "dashback",
+         "target": "direction", "power": [60, 95, 130, 165], "ratio": 0.6,
+         "cooldown": [9, 8, 7, 6], "range": 4.5, "radius": 1.0, "recoil": 4.5},
+        {"id": "boomburst", "name": "Granvoce", "type": "Normal", "category": "none", "shape": "buff",
+         "target": "self", "cooldown": [14, 13, 12, 11],
+         "passive": {"stat": "sp_attack", "amount": [8, 16, 24, 32]},
+         "effects": {"atk": {"mult": 1.35, "duration": 5}}}
+      ]
+    },
+    "R": {
+      "upgrades": [
+        {"id": "spiritshackle", "name": "Cucitombra", "type": "Ghost", "category": "special", "shape": "projectile",
+         "fx": "arrow_big",
+         "target": "direction", "power": [220, 340, 460], "ratio": 0.6,
+         "cooldown": [100, 90, 80], "range": 14, "radius": 0.5, "speed": 16,
+         "effects": {"dashlock": {"stun": 0.8, "duration": 3.0}}},
+        {"id": "arrowrain", "name": "Pioggia di Frecce", "type": "Grass", "category": "special", "shape": "rain",
+         "fx": "arrow_rain",
+         "target": "point", "power": [60, 95, 130], "ratio": 0.3,
+         "cooldown": [90, 80, 70], "range": 12, "radius": 3.0,
+         "effects": {"delay": 1.0, "duration": 3.0, "slow": {"mult": 0.6, "duration": 0.6}}}
+      ]
+    }
+  }
+}

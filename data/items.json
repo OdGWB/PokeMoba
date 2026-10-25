@@ -1,0 +1,29 @@
+{
+  "_comment": "Oggetti PLACEHOLDER (Fase 6): servono a provare la meccanica (oro, negozio, slot, combinazioni). I bonus sono generici e provvisori; gli effetti precisi di ogni oggetto verranno decisi dopo, item per item, cambiando solo questo file. 'build_from' = componenti che si fondono nell'oggetto completo (il prezzo sconta i componenti già posseduti). Icone: assets/items/<id>.png (PokeAPI), altrimenti segnaposto colorato.",
+
+  "base": [
+    {"id": "muscle_band", "name": "Muscolbanda",  "price": 300, "stats": {"attack": 15}},
+    {"id": "wise_glasses","name": "Saggiocchiali", "price": 300, "stats": {"sp_attack": 18}},
+    {"id": "scope_lens",  "name": "Mirino",        "price": 300, "stats": {"attack": 8, "sp_attack": 8}},
+    {"id": "shell_bell",  "name": "Conchinella",   "price": 350, "stats": {"hp": 150}},
+    {"id": "berry",       "name": "Bacca",         "price": 250, "stats": {"hp": 120}}
+  ],
+
+  "completed": [
+    {"id": "choice_band",  "name": "Fascia Scelta",   "price": 1100, "build_from": ["muscle_band", "scope_lens"], "stats": {"attack": 45},                "note": "placeholder: offensivo fisico"},
+    {"id": "choice_specs", "name": "Lente Scelta",    "price": 1100, "build_from": ["wise_glasses", "scope_lens"], "stats": {"sp_attack": 55},             "note": "placeholder: offensivo speciale"},
+    {"id": "leftovers",    "name": "Avanzi",          "price": 1000, "build_from": ["berry", "shell_bell"],        "stats": {"hp": 350},                   "note": "placeholder: in futuro rigen"},
+    {"id": "assault_vest", "name": "Corpetto Assalto","price": 1050, "build_from": ["shell_bell"],                 "stats": {"hp": 250, "sp_defense": 30}, "note": "placeholder: tank speciale"},
+    {"id": "rocky_helmet", "name": "Bitorzolelmo",    "price": 1000, "build_from": ["shell_bell"],                 "stats": {"defense": 40, "hp": 150},    "note": "placeholder: in futuro danno a chi ti colpisce"},
+    {"id": "focus_sash",   "name": "Focalnastro",     "price": 900,  "build_from": ["berry"],                      "stats": {"hp": 180, "defense": 15},    "note": "placeholder: in futuro sopravvivi a un colpo letale"},
+    {"id": "quick_claw",   "name": "Rapidartigli",    "price": 950,  "build_from": ["scope_lens"],                 "stats": {"attack": 20, "sp_attack": 20}, "note": "placeholder: ibrido"}
+  ],
+
+  "recommended": {
+    "default": ["choice_band", "leftovers", "assault_vest"],
+    "combattente/mago": ["choice_specs", "choice_band", "focus_sash"],
+    "tank": ["assault_vest", "rocky_helmet", "leftovers"],
+    "mago/assassino": ["choice_specs", "quick_claw", "focus_sash"],
+    "supporto": ["leftovers", "assault_vest", "wise_glasses"]
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "_comment": "Statistiche convertite dalle base reali: hp = real*7 + 200; Att/Dif/AttSp/DifSp = valore reale; Vel = valore reale. Ogni stadio evolutivo ha le proprie statistiche (base_stats).",
+  "dex": 158,
+  "name": "Totodile",
+  "types": ["Water"],
+  "role": "combattente",
+  "color": [90, 150, 210],
+  "radius": 0.44,
+  "base_speed": 3.6,
+  "sprite_dir": "assets/pokemon/0158",
+  "passive": "forzabruta",
+
+  "base_stats": {"hp": 550, "attack": 65, "defense": 64, "sp_attack": 44, "sp_defense": 48, "speed": 43},
+  "growth":     {"hp": 35,  "attack": 3,  "defense": 3,  "sp_attack": 2,  "sp_defense": 2,  "speed": 0},
+
+  "evolutions": [
+    {"stage": 0, "level": 1, "name": "Totodile",   "dex": 158, "sprite_dir": "assets/pokemon/0158", "stat_mult": 1.0, "radius": 0.44,
+     "base_stats": {"hp": 550, "attack": 65, "defense": 64, "sp_attack": 44, "sp_defense": 48, "speed": 43},
+     "growth":     {"hp": 35,  "attack": 3,  "defense": 3,  "sp_attack": 2,  "sp_defense": 2,  "speed": 0}},
+    {"stage": 1, "level": 4, "name": "Croconaw",   "dex": 159, "sprite_dir": "assets/pokemon/0159", "stat_mult": 1.0, "radius": 0.52,
+     "base_stats": {"hp": 655, "attack": 80, "defense": 80, "sp_attack": 59, "sp_defense": 63, "speed": 58},
+     "growth":     {"hp": 38,  "attack": 3.2, "defense": 3.2, "sp_attack": 2.2, "sp_defense": 2.2, "speed": 0}},
+    {"stage": 2, "level": 8, "name": "Feraligatr", "dex": 160, "sprite_dir": "assets/pokemon/0160", "stat_mult": 1.0, "radius": 0.62,
+     "base_stats": {"hp": 795, "attack": 105, "defense": 100, "sp_attack": 79, "sp_defense": 83, "speed": 78},
+     "growth":     {"hp": 42,  "attack": 3.6, "defense": 3.4, "sp_attack": 2.4, "sp_defense": 2.4, "speed": 0}}
+  ],
+
+  "moves": {
+    "Q": {
+      "base": {"id": "watergun", "name": "Pistolacqua", "type": "Water", "category": "special", "shape": "projectile",
+               "target": "direction", "power": [55, 85, 115, 145], "ratio": 0.5,
+               "cooldown": [4.5, 4, 3.5, 3], "range": 7, "radius": 0.5, "speed": 11},
+      "upgrades": [
+        {"id": "hydropump", "name": "Idropompa", "type": "Water", "category": "special", "shape": "projectile",
+         "target": "direction", "power": [110, 160, 210, 260], "ratio": 0.75,
+         "cooldown": [7, 6.5, 6, 5.5], "range": 10, "radius": 0.6, "speed": 13},
+        {"id": "hydropulse", "name": "Idropulsar", "type": "Water", "category": "special", "shape": "bubble",
+         "target": "direction", "power": [80, 120, 160, 200], "ratio": 0.6,
+         "cooldown": [7, 6.5, 6, 5.5], "range": 8, "radius": 0.7, "speed": 9,
+         "effects": {"confuse": {"duration": 0.9}}}
+      ]
+    },
+    "W": {
+      "base": {"id": "bite", "name": "Morso", "type": "Dark", "category": "physical", "shape": "cone",
+               "target": "direction", "power": [55, 85, 115, 145], "ratio": 0.9,
+               "cooldown": [5, 4.5, 4, 3.5], "range": 2.3, "angle": 55,
+               "effects": {"stun": {"duration": 0.45}}},
+      "upgrades": [
+        {"id": "crunch", "name": "Sgranocchio", "type": "Dark", "category": "physical", "shape": "cone",
+         "target": "direction", "power": [90, 135, 180, 225], "ratio": 1.0,
+         "cooldown": [6, 5.5, 5, 4.5], "range": 2.6, "angle": 55,
+         "effects": {"def_debuff": {"amount": 25, "duration": 3.5}}},
+        {"id": "icefang", "name": "Gelodenti", "type": "Ice", "category": "none", "shape": "cone",
+         "target": "direction", "power": [0, 0, 0, 0],
+         "cooldown": [10, 9.5, 9, 8.5], "range": 2.6, "angle": 50,
+         "effects": {"freeze": {"duration": 1.4}}}
+      ]
+    },
+    "E": {
+      "base": {"id": "scaryface", "name": "Visotruce", "type": "Normal", "category": "none", "shape": "cone",
+               "target": "direction", "cooldown": [9, 8.5, 8, 7.5], "range": 4.2, "angle": 60,
+               "effects": {"slow": {"mult": 0.55, "duration": 1.6}}},
+      "upgrades": [
+        {"id": "dragondance", "name": "Dragodanza", "type": "Dragon", "category": "none", "shape": "buff",
+         "target": "self", "cooldown": [14, 13, 12, 11],
+         "effects": {"atk": {"mult": 1.4, "duration": 5}, "speed": {"mult": 1.3, "duration": 5}}},
+        {"id": "aquajet", "name": "Acquagetto", "type": "Water", "category": "physical", "shape": "dash",
+         "target": "direction", "power": [0, 0, 0, 0],
+         "cooldown": [7, 6.5, 6, 5.5], "range": 5.5, "radius": 1.0,
+         "effects": {"speed": {"mult": 1.2, "duration": 1.5}}}
+      ]
+    },
+    "R": {
+      "upgrades": [
+        {"id": "dig", "name": "SUB", "type": "Water", "category": "physical", "shape": "sub",
+         "target": "point", "power": [220, 330, 440], "ratio": 0.9,
+         "cooldown": [85, 75, 65], "range": 6.5, "radius": 2.3,
+         "_comment": "SUB: ci si inabissa (intargetabili) e si resta liberi di muoversi per 'duration' secondi; si riemerge a tempo o ri-premendo R, facendo danno ad area attorno al punto raggiunto.",
+         "effects": {"untargetable": {"duration": 3.0}}},
+        {"id": "outrage", "name": "Oltraggio", "type": "Dragon", "category": "none", "shape": "buff",
+         "target": "self", "cooldown": [90, 80, 70],
+         "effects": {"rampage": {"duration": 4}, "atk": {"mult": 1.3, "duration": 4},
+                     "speed": {"mult": 1.15, "duration": 4}}}
+      ]
+    }
+  }
+}

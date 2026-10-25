@@ -1,0 +1,89 @@
+{
+  "_comment": "Linea Gastly->Haunter->Gengar: mago/assassino, danno speciale, Spettro/Veleno. hp = reale*7+200; altre stat = valore reale. Passiva Corpofunesto (cariche d'anima).",
+  "dex": 92,
+  "name": "Gastly",
+  "types": ["Ghost", "Poison"],
+  "role": "mago",
+  "color": [150, 100, 205],
+  "radius": 0.42,
+  "base_speed": 3.8,
+  "sprite_dir": "assets/pokemon/0092",
+  "passive": "corpofunesto",
+
+  "base_stats": {"hp": 410, "attack": 35, "defense": 30, "sp_attack": 100, "sp_defense": 35, "speed": 80},
+  "growth":     {"hp": 30,  "attack": 2,  "defense": 2,  "sp_attack": 4,   "sp_defense": 2,  "speed": 0},
+
+  "evolutions": [
+    {"stage": 0, "level": 1, "name": "Gastly",  "dex": 92, "sprite_dir": "assets/pokemon/0092", "radius": 0.42,
+     "base_stats": {"hp": 410, "attack": 35, "defense": 30, "sp_attack": 100, "sp_defense": 35, "speed": 80},
+     "growth":     {"hp": 30,  "attack": 2,  "defense": 2,  "sp_attack": 4,   "sp_defense": 2,  "speed": 0}},
+    {"stage": 1, "level": 4, "name": "Haunter", "dex": 93, "sprite_dir": "assets/pokemon/0093", "radius": 0.50,
+     "base_stats": {"hp": 515, "attack": 50, "defense": 45, "sp_attack": 115, "sp_defense": 55, "speed": 95},
+     "growth":     {"hp": 34,  "attack": 2.2, "defense": 2.2, "sp_attack": 4.5, "sp_defense": 2.5, "speed": 0}},
+    {"stage": 2, "level": 8, "name": "Gengar",  "dex": 94, "sprite_dir": "assets/pokemon/0094", "radius": 0.58,
+     "base_stats": {"hp": 620, "attack": 65, "defense": 60, "sp_attack": 130, "sp_defense": 75, "speed": 110},
+     "growth":     {"hp": 40,  "attack": 2.4, "defense": 2.4, "sp_attack": 5,  "sp_defense": 3,  "speed": 0}}
+  ],
+
+  "moves": {
+    "Q": {
+      "base": {"id": "lick", "name": "Leccata", "type": "Ghost", "category": "physical", "shape": "cone",
+               "target": "direction", "power": [50, 80, 110, 140], "ratio": 0.6,
+               "cooldown": [5, 4.5, 4, 3.5], "range": 2.4, "angle": 50,
+               "effects": {"root": {"duration": 1.0}}},
+      "upgrades": [
+        {"id": "shadowball", "name": "Palla Ombra", "type": "Ghost", "category": "special", "shape": "bubble",
+         "target": "direction", "power": [70, 110, 150, 190], "ratio": 0.5,
+         "cooldown": [6, 5.5, 5, 4.5], "range": 8, "radius": 0.6, "speed": 12,
+         "effects": {"spdef_debuff": {"amount": 22, "duration": 2.0}}},
+        {"id": "curse_hit", "name": "Sciagura", "type": "Ghost", "category": "special", "shape": "projectile",
+         "target": "direction", "power": [60, 95, 130, 165], "ratio": 0.5,
+         "cooldown": [7, 6.5, 6, 5.5], "range": 8, "radius": 0.6, "speed": 12,
+         "effects": {"bonus_vs_status": 2.0}}
+      ]
+    },
+    "W": {
+      "base": {"id": "sludgewave", "name": "Velenoshock", "type": "Poison", "category": "special", "shape": "bolt",
+               "target": "point", "power": [25, 40, 55, 70], "ratio": 0.25,
+               "cooldown": [4, 3.7, 3.4, 3.1], "range": 5,
+               "effects": {"poison": {"dps": 22, "duration": 2.0}}},
+      "upgrades": [
+        {"id": "dreameater", "name": "Mangiasogni", "type": "Psychic", "category": "special", "shape": "bolt",
+         "target": "point", "power": [70, 110, 150, 190], "ratio": 0.6,
+         "cooldown": [8, 7.5, 7, 6.5], "range": 5.5,
+         "effects": {"requires_sleep": true, "bonus_vs_sleep": 2.0, "heal_self_ratio": 0.4}},
+        {"id": "sludgebomb", "name": "Fangobomba", "type": "Poison", "category": "special", "shape": "area",
+         "target": "point", "power": [50, 80, 110, 140], "ratio": 0.4,
+         "cooldown": [8, 7.5, 7, 6.5], "range": 7, "radius": 2.2,
+         "effects": {"poison": {"dps": 26, "duration": 2.0}}}
+      ]
+    },
+    "E": {
+      "base": {"id": "shadowsneak", "name": "Furtivombra", "type": "Ghost", "category": "none", "shape": "dash",
+               "target": "direction", "power": [0, 0, 0, 0],
+               "cooldown": [9, 8, 7, 6], "range": 5.5, "radius": 0.8, "wall_pierce": false,
+               "effects": {"speed": {"mult": 1.15, "duration": 1.0}}},
+      "upgrades": [
+        {"id": "hypnosis", "name": "Ipnosi", "type": "Psychic", "category": "none", "shape": "bubble",
+         "target": "direction", "power": [0, 0, 0, 0],
+         "cooldown": [14, 13, 12, 11], "range": 8, "radius": 0.6, "speed": 5,
+         "effects": {"sleep": {"duration": 1.8, "delay": 1.0}}},
+        {"id": "nastyplot", "name": "Congiura", "type": "Dark", "category": "none", "shape": "buff",
+         "target": "self", "cooldown": [14, 13, 12, 11],
+         "passive": {"stat": "sp_attack", "amount": [8, 16, 24, 32]},
+         "effects": {"atk": {"mult": 1.35, "duration": 5}, "speed": {"mult": 1.15, "duration": 5}}}
+      ]
+    },
+    "R": {
+      "upgrades": [
+        {"id": "curse_ult", "name": "Maledizione", "type": "Ghost", "category": "special", "shape": "curse",
+         "target": "point", "power": [250, 400, 550], "ratio": 0.8,
+         "cooldown": [100, 90, 80], "range": 8,
+         "effects": {"delay": 3.0, "charge_power": 3.0}},
+        {"id": "phantomdive", "name": "Spettrotuffo", "type": "Ghost", "category": "none", "shape": "blink",
+         "target": "point", "power": [0, 0, 0], "cooldown": [24, 22, 20], "range": 6,
+         "effects": {"return_delay": 1.5, "charge_range": 0.05}}
+      ]
+    }
+  }
+}

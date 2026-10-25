@@ -1,0 +1,8 @@
+# PokrLOL - dipendenze
+
+# Rendering, input, finestra.
+pygame-ce>=2.4
+
+# Serializzazione compatta per i messaggi di rete (Fase 5).
+# Opzionale: se assente, net/protocol.py ripiegherà su struct.
+# msgpack>=1.0
