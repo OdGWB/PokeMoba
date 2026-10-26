@@ -35,33 +35,37 @@ Passaggi completati:
     si alloca solo se ci si disegna dentro, e nel draw si blittano solo i
     chunk visibili (culling per chunk).
   Risultato: RAM 3v3 139->93 MB, 5v5 312->208 MB; draw() ~2-3x piu veloce.
-- Palette da giungla del suolo, rumore PER PIXEL in coord mondo
-  (game/renderer.py _floor_color/_moss_at/_mud_at; game/map_renderer.py
-  _build_floor/_scatter_detail): palette cupa e desaturata (base #2E4A33, scuro
-  #233B29, chiaro #3A5A3C, muschio #4A6B3A, terra #5A4A35, fango #3E3527). Il
-  colore NON e piu per tile: _build_floor campiona una maschera a bassa
-  risoluzione (k=2 campioni/tile) in coordinate MONDO e la scala con
-  smoothscale -> un'unica immagine continua, chiazze organiche che attraversano
-  i tile senza cuciture ne "mattonelle"; muschio/fango usano due ottave con
-  soglia -> bordi irregolari e sfumati. I dettagli (ciuffi d'erba, fiocchi,
-  granelli) si disegnano sull'immagine prima del blit, saltando i tile dei
-  sentieri e il fango nudo. Screenshot: screenshots/step_3.png.
-- Sentieri come STRISCE continue (game/map_renderer.py _compute_paths/
-  _stroke_paths/_catmull): la BFS multi-sorgente dai tile-lane da, per ogni
-  campo, il percorso piu corto che aggira muri ed evita l'acqua; i punti si
-  uniscono con una spline Catmull-Rom, deformata con rumore in perpendicolare,
-  e si disegna una striscia con profilo sfumato (cerchi concentrici dal bordo
-  trasparente al nucleo secco DIRT_DRY, largo 1-2 tile variabile). La terra
-  resta solo sui tile d'erba (gli altri tile vengono ritagliati dalla striscia)
-  e sui sentieri NON si disegnano fili d'erba. Puramente grafico. I campi
-  arrivano via MapRenderer.set_camps(camps), chiamato dalle scene.
-  Screenshot: screenshots/step_4.png.
+- Suolo di giungla PER PIXEL in coord mondo, bordi pixel-art (game/map_renderer.py
+  _build_floor con numpy; _np_vnoise/_np_tone/_np_moss/_np_mud; _BAYER): palette
+  cupa e desaturata (base #2E4A33, scuro #233B29, chiaro #3A5A3C, muschio
+  #4A6B3A, terra #5A4A35, fango #3E3527). Niente smoothscale: i campi di rumore
+  (tinta a 2 scale, muschio, fango) si calcolano a risoluzione ridotta (STEP=4
+  px) UNA volta e si interpolano (bilineare, numpy) a piena risoluzione per
+  strisce; il verde resta continuo, muschio e fango vengono QUANTIZZATI in 2-3
+  livelli coi confini sgranati a DITHERING di Bayer -> chiazze organiche che
+  attraversano i tile ma con bordi a gradini, non sfumati. Dettagli (ciuffi,
+  fiocchi, granelli) disegnati sopra, saltando i tile dei sentieri e il fango.
+  Costo una-tantum ~3-6s (solo al build; a frame solo blit). Screenshot:
+  screenshots/step_3.png.
+- Sentieri pixel-art a 3 livelli (game/map_renderer.py _compute_paths/
+  _stroke_paths/_catmull): Dijkstra multi-sorgente dai tile-lane con PENALITA'
+  per i tile adiacenti ai muri -> il sentiero resta in campo aperto e, se un muro
+  e vicino, gli corre ACCANTO (mai sotto); collega sempre campo<->lane (rotte
+  troppo corte scartate, niente vicoli ciechi). Spline Catmull-Rom deformata con
+  rumore, larghezza variabile (rumore, 1-2 tile). Profilo a 3 LIVELLI netti
+  (bordo scuro, terra, nucleo secco DIRT_DRY) col bordo esterno a 2 densita' di
+  DITHERING (niente sfumatura); sopra, ciuffi d'erba che invadono la terra,
+  sassolini e foglie. La terra resta solo sui tile d'erba (gli altri ritagliati)
+  e sul sentiero NON si disegnano fili d'erba. I campi arrivano via
+  MapRenderer.set_camps(camps). Screenshot: screenshots/step_4.png.
 - Cespugli ricolorati coi toni della giungla (BUSH_* in renderer.py: base
   #1F3B24, luce #3E6B3A, cresta non-lime): armonia con la nuova palette, in
   attesa del rifacimento completo delle chiome (passo futuro).
 - Lane desaturata (LANE_* verso il grigio-bruno) e bordo lane<->erba IRREGOLARE
-  (_shore_overlay kind path/fringe, per-tile via _edge_variant): frontiera
-  ondulata (due seni + rumore) con ciuffi d'erba che invadono la terra battuta.
+  OVUNQUE in stile pixel art (renderer.py _edge_overlay): la frontiera segue un
+  rumore in coordinate MONDO lungo il bordo -> continua e mossa attraverso tutti
+  i tile (mai dritta); transizione a gradini con dithering di Bayer (solido
+  vicino all'erba, stipple verso la terra) + ciuffi d'erba che invadono la lane.
 
 Scelte tecniche importanti:
 - canopy e lighting_overlay sono RISERVATI e per ora VUOTI: la resa resta

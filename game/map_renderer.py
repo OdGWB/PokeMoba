@@ -29,7 +29,9 @@ import math
 import random
 from collections import deque
 
+import numpy as np
 import pygame
+import pygame.surfarray
 
 import config
 from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
@@ -38,6 +40,45 @@ from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
 COL_GRID = (0, 0, 0)
 COL_BG = (18, 20, 24)            # sfondo (riempie il bordo del layer opaco)
 CHUNK = 1024                     # lato del chunk in pixel
+
+# Matrice di Bayer 4x4 (ordered dithering) in [0,1): soglia per-pixel con cui si
+# "sgranano" i confini tra i livelli di colore -> transizioni a gradini in stile
+# pixel art invece di sfumature morbide.
+_BAYER = np.array([[0, 8, 2, 10], [12, 4, 14, 6],
+                   [3, 11, 1, 9], [15, 7, 13, 5]], dtype=np.float32) / 16.0
+
+
+def _np_hash01(xi, yi):
+    """Hash deterministico vettoriale (uguale a Renderer._h01) -> [0,1]."""
+    h = (xi * 374761393 + yi * 668265263) & 0xFFFFFFFF
+    h = ((h ^ (h >> 13)) * 1274126177) & 0xFFFFFFFF
+    h = h ^ (h >> 16)
+    return (h & 0xFFFF).astype(np.float32) / 65535.0
+
+
+def _np_vnoise(X, Y):
+    """Value-noise bilineare vettoriale (uguale a Renderer._vnoise)."""
+    x0 = np.floor(X).astype(np.int64); y0 = np.floor(Y).astype(np.int64)
+    fx = (X - x0).astype(np.float32); fy = (Y - y0).astype(np.float32)
+    sx = fx * fx * (3 - 2 * fx); sy = fy * fy * (3 - 2 * fy)
+    a = _np_hash01(x0, y0); b = _np_hash01(x0 + 1, y0)
+    c = _np_hash01(x0, y0 + 1); d = _np_hash01(x0 + 1, y0 + 1)
+    top = a + (b - a) * sx; bot = c + (d - c) * sx
+    return top + (bot - top) * sy
+
+
+def _np_tone(TX, TY):      # verde a due scale (= Renderer._two_octave)
+    return 0.62 * _np_vnoise(TX / 4.0, TY / 4.0) + 0.38 * _np_vnoise((TX + 40) / 9.0, (TY + 40) / 9.0)
+
+
+def _np_moss(TX, TY):      # (= Renderer._moss_at)
+    n = _np_vnoise((TX + 123) / 6.5, (TY + 77) / 6.5) * 0.74 + _np_vnoise((TX + 123) / 2.4, (TY + 77) / 2.4) * 0.26
+    return np.clip((n - 0.55) / 0.22, 0.0, 1.0)
+
+
+def _np_mud(TX, TY):       # (= Renderer._mud_at)
+    n = _np_vnoise((TX + 311) / 7.5, (TY + 517) / 7.5) * 0.72 + _np_vnoise((TX + 311) / 2.7, (TY + 517) / 2.7) * 0.28
+    return np.clip((n - 0.60) / 0.17, 0.0, 1.0)
 
 # Tile "alti": resi come rilievi 2.5D estrusi verso l'alto (come nel Renderer).
 TALL_TILES = (TILE_WALL, TILE_JUNGLE_WALL, TILE_BUSH)
@@ -263,20 +304,67 @@ class MapRenderer:
 
     # --- Suolo organico (rumore per pixel in coord mondo) --------------------
     def _build_floor(self, grid, p) -> pygame.Surface:
-        """Immagine del suolo di giungla a piena mappa: colore (verde + muschio +
-        fango) calcolato a BASSA RISOLUZIONE in coordinate mondo e poi scalato
-        con smoothscale. Così le chiazze sono organiche e attraversano i tile
-        senza cuciture; la bassa risoluzione tiene il costo basso (una volta)."""
+        """Immagine del suolo di giungla a piena mappa, calcolata PER PIXEL in
+        coordinate mondo con numpy (niente smoothscale). Il verde a due scale
+        resta continuo; muschio e fango vengono QUANTIZZATI in 2-3 livelli e i
+        confini sono sgranati con dithering di Bayer -> chiazze organiche che
+        attraversano i tile ma con bordi a gradini in stile pixel art. Elaborata
+        a strisce orizzontali per non allocare array enormi (mappe grandi)."""
+        from game.renderer import GRASS_LO, GRASS_HI, JUNGLE_MOSS, JUNGLE_MUD
         ts = self.tile_size
         Wt, Ht = grid.width, grid.height
-        k = 2                              # campioni per tile (poi smoothscale)
-        sw, sh = Wt * k + 1, Ht * k + 1
-        small = pygame.Surface((sw, sh))
-        for sy in range(sh):
-            ty = sy / k
-            for sx in range(sw):
-                small.set_at((sx, sy), p._floor_color(sx / k, ty))
-        return pygame.transform.smoothscale(small, (Wt * ts, Ht * ts))
+        W, H = Wt * ts, Ht * ts
+        floor = pygame.Surface((W, H))
+        GLO = np.array(GRASS_LO, np.float32); GHI = np.array(GRASS_HI, np.float32)
+        MOSS = np.array(JUNGLE_MOSS, np.float32); MUD = np.array(JUNGLE_MUD, np.float32)
+        # Forza del livello di chiazza (0=niente .. pieno): pochi gradini netti.
+        MUD_STR = np.array([0.0, 0.5, 0.78, 1.0], np.float32)   # 3 livelli + 0
+        MOSS_STR = np.array([0.0, 0.42, 0.64], np.float32)      # 2 livelli + 0
+
+        # Le chiazze sono a BASSA frequenza: calcolo i campi di rumore (tinta,
+        # muschio, fango) a risoluzione ridotta UNA volta, poi li interpolo
+        # (bilineare) a piena risoluzione per strisce e quantizzo+dithero lì.
+        # Molto più veloce del rumore per pixel, resa identica.
+        STEP = 4
+        wl = W // STEP + 2; hl = H // STEP + 2
+        TXl = (np.arange(wl, dtype=np.float32) * STEP / ts)[None, :]
+        TYl = (np.arange(hl, dtype=np.float32) * STEP / ts)[:, None]
+        tone_l = _np_tone(TXl, TYl).astype(np.float32)
+        moss_l = _np_moss(TXl, TYl).astype(np.float32)
+        mud_l = _np_mud(TXl, TYl).astype(np.float32)
+        # Indici/pesi bilineari lungo X (una volta sola).
+        fx = np.arange(W, dtype=np.float32) / STEP
+        x0 = np.floor(fx).astype(np.int64); x1 = np.minimum(x0 + 1, wl - 1)
+        wx = (fx - x0)[None, :]
+        # Pre-interpola i campi lungo X (una volta sola): (hl, W) float32. Poi in
+        # ogni striscia resta solo l'interpolazione in Y, cheap.
+        def up_x(field):
+            return field[:, x0] * (1 - wx) + field[:, x1] * wx
+        tone_x = up_x(tone_l); moss_x = up_x(moss_l); mud_x = up_x(mud_l)
+        colx = np.arange(W) % 4
+        STRIP = 300
+        dst = pygame.surfarray.pixels3d(floor)            # vista (W, H, 3) uint8
+        for y0 in range(0, H, STRIP):
+            y1 = min(H, y0 + STRIP)
+            fy = np.arange(y0, y1, dtype=np.float32) / STEP
+            y0i = np.floor(fy).astype(np.int64); y1i = np.minimum(y0i + 1, hl - 1)
+            wy = (fy - y0i)[:, None]
+            bay = _BAYER[(np.arange(y0, y1)[:, None]) % 4, colx[None, :]]
+            tone = tone_x[y0i] * (1 - wy) + tone_x[y1i] * wy
+            r = GLO[0] + (GHI[0] - GLO[0]) * tone
+            g = GLO[1] + (GHI[1] - GLO[1]) * tone
+            b = GLO[2] + (GHI[2] - GLO[2]) * tone
+            moss = moss_x[y0i] * (1 - wy) + moss_x[y1i] * wy
+            ms = MOSS_STR[np.clip(np.floor(moss * 2.0 + bay), 0, 2).astype(np.int64)]
+            r += (MOSS[0] - r) * ms; g += (MOSS[1] - g) * ms; b += (MOSS[2] - b) * ms
+            mud = mud_x[y0i] * (1 - wy) + mud_x[y1i] * wy
+            mu = MUD_STR[np.clip(np.floor(mud * 3.0 + bay), 0, 3).astype(np.int64)]
+            r += (MUD[0] - r) * mu; g += (MUD[1] - g) * mu; b += (MUD[2] - b) * mu
+            dst[:, y0:y1, 0] = np.clip(r, 0, 255).T
+            dst[:, y0:y1, 1] = np.clip(g, 0, 255).T
+            dst[:, y0:y1, 2] = np.clip(b, 0, 255).T
+        del dst
+        return floor
 
     def _scatter_detail(self, grid, floor_img, p, path_tiles) -> None:
         """Dettagli sul suolo (in coordinate MONDO, disegnati sull'immagine del
@@ -316,43 +404,64 @@ class MapRenderer:
 
     # --- Sentieri di terra battuta (strisce continue spline) -----------------
     def _compute_paths(self, grid):
-        """BFS multi-sorgente dai tile-lane -> per ogni campo il percorso più
-        corto alla lane (aggira i muri, evita l'acqua). Ritorna (routes,
-        path_tiles): le rotte in tile e l'insieme dei tile coperti (centro + 1
-        anello) per non disegnarci sopra i fili d'erba."""
+        """Dijkstra multi-sorgente dai tile-lane -> per ogni campo il percorso
+        verso la lane più vicina. Il costo PENALIZZA i tile adiacenti ai muri:
+        così il sentiero preferisce il terreno aperto e, quando un muro è vicino,
+        gli corre ACCANTO invece di infilarsi contro (o sotto). Aggira i muri ed
+        evita l'acqua. Ritorna (routes, path_tiles): le rotte in tile e i tile
+        coperti (centro + 1 anello) per non disegnarci i fili d'erba."""
+        import heapq
         routes, path_tiles = [], set()
         if not self._camps:
             return routes, path_tiles
         Wt, Ht = grid.width, grid.height
         tiles = grid.tiles
+        walls = (TILE_WALL, TILE_JUNGLE_WALL)
 
         def walk(x, y):
             return (0 <= x < Wt and 0 <= y < Ht
                     and tiles[y][x] in (TILE_FLOOR, TILE_LANE, TILE_BUSH))
 
+        def near_wall(x, y):
+            for ox in (-1, 0, 1):
+                for oy in (-1, 0, 1):
+                    nx, ny = x + ox, y + oy
+                    if 0 <= nx < Wt and 0 <= ny < Ht and tiles[ny][nx] in walls:
+                        return True
+            return False
+
+        dist = {}
         parent = {}
-        dq = deque()
+        heap = []
         has_lane = False
         for y in range(Ht):
             row = tiles[y]
             for x in range(Wt):
                 if row[x] == TILE_LANE:
                     has_lane = True
+                    dist[(x, y)] = 0.0
                     parent[(x, y)] = None
-                    dq.append((x, y))
+                    heapq.heappush(heap, (0.0, x, y))
         if not has_lane:
             return routes, path_tiles
-        NB = ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1))
-        while dq:
-            cx, cy = dq.popleft()
-            for dx, dy in NB:
+        NB = ((1, 0, 1.0), (-1, 0, 1.0), (0, 1, 1.0), (0, -1, 1.0),
+              (1, 1, 1.4142), (1, -1, 1.4142), (-1, 1, 1.4142), (-1, -1, 1.4142))
+        WALL_PEN = 4.0
+        while heap:
+            d, cx, cy = heapq.heappop(heap)
+            if d > dist.get((cx, cy), 1e18):
+                continue
+            for dx, dy, cost in NB:
                 nx, ny = cx + dx, cy + dy
-                if (nx, ny) in parent or not walk(nx, ny):
+                if not walk(nx, ny):
                     continue
                 if dx and dy and not (walk(cx + dx, cy) and walk(cx, cy + dy)):
                     continue
-                parent[(nx, ny)] = (cx, cy)
-                dq.append((nx, ny))
+                nd = d + cost + (WALL_PEN if near_wall(nx, ny) else 0.0)
+                if nd < dist.get((nx, ny), 1e18):
+                    dist[(nx, ny)] = nd
+                    parent[(nx, ny)] = (cx, cy)
+                    heapq.heappush(heap, (nd, nx, ny))
 
         for camp_x, camp_y in self._camps:
             start = (int(camp_x), int(camp_y))
@@ -363,7 +472,7 @@ class MapRenderer:
                 route.append(cur)
                 cur = parent.get(cur)
                 guard += 1
-            if len(route) < 2:
+            if len(route) < 3:          # campo praticamente sulla lane: niente
                 continue
             routes.append(route)
             for tx, ty in route:                 # centro + 1 anello -> larghezza
@@ -396,25 +505,28 @@ class MapRenderer:
         return out
 
     def _stroke_paths(self, decor, grid, routes, p) -> None:
-        """Disegna ogni rotta come una STRISCIA continua di terra battuta: spline
-        tra i punti, deformata con rumore; profilo sfumato (nucleo pieno + bordi
-        trasparenti, largo 1-2 tile). La terra resta solo sui tile d'erba (i tile
-        non-erba vengono ritagliati dalla striscia)."""
+        """Disegna ogni rotta come una STRISCIA continua di terra battuta in stile
+        pixel art: spline deformata con rumore, larghezza variabile (rumore), e
+        profilo a 3 LIVELLI netti (bordo scuro, terra, nucleo secco) col BORDO
+        ESTERNO sgranato a dithering di Bayer (niente sfumatura morbida). Sopra:
+        ciuffi d'erba che invadono la terra, qualche sassolino e foglia. La terra
+        resta solo sui tile d'erba (gli altri tile vengono ritagliati)."""
         if not routes:
             return
-        from game.renderer import JUNGLE_DIRT, DIRT_DRY
+        import pygame.surfarray as sa
+        from game.renderer import (JUNGLE_DIRT, DIRT_DRY, GRASS_TUFT_LIGHT,
+                                    GRASS_FRINGE, BUSH_MID)
         ts = self.tile_size
         top = self._top
         Wt, Ht = grid.width, grid.height
         tiles = grid.tiles
-        # Profilo del pennello: (raggio in frazioni di tile, colore, alpha), dal
-        # bordo morbido al nucleo secco. Disegnati dal largo al stretto: i cerchi
-        # stretti (opachi) coprono il centro, quelli larghi restano ai bordi.
-        prof = [(0.95, JUNGLE_DIRT, 55), (0.66, JUNGLE_DIRT, 140),
-                (0.45, DIRT_DRY, 205), (0.28, DIRT_DRY, 240)]
+        DIRT = np.array(JUNGLE_DIRT, np.float32)
+        DRY = np.array(DIRT_DRY, np.float32)
+        EDGE = (np.array(JUNGLE_DIRT, np.float32) * 0.82)   # bordo umido più scuro
+        PEBBLE = ((72, 68, 62), (104, 98, 88))
+        LEAF = (BUSH_MID, (96, 104, 60))
 
         for route in routes:
-            # Punti di controllo: centri tile, sottocampionati, + estremo lane.
             pts = [(tx * ts + ts / 2, ty * ts + ts / 2) for (tx, ty) in route]
             ctrl = pts[::2]
             if ctrl[-1] != pts[-1]:
@@ -422,9 +534,9 @@ class MapRenderer:
             curve = self._catmull(ctrl, 8)
             if len(curve) < 2:
                 continue
-            # Deformazione con rumore: sposta ogni punto in perpendicolare.
+            seed = (hash(route[0]) & 0xFFFF)
             amp = ts * 0.45
-            samp = []
+            samp = []; perps = []; cr = []; mr = []; er = []
             for i, (x, y) in enumerate(curve):
                 px, py = curve[max(0, i - 1)]
                 nx, ny = curve[min(len(curve) - 1, i + 1)]
@@ -432,24 +544,69 @@ class MapRenderer:
                 tl = math.hypot(tgx, tgy) or 1.0
                 perp = (-tgy / tl, tgx / tl)
                 d = (p._vnoise(x / 34.0, y / 34.0) - 0.5) * 2.0 * amp
-                samp.append((x + perp[0] * d, y + perp[1] * d))
-            # Bounding box + margine per il pennello.
-            marg = int(ts * 1.1)
+                sx, sy = x + perp[0] * d, y + perp[1] * d
+                samp.append((sx, sy)); perps.append(perp)
+                # Larghezza variabile lungo il percorso (rumore): ~1-2 tile.
+                rm = 0.72 + 0.6 * p._vnoise(i * 0.5 + seed * 0.013, seed * 0.07)
+                cr.append(max(1, int(ts * 0.30 * rm)))
+                mr.append(max(1, int(ts * 0.52 * rm)))
+                er.append(max(1, int(ts * 0.74 * rm)))
+            marg = int(ts * 1.2)
             xs = [q[0] for q in samp]; ys = [q[1] for q in samp]
             bx0 = max(0, int(min(xs)) - marg); by0 = max(0, int(min(ys)) - marg)
             bx1 = min(Wt * ts, int(max(xs)) + marg); by1 = min(Ht * ts, int(max(ys)) + marg)
             bw, bh = bx1 - bx0, by1 - by0
             if bw <= 0 or bh <= 0:
                 continue
+
+            # Maschere piene dei 3 raggi (unione di dischi lungo il percorso).
+            temp = pygame.Surface((bw, bh))
+
+            def mask(radii):
+                temp.fill((0, 0, 0))
+                for (x, y), r in zip(samp, radii):
+                    pygame.draw.circle(temp, (255, 255, 255), (int(x - bx0), int(y - by0)), r)
+                return sa.array_red(temp) > 127
+
+            br = [(m + e) // 2 for m, e in zip(mr, er)]   # raggio intermedio del bordo
+            em = mask(er); bm = mask(br); mm = mask(mr); cm = mask(cr)
+            ax = (bx0 + np.arange(bw))[:, None]
+            ay = (by0 + np.arange(bh))[None, :]
+            bay = _BAYER[ay % 4, ax % 4]            # soglia di dithering per pixel
+            rgb = np.zeros((bw, bh, 3), np.float32)
+            alpha = np.zeros((bw, bh), np.float32)
+            edge_in = bm & ~mm                       # bordo interno: dither denso
+            edge_out = em & ~bm                      # bordo esterno: dither rado
+            mid_only = mm & ~cm
+            rgb[edge_in] = EDGE; alpha[edge_in & (bay < 0.62)] = 255
+            rgb[edge_out] = EDGE; alpha[edge_out & (bay < 0.32)] = 255
+            rgb[mid_only] = DIRT; alpha[mid_only] = 255
+            rgb[cm] = DRY; alpha[cm] = 255
             ribbon = pygame.Surface((bw, bh), pygame.SRCALPHA)
-            ph = (hash(route[0]) & 0xFFFF) / 0xFFFF * math.tau
-            for frac, col, a in prof:
-                rgba = (col[0], col[1], col[2], a)
-                for i, (x, y) in enumerate(samp):
-                    # Larghezza variabile lungo il percorso (1-2 tile).
-                    wscale = 0.8 + 0.4 * (0.5 + 0.5 * math.sin(i * 0.12 + ph))
-                    r = max(1, int(ts * frac * wscale))
-                    pygame.draw.circle(ribbon, rgba, (int(x - bx0), int(y - by0)), r)
+            v3 = sa.pixels3d(ribbon); v3[:] = np.clip(rgb, 0, 255).astype(np.uint8); del v3
+            va = sa.pixels_alpha(ribbon); va[:] = alpha.astype(np.uint8); del va
+
+            # Ciuffi d'erba che invadono la terra dal bordo + sassolini e foglie.
+            rng = random.Random(hash(route[-1]) & 0xFFFFFFFF)
+            for i in range(0, len(samp), 2):
+                x, y = samp[i]; pxp, pyp = perps[i]
+                if rng.random() < 0.5:               # ciuffo d'erba dal bordo verso l'interno
+                    side = 1 if rng.random() < 0.5 else -1
+                    ex = x + pxp * er[i] * side; ey = y + pyp * er[i] * side
+                    bl = rng.randint(2, 5)
+                    c = GRASS_TUFT_LIGHT if rng.random() < 0.5 else GRASS_FRINGE
+                    pygame.draw.line(ribbon, c, (int(ex - bx0), int(ey - by0)),
+                                     (int(ex - pxp * bl * side - bx0), int(ey - pyp * bl * side - by0)), 1)
+                if rng.random() < 0.45:              # sassolino o foglia sul battuto
+                    jx = rng.randint(-cr[i], cr[i]); jy = rng.randint(-cr[i], cr[i])
+                    qx, qy = int(x + jx - bx0), int(y + jy - by0)
+                    if 0 <= qx < bw and 0 <= qy < bh:
+                        if rng.random() < 0.6:
+                            pygame.draw.circle(ribbon, rng.choice(PEBBLE), (qx, qy), 1)
+                        else:
+                            lf = rng.choice(LEAF)
+                            pygame.draw.ellipse(ribbon, lf, pygame.Rect(qx, qy, 3, 2))
+
             # Ritaglio: la terra resta solo sui tile d'erba (via gli altri).
             tx0, ty0 = bx0 // ts, by0 // ts
             tx1, ty1 = (bx1 - 1) // ts + 1, (by1 - 1) // ts + 1

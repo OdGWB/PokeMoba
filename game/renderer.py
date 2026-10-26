@@ -31,6 +31,10 @@ TILE_COLORS = {
 }
 COL_WALL_TOP = (64, 66, 74)
 COL_GRID = (0, 0, 0)
+# Matrice di Bayer 4x4 (ordered dithering), valori in [0,1): soglia per-pixel per
+# le transizioni a gradini (bordo lane<->erba) in stile pixel art.
+_BAYER = [[v / 16.0 for v in row] for row in
+          ((0, 8, 2, 10), (12, 4, 14, 6), (3, 11, 1, 9), (15, 7, 13, 5))]
 
 # --- Palette "texture" procedurali (strada 1): niente asset esterni, solo
 #     draw-call rese stabili con un seed per-tile e messe in cache. ------------
@@ -640,15 +644,55 @@ class Renderer:
             # Lane <-> erba: bordo sfumato (terra battuta sull'erba, erba che
             # invade la lane) -> il sentiero si fonde con la giungla.
             elif t == TILE_LANE and nb == TILE_FLOOR:
-                surface.blit(self._shore_overlay(side, "fringe", self._edge_variant(tx, ty)), (sx, sy))
+                surface.blit(self._edge_overlay(side, "fringe", tx, ty), (sx, sy))
             elif ground == TILE_FLOOR and nb == TILE_LANE:
-                surface.blit(self._shore_overlay(side, "path", self._edge_variant(tx, ty)), (sx, sy))
+                surface.blit(self._edge_overlay(side, "path", tx, ty), (sx, sy))
 
-    @staticmethod
-    def _edge_variant(tx: int, ty: int) -> int:
-        """Poche varianti per tile del bordo lane<->erba: così il profilo mosso
-        cambia da un tile all'altro e la linea lunga non sembra dritta/ripetuta."""
-        return (((tx * 73856093) ^ (ty * 19349663)) >> 7) & 7
+    def _edge_overlay(self, side: str, kind: str, tx: int, ty: int) -> pygame.Surface:
+        """Bordo lane<->erba IRREGOLARE e in stile pixel art, costruito con la
+        posizione ASSOLUTA del tile: la frontiera segue un rumore in coordinate
+        MONDO lungo il bordo -> è continua e mossa attraverso tutti i tile (mai
+        dritta), diversa ovunque. La transizione è a GRADINI con dithering di
+        Bayer (solido vicino all'erba, stipple verso la terra), più ciuffi d'erba
+        che invadono la terra. kind='fringe' (erba che invade la lane) /
+        'path' (terra battuta che invade l'erba)."""
+        ts = self.tile_size
+        s = pygame.Surface((ts, ts), pygame.SRCALPHA)
+        base = PATH_EDGE if kind == "path" else GRASS_FRINGE
+        A = 200
+        maxd = max(3, int(ts * (0.85 if kind == "fringe" else 0.62)))
+
+        def pt(along, into):
+            if side == "N":
+                return (along, into)
+            if side == "S":
+                return (along, ts - 1 - into)
+            if side == "W":
+                return (into, along)
+            return (ts - 1 - into, along)           # E
+
+        horiz = side in ("N", "S")
+        rng = random.Random(((tx * 73856093) ^ (ty * 19349663)) & 0xFFFFFFFF)
+        for along in range(ts):
+            wc = (tx * ts + along) if horiz else (ty * ts + along)
+            n = (self._vnoise(wc / 17.0, 7.3) * 0.68
+                 + self._vnoise(wc / 5.5, 3.1) * 0.32)
+            da = max(2, int(maxd * (0.3 + 0.62 * n)))
+            for into in range(da):
+                x, y = pt(along, into)
+                cov = 1.0 - into / da                # 1 al bordo erba .. 0 frontiera
+                cov = round(cov * 2) / 2.0           # 2-3 livelli a gradini
+                wx, wy = tx * ts + x, ty * ts + y
+                if _BAYER[wy % 4][wx % 4] < cov:
+                    s.set_at((x, y), (base[0], base[1], base[2], A))
+            if kind == "fringe" and rng.random() < 0.6:
+                blade = rng.randint(2, 6)
+                c = GRASS_TUFT_LIGHT if rng.random() < 0.5 else GRASS_FRINGE
+                for into in range(da, min(maxd, da + blade)):
+                    if rng.random() < 0.7:
+                        x, y = pt(along, into)
+                        s.set_at((x, y), (c[0], c[1], c[2], 170))
+        return s
 
     def _shore_overlay(self, side: str, kind: str, variant: int = 0) -> pygame.Surface:
         """Striscia-riva sfumata perpendicolare al bordo `side` del tile.
