@@ -166,13 +166,39 @@ Passaggi completati:
   roccia, densita' di faccette/massi/muschio): niente piu macchie nere interne,
   basi/bordi curvi che seguono la maschera, superficie meno piatta. Screenshot:
   screenshots/step_9.png (diagonale lungo il fiume) e step_9_over.png (minimappa).
+- MURI DI GIUNGLA come RILIEVI pseudo-3D in stile LoL (game/map_renderer.py
+  _build_jungle_walls rifatto + nuovo _jungle_components; CANOPY_OUTLINE #12281A):
+  la cima NON e' piu roccia ma VEGETAZIONE. (1) CIMA vegetata: griglia di chiome
+  (passo ~0.48 tile, solo celle SOLID via meshgrid) dove ogni chioma e' una
+  _sphere illuminata alto-sinistra (riuso del mattone 3D dei cespugli); i toni
+  salgono dallo scuro al chiaro (tiers BUSH_SHADOW..BUSH_HILITE) per chiazze di
+  rumore + bonus "verso la luce" sul bordo NORD del muro; sotto, base uniforme
+  BUSH_SHADOW che riempie i buchi; ritaglio alla silhouette; CONTORNO scuro
+  #12281A sui lati esposti (dn|rt|lf) e cresta BUSH_RIMLIGHT sul bordo nord (up).
+  (2) PARETE frontale (cliff) alzata a ~1 tile (RELIEF = max(H, 0.95*ts), non
+  tocca self._H globale): gradiente spalla JW_CLIFF_HI -> JW_CLIFF -> JW_CLIFF_DK
+  (piu SCURA in basso), UN solo strato orizzontale tenue a meta, crepe CORTE,
+  spezzate e oblique (set_at con serpeggio ~1px: sembrano roccia, NON uno
+  steccato come le vecchie verticali piene) + muschio JW_MOSS/_DK sul bordo.
+  (3) OVERHANG: le chiome del bordo SUD sporgono nel layer CANOPY (lobi scuri
+  sotto-chioma alla base della parete, debordano un filo in basso -> SOPRA le
+  unita che passano vicino; azzerate dove c'e la sagoma, non coprono la cima).
+  SEED per muro: _jungle_components etichetta le componenti connesse (8-vicini)
+  dei tile muro-giungla; da id-componente derivano dimensione/densita'/jitter
+  delle chiome -> ogni muro ha forma propria. Ombra proiettata ALLUNGATA a
+  sud-est (_build_jungle_shadow: L ~1.3 tile, alfa 105). Via la vecchia cima di
+  roccia (mottled + _rock_facet/_round_rock/massi sul contorno): _rock_facet/
+  _round_rock ora NON piu usati (restano in renderer.py). Costo build invariato:
+  3v3 ~8s, 5v5 ~18s. Screenshot: screenshots/step_10.png (ravvicinato) e
+  step_10_over.png (minimappa).
 
 Scelte tecniche importanti:
-- canopy resta RISERVATO e VUOTO; lighting_overlay ora porta il velo d'atmosfera
-  (chioma + luce campi, vedi sopra). La vignettatura e' screen-space e vive in
-  draw_canopy, fuori dai layer. Le chiome dei cespugli stanno ancora in
-  walls_base (sotto le unita); spostarle in canopy (sopra le unita) sara un
-  passaggio futuro a se.
+- canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul
+  bordo sud (sopra le unita, vedi passo rilievi pseudo-3D). lighting_overlay
+  porta il velo d'atmosfera (chioma + luce campi). La vignettatura e'
+  screen-space e vive in draw_canopy, fuori dai layer. Le chiome dei CESPUGLI
+  (TILE_BUSH) stanno ancora in walls_base e restano per-tile/squadrate: il loro
+  rifacimento e' un passaggio futuro a se.
 - I singoli sprite dei tile NON sono stati spostati: restano i builder nel
   Renderer (game/renderer.py), riusati da MapRenderer -> grafica invariata.
 - Offset camera: camera.snap() arrotonda l'offset a interi UNA volta per
