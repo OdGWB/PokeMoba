@@ -191,16 +191,44 @@ Passaggi completati:
   _round_rock ora NON piu usati (restano in renderer.py). Costo build invariato:
   3v3 ~8s, 5v5 ~18s. Screenshot: screenshots/step_10.png (ravvicinato) e
   step_10_over.png (minimappa).
+- REVISIONE dei rilievi (step_11), su feedback. (1) CHIOMA ad ALBERI, non piu
+  cerchi uniformi (sembrava pluriball): nuovo _draw_tree disegna UN albero come
+  gruppo di ciuffi tondi (chioma irregolare) con illuminazione sull'INTERO
+  albero (ciuffi basso-destra scuri, alto-sinistra chiari + riflessi); alberi
+  GRANDI all'interno e PICCOLI sul bordo via campo distanza-dal-bordo (_dist_lo
+  su ~solid, low-res, R cresce con la distanza); passo ~0.76 tile, toni
+  BUSH_DARK..BUSH_HILITE + riflessi BUSH_RIMLIGHT. CONTORNO esterno TUTTO scuro
+  #12281A (tolta la cresta chiara sul bordo nord: niente verde chiaro sul
+  contorno). (2) PARETE piu alta (RELIEF = max(H, 1.12*ts); il margine `top`
+  della mappa ora e' max(H, 1.2*ts) cosi la cima estrusa non si taglia in alto):
+  DUE strati orizzontali, crepe corte spezzate, muschio e RADICI verde-brune
+  (ROOT/ROOT_D) che scendono serpeggiando dalla chioma, base piu SCURA.
+  (3) ARTEFATTI rimossi: l'overhang usa _draw_tree (niente piu "ciambelle"
+  semitrasparenti delle _sphere) e i suoi centri stanno SOTTO la sagoma (niente
+  tagli orizzontali). (4) MURO DI CONFINE unificato: TILE_WALL entra nella
+  SILHOUETTE (in _jungle_solid e _jungle_components) e viene reso come
+  foresta+scogliera come i muri di giungla; rimossi il vecchio rilievo di pietra
+  per-tile (_tall_surf) e la sua ombra per-tile; in _build_ao TILE_WALL non e'
+  piu per-tile (viene dalla silhouette curva). (5) NESSUN cespuglio sui muri:
+  _jungle_solid RITAGLIA la sagoma via dai tile BUSH (il muro si ferma al confine
+  del cespuglio) e i cespugli si disegnano PRIMA dei muri (coperti dove un muro
+  li sovrasta). Costo build ~invariato (3v3 ~8s, 5v5 ~19s; densita' alberi
+  tarata) nonostante l'area raddoppiata dall'unione di TILE_WALL. Screenshot:
+  screenshots/step_11.png (ravvicinato) e step_11_over.png (minimappa).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul
   bordo sud (sopra le unita, vedi passo rilievi pseudo-3D). lighting_overlay
   porta il velo d'atmosfera (chioma + luce campi). La vignettatura e'
   screen-space e vive in draw_canopy, fuori dai layer. Le chiome dei CESPUGLI
-  (TILE_BUSH) stanno ancora in walls_base e restano per-tile/squadrate: il loro
-  rifacimento e' un passaggio futuro a se.
-- I singoli sprite dei tile NON sono stati spostati: restano i builder nel
-  Renderer (game/renderer.py), riusati da MapRenderer -> grafica invariata.
+  (TILE_BUSH) stanno ancora in walls_base e restano per-tile/squadrate (ora NON
+  si sovrappongono ai muri, ma la silhouette ad alberi e' solo dei muri): il
+  rifacimento dei cespugli nello stesso stile e' un passaggio futuro a se.
+- TILE_WALL (muro di confine) NON e' piu reso come pietra per-tile: e' entrato
+  nella silhouette vegetata dei muri (foresta+scogliera). I builder di pietra
+  (_tall_surf/_paint_stone_tall) e _rock_facet/_round_rock restano in
+  renderer.py ma non sono piu usati dalla mappa. Gli altri sprite dei tile
+  (lane/acqua/cespugli) restano invariati, costruiti dal Renderer.
 - Offset camera: camera.snap() arrotonda l'offset a interi UNA volta per
   frame (camera.ox/oy); mappa e unita (world_to_screen) usano lo stesso
   valore -> niente tremolio di 1px ne seam tra chunk su scroll sub-pixel

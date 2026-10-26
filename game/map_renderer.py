@@ -219,8 +219,11 @@ class MapRenderer:
 
     def build(self, grid) -> None:
         ts = self.tile_size
-        H = max(6, int(ts * 0.5))        # altezza di estrusione dei rilievi
-        top = H                          # margine in alto per i rilievi di riga 0
+        H = max(6, int(ts * 0.5))        # altezza di estrusione dei rilievi (cespugli)
+        # Margine superiore: deve contenere l'estrusione piu alta, ovvero la
+        # parete ~1 tile dei muri vegetati (RELIEF in _build_jungle_walls) -> cosi
+        # la cima estrusa non viene tagliata al bordo alto della mappa.
+        top = max(H, int(ts * 1.2))      # margine in alto per i rilievi di riga 0
         self._H = H
         self._top = top
         Wt, Ht = grid.width, grid.height
@@ -286,35 +289,19 @@ class MapRenderer:
         #     ricalcolano da QUESTA maschera, non dai tile.
         solid = self._jungle_solid(grid)
 
-        # --- Passata ombre proiettate -----------------------------------------
-        # (a) muro di confine in PIETRA (TILE_WALL): ombra per-tile come prima.
-        def is_stone(x, y):
-            return 0 <= x < Wt and 0 <= y < Ht and tiles[y][x] == TILE_WALL
-
-        for ty in range(Ht):
-            row = tiles[ty]
-            for tx in range(Wt):
-                if row[tx] in TALL_TILES:
-                    continue
-                nw = ((1 if is_stone(tx, ty - 1) else 0)
-                      | (2 if is_stone(tx - 1, ty) else 0))
-                if nw:
-                    shadows.blit(p._shadow_surf(nw), (tx * ts, ty * ts + top))
-
-        # (b) muri di giungla: ombra proiettata a sud-est dalla SILHOUETTE.
+        # --- Ombra proiettata a sud-est dalla SILHOUETTE (muro di giungla E muro
+        #     di confine, ora unificati nella stessa sagoma vegetata: niente piu
+        #     ombra per-tile della vecchia pietra).
         if solid is not None:
             self._build_jungle_shadow(grid, shadows, solid)
 
-        # --- Ambient occlusion: gradiente morbido attorno ai tile "alti"
-        #     (silhouette dei muri di giungla + cespugli + pietra).
+        # --- Ambient occlusion: gradiente morbido attorno ai corpi "alti"
+        #     (silhouette dei muri + cespugli per-tile).
         self._build_ao(grid, shadows, solid)
 
-        # --- Muri di giungla: riempimento della silhouette (texture di roccia +
-        #     massi sul contorno + parete 2.5D), PRIMA dei cespugli/pietra.
-        if solid is not None:
-            self._build_jungle_walls(grid, walls, self.layers["canopy"], p, solid)
-
-        # --- Passata 2: rilievi 2.5D per-tile (cespugli e muro di pietra) ------
+        # --- Cespugli per-tile PRIMA dei muri: i muri (disegnati dopo, opachi
+        #     sulla sagoma) li COPRONO dove si sovrappongono -> nessun cespuglio
+        #     sopra un muro.
         def is_bush(x, y):
             return 0 <= x < Wt and 0 <= y < Ht and tiles[y][x] == TILE_BUSH
 
@@ -326,21 +313,21 @@ class MapRenderer:
         for ty in range(Ht):
             row = tiles[ty]
             for tx in range(Wt):
-                t = row[tx]
-                if t not in TALL_TILES or t == TILE_JUNGLE_WALL:
+                if row[tx] != TILE_BUSH:
                     continue
                 ax = tx * ts
                 ay = ty * ts - H + top
-                if t == TILE_BUSH:
-                    mask = ((1 if is_bush(tx, ty - 1) else 0)
-                            | (2 if is_bush(tx + 1, ty) else 0)
-                            | (4 if is_bush(tx, ty + 1) else 0)
-                            | (8 if is_bush(tx - 1, ty) else 0))
-                    variant = sym_seed(tx, ty, 15)
-                    walls.blit(p._bush_surf(mask, variant, H), (ax, ay))
-                else:
-                    variant = (((tx * 73856093) ^ (ty * 19349663)) >> 6) & 7
-                    walls.blit(p._tall_surf(t, variant, H), (ax, ay))
+                mask = ((1 if is_bush(tx, ty - 1) else 0)
+                        | (2 if is_bush(tx + 1, ty) else 0)
+                        | (4 if is_bush(tx, ty + 1) else 0)
+                        | (8 if is_bush(tx - 1, ty) else 0))
+                variant = sym_seed(tx, ty, 15)
+                walls.blit(p._bush_surf(mask, variant, H), (ax, ay))
+
+        # --- Muri (giungla + confine) come rilievi vegetati: riempiono la
+        #     silhouette, COPRENDO i cespugli sovrapposti.
+        if solid is not None:
+            self._build_jungle_walls(grid, walls, self.layers["canopy"], p, solid)
 
         # --- Velo d'atmosfera SOPRA le unita: ombre della chioma sulla giungla
         #     e macchie di luce calda vicino ai campi (lighting_overlay).
@@ -426,11 +413,11 @@ class MapRenderer:
         Wt, Ht = grid.width, grid.height
         W, H = Wt * ts, Ht * ts
         tiles = grid.tiles
-        tall = np.zeros((Ht, Wt), bool)               # cespugli + pietra (per-tile)
-        for ty in range(Ht):
-            row = tiles[ty]
+        tall = np.zeros((Ht, Wt), bool)               # cespugli (per-tile); i muri
+        for ty in range(Ht):                          # (giungla+confine) vengono
+            row = tiles[ty]                           # dalla silhouette (curva)
             for tx in range(Wt):
-                if row[tx] in (TILE_BUSH, TILE_WALL):
+                if row[tx] == TILE_BUSH:
                     tall[ty, tx] = True
         step = max(2, ts // 4)
         R = AO_RADIUS_TILES * ts / step              # raggio in celle low-res
@@ -529,7 +516,7 @@ class MapRenderer:
         for ty in range(Ht):
             row = tiles[ty]
             for tx in range(Wt):
-                if row[tx] == TILE_JUNGLE_WALL:
+                if row[tx] in (TILE_JUNGLE_WALL, TILE_WALL):
                     tm[ty, tx] = True
         if not tm.any():
             return None
@@ -566,6 +553,19 @@ class MapRenderer:
             thr = np.where(b >= 0.80, True,
                            np.where(b <= 0.22, False, (b + nz * 0.33) > 0.5))
             solid[y0:y1] = (thr | core_full[y0:y1]) & allow_full[y0:y1]
+        # NESSUN muro deve coprire un cespuglio: la sagoma (che sborda ~0.5 tile)
+        # viene ritagliata via dai tile BUSH -> il muro si ferma al confine del
+        # cespuglio, i due non si sovrappongono.
+        bush = np.zeros((Ht, Wt), bool)
+        for ty in range(Ht):
+            row = tiles[ty]
+            for tx in range(Wt):
+                if row[tx] == TILE_BUSH:
+                    bush[ty, tx] = True
+        if bush.any():
+            bpx = bush[np.clip(np.arange(H) // ts, 0, Ht - 1)][:,
+                       np.clip(np.arange(W) // ts, 0, Wt - 1)]
+            solid &= ~bpx
         return solid
 
     def _build_jungle_shadow(self, grid, shadows, solid) -> None:
@@ -601,9 +601,10 @@ class MapRenderer:
         tiles = grid.tiles
         lab = np.zeros((Ht, Wt), np.int32)
         cur = 0
+        walltypes = (TILE_JUNGLE_WALL, TILE_WALL)
         for y in range(Ht):
             for x in range(Wt):
-                if tiles[y][x] == TILE_JUNGLE_WALL and lab[y, x] == 0:
+                if tiles[y][x] in walltypes and lab[y, x] == 0:
                     cur += 1
                     dq = deque([(x, y)]); lab[y, x] = cur
                     while dq:
@@ -612,42 +613,73 @@ class MapRenderer:
                             for ox in (-1, 0, 1):
                                 nx, ny = cx + ox, cy + oy
                                 if (0 <= nx < Wt and 0 <= ny < Ht
-                                        and tiles[ny][nx] == TILE_JUNGLE_WALL
+                                        and tiles[ny][nx] in walltypes
                                         and lab[ny, nx] == 0):
                                     lab[ny, nx] = cur; dq.append((nx, ny))
         return lab
 
+    @staticmethod
+    def _draw_tree(surf, cx, cy, R, rng, tones) -> None:
+        """Un ALBERO singolo: gruppo di ciuffi tondi che formano una chioma
+        irregolare (non un cerchio liscio). Illuminazione direzionale sull'INTERO
+        albero: ciuffi in basso-destra scuri, in alto-sinistra chiari, con pochi
+        riflessi. `tones` = (scuro, medio, chiaro, luce, riflesso)."""
+        DK, MD, LT, HI, RF = tones
+        R = max(3, int(R))
+        n = max(3, int(R * 0.42))
+        tufts = [(0.0, R * 0.12, R * 0.66)]              # corpo centrale
+        for _ in range(n):
+            a = rng.random() * math.tau
+            rad = (rng.random() ** 0.5) * R * 0.72
+            tr = R * (0.36 + rng.random() * 0.30)
+            tufts.append((math.cos(a) * rad, math.sin(a) * rad * 0.92, tr))
+        # retro (basso-destra, scuro) -> fronte (alto-sinistra, chiaro)
+        tufts.sort(key=lambda t: (t[0] + t[1]), reverse=True)
+        for ox, oy, tr in tufts:
+            li = -(ox + oy) / (R * 1.25)                 # -1 basso-dx .. +1 alto-sx
+            col = DK if li < -0.28 else MD if li < 0.12 else LT if li < 0.5 else HI
+            pygame.draw.circle(surf, col, (int(cx + ox), int(cy + oy)), int(tr))
+        for _ in range(max(1, n // 4)):                  # riflessi in alto-sinistra
+            hx = cx - rng.random() * R * 0.5
+            hy = cy - rng.random() * R * 0.5
+            pygame.draw.circle(surf, RF, (int(hx), int(hy)), max(1, int(R * 0.12)))
+
     def _build_jungle_walls(self, grid, walls, canopy, p, solid) -> None:
-        """Muri di giungla come RILIEVI pseudo-3D in stile LoL:
-          - CIMA vegetata: chiome di alberi a strati (verde scuro->chiaro verso la
-            luce alto-sinistra), contorno scuro #12281A, forma/dimensione variata
-            da un SEED per muro (componente connessa);
-          - PARETE frontale (sud): roccia alta ~1 tile a STRATI con crepe e
-            muschio, piu scura in basso;
+        """Muri (giungla + confine) come RILIEVI pseudo-3D in stile LoL:
+          - CIMA vegetata: chioma composta da ALBERI singoli di dimensioni diverse
+            (grandi all'interno, piccoli sul bordo via distanza dal bordo), ognuno
+            un gruppo di ciuffi a 3-4 toni (scuro basso-dx, chiaro+riflessi
+            alto-sx); CONTORNO esterno scuro #12281A, mai verde chiaro;
+          - PARETE frontale (sud): roccia ~1 tile con strati, crepe, muschio e
+            RADICI che scendono dalla chioma, piu scura alla base;
           - le chiome del bordo SUD sporgono nel layer CANOPY (sopra le unita).
-        Tutto su una Surface a piena mappa, poi blit LAZY per chunk."""
+        Forma/dimensione variate da un SEED per muro (componente connessa)."""
         import pygame.surfarray as sa
         from game.renderer import (JW_CLIFF, JW_CLIFF_DK, JW_CLIFF_HI, JW_MOSS,
                                     JW_MOSS_DK, BUSH_SHADOW, BUSH_DARK, BUSH_MID,
                                     BUSH_LIGHT, BUSH_HILITE, BUSH_RIMLIGHT)
         ts = self.tile_size; top = self._top
         H, W = solid.shape
-        RELIEF = max(self._H, int(ts * 0.95))   # parete frontale ~1 tile alta
+        RELIEF = max(self._H, int(ts * 1.12))   # parete frontale ~1 tile alta
         Hf = H + RELIEF
         comp = self._jungle_components(grid)     # etichette dei muri (per seed)
-        # --- Facce/bordi dalla maschera (shift a 1px) -------------------------
         up = np.zeros_like(solid); up[1:, :] = ~solid[:-1, :]; up[0, :] = True
         dn = np.zeros_like(solid); dn[:-1, :] = ~solid[1:, :]; dn[-1, :] = True
         lf = np.zeros_like(solid); lf[:, 1:] = ~solid[:, :-1]; lf[:, 0] = True
         rt = np.zeros_like(solid); rt[:, :-1] = ~solid[:, 1:]; rt[:, -1] = True
         boundary = solid & (up | dn | lf | rt)
         south = solid & dn
-
-        # Mappa pixel->seed del muro: per ogni pixel, il seed della componente del
-        # tile che lo contiene (clamp ai bordi: la sagoma sborda ~mezzo tile).
         tcx = np.clip(np.arange(W) // ts, 0, grid.width - 1)
         tcy = np.clip(np.arange(H) // ts, 0, grid.height - 1)
-        comp_px = comp[tcy][:, tcx]                       # (H,W) int label per pixel
+        comp_px = comp[tcy][:, tcx]                       # (H,W) label per pixel
+
+        # Campo DISTANZA-DAL-BORDO (low-res): alberi grandi dentro, piccoli ai bordi.
+        sdl = max(2, ts // 4)
+        hl = (H + sdl - 1) // sdl; wl = (W + sdl - 1) // sdl
+        sly = np.minimum(np.arange(hl) * sdl, H - 1)
+        slx = np.minimum(np.arange(wl) * sdl, W - 1)
+        sm_lo = solid[sly][:, slx]
+        distlo = self._dist_lo(~sm_lo, int(math.ceil(2.6 * ts / sdl)))   # dist dal non-solido
 
         # --- (1) PARETE DI ROCCIA (cliff): sotto il bordo sud, segue la sagoma --
         cliff = np.zeros((Hf, W), bool)
@@ -665,89 +697,78 @@ class MapRenderer:
         ms = pygame.Surface((W, Hf), pygame.SRCALPHA)
         c3 = sa.pixels3d(ms); ca = sa.pixels_alpha(ms)
         df = depth.astype(np.float32) / max(1, RELIEF)
-        # Gradiente: spalla chiara appena sotto la cima -> grigio-pietra -> SCURA
-        # in basso (base). Niente nero: la base resta roccia in ombra.
-        g = np.clip(df * 1.15, 0.0, 1.0)[..., None]
-        clrgb = CLhi + (CL - CLhi) * g
-        clrgb = clrgb + (CLdk - clrgb) * np.clip((df - 0.55) / 0.45, 0, 1)[..., None]
-        # UN solo STRATO orizzontale tenue a meta parete (sedimento di roccia):
-        # righe multiple + le crepe verticali sembrerebbero uno steccato.
-        band = (depth == (RELIEF // 2))[..., None]
-        clrgb = clrgb * np.where(band, np.float32(0.86), np.float32(1.0))
+        g = np.clip(df * 1.1, 0.0, 1.0)[..., None]
+        clrgb = CLhi + (CL - CLhi) * g                   # spalla chiara -> pietra
+        clrgb = clrgb + (CLdk - clrgb) * np.clip((df - 0.5) / 0.5, 0, 1)[..., None]  # base SCURA
+        # DUE strati orizzontali tenui (sedimenti di roccia). Le crepe sono corte e
+        # spezzate (sotto) -> strati+crepe leggono come roccia, non come steccato.
+        s1 = RELIEF // 3; s2 = (2 * RELIEF) // 3
+        band = ((depth == s1) | (depth == s2))[..., None]
+        clrgb = clrgb * np.where(band, np.float32(0.84), np.float32(1.0))
         cmask3 = cliff[..., None]
         c3[:] = np.where(cmask3, clrgb, 0).astype(np.uint8).transpose(1, 0, 2)
         ca[:] = (cliff.T.astype(np.uint8) * 255)
         del c3, ca
-        # Crepe + muschio: le crepe sono CORTE, SPEZZATE e un filo oblique (roccia,
-        # non steccato): partono a quote diverse e serpeggiano di ~1px per riga.
+        # Crepe corte spezzate, muschio sul bordo, e RADICI che scendono dalla
+        # chioma (verde-brune, serpeggianti) lungo la parete.
         ys_c, xs_c = np.where(south)
+        ROOT = (40, 44, 30); ROOT_D = (26, 30, 20)
         if len(xs_c):
             crng = random.Random(0xC1FF ^ (len(xs_c) & 0xFFFFFFFF))
             crack = tuple(int(v) for v in CLdk)
-            for _ in range(min(3000, max(3, len(xs_c) // 14))):
+            for _ in range(min(3500, max(4, len(xs_c) // 13))):
                 j = crng.randrange(len(xs_c))
                 x = int(xs_c[j]); y0 = int(ys_c[j])
-                if crng.random() < 0.55:                  # crepa corta spezzata
-                    yy = y0 + 1 + crng.randint(0, max(1, RELIEF // 2))
-                    xx = x
+                k = crng.random()
+                if k < 0.4:                               # crepa corta spezzata
+                    yy = y0 + 1 + crng.randint(0, max(1, RELIEF // 2)); xx = x
                     for _s in range(crng.randint(2, max(3, RELIEF // 2))):
                         if 0 <= xx < W and 0 <= yy < Hf and cliff[yy, xx]:
                             ms.set_at((xx, yy), crack)
                         xx += crng.randint(-1, 1); yy += 1
+                elif k < 0.7:                             # RADICE dalla chioma
+                    yy = y0 + 1; xx = x
+                    rc = ROOT if crng.random() < 0.6 else ROOT_D
+                    for _s in range(crng.randint(RELIEF // 2, RELIEF)):
+                        if 0 <= xx < W and 0 <= yy < Hf and cliff[yy, xx]:
+                            ms.set_at((xx, yy), rc)
+                        yy += 1
+                        if crng.random() < 0.35:
+                            xx += crng.randint(-1, 1)
                 else:                                     # ciuffo di muschio sul bordo
                     mc = JW_MOSS if crng.random() < 0.55 else JW_MOSS_DK
                     pygame.draw.circle(ms, mc, (x, y0 + crng.randint(0, 2)),
                                        crng.randint(1, max(1, ts // 10)))
-            ma = sa.pixels_alpha(ms)                      # ritaglia muschio alla parete
+            ma = sa.pixels_alpha(ms)                      # ritaglia dettagli alla parete
             np.minimum(ma, cliff.T.astype(np.uint8) * 255, out=ma); del ma
 
-        # --- (2) CIMA VEGETATA: chiome di alberi a strati, ritagliate alla sagoma
-        tiers = ((BUSH_SHADOW, BUSH_DARK),     # 0: fondo in ombra
-                 (BUSH_DARK, BUSH_MID),        # 1: corpo
-                 (BUSH_MID, BUSH_LIGHT),       # 2: mezza luce
-                 (BUSH_LIGHT, BUSH_HILITE))    # 3: cresta illuminata
+        # --- (2) CIMA VEGETATA: ALBERI singoli, grandi dentro / piccoli al bordo -
+        tones = (BUSH_DARK, BUSH_MID, BUSH_LIGHT, BUSH_HILITE, BUSH_RIMLIGHT)
         fol = pygame.Surface((W, H), pygame.SRCALPHA)
-        # Base scura uniforme sotto le chiome (riempie i buchi tra i grappoli).
         f3 = sa.pixels3d(fol); fa = sa.pixels_alpha(fol)
-        base = np.array(BUSH_SHADOW, np.uint8)
-        f3[solid.T] = base; fa[solid.T] = 255
+        f3[solid.T] = np.array(BUSH_SHADOW, np.uint8); fa[solid.T] = 255  # base scura
         del f3, fa
-        north_r = max(3, int(ts * 0.8))                   # quanto "su" guardo per la luce
-        sp = max(4, int(ts * 0.48))                       # passo della griglia di chiome
-        base_r = ts * 0.42
+        sp = max(5, int(ts * 0.76))                       # passo tra gli alberi
         jcx = np.arange(0, W, sp); jcy = np.arange(0, H, sp)
-        GY, GX = np.meshgrid(jcy, jcx, indexing="ij")   # solo le celle SOLID
+        GY, GX = np.meshgrid(jcy, jcx, indexing="ij")     # nord->sud (ordine chiome)
         sel = solid[GY, GX]
         for gy, gx in zip(GY[sel].tolist(), GX[sel].tolist()):
-                cid = int(comp_px[gy, gx])
-                sseed = (cid * 2654435761) & 0xFFFFFFFF
-                # jitter deterministico per cella (dipende dal muro -> varia per muro)
-                hh = ((gx * 374761393) ^ (gy * 668265263) ^ sseed) & 0xFFFFFFFF
-                jx = (hh & 7) - 3; jy = ((hh >> 3) & 7) - 3
-                cx = int(min(W - 1, max(0, gx + jx)))
-                cy = int(min(H - 1, max(0, gy + jy)))
-                if not solid[cy, cx]:
-                    continue
-                szf = 0.78 + 0.5 * (((sseed >> 10) & 0xFF) / 255.0)   # dimensione per muro
-                r = int(base_r * szf) + ((hh >> 6) & 3) - 1
-                r = max(4, r)
-                # Strati: chiaro verso la luce (bordo nord del muro) e a chiazze.
-                patch = p._vnoise(cx / 46.0, cy / 46.0)
-                near_north = (cy - north_r < 0) or (not solid[cy - north_r, cx])
-                score = 0.42 * patch + (0.40 if near_north else 0.0) \
-                    + 0.18 * (((sseed >> 18) & 0xFF) / 255.0)
-                ti = 3 if score > 0.74 else 2 if score > 0.5 else 1 if score > 0.26 else 0
-                sh_col, hi_col = tiers[ti]
-                p._sphere(fol, cx, cy, r, sh_col, hi_col)
-        # Ritaglio alla sagoma + contorno scuro #12281A (lati esposti) e cresta di
-        # luce sul bordo nord (verso la luce).
+            cid = int(comp_px[gy, gx])
+            sseed = (cid * 2654435761) & 0xFFFFFFFF
+            hh = ((gx * 374761393) ^ (gy * 668265263) ^ sseed) & 0xFFFFFFFF
+            cx = int(min(W - 1, max(0, gx + (hh & 7) - 3)))
+            cy = int(min(H - 1, max(0, gy + ((hh >> 3) & 7) - 3)))
+            if not solid[cy, cx]:
+                continue
+            dtile = distlo[min(hl - 1, cy // sdl), min(wl - 1, cx // sdl)] * sdl / ts
+            szf = 0.82 + 0.4 * (((sseed >> 10) & 0xFF) / 255.0)     # per muro
+            R = ts * (0.30 + 0.36 * min(1.0, dtile / 2.2)) * szf    # grande dentro
+            self._draw_tree(fol, cx, cy, R, random.Random(hh), tones)
+        # Ritaglio alla sagoma + CONTORNO esterno scuro #12281A (tutto il bordo).
         fa = sa.pixels_alpha(fol)
         np.minimum(fa, solid.T.astype(np.uint8) * 255, out=fa); del fa
         f3 = sa.pixels3d(fol); fa = sa.pixels_alpha(fol)
-        edge_dark = boundary & (dn | rt | lf)             # contorno scuro
-        edge_lit = boundary & up                          # bordo nord: cresta di luce
-        f3[edge_dark.T] = np.array(CANOPY_OUTLINE, np.uint8); fa[edge_dark.T] = 255
-        f3[edge_lit.T] = np.array(BUSH_RIMLIGHT, np.uint8); fa[edge_lit.T] = 255
+        f3[boundary.T] = np.array(CANOPY_OUTLINE, np.uint8); fa[boundary.T] = 255
         del f3, fa
         ms.blit(fol, (0, 0))                              # cima sopra la parete
 
@@ -762,32 +783,23 @@ class MapRenderer:
                     walls.blit(sub.copy(), (bx, by + off_y))
 
         # --- (4) OVERHANG: chiome del bordo SUD che sporgono nel layer CANOPY,
-        #     sopra le unita che passano alla base del muro. Lobi scuri (sotto-
-        #     chioma in ombra) alla BASE della parete, debordanti un po' oltre.
+        #     sopra le unita alla base del muro. Alberelli scuri (sotto-chioma in
+        #     ombra) centrati alla BASE della parete, debordano un po' in basso.
+        #     I centri stanno SOTTO la sagoma -> niente tagli orizzontali.
+        tones_dk = (BUSH_SHADOW, BUSH_DARK, BUSH_DARK, BUSH_MID, BUSH_MID)
         over = pygame.Surface((W, Hf), pygame.SRCALPHA)
         if len(xs_c):
-            orng = random.Random(0x0A11 ^ (len(xs_c) & 0xFFFFFFFF))
             step_o = max(3, ts // 3)
-            order = list(range(0, len(xs_c), 1))
             for j in range(0, len(xs_c), step_o):
                 x = int(xs_c[j]); yb = int(ys_c[j])
                 cid = int(comp_px[min(H - 1, yb), x])
                 sseed = (cid * 2654435761) & 0xFFFFFFFF
                 hh = ((x * 374761393) ^ (yb * 668265263) ^ sseed) & 0xFFFFFFFF
                 szf = 0.7 + 0.5 * (((sseed >> 10) & 0xFF) / 255.0)
-                r = max(3, int(ts * 0.34 * szf) + ((hh >> 4) & 3) - 1)
-                # centro alla BASE della parete (ms-row = bordo sud + RELIEF), con
-                # un filo di debordo verso il basso -> sporge sulle unita.
-                oy = yb + RELIEF - r // 2 + ((hh >> 7) & 3)
+                R = ts * 0.3 * szf
+                oy = yb + RELIEF - int(R * 0.4) + ((hh >> 7) & 3)  # alla base, deborda
                 ox = x + ((hh >> 9) & 3) - 1
-                # Sotto-chioma in ombra: piu scura (poca luce sotto le foglie).
-                sh_col = BUSH_SHADOW if (hh & 1) else BUSH_DARK
-                hi_col = BUSH_DARK if (hh & 1) else BUSH_MID
-                p._sphere(over, ox, oy, r, sh_col, hi_col)
-            # i lobi NON devono coprire la cima vegetata (solo debordare in basso):
-            # azzero l'overhang dove c'e' la sagoma (ms-rows [0,H)).
-            oa = sa.pixels_alpha(over)
-            oa[:, :H][solid.T] = 0; del oa
+                self._draw_tree(over, ox, oy, R, random.Random(hh ^ 0x0A11), tones_dk)
             for by in range(0, Hf, CHUNK):
                 bh = min(CHUNK, Hf - by)
                 for bx in range(0, W, CHUNK):
