@@ -532,20 +532,19 @@ class MapRenderer:
             return None
         s = max(2, ts // 4)
         hl = (H + s - 1) // s; wl = (W + s - 1) // s
-        cyl = np.minimum((np.arange(hl) * s) // ts, Ht - 1)
-        cxl = np.minimum((np.arange(wl) * s) // ts, Wt - 1)
-        sq = tm[cyl][:, cxl].astype(np.float32)          # quadrati (hl,wl)
-        # centri-muro a bassa risoluzione -> distanza (per blob tondi + clamp).
+        # Campo da DISCHI sui centri-muro (NON dai quadrati dei tile): l'unione
+        # di dischi sovrapposti non ha spigoli di griglia, cosi niente lati dritti
+        # residui (le basi dei pilastri e i bordi inferiori diventano curvi).
         ys, xs = np.where(tm)
         cmask = np.zeros((hl, wl), bool)
         ccx = np.clip(((xs + 0.5) * ts / s).astype(int), 0, wl - 1)
         ccy = np.clip(((ys + 0.5) * ts / s).astype(int), 0, hl - 1)
         cmask[ccy, ccx] = True
-        dist = self._dist_lo(cmask, int(math.ceil(ts * 1.1 / s)))
-        core = dist <= (ts * 0.40 / s)                   # sempre pieno (blob tondi)
-        allowed = dist <= (ts * 0.98 / s)                # sporgenza max ~mezzo tile
-        field = np.maximum(sq, core.astype(np.float32))
-        bf = self._sep_blur(field, max(1, int(ts * 0.6 / s)), passes=3)
+        dist = self._dist_lo(cmask, int(math.ceil(ts * 1.25 / s)))
+        disc = (dist <= (ts * 0.72 / s)).astype(np.float32)   # dischi uniti
+        core = dist <= (ts * 0.42 / s)                   # sempre pieno (blob tondi)
+        allowed = dist <= (ts * 1.0 / s)                 # sporgenza max ~mezzo tile
+        bf = self._sep_blur(disc, max(1, int(ts * 0.55 / s)), passes=3)
         # upscala bf a piena risoluzione (una volta), poi soglia+rumore a strisce.
         bf_full = self._upscale(bf, W, H, s)
         core_full = core[np.minimum(np.arange(H) // s, hl - 1)][:, np.minimum(np.arange(W) // s, wl - 1)]
@@ -557,7 +556,12 @@ class MapRenderer:
             y1 = min(H, y0 + STRIP)
             TYf = (np.arange(y0, y1, dtype=np.float32) / ts)[:, None]
             nz = _np_vnoise(TXf / 1.5 + 11.0, TYf / 1.5 + 7.0) - 0.5     # [-0.5,0.5]
-            thr = (bf_full[y0:y1] + nz * 0.33) > 0.5
+            b = bf_full[y0:y1]
+            # Rumore SOLO nella fascia di bordo: l'interno (b alto) resta SEMPRE
+            # pieno -> niente buchi/fessure nere dentro il muro; l'esterno (b
+            # basso) resta vuoto. Il contorno e' irregolare solo al bordo.
+            thr = np.where(b >= 0.80, True,
+                           np.where(b <= 0.22, False, (b + nz * 0.33) > 0.5))
             solid[y0:y1] = (thr | core_full[y0:y1]) & allow_full[y0:y1]
         return solid
 
@@ -592,8 +596,8 @@ class MapRenderer:
         (solo i blocchi con contenuto)."""
         import pygame.surfarray as sa
         from game.renderer import (JW_TOP, JW_TOP_HI, JW_TOP_SH, JW_MOSS,
-                                    JW_MOSS_DK, JW_CLIFF, JW_CLIFF_DK, JW_CLIFF_HI,
-                                    JW_HILITE, JW_RIM, JW_EDGE_SH, JW_CONTACT)
+                                    JW_MOSS_DK, JW_CLIFF, JW_CLIFF_HI,
+                                    JW_HILITE, JW_RIM, JW_EDGE_SH)
         ts = self.tile_size; top = self._top; Hh = self._H
         H, W = solid.shape
         Hf = H + Hh
@@ -607,11 +611,13 @@ class MapRenderer:
         # --- (1) CIMA: base roccia mottled + muschio, ritagliata alla sagoma ---
         TOPc = np.array(JW_TOP, np.float32); TOPhi = np.array(JW_TOP_HI, np.float32)
         TOPsh = np.array(JW_TOP_SH, np.float32); MOSSc = np.array(JW_MOSS, np.float32)
-        MOSSdk = np.array(JW_MOSS_DK, np.float32); CRACK = np.array(JW_CLIFF_DK, np.float32)
+        MOSSdk = np.array(JW_MOSS_DK, np.float32)
         top_surf = pygame.Surface((W, H), pygame.SRCALPHA)
         v3 = sa.pixels3d(top_surf)
         # Noise calcolato a BASSA risoluzione (STEP) e interpolato bilineare a
         # strisce (come _build_floor): stessa resa, molto piu veloce del per-pixel.
+        # Niente macchie scure "piene" (sembravano buchi): la base e' solo roccia
+        # chiaro/scuro + muschio; crepe e volume li danno le faccette (sotto).
         STEP = 4
         wl = W // STEP + 2; hl = H // STEP + 2
         TXl = (np.arange(wl, dtype=np.float32) * STEP / ts)[None, :]
@@ -619,14 +625,13 @@ class MapRenderer:
         mott_l = (_np_vnoise(TXl / 2.2, TYl / 2.2) * 0.6
                   + _np_vnoise(TXl / 0.8 + 5, TYl / 0.8 + 5) * 0.4).astype(np.float32)
         mo_l = _np_vnoise(TXl / 3.2 + 20, TYl / 3.2 + 20).astype(np.float32)
-        crk_l = _np_vnoise(TXl / 1.1 + 70, TYl / 1.1 + 70).astype(np.float32)
         fx = np.arange(W, dtype=np.float32) / STEP
         x0 = np.floor(fx).astype(np.int64); x1 = np.minimum(x0 + 1, wl - 1)
         wx = (fx - x0)[None, :]
 
         def up_x(f):
             return f[:, x0] * (1 - wx) + f[:, x1] * wx
-        mott_x = up_x(mott_l); mo_x = up_x(mo_l); crk_x = up_x(crk_l)
+        mott_x = up_x(mott_l); mo_x = up_x(mo_l)
         STRIP = 300
         for y0 in range(0, H, STRIP):
             y1 = min(H, y0 + STRIP)
@@ -634,28 +639,41 @@ class MapRenderer:
             y0i = np.floor(fy).astype(np.int64); y1i = np.minimum(y0i + 1, hl - 1)
             wy = (fy - y0i)[:, None]
             mott = mott_x[y0i] * (1 - wy) + mott_x[y1i] * wy
-            t = np.clip((mott - 0.28) / 0.42, 0.0, 1.0)[..., None]
+            t = np.clip((mott - 0.25) / 0.45, 0.0, 1.0)[..., None]
             col = TOPc + (TOPhi - TOPc) * t              # roccia illuminata
-            col = col + (TOPsh - col) * np.clip((0.3 - mott) / 0.3, 0, 1)[..., None]  # avvallamenti scuri
+            col = col + (TOPsh - col) * np.clip((0.26 - mott) / 0.32, 0, 1)[..., None]  # avvallamenti (non neri)
             mo = mo_x[y0i] * (1 - wy) + mo_x[y1i] * wy
             mk = np.clip((mo - 0.56) / 0.22, 0.0, 1.0)[..., None]
             moss = MOSSdk + (MOSSc - MOSSdk) * t         # muschio chiaro/scuro
             col = col + (moss - col) * (mk * 0.8)
-            cr = (crk_x[y0i] * (1 - wy) + crk_x[y1i] * wy < 0.16)[..., None]  # fessure
-            col = np.where(cr, CRACK, col)
             v3[:, y0:y1, :] = np.clip(col, 0, 255).astype(np.uint8).transpose(1, 0, 2)
         del v3
         va = sa.pixels_alpha(top_surf); va[:] = (solid.T.astype(np.uint8) * 255); del va
-        # Faccette di roccia sparse sulla cima (volume), ritagliate alla sagoma.
+        # Dettaglio di roccia sulla cima (densita' della vecchia texture): tante
+        # FACCETTE spigolose (danno piatti + crepe nette + volume), qualche MASSO
+        # tondo in rilievo e fiocchi di MUSCHIO. Tutto ritagliato alla sagoma.
         ys_s, xs_s = np.where(solid)
         if len(xs_s):
             frng = random.Random(0xF00D ^ (len(xs_s) & 0xFFFFFFFF))
-            nf = min(3500, max(6, int(len(xs_s) / (ts * ts) * 0.9)))
+            ntile = len(xs_s) / float(ts * ts)
+            nf = min(16000, max(10, int(ntile * 2.4)))      # ~2-3 faccette per tile
             for _ in range(nf):
                 j = frng.randrange(len(xs_s))
                 fx = int(xs_s[j]); fy = int(ys_s[j])
-                fr = frng.randint(max(3, ts // 4), max(5, int(ts * 0.5)))
+                fr = frng.randint(max(2, ts // 5), max(4, int(ts * 0.42)))
                 p._rock_facet(top_surf, fx, fy, fr, frng, JW_TOP, JW_HILITE, JW_TOP_SH)
+            nb = min(4000, max(3, int(ntile * 0.5)))         # massi in rilievo
+            for _ in range(nb):
+                j = frng.randrange(len(xs_s))
+                bx = int(xs_s[j]); by = int(ys_s[j])
+                br = frng.randint(max(2, ts // 5), max(4, int(ts * 0.34)))
+                p._round_rock(top_surf, bx, by, br, frng, JW_TOP, JW_HILITE, JW_TOP_SH)
+            nm = min(6000, max(4, int(ntile * 1.2)))         # fiocchi di muschio
+            for _ in range(nm):
+                j = frng.randrange(len(xs_s))
+                mx = int(xs_s[j]); my = int(ys_s[j])
+                mc = JW_MOSS if frng.random() < 0.6 else JW_MOSS_DK
+                pygame.draw.circle(top_surf, mc, (mx, my), frng.randint(1, max(1, ts // 8)))
             va2 = sa.pixels_alpha(top_surf)
             np.minimum(va2, solid.T.astype(np.uint8) * 255, out=va2); del va2
 
@@ -670,27 +688,19 @@ class MapRenderer:
             depth[k:H + k][newly] = k
         solid_full = np.zeros((Hf, W), bool); solid_full[:H] = solid
         cliff &= ~solid_full
-        CL = np.array(JW_CLIFF, np.float32); CLdk = np.array(JW_CLIFF_DK, np.float32)
-        CLhi = np.array(JW_CLIFF_HI, np.float32)
+        # Parete in tono di ROCCIA (non nera, cosi non sembra un buco): spalla
+        # illuminata in alto (CLhi) che sfuma al grigio-pietra JW_CLIFF in basso.
+        CL = np.array(JW_CLIFF, np.float32); CLhi = np.array(JW_CLIFF_HI, np.float32)
         ms = pygame.Surface((W, Hf), pygame.SRCALPHA)
         c3 = sa.pixels3d(ms); ca = sa.pixels_alpha(ms)
         dfrac = (depth.astype(np.float32) / max(1, Hh))[..., None]
-        clrgb = (CL + (CLdk - CL) * np.clip(dfrac * 1.5, 0, 1))   # piu scura in basso
-        clrgb = np.where((depth == 1)[..., None], CLhi, clrgb)    # spalla illuminata
+        clrgb = CLhi + (CL - CLhi) * np.clip(dfrac * 1.1, 0, 1)
         cmask3 = cliff[..., None]
         c3[:] = np.where(cmask3, clrgb, 0).astype(np.uint8).transpose(1, 0, 2)
         ca[:] = (cliff.T.astype(np.uint8) * 255)
         del c3, ca
         # cima sopra la parete.
         ms.blit(top_surf, (0, 0))
-        # ombra di contatto scura dove la parete tocca terra (ultima riga utile).
-        base = cliff & ~np.vstack([cliff[1:], np.zeros((1, W), bool)])
-        if base.any():
-            cs = pygame.Surface((W, Hf), pygame.SRCALPHA)
-            cb = sa.pixels3d(cs); cab = sa.pixels_alpha(cs)
-            cb[base.T] = (0, 0, 0); cab[base.T] = JW_CONTACT[3]
-            del cb, cab
-            ms.blit(cs, (0, 0))
 
         # --- (3) RIM chiaro/scuro lungo il NUOVO contorno (definizione) -------
         rim = pygame.Surface((W, H), pygame.SRCALPHA)

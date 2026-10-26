@@ -128,34 +128,44 @@ Passaggi completati:
   _jungle_solid/_build_jungle_walls/_build_jungle_shadow; _build_ao ora prende la
   silhouette). La SAGOMA non e' piu per-tile: si ricava da una maschera binaria e
   si ammorbidisce, cosi diagonali e muri isolati non mostrano la griglia.
-  _jungle_solid: (1) maschera binaria dei TILE muro-giungla; (2) a bassa
-  risoluzione (STEP ts/4) blur ~gaussiano (3 box blur separabili via somme
-  cumulate, _sep_blur, raggio ~0.6 tile) su (quadrati UNION dischi ai centri),
-  upscalata bilineare a piena risoluzione, poi SOGLIA 0.5 col rumore di bordo
-  (_np_vnoise, ampiezza 0.33) -> diagonali vere, angoli tondi, contorno
-  IRREGOLARE pixel-art (soglia booleana, niente AA). CLAMP mezzo tile (la
-  COLLISIONE resta sui tile): distanza low-res dai centri-muro (_dist_lo); ogni
-  cella entro ~0.4 tile da un centro resta piena (i muri piccoli diventano BLOB
-  tondi, non spariscono, non rettangoli) e la sagoma non sborda oltre ~mezzo tile
-  (allowed, dist<=0.98 tile dal centro). _build_jungle_walls riempie la
-  silhouette: cima = roccia mottled (rumore low-res a strisce, lerp
-  JW_TOP..JW_TOP_HI + avvallamenti JW_TOP_SH + muschio JW_MOSS/_DK + fessure
-  JW_CLIFF_DK) ritagliata alla sagoma, con FACCETTE _rock_facet sparse per dare
-  volume; MASSI _round_rock lungo il NUOVO contorno (chiari verso N/O, scuri
-  verso S/E); PARETE 2.5D (cliff) che segue il bordo sud della sagoma (depth per
-  colonna, spalla JW_CLIFF_HI in alto, piu scura in basso, ombra di contatto alla
-  base) estrusa su di H. Tutto su un'unica Surface a piena mappa, poi blit LAZY
-  per chunk (solo i blocchi con alpha). _build_jungle_shadow: ombra proiettata a
-  SUD-EST dalla SILHOUETTE (non dai tile), accumulata a bassa risoluzione con
-  alfa calante e upscalata. _build_ao: l'occupazione low-res viene dalla
-  silhouette (+ cespugli e pietra per-tile) -> l'AO segue il contorno curvo, non
-  piu rettangoli allineati ai tile (risolve il "pilastro" con AO quadrata). Il
-  MURO DI CONFINE in pietra (TILE_WALL) e i CESPUGLI restano per-tile come prima.
+  _jungle_solid: (1) maschera binaria dei TILE muro-giungla; (2) campo da DISCHI
+  sovrapposti sui centri-muro (NON dai quadrati dei tile: l'unione di dischi non
+  ha spigoli di griglia -> niente lati dritti/basi rettangolari residue), blur
+  ~gaussiano a bassa risoluzione (STEP ts/4; 3 box blur separabili via somme
+  cumulate, _sep_blur, raggio ~0.55 tile), upscalato bilineare a piena
+  risoluzione, poi SOGLIA 0.5. Il rumore di bordo (_np_vnoise, ampiezza 0.33) si
+  applica SOLO nella fascia di transizione (0.22<bf<0.80): l'INTERNO (bf alto)
+  resta SEMPRE pieno e l'ESTERNO (bf basso) sempre vuoto -> contorno irregolare
+  pixel-art SOLO al bordo, e NIENTE buchi/fessure nere dentro il muro. CLAMP
+  mezzo tile (la COLLISIONE resta sui tile): distanza low-res dai centri-muro
+  (_dist_lo); ogni cella entro ~0.42 tile da un centro resta piena (i muri
+  piccoli diventano BLOB tondi, non spariscono ne restano rettangoli) e la sagoma
+  non sborda oltre ~mezzo tile (allowed, dist<=1.0 tile dal centro).
+  _build_jungle_walls riempie la silhouette: cima = roccia mottled chiaro/scuro
+  (rumore low-res a strisce, lerp JW_TOP..JW_TOP_HI, avvallamenti verso JW_TOP_SH,
+  NON neri) + muschio JW_MOSS/_DK, ritagliata alla sagoma; sopra, per la DENSITA'
+  della vecchia texture: tante FACCETTE spigolose _rock_facet (~2-3 per tile:
+  piatti + crepe nette + volume), qualche MASSO tondo _round_rock in rilievo e
+  fiocchi di muschio. MASSI _round_rock anche lungo il NUOVO contorno (chiari
+  verso N/O, scuri verso S/E). PARETE 2.5D (cliff) che segue il bordo sud della
+  sagoma (depth per colonna) in tono di ROCCIA (spalla JW_CLIFF_HI in alto ->
+  JW_CLIFF in basso, NON nera, cosi non sembra un buco; niente contatto nero: il
+  contatto a terra lo da gia il layer ombre). Tutto su un'unica Surface a piena
+  mappa, poi blit LAZY per chunk (solo i blocchi con alpha). _build_jungle_shadow:
+  ombra proiettata a SUD-EST dalla SILHOUETTE (non dai tile), accumulata a bassa
+  risoluzione con alfa calante e upscalata. _build_ao: l'occupazione low-res
+  viene dalla silhouette (+ cespugli e pietra per-tile) -> l'AO segue il contorno
+  curvo, non piu rettangoli allineati ai tile (risolve il "pilastro" con AO
+  quadrata). Il MURO DI CONFINE in pietra (TILE_WALL) e i CESPUGLI restano
+  per-tile come prima.
   Rimossi i vecchi builder per-tile dei jungle wall (_jwall_surf/_build_jwall) e
   l'autotiling (_carve_autotile/_autotile_footprint/_mask8); _rock_facet/
   _round_rock/_jitter restano, riusati dalla silhouette. Costo build una-tantum:
-  3v3 ~8s, 5v5 ~18s (noise a bassa risoluzione). Screenshot: screenshots/step_9.png
-  (diagonale lungo il fiume) e step_9_over.png (minimappa).
+  3v3 ~8s, 5v5 ~17s (noise a bassa risoluzione). Correzioni post-revisione (vedi
+  sopra: dischi anziche quadrati, rumore solo al bordo, cliff/base in tono di
+  roccia, densita' di faccette/massi/muschio): niente piu macchie nere interne,
+  basi/bordi curvi che seguono la maschera, superficie meno piatta. Screenshot:
+  screenshots/step_9.png (diagonale lungo il fiume) e step_9_over.png (minimappa).
 
 Scelte tecniche importanti:
 - canopy resta RISERVATO e VUOTO; lighting_overlay ora porta il velo d'atmosfera
