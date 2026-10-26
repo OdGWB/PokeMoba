@@ -102,11 +102,19 @@ Passaggi completati:
   _build_lighting), SOPRA le unita: (a) ombre della chioma = rumore a bassa
   frequenza (_np_vnoise, chiazze ~6 tile) scuro #0C1613, SOLO sulla giungla
   (tutto cio che non e' TILE_LANE) con un velo base uniforme -> la giungla resta
-  piu cupa delle lane; (b) poche macchie di luce calda #B68246 vicino ai campi
-  (falloff gaussiano, raggio ~3 tile) che "aprono" la chioma scurita (radura
-  illuminata); (c) composite warm-over-dark premoltiplicato in un'unica RGBA per
-  pixel, calcolato a strisce (niente array a piena mappa) e blittato a blocchi
-  CHUNK lazy. Alfe contenute: le unita restano leggibili. Vignettatura leggera
+  piu cupa delle lane; (b) poche macchie di luce calda #DC925C (arancio chiaro)
+  vicino ai campi (falloff gaussiano, raggio ~3 tile) che "aprono" la chioma
+  scurita (radura illuminata); (c) composite warm-over-dark premoltiplicato in
+  un'unica RGBA per pixel, calcolato a strisce (niente array a piena mappa) e
+  blittato a blocchi CHUNK lazy. Alfe contenute: le unita restano leggibili.
+  LEGGIBILITA' DEI MURI: la cima dei muri (TILE_WALL/TILE_JUNGLE_WALL) e' quasi
+  esclusa dal velo di chioma (resta al 30%, WALL_CANOPY_KEEP) e attenua la luce
+  calda (resta al 35%, WALL_WARM_KEEP), cosi i muri restano nettamente piu
+  chiari del terreno (a colpo d'occhio e in minimappa si distingue il
+  calpestabile). I muri sono estrusi verso l'alto di H, quindi la maschera a
+  piena risoluzione (wall_px) marca anche la fascia della CIMA indicizzando la
+  riga del muro sia da y//ts sia da (y+H)//ts. I cespugli NON sono esclusi (sono
+  vegetazione: il velo ci sta bene). Vignettatura leggera
   (VIGNETTE_*) scurisce i bordi dello SCHERMO: screen-space, costruita una volta
   per dimensione vista (_vignette, cache) e blittata per ultima in draw_canopy,
   NON nei layer di mappa. Screenshot: screenshots/step_7.png (ravvicinato con

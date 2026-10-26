@@ -52,9 +52,13 @@ CANOPY_DARK = (12, 22, 19)       # verde-nero freddo
 CANOPY_BASE = 20                 # velo uniforme sulla giungla (giungla < lane)
 CANOPY_AMP = 64                  # extra nelle chiazze di chioma densa
 # Campi dei mostri: poche macchie di luce calda e tenue (radura illuminata).
-CAMP_WARM = (182, 130, 70)       # luce calda
+CAMP_WARM = (220, 146, 92)       # luce calda, arancio chiaro (meno giallo-verde)
 CAMP_WARM_A = 98                 # alfa al centro della macchia
 CAMP_R_TILES = 3.0               # raggio della macchia di luce
+# Quanto il velo di chioma e la luce calda SI RIDUCONO sulla cima dei muri:
+# i muri devono restare ben piu chiari del terreno (leggibilita del calpestabile).
+WALL_CANOPY_KEEP = 0.30          # la chioma sui muri resta al 30%
+WALL_WARM_KEEP = 0.35            # la luce calda sui muri resta al 35%
 # Vignettatura: leggero scurimento ai bordi dello SCHERMO (screen-space).
 VIGNETTE_COL = (8, 14, 14)
 VIGNETTE_A = 92
@@ -458,13 +462,25 @@ class MapRenderer:
         Wt, Ht = grid.width, grid.height
         W, H = Wt * ts, Ht * ts
         tiles = grid.tiles
-        # Giungla = tutto cio che NON e' lane (a livello tile).
+        # Giungla = tutto cio che NON e' lane (a livello tile). Muri a parte:
+        # la loro CIMA va quasi esclusa dal velo (restano i rilievi piu chiari).
         jungle = np.ones((Ht, Wt), np.float32)
+        wall_t = np.zeros((Ht, Wt), bool)
         for ty in range(Ht):
             row = tiles[ty]
             for tx in range(Wt):
                 if row[tx] == TILE_LANE:
                     jungle[ty, tx] = 0.0
+                elif row[tx] in (TILE_WALL, TILE_JUNGLE_WALL):
+                    wall_t[ty, tx] = True
+        # Maschera dei muri a piena risoluzione: il muro e' estruso verso l'alto
+        # di H, quindi la sua cima cade nella cella SOPRA -> marco anche quella
+        # fascia (indicizzando la riga del muro sia da y//ts che da (y+H)//ts).
+        Hx = self._H
+        ry_base = np.clip(np.arange(H) // ts, 0, Ht - 1)
+        ry_cap = np.clip((np.arange(H) + Hx) // ts, 0, Ht - 1)
+        cx_tile = np.clip(np.arange(W) // ts, 0, Wt - 1)
+        wall_px = (wall_t[ry_base][:, cx_tile] | wall_t[ry_cap][:, cx_tile])  # (H, W) bool
         # Rumore a bassa frequenza (chiome) per tile -> chiazze d'ombra densa.
         TX = np.arange(Wt, dtype=np.float32)[None, :]
         TY = np.arange(Ht, dtype=np.float32)[:, None]
@@ -502,9 +518,14 @@ class MapRenderer:
                     continue
                 dx = px_x - cxp; dy = ry - cyp
                 np.maximum(w, np.exp(-(dx * dx + dy * dy) / (Rpx * Rpx)), out=w)
+            # Sulla CIMA dei muri il velo si riduce quasi a zero e la luce calda
+            # si attenua: i muri restano nettamente piu chiari del terreno.
+            wpx = wall_px[yb:ye]
+            keep_canopy = np.where(wpx, WALL_CANOPY_KEEP, 1.0).astype(np.float32)
+            keep_warm = np.where(wpx, WALL_WARM_KEEP, 1.0).astype(np.float32)
             # Ombra della chioma (ridotta vicino ai campi) + luce calda, composite.
-            ad = (CANOPY_BASE + CANOPY_AMP * sden_px) * jung_px * (1.0 - 0.85 * w)
-            aw = CAMP_WARM_A * w
+            ad = (CANOPY_BASE + CANOPY_AMP * sden_px) * jung_px * (1.0 - 0.85 * w) * keep_canopy
+            aw = CAMP_WARM_A * w * keep_warm
             ad01 = ad / 255.0; aw01 = aw / 255.0
             out_a = aw01 + ad01 * (1.0 - aw01)
             denom = np.where(out_a > 1e-4, out_a, 1.0)
