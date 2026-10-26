@@ -61,6 +61,17 @@ Passaggi completati:
   sassolini e foglie. La terra resta solo sui tile d'erba (gli altri ritagliati)
   e sul sentiero NON si disegnano fili d'erba. I campi arrivano via
   MapRenderer.set_camps(camps). Screenshot: screenshots/step_4.png.
+- Incroci FUSI + radura del campo (_stroke_paths rifatto): i dischi di TUTTE le
+  rotte confluiscono in UN SOLO insieme (er_d/br_d/mr_d/cr_d). Ogni rotta si
+  rasterizza nella propria bbox ma con l'UNIONE dei dischi che la toccano, quindi
+  dove due sentieri si incrociano o condividono un tratto (piu campi -> stessa
+  lane) le maschere sono l'unione: un UNICO incrocio a bordi fusi, senza strisce
+  sovrapposte ne doppi bordi scuri. Le bbox che si sovrappongono ricompongono gli
+  STESSI pixel (stesse maschere di unione + dithering in coord assolute) ->
+  idempotente. Ogni ramo TERMINA sul suo campo con una RADURA tonda di terra
+  battuta (disco centrato sul tile del campo, aggiunto ai dischi): il sentiero
+  "porta a un campo" e non svanisce piu nell'erba vicino a un muro. Screenshot:
+  screenshots/step_5.png (incrocio) e step_5_over.png (mappa intera).
 - Cespugli ricolorati coi toni della giungla (BUSH_* in renderer.py: base
   #1F3B24, luce #3E6B3A, cresta non-lime): armonia con la nuova palette, in
   attesa del rifacimento completo delle chiome (passo futuro).

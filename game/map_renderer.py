@@ -540,6 +540,15 @@ class MapRenderer:
         PEBBLE = ((72, 68, 62), (104, 98, 88))
         LEAF = (BUSH_MID, (96, 104, 60))
 
+        # --- 1. Geometria di OGNI rotta (spline deformata + larghezza variabile)
+        #     e relativi dischi. I dischi di TUTTE le rotte confluiscono in UN
+        #     SOLO insieme: dove due sentieri si incrociano o condividono un
+        #     tratto le maschere sono l'UNIONE -> un unico incrocio a bordi fusi,
+        #     senza strisce sovrapposte né doppi bordi scuri. Ogni rotta termina
+        #     sul suo CAMPO con una RADURA tonda di terra battuta, così il ramo
+        #     "porta a un campo" e non svanisce nell'erba vicino a un muro.
+        er_d = []; br_d = []; mr_d = []; cr_d = []   # dischi globali: (x, y, r)
+        geoms = []                                   # per rotta, per decori/bbox
         for route in routes:
             pts = [(tx * ts + ts / 2, ty * ts + ts / 2) for (tx, ty) in route]
             ctrl = pts[::2]
@@ -550,7 +559,7 @@ class MapRenderer:
                 continue
             seed = (hash(route[0]) & 0xFFFF)
             amp = ts * 0.45
-            samp = []; perps = []; cr = []; mr = []; er = []
+            samp = []; perps = []; cr = []; er = []
             for i, (x, y) in enumerate(curve):
                 px, py = curve[max(0, i - 1)]
                 nx, ny = curve[min(len(curve) - 1, i + 1)]
@@ -562,28 +571,50 @@ class MapRenderer:
                 samp.append((sx, sy)); perps.append(perp)
                 # Larghezza variabile lungo il percorso (rumore): ~1-2 tile.
                 rm = 0.72 + 0.6 * p._vnoise(i * 0.5 + seed * 0.013, seed * 0.07)
-                cr.append(max(1, int(ts * 0.30 * rm)))
-                mr.append(max(1, int(ts * 0.52 * rm)))
-                er.append(max(1, int(ts * 0.74 * rm)))
-            marg = int(ts * 1.2)
-            xs = [q[0] for q in samp]; ys = [q[1] for q in samp]
+                cri = max(1, int(ts * 0.30 * rm)); mri = max(1, int(ts * 0.52 * rm))
+                eri = max(1, int(ts * 0.74 * rm))
+                cr.append(cri); er.append(eri)
+                er_d.append((sx, sy, eri)); br_d.append((sx, sy, (mri + eri) // 2))
+                mr_d.append((sx, sy, mri)); cr_d.append((sx, sy, cri))
+            # Radura del campo (route[0]): disco tondo centrato sul tile del campo
+            # -> il sentiero finisce in uno slargo di terra, segno del campo.
+            ctx, cty = route[0]
+            ccx, ccy = ctx * ts + ts / 2, cty * ts + ts / 2
+            ce = max(2, int(ts * 0.92)); cmd = max(2, int(ts * 0.64)); ccr = max(1, int(ts * 0.38))
+            er_d.append((ccx, ccy, ce)); br_d.append((ccx, ccy, (cmd + ce) // 2))
+            mr_d.append((ccx, ccy, cmd)); cr_d.append((ccx, ccy, ccr))
+            xs = [q[0] for q in samp] + [ccx]; ys = [q[1] for q in samp] + [ccy]
+            geoms.append((samp, perps, cr, er, xs, ys, hash(route[-1]) & 0xFFFFFFFF))
+        if not geoms:
+            return
+
+        marg = int(ts * 1.4)
+
+        def discs_in(lst, bx0, by0, bx1, by1):
+            return [(x, y, r) for (x, y, r) in lst
+                    if x + r >= bx0 and x - r <= bx1 and y + r >= by0 and y - r <= by1]
+
+        # --- 2. Rasterizza ogni rotta nella sua bbox, ma con l'UNIONE di TUTTI i
+        #     dischi che la toccano (fusione degli incroci). Le bbox che si
+        #     sovrappongono ricompongono gli STESSI pixel (stesse maschere, stesso
+        #     dithering in coord assolute) -> idempotente, nessun doppio strato.
+        for (samp, perps, cr, er, xs, ys, dseed) in geoms:
             bx0 = max(0, int(min(xs)) - marg); by0 = max(0, int(min(ys)) - marg)
             bx1 = min(Wt * ts, int(max(xs)) + marg); by1 = min(Ht * ts, int(max(ys)) + marg)
             bw, bh = bx1 - bx0, by1 - by0
             if bw <= 0 or bh <= 0:
                 continue
 
-            # Maschere piene dei 3 raggi (unione di dischi lungo il percorso).
+            # Maschere piene dei raggi (unione di TUTTI i dischi nella bbox).
             temp = pygame.Surface((bw, bh))
 
-            def mask(radii):
+            def mask(lst):
                 temp.fill((0, 0, 0))
-                for (x, y), r in zip(samp, radii):
+                for (x, y, r) in discs_in(lst, bx0, by0, bx1, by1):
                     pygame.draw.circle(temp, (255, 255, 255), (int(x - bx0), int(y - by0)), r)
                 return sa.array_red(temp) > 127
 
-            br = [(m + e) // 2 for m, e in zip(mr, er)]   # raggio intermedio del bordo
-            em = mask(er); bm = mask(br); mm = mask(mr); cm = mask(cr)
+            em = mask(er_d); bm = mask(br_d); mm = mask(mr_d); cm = mask(cr_d)
             ax = (bx0 + np.arange(bw))[:, None]
             ay = (by0 + np.arange(bh))[None, :]
             bay = _BAYER[ay % 4, ax % 4]            # soglia di dithering per pixel
@@ -601,7 +632,7 @@ class MapRenderer:
             va = sa.pixels_alpha(ribbon); va[:] = alpha.astype(np.uint8); del va
 
             # Ciuffi d'erba che invadono la terra dal bordo + sassolini e foglie.
-            rng = random.Random(hash(route[-1]) & 0xFFFFFFFF)
+            rng = random.Random(dseed)
             for i in range(0, len(samp), 2):
                 x, y = samp[i]; pxp, pyp = perps[i]
                 if rng.random() < 0.5:               # ciuffo d'erba dal bordo verso l'interno
