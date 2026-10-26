@@ -231,20 +231,46 @@ Passaggi completati:
   variante 0-7 + palette) disegnati poche decine di volte e BLITTATI a migliaia
   -> build di nuovo ~8s (3v3) / ~17s (5v5) nonostante la densita' molto maggiore.
   Screenshot: screenshots/step_12.png (ravvicinato) e step_12_over.png (minimappa).
+- CESPUGLI come ERBA ALTA stile Pokemon (step_13), su richiesta: i cespugli
+  NON sono piu palline-chioma come i muri (prima erano indistinguibili dalla
+  vegetazione dei muri). Nuovo game/renderer.py _build_bush (rifatto da zero) +
+  helper _blade; via _sphere (non piu usato). Ogni tile BUSH e' una macchia di
+  LAME a V: niente cerchi, solo triangoli sottili che salgono dalla base.
+  (1) Disegno a BASSA RISOLUZIONE (PX = ts//12 px schermo per px logico) su una
+  Surface piccola, poi pygame.transform.scale NEAREST a (ts, ts+H) -> pixel
+  grossi, look retro (come da CLAUDE.md). (2) PALETTE giallo-oliva CHIARA
+  (GRASS_BASE..GRASS_HILITE in renderer.py: base #22361C, lame #38521F/#5C7C2E/
+  #86A63C, punte #B8CE5C) scelta apposta per STACCARE dalla chioma scura dei muri
+  (BUSH_*): leggibile a colpo d'occhio e in minimappa. (3) Ogni LAMA = triangolo
+  col CONTORNO scuro (GRASS_OUT, triangolo piu largo dietro) poi il colore dentro
+  -> bordo netto pixel-art. I ciuffi sono VENTAGLI a V (2-4 lame con lean
+  crescente). (4) STRATI dal piu' SCURO al piu' CHIARO verso la luce: il colore
+  della lama dipende da uno `score` = altezza della punta + bias verso
+  ALTO-SINISTRA; le lame si disegnano ordinate per score (retro scuro/corto ->
+  fronte chiaro/alto), e il colpo di luce GRASS_HILITE tocca SOLO le punte nella
+  meta' superiore e a sinistra. (5) SILHOUETTE irregolare: le punte bucano il
+  bordo alto del tile (dentro l'estrusione H), niente cima piatta. (6) Banda di
+  base scura che riempie tutta la larghezza (erba continua coi vicini, nessun
+  buco tra tile) + ombra di contatto a BASSO-DESTRA solo sui lati esposti (mask).
+  Seme per tile (variant) -> ciuffi diversi dai vicini; sprite in cache come
+  prima (chiave mask+variant+H). Screenshot: screenshots/step_13.png (ravvicinato,
+  erba accanto a un muro per il confronto) e step_13_over.png (minimappa).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul
   bordo sud (sopra le unita, vedi passo rilievi pseudo-3D). lighting_overlay
   porta il velo d'atmosfera (chioma + luce campi). La vignettatura e'
-  screen-space e vive in draw_canopy, fuori dai layer. Le chiome dei CESPUGLI
-  (TILE_BUSH) stanno ancora in walls_base e restano per-tile/squadrate (ora NON
-  si sovrappongono ai muri, ma la silhouette ad alberi e' solo dei muri): il
-  rifacimento dei cespugli nello stesso stile e' un passaggio futuro a se.
+  screen-space e vive in draw_canopy, fuori dai layer. I CESPUGLI (TILE_BUSH)
+  stanno in walls_base e sono resi per-tile da _build_bush come ERBA ALTA a lame
+  a V (vedi step_13): stile e palette DIVERSI dai muri apposta, per distinguerli
+  a colpo d'occhio e in minimappa. Restano disegnati PRIMA dei muri, quindi un
+  muro che li sovrasta li copre.
 - TILE_WALL (muro di confine) NON e' piu reso come pietra per-tile: e' entrato
   nella silhouette vegetata dei muri (foresta+scogliera). I builder di pietra
   (_tall_surf/_paint_stone_tall) e _rock_facet/_round_rock restano in
   renderer.py ma non sono piu usati dalla mappa. Gli altri sprite dei tile
-  (lane/acqua/cespugli) restano invariati, costruiti dal Renderer.
+  (lane/acqua) restano invariati, costruiti dal Renderer; i cespugli sono ora
+  erba alta (step_13).
 - Offset camera: camera.snap() arrotonda l'offset a interi UNA volta per
   frame (camera.ox/oy); mappa e unita (world_to_screen) usano lo stesso
   valore -> niente tremolio di 1px ne seam tra chunk su scroll sub-pixel

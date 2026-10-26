@@ -89,6 +89,16 @@ BUSH_HILITE = (84, 128, 74)      # colpo di luce sulla cupola
 BUSH_RIMLIGHT = (104, 146, 86)   # cresta sul bordo alto esposto (giungla, non lime)
 BUSH_RIM = (8, 20, 12)           # contorno/contatto scuro alla base
 BUSH_CONTACT = (0, 0, 0, 110)    # ombra proiettata sull'erba (radica a terra)
+# --- ERBA ALTA (cespugli, stile Pokemon): ciuffi a V, verde CHIARO e tendente
+#     al giallo-oliva, per staccare NETTAMENTE dalla chioma scura dei muri
+#     (anche in minimappa). Niente cerchi: solo lame triangolari.
+GRASS_BASE = (34, 54, 28)        # fondo/radici in ombra (banda a terra)
+GRASS_DARK = (56, 82, 34)        # lame basse / sul retro (oliva scuro)
+GRASS_MID = (92, 124, 46)        # lame a mezza altezza (oliva)
+GRASS_LIGHT = (134, 166, 60)     # lame in alto, verso la luce (giallo-oliva)
+GRASS_HILITE = (184, 206, 92)    # punte illuminate (meta' superiore, alto-sx)
+GRASS_OUT = (20, 36, 18)         # contorno scuro delle lame
+GRASS_CONTACT = (0, 0, 0, 96)    # ombra a terra (basso-destra)
 # Muro di confine (TILE_WALL): pietra grigia fredda (resta un muro costruito).
 STONE_WALL = ((118, 120, 130), (70, 72, 82), (40, 42, 50), (52, 54, 62))
 # --- Altopiano roccioso della giungla (reso neighbor-aware: un blocco connesso
@@ -268,140 +278,102 @@ class Renderer:
         return s
 
     @staticmethod
-    def _sphere(surf, cx, cy, r, sh_col, hi_col):
-        """Sfera illuminata da alto-sinistra: anelli concentrici dal colore
-        d'ombra (bordo) al colpo di luce (centro spostato in alto-sinistra).
-        È il mattone 3D delle chiome: dà volume vero, non un cerchio piatto."""
-        for i in range(r, 0, -1):
-            f = (i / r) ** 0.85                       # 1 bordo .. 0 centro
-            col = (int(hi_col[0] + (sh_col[0] - hi_col[0]) * f),
-                   int(hi_col[1] + (sh_col[1] - hi_col[1]) * f),
-                   int(hi_col[2] + (sh_col[2] - hi_col[2]) * f))
-            off = int((r - i) * 0.42)                 # luce verso alto-sinistra
-            pygame.draw.circle(surf, col, (cx - off, cy - off), i)
+    def _blade(target, bx, by, h, lean, w, col, out):
+        """Una lama d'erba: triangolo sottile dalla base (bx,by) alla punta,
+        inclinato di `lean` px. Prima il contorno scuro (triangolo piu largo),
+        poi il colore dentro -> ogni lama ha il suo bordo netto (pixel-art)."""
+        tipx, tipy = bx + lean, by - h
+        pygame.draw.polygon(target, out, ((bx - w - 1, by), (bx + w + 1, by),
+                                          (tipx, tipy - 1)))
+        if w >= 1:
+            pygame.draw.polygon(target, col, ((bx - w, by - 1), (bx + w, by - 1),
+                                              (tipx, tipy + 1)))
+        else:
+            pygame.draw.line(target, col, (bx, by - 1), (tipx, tipy + 1))
 
     def _build_bush(self, mask: int, variant: int, ts: int, H: int) -> pygame.Surface:
-        """Un tile come pezzo di un'unica chioma.
+        """Un tile di ERBA ALTA (stile Pokemon): ciuffi di lame a V, densi,
+        verde chiaro giallo-oliva. NIENTE cerchi: solo lame triangolari che
+        salgono dalla base. Sagoma irregolare (le punte bucano il bordo alto del
+        tile, entro l'estrusione H). Si disegna a BASSA risoluzione e si scala
+        in modo nearest -> pixel grossi, look retro.
 
-        mask bit: 1=N 2=E 4=S 8=W (anch'esso cespuglio). Sui lati INTERNI la
-        chioma riempie a filo del bordo e i lobi di foglie sconfinano -> la
-        massa è continua coi vicini; sui lati ESPOSTI si arrotonda con stacco
-        netto dal terreno (contorno scuro + ombra di contatto).
-        """
+        mask bit: 1=N 2=E 4=S 8=W (vicino anch'esso erba). Sui lati INTERNI la
+        banda di base riempie a filo del bordo (erba continua coi vicini); sui
+        lati ESPOSTI c'e' ombra di contatto (basso-destra) e il bordo resta
+        libero -> i tile insieme leggono come UNA macchia d'erba, ma ogni tile
+        ha il suo seme (ciuffi diversi dai vicini)."""
         n = bool(mask & 1); e = bool(mask & 2); s = bool(mask & 4); w = bool(mask & 8)
         surf = pygame.Surface((ts, ts + H), pygame.SRCALPHA)
         rng = random.Random((variant * 2654435761 ^ 0xB5) & 0xFFFFFFFF)
-        L, R = 0, ts
-        Ctop = 0 if n else max(1, int(H * 0.5))
-        B = ts + H                      # terra
-        span = max(1, B - Ctop)
-        cx, cy = (L + R) // 2, (Ctop + B) // 2
-        # Lato alto-sinistra esposto = cresta illuminata; basso-destra = fianco
-        # in ombra -> i tile insieme leggono come UN'UNICA cupola 3D.
 
-        def shape(target, color):
-            """Silhouette: tonda sui lati ESPOSTI (N/E/W), a filo su quelli
-            interni; base SEMPRE piatta (il cespuglio appoggia a terra)."""
-            pygame.draw.ellipse(target, color, pygame.Rect(L, Ctop, R - L, B - Ctop))
-            pygame.draw.rect(target, color, pygame.Rect(L, cy, R - L, B - cy))  # base piatta
-            if n:
-                pygame.draw.rect(target, color, pygame.Rect(L, Ctop, R - L, cy - Ctop))
-            if w:
-                pygame.draw.rect(target, color, pygame.Rect(L, Ctop, cx - L, B - Ctop))
-            if e:
-                pygame.draw.rect(target, color, pygame.Rect(cx, Ctop, R - cx, B - Ctop))
+        # Risoluzione ridotta: PX px schermo per 1 px logico; poi scale nearest.
+        PX = max(2, ts // 12)
+        lw = ts // PX
+        lh = (ts + H) // PX
+        lo = pygame.Surface((lw, lh), pygame.SRCALPHA)
+        B = lh                              # riga di terra (base del tile)
+        tile_top = H // PX                  # confine tile/estrusione in low-res
+        ground = B                          # le lame radicano a terra
 
-        # (1) Ombra di contatto sull'erba (stacco netto dal pavimento).
-        if not (n and e and s and w):
-            sh = pygame.Surface((ts, ts + H), pygame.SRCALPHA)
-            pygame.draw.ellipse(sh, BUSH_CONTACT,
-                                pygame.Rect(1, B - int(ts * 0.42), ts - 2, int(ts * 0.5)))
-            surf.blit(sh, (0, 0))
+        # (1) Ombra di contatto a terra, verso BASSO-DESTRA, solo sui lati esposti.
+        if not s or not e:
+            sh = pygame.Surface((lw, lh), pygame.SRCALPHA)
+            ox = 1 if not e else 0
+            pygame.draw.ellipse(sh, GRASS_CONTACT,
+                                pygame.Rect(ox, B - max(2, lh // 6),
+                                            lw - 1, max(2, lh // 5)))
+            lo.blit(sh, (0, 0))
 
-        # La chioma si disegna a parte e poi si RITAGLIA sulla silhouette tonda.
-        canopy = pygame.Surface((ts, ts + H), pygame.SRCALPHA)
-        shape(canopy, BUSH_DARK)        # massa base
+        # (2) Banda di base scura (radici): riempie tutta la larghezza -> nessun
+        #     buco tra tile vicini. Alta ~1/4 del tile.
+        band_h = max(2, (lh - tile_top) // 4)
+        pygame.draw.rect(lo, GRASS_BASE, pygame.Rect(0, B - band_h, lw, band_h))
 
-        # (2) GRAPPOLI: pochi, grandi, ognuno una SFERA illuminata (vero 3D). La
-        #     luce è come i muretti: VERTICALE (cima chiara, base in ombra), con
-        #     un filo di bias a sinistra. Il tono dipende dalla posizione nel
-        #     grappolo (non per-tile) -> niente cuciture tra tile vicine.
-        tiers = ((BUSH_SHADOW, BUSH_DARK),     # 0: fondo/fronte in ombra
-                 (BUSH_DARK, BUSH_MID),        # 1: corpo
-                 (BUSH_MID, BUSH_LIGHT),       # 2: cupola a mezza luce
-                 (BUSH_LIGHT, BUSH_HILITE))    # 3: cresta illuminata
-        clumps = []
-        base_r = int(ts * 0.4)
-        for gyq in range(3):
-            for gxq in range(3):
-                if (gxq + gyq) % 2 and rng.random() < 0.45:
-                    continue
-                px = L + int((gxq + 0.5) / 3 * (R - L)) + rng.randint(-3, 3)
-                py = Ctop + int((gyq + 0.4) / 3 * span) + rng.randint(-3, 3)
-                r = base_r + rng.randint(-ts // 8, ts // 10)
-                clumps.append((px, py, max(4, r)))
-        # dal fondo alla cima: i grappoli alti coprono quelli bassi (profondità).
-        clumps.sort(key=lambda c: c[1], reverse=True)
-        # Bias globale sul grappolo (non per-tile): così una colonna di tile è
-        # un gradiente unico cima->base, senza cuciture tra una tile e l'altra.
-        vbias = (0.34 if (s and not n) else -0.30 if (n and not s) else 0.0)
-        hbias = (0.10 if (e and not w) else -0.10 if (w and not e) else 0.0)
-        for px, py, r in clumps:
-            hn = (py - Ctop) / span                 # 0 cima .. 1 base
-            xn = max(0.0, min(1.0, px / ts))
-            score = (1.0 - hn) + vbias + hbias       # dominante: l'altezza
-            score += (0.15 * (1.0 - xn)) if not w else 0.0
-            if not s:
-                score -= 0.22 * hn                   # la base esposta va in ombra
-            ti = 3 if score > 0.74 else 2 if score > 0.48 else 1 if score > 0.24 else 0
-            sh_col, hi_col = tiers[ti]
-            self._sphere(canopy, px, py, r, sh_col, hi_col)
+        # (3) CIUFFI A V: basi sparse lungo tutta la larghezza; ogni ciuffo e' un
+        #     ventaglio di 2-4 lame. Il colore della lama dipende dall'ALTEZZA
+        #     della punta (bassa=scuro .. alta=chiaro) con BIAS verso ALTO-SINISTRA
+        #     (la luce): le punte alte a sinistra prendono il colpo di luce.
+        #     Raccolgo le lame e le disegno dal RETRO (scure/corte) al FRONTE
+        #     (chiare/alte) cosi' le punte illuminate stanno sopra.
+        hmax = (lh - tile_top) + tile_top * 0.6   # altezza max lama (buca il tile)
+        xl = max(1, lw - 1)
+        blades = []
+        nb = 2 * lw                                # densita' (fitti)
+        for _ in range(nb):
+            bx = rng.randint(0, lw - 1)
+            by = ground - rng.randint(0, max(1, band_h - 1))
+            tufts = rng.randint(2, 4)              # lame del ciuffo (ventaglio a V)
+            base_h = rng.uniform(0.45, 1.0) * hmax
+            for k in range(tufts):
+                spread = (k - (tufts - 1) / 2)
+                lean = int(spread * rng.uniform(2.0, 3.2)) + rng.randint(-1, 1)
+                h = max(2, int(base_h * rng.uniform(0.75, 1.0)))
+                wdt = 1 if h > hmax * 0.4 else 0
+                tipy = by - h
+                tn = max(0.0, min(1.0, (ground - tipy) / max(1.0, hmax)))  # 0 basso..1 alto
+                xn = bx / xl                       # 0 sinistra .. 1 destra
+                score = tn + 0.22 * (1.0 - xn)     # bias verso ALTO-SINISTRA (luce)
+                upper = tipy <= tile_top + (lh - tile_top) * 0.45  # punta in meta' alta
+                if score > 0.92 and upper and xn < 0.6:
+                    col = GRASS_HILITE             # colpo di luce: solo meta' alta, a sx
+                elif score > 0.68:
+                    col = GRASS_LIGHT
+                elif score > 0.40:
+                    col = GRASS_MID
+                else:
+                    col = GRASS_DARK
+                blades.append((score, bx, by, h, lean, wdt, col))
 
-        # (3) FRONTE in ombra alla base esposta (sud): come la parete dei muretti
-        #     dà ALTEZZA. Solo se il lato sud è esposto (non spezza il grappolo).
-        if not s:
-            hf = int(span * 0.5)
-            grad = pygame.Surface((ts, hf), pygame.SRCALPHA)
-            for yy in range(hf):
-                a = int(120 * (yy / max(1, hf - 1)) ** 1.5)
-                pygame.draw.line(grad, (0, 0, 0, a), (0, yy), (ts, yy))
-            canopy.blit(grad, (0, B - hf))
+        # disegna dal RETRO (score basso, scuro/corto) al FRONTE (alto, chiaro):
+        # le punte illuminate restano sopra -> strati dal piu' scuro al piu' chiaro.
+        blades.sort(key=lambda t: t[0])
+        for _sc, bx, by, h, lean, wdt, col in blades:
+            self._blade(lo, bx, by, h, lean, wdt, col, GRASS_OUT)
 
-        # (4) Luce di cupola additiva sulla CIMA esposta (nord): accende la cresta.
-        if not n:
-            hf = int(span * 0.55)
-            glow = pygame.Surface((ts, hf), pygame.SRCALPHA)
-            for yy in range(hf):
-                v = int(42 * (1 - yy / max(1, hf - 1)) ** 1.2)
-                pygame.draw.line(glow, (v, int(v * 1.2), int(v * 0.7)), (0, yy), (ts, yy))
-            canopy.blit(glow, (0, Ctop), special_flags=pygame.BLEND_RGB_ADD)
-
-        # (5) Ritaglio sulla silhouette tonda (azzera ciò che sborda).
-        masks = pygame.Surface((ts, ts + H), pygame.SRCALPHA)
-        shape(masks, (255, 255, 255, 255))
-        canopy.blit(masks, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
-        surf.blit(canopy, (0, 0))
-
-        # (6) CRESTA DI LUCE sul profilo alto esposto (il cue "cupola che sporge
-        #     verso l'alto", come la cima chiara dei muretti). Salto i lati interni.
-        fw = max(2, int(ts * 0.14))
-        for x in range(L, R):
-            top_y = None
-            for y in range(Ctop, cy + 1):
-                if masks.get_at((x, y))[3] > 0:
-                    top_y = y
-                    break
-            if top_y is None or (n and top_y <= Ctop + 1):
-                continue
-            if (w and x < fw) or (e and x >= R - fw):
-                continue
-            surf.set_at((x, top_y), BUSH_RIMLIGHT)
-            if top_y + 1 < B:
-                surf.set_at((x, top_y + 1), BUSH_HILITE)
-
-        # (7) Base scura di contatto a terra sul lato sud esposto.
-        if not s:
-            pygame.draw.line(surf, BUSH_RIM, (L, B - 1), (R, B - 1), 2)
+        # (4) Scala a piena risoluzione in modo NEAREST (pixel grossi).
+        big = pygame.transform.scale(lo, (ts, ts + H))
+        surf.blit(big, (0, 0))
         return surf
 
     def _build_tile(self, t: int, variant: int, ts: int) -> pygame.Surface:
