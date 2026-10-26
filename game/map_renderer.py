@@ -318,8 +318,9 @@ class MapRenderer:
         GLO = np.array(GRASS_LO, np.float32); GHI = np.array(GRASS_HI, np.float32)
         MOSS = np.array(JUNGLE_MOSS, np.float32); MUD = np.array(JUNGLE_MUD, np.float32)
         # Forza del livello di chiazza (0=niente .. pieno): pochi gradini netti.
+        # Il muschio ha gradini PICCOLI (poco contrasto -> dithering discreto).
         MUD_STR = np.array([0.0, 0.5, 0.78, 1.0], np.float32)   # 3 livelli + 0
-        MOSS_STR = np.array([0.0, 0.42, 0.64], np.float32)      # 2 livelli + 0
+        MOSS_STR = np.array([0.0, 0.28, 0.48], np.float32)      # 2 livelli + 0
 
         # Le chiazze sono a BASSA frequenza: calcolo i campi di rumore (tinta,
         # muschio, fango) a risoluzione ridotta UNA volta, poi li interpolo
@@ -350,15 +351,26 @@ class MapRenderer:
             y0i = np.floor(fy).astype(np.int64); y1i = np.minimum(y0i + 1, hl - 1)
             wy = (fy - y0i)[:, None]
             bay = _BAYER[(np.arange(y0, y1)[:, None]) % 4, colx[None, :]]
+
+            def dlevel(valN, nmax):
+                # Livello quantizzato con DITHERING solo in una FASCIA STRETTA
+                # vicino al confine tra due livelli: così gran parte della chiazza
+                # è a tinta piena e il retino a scacchiera resta sottile.
+                lo = np.floor(valN)
+                t = valN - lo
+                tt = np.clip((t - 0.38) / 0.24, 0.0, 1.0)      # 0 pieno-basso .. 1 pieno-alto
+                lvl = lo + (bay < tt)
+                return np.clip(lvl, 0, nmax).astype(np.int64)
+
             tone = tone_x[y0i] * (1 - wy) + tone_x[y1i] * wy
             r = GLO[0] + (GHI[0] - GLO[0]) * tone
             g = GLO[1] + (GHI[1] - GLO[1]) * tone
             b = GLO[2] + (GHI[2] - GLO[2]) * tone
             moss = moss_x[y0i] * (1 - wy) + moss_x[y1i] * wy
-            ms = MOSS_STR[np.clip(np.floor(moss * 2.0 + bay), 0, 2).astype(np.int64)]
+            ms = MOSS_STR[dlevel(moss * 2.0, 2)]
             r += (MOSS[0] - r) * ms; g += (MOSS[1] - g) * ms; b += (MOSS[2] - b) * ms
             mud = mud_x[y0i] * (1 - wy) + mud_x[y1i] * wy
-            mu = MUD_STR[np.clip(np.floor(mud * 3.0 + bay), 0, 3).astype(np.int64)]
+            mu = MUD_STR[dlevel(mud * 3.0, 3)]
             r += (MUD[0] - r) * mu; g += (MUD[1] - g) * mu; b += (MUD[2] - b) * mu
             dst[:, y0:y1, 0] = np.clip(r, 0, 255).T
             dst[:, y0:y1, 1] = np.clip(g, 0, 255).T
@@ -416,17 +428,19 @@ class MapRenderer:
             return routes, path_tiles
         Wt, Ht = grid.width, grid.height
         tiles = grid.tiles
-        walls = (TILE_WALL, TILE_JUNGLE_WALL)
+        # Ostacoli che il sentiero deve AGGIRARE: muri e anche i cespugli (un
+        # sentiero non passa sotto un cespuglio).
+        obstacles = (TILE_WALL, TILE_JUNGLE_WALL, TILE_BUSH)
 
         def walk(x, y):
             return (0 <= x < Wt and 0 <= y < Ht
-                    and tiles[y][x] in (TILE_FLOOR, TILE_LANE, TILE_BUSH))
+                    and tiles[y][x] in (TILE_FLOOR, TILE_LANE))
 
         def near_wall(x, y):
             for ox in (-1, 0, 1):
                 for oy in (-1, 0, 1):
                     nx, ny = x + ox, y + oy
-                    if 0 <= nx < Wt and 0 <= ny < Ht and tiles[ny][nx] in walls:
+                    if 0 <= nx < Wt and 0 <= ny < Ht and tiles[ny][nx] in obstacles:
                         return True
             return False
 

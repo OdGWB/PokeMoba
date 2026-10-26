@@ -43,14 +43,17 @@ Passaggi completati:
   px) UNA volta e si interpolano (bilineare, numpy) a piena risoluzione per
   strisce; il verde resta continuo, muschio e fango vengono QUANTIZZATI in 2-3
   livelli coi confini sgranati a DITHERING di Bayer -> chiazze organiche che
-  attraversano i tile ma con bordi a gradini, non sfumati. Dettagli (ciuffi,
-  fiocchi, granelli) disegnati sopra, saltando i tile dei sentieri e il fango.
+  attraversano i tile ma con bordi a gradini, non sfumati. Il dithering e' in
+  una FASCIA STRETTA vicino al confine (dlevel: interno a tinta piena) e il
+  muschio ha gradini piccoli -> poco contrasto, niente retino a scacchiera.
+  Dettagli (ciuffi, fiocchi, granelli) disegnati sopra, saltando i sentieri.
   Costo una-tantum ~3-6s (solo al build; a frame solo blit). Screenshot:
   screenshots/step_3.png.
 - Sentieri pixel-art a 3 livelli (game/map_renderer.py _compute_paths/
-  _stroke_paths/_catmull): Dijkstra multi-sorgente dai tile-lane con PENALITA'
-  per i tile adiacenti ai muri -> il sentiero resta in campo aperto e, se un muro
-  e vicino, gli corre ACCANTO (mai sotto); collega sempre campo<->lane (rotte
+  _stroke_paths/_catmull): Dijkstra multi-sorgente dai tile-lane. I cespugli
+  (oltre ai muri) sono OSTACOLI: il sentiero li AGGIRA, non ci passa sotto. La
+  PENALITA' sui tile adiacenti a muri/cespugli tiene il sentiero in campo aperto
+  e, se un ostacolo e vicino, gli corre ACCANTO; collega sempre campo<->lane (rotte
   troppo corte scartate, niente vicoli ciechi). Spline Catmull-Rom deformata con
   rumore, larghezza variabile (rumore, 1-2 tile). Profilo a 3 LIVELLI netti
   (bordo scuro, terra, nucleo secco DIRT_DRY) col bordo esterno a 2 densita' di
