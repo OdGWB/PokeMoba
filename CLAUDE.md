@@ -119,6 +119,33 @@ Passaggi completati:
   per dimensione vista (_vignette, cache) e blittata per ultima in draw_canopy,
   NON nei layer di mappa. Screenshot: screenshots/step_7.png (ravvicinato con
   finte unita) e step_7_over.png (mappa intera).
+- Autotiling a 8 vicini sui MURI DI GIUNGLA (bitmask blob, game/renderer.py
+  _autotile_footprint/_carve_autotile; maschera a 8 bit in map_renderer.py
+  _mask8): i bordi non sono piu a scaletta ma hanno diagonali e curve morbide,
+  con contorno IRREGOLARE (non liscio). map_renderer passa a _jwall_surf una
+  bitmask a 8 vicini (cardinali 1/2/4/8 + diagonali 16/32/64/128); i builder
+  texturizzano come prima e poi _carve_autotile RIMODELLA l'impronta dello
+  sprite gia pronto (niente riscrittura della texture): (1) ritaglia la forma a
+  un'IMPRONTA blob dove gli angoli CONVESSI esposti (entrambi i cardinali
+  adiacenti assenti) sono arrotondati con un arco il cui raggio OSCILLA con
+  l'angolo (sin a 2 frequenze, fase per-variante) -> curve irregolari, bordi
+  pixel-art netti (soglia booleana, niente AA). Due tile in diagonale (staircase)
+  arrotondano gli angoli che si TOCCANO -> la scaletta diventa una diagonale
+  morbida. I lati CONDIVISI con un vicino solido restano a filo (nessuna
+  cucitura ne linea di griglia). (2) Ridisegna un RIM chiaro (JW_RIM, verso la
+  luce N/O) / scuro (JW_EDGE_SH, verso l'ombra S/E) SOLO lungo i nuovi bordi
+  curvi INTERNI (mai sul perimetro del tile: li' o e' un lato condiviso o una
+  faccia piatta gia texturizzata) -> niente linee di griglia reintrodotte. (3)
+  Sugli angoli INTERNI (due cardinali presenti, diagonale assente) posa un'ombra
+  concava ad anello, come una fenditura tra due bracci di roccia. La PARETE
+  (cliff, righe >= ts) segue l'impronta: resta solo sotto le colonne che toccano
+  ancora il bordo sud (foot[:, ts-1]), cosi gli angoli SW/SE arrotondati sollevano
+  la parete. Varianti generate proceduralmente (seed = variant^mask) e messe in
+  cache nel Renderer come prima (key include la mask a 8 bit). I CESPUGLI restano
+  sul loro builder a 4 bit (gia silhouette ellittica tonda): il carve e' solo per
+  i muri di giungla. Il MURO DI CONFINE in pietra (TILE_WALL, _build_tall, senza
+  mask) non e' ancora autotilato: resta a scaletta, rifacimento a un passo futuro.
+  Screenshot: screenshots/step_8.png (diagonale ravvicinata) e step_8_over.png.
 
 Scelte tecniche importanti:
 - canopy resta RISERVATO e VUOTO; lighting_overlay ora porta il velo d'atmosfera

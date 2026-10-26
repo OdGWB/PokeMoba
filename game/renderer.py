@@ -11,6 +11,9 @@ import pygame
 import math
 import random
 
+import numpy as np
+import pygame.surfarray
+
 import config
 from engine.entities import Core, Pokemon, Structure, Unit
 from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
@@ -438,6 +441,92 @@ class Renderer:
             self._tile_cache[key] = surf
         return surf
 
+    # --- Autotiling blob a 8 vicini: rimodella l'IMPRONTA del tile ------------
+    def _autotile_footprint(self, mask, variant, ts, H, rscale, wob):
+        """Impronta (footprint) dell'autotiling a 8 vicini, come maschera alpha.
+
+        Gli angoli CONVESSI esposti (entrambi i cardinali adiacenti assenti) sono
+        arrotondati con un arco il cui raggio OSCILLA con l'angolo (rumore per
+        variante) -> contorno con diagonali e curve, irregolare e non liscio.
+        I lati CONDIVISI con un vicino solido restano a filo: nessuna cucitura, e
+        due tile in diagonale (staircase) arrotondano gli angoli che si toccano
+        -> la scaletta diventa una diagonale morbida.
+
+        Ritorna (alpha, foot): `foot` bool (ts,ts) = impronta della cima; `alpha`
+        uint8 (ts, ts+H) = cima mascherata + parete (cliff) sotto le colonne che
+        toccano il bordo sud quando S e' esposto (cosi la parete segue l'impronta).
+        """
+        N = bool(mask & 1); E = bool(mask & 2); S = bool(mask & 4); W = bool(mask & 8)
+        X = np.arange(ts, dtype=np.float32)[:, None]
+        Y = np.arange(ts, dtype=np.float32)[None, :]
+        foot = np.ones((ts, ts), bool)
+        rng = random.Random((variant * 2654435761 ^ (mask * 2246822519)) & 0xFFFFFFFF)
+        rr = ts * rscale
+
+        def convex(qx, qy, cx, cy):
+            dx = X - cx; dy = Y - cy
+            d = np.hypot(dx, dy)
+            ang = np.arctan2(dy, dx)
+            ph1 = rng.random() * math.tau; ph2 = rng.random() * math.tau
+            rw = rr * (1.0 + wob * np.sin(ang * 3 + ph1) + 0.5 * wob * np.sin(ang * 7 + ph2))
+            foot[qx & qy & (d > rw)] = False
+
+        if not N and not W: convex(X <= rr, Y <= rr, rr, rr)
+        if not N and not E: convex(X >= ts - 1 - rr, Y <= rr, ts - 1 - rr, rr)
+        if not S and not W: convex(X <= rr, Y >= ts - 1 - rr, rr, ts - 1 - rr)
+        if not S and not E: convex(X >= ts - 1 - rr, Y >= ts - 1 - rr, ts - 1 - rr, ts - 1 - rr)
+
+        alpha = np.zeros((ts, ts + H), np.uint8)
+        alpha[:, :ts][foot] = 255
+        if not S:                                   # parete sotto le colonne piene
+            alpha[foot[:, ts - 1], ts:] = 255
+        return alpha, foot
+
+    def _carve_autotile(self, surf, mask, variant, ts, H, rscale, wob,
+                        rim_hi, rim_lo, crevice):
+        """Applica l'autotiling allo sprite gia texturizzato: (1) ritaglia la
+        forma all'impronta arrotondata; (2) ridisegna un rim chiaro/scuro lungo
+        i NUOVI bordi curvi (mai sui lati condivisi -> niente linee di griglia);
+        (3) sugli angoli INTERNI (due cardinali presenti, diagonale assente)
+        posa un'ombra concava, come una fenditura dove due bracci di roccia si
+        incontrano. Usa gli 8 vicini per decidere convesso/concavo."""
+        N = bool(mask & 1); E = bool(mask & 2); S = bool(mask & 4); W = bool(mask & 8)
+        NE = bool(mask & 16); SE = bool(mask & 32); SW = bool(mask & 64); NW = bool(mask & 128)
+        alpha, foot = self._autotile_footprint(mask, variant, ts, H, rscale, wob)
+        sa = pygame.surfarray
+        va = sa.pixels_alpha(surf)
+        np.minimum(va, alpha, out=va)               # ritaglio alla forma
+        # Rim lungo i bordi curvi INTERNI (non sui lati del tile: li' o e' un
+        # lato condiviso, o e' una faccia piatta gia texturizzata).
+        up = np.zeros_like(foot); up[:, 1:] = ~foot[:, :-1]
+        dn = np.zeros_like(foot); dn[:, :-1] = ~foot[:, 1:]
+        lf = np.zeros_like(foot); lf[1:, :] = ~foot[:-1, :]
+        rt = np.zeros_like(foot); rt[:-1, :] = ~foot[1:, :]
+        inner = np.zeros_like(foot)
+        inner[1:-1, 1:-1] = True
+        bnd = foot & (up | dn | lf | rt) & inner
+        dark = bnd & (dn | rt)
+        light = bnd & (up | lf) & ~dark
+        v3 = sa.pixels3d(surf)
+        for sel, col in ((light, rim_hi), (dark, rim_lo)):
+            idx = np.zeros((ts, ts + H), bool); idx[:, :ts] = sel
+            v3[idx] = col
+            va[idx] = 255
+        del v3, va
+        # Fenditure agli angoli interni: ombra concava (nessun ritaglio).
+        crev = []
+        if N and W and not NW: crev.append((0, 0))
+        if N and E and not NE: crev.append((ts, 0))
+        if S and W and not SW: crev.append((0, ts))
+        if S and E and not SE: crev.append((ts, ts))
+        if crev:
+            cr = int(ts * 0.34)
+            for (cx, cy) in crev:
+                sh = pygame.Surface((ts, ts), pygame.SRCALPHA)
+                pygame.draw.circle(sh, crevice, (cx, cy), cr)
+                pygame.draw.circle(sh, (0, 0, 0, 0), (cx, cy), max(1, cr - 3))
+                surf.blit(sh, (0, 0))
+
     def _build_jwall(self, mask: int, variant: int, ts: int, H: int):
         """Un tile come pezzo di un unico altopiano roccioso.
 
@@ -513,6 +602,10 @@ class Renderer:
             contact = pygame.Surface((ts, 3), pygame.SRCALPHA)
             contact.fill(JW_CONTACT)
             surf.blit(contact, (0, cy1 - 2))
+        # Autotiling: rimodella l'impronta (angoli convessi tondi, fenditure agli
+        # angoli interni, rim sui bordi curvi) -> diagonali e curve, niente scaletta.
+        self._carve_autotile(surf, mask, variant, ts, H, 0.58, 0.16,
+                             JW_RIM, JW_EDGE_SH, (10, 14, 10, 115))
         return surf
 
     def _rock_facet(self, surf, cx, cy, r, rng, base_col, hi_col, sh_col):

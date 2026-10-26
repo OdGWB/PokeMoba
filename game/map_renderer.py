@@ -315,10 +315,7 @@ class MapRenderer:
                 ax = tx * ts
                 ay = ty * ts - H + top
                 if t == TILE_JUNGLE_WALL:
-                    mask = ((1 if is_jw(tx, ty - 1) else 0)
-                            | (2 if is_jw(tx + 1, ty) else 0)
-                            | (4 if is_jw(tx, ty + 1) else 0)
-                            | (8 if is_jw(tx - 1, ty) else 0))
+                    mask = self._mask8(is_jw, tx, ty)
                     variant = sym_seed(tx, ty, 31)
                     walls.blit(p._jwall_surf(mask, variant, H), (ax, ay))
                 elif t == TILE_BUSH:
@@ -337,6 +334,21 @@ class MapRenderer:
         self._build_lighting(grid, self.layers["lighting_overlay"])
 
         self._grid = grid
+
+    @staticmethod
+    def _mask8(same, tx, ty) -> int:
+        """Bitmask a 8 vicini per l'autotiling. `same(x,y)` dice se il vicino e'
+        dello stesso tipo. Bit cardinali 1=N 2=E 4=S 8=W (usati dai builder per i
+        lati esposti) + diagonali 16=NE 32=SE 64=SW 128=NW (usati dal carve per
+        decidere angoli convessi/concavi -> contorno con diagonali e curve)."""
+        return ((1 if same(tx, ty - 1) else 0)
+                | (2 if same(tx + 1, ty) else 0)
+                | (4 if same(tx, ty + 1) else 0)
+                | (8 if same(tx - 1, ty) else 0)
+                | (16 if same(tx + 1, ty - 1) else 0)
+                | (32 if same(tx + 1, ty + 1) else 0)
+                | (64 if same(tx - 1, ty + 1) else 0)
+                | (128 if same(tx - 1, ty - 1) else 0))
 
     def _inner_mask(self, grid):
         """Maschera (Ht,Wt) dei tile DENTRO l'anello delle lane. Flood-fill dal
