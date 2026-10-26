@@ -41,6 +41,24 @@ COL_GRID = (0, 0, 0)
 COL_BG = (18, 20, 24)            # sfondo (riempie il bordo del layer opaco)
 CHUNK = 1024                     # lato del chunk in pixel
 
+# --- Atmosfera (layer shadows e lighting_overlay) ------------------------------
+# Ambient occlusion: ombra di contatto morbida vicino a muri/cespugli.
+AO_COL = (15, 30, 26)            # #0F1E1A tono d'ombra
+AO_MAXA = 110                    # alfa massima (a ridosso dell'ostacolo)
+AO_RADIUS_TILES = 1.5            # raggio del gradiente
+# Chioma: velo d'ombra sulla giungla (non sulle lane), con chiazze a bassa
+# frequenza come luce filtrata dagli alberi.
+CANOPY_DARK = (12, 22, 19)       # verde-nero freddo
+CANOPY_BASE = 20                 # velo uniforme sulla giungla (giungla < lane)
+CANOPY_AMP = 64                  # extra nelle chiazze di chioma densa
+# Campi dei mostri: poche macchie di luce calda e tenue (radura illuminata).
+CAMP_WARM = (182, 130, 70)       # luce calda
+CAMP_WARM_A = 98                 # alfa al centro della macchia
+CAMP_R_TILES = 3.0               # raggio della macchia di luce
+# Vignettatura: leggero scurimento ai bordi dello SCHERMO (screen-space).
+VIGNETTE_COL = (8, 14, 14)
+VIGNETTE_A = 92
+
 # Matrice di Bayer 4x4 (ordered dithering) in [0,1): soglia per-pixel con cui si
 # "sgranano" i confini tra i livelli di colore -> transizioni a gradini in stile
 # pixel art invece di sfumature morbide.
@@ -175,6 +193,7 @@ class MapRenderer:
         self._H = 0
         self._grid_sprite = None     # sprite riga griglia di debug (cache)
         self._camps: list[tuple[int, int]] = []   # centri dei campi (per i sentieri)
+        self._vig = None             # vignettatura screen-space (cache per dimensione vista)
 
     def set_camps(self, camps) -> None:
         """Posizioni dei campi della giungla (da MapData): servono SOLO a tracciare
@@ -267,6 +286,10 @@ class MapRenderer:
                 if nw:
                     shadows.blit(p._shadow_surf(nw), (tx * ts, ty * ts + top))
 
+        # --- Ambient occlusion: gradiente d'ombra morbido entro ~1.5 tile dai
+        #     tile "alti" (muri e cespugli), sotto le ombre proiettate.
+        self._build_ao(grid, shadows)
+
         # --- Passata 2: rilievi 2.5D (walls_base), dall'alto in basso ---------
         def is_jw(x, y):
             return 0 <= x < Wt and 0 <= y < Ht and tiles[y][x] == TILE_JUNGLE_WALL
@@ -305,6 +328,10 @@ class MapRenderer:
                     variant = (((tx * 73856093) ^ (ty * 19349663)) >> 6) & 7
                     walls.blit(p._tall_surf(t, variant, H), (ax, ay))
 
+        # --- Velo d'atmosfera SOPRA le unita: ombre della chioma sulla giungla
+        #     e macchie di luce calda vicino ai campi (lighting_overlay).
+        self._build_lighting(grid, self.layers["lighting_overlay"])
+
         self._grid = grid
 
     def _inner_mask(self, grid):
@@ -330,6 +357,182 @@ class MapRenderer:
             x, y = dq.popleft()
             push(x + 1, y); push(x - 1, y); push(x, y + 1); push(x, y - 1)
         return ~outer
+
+    # --- Atmosfera: ambient occlusion + velo di luce -------------------------
+    @staticmethod
+    def _upscale(lo, W: int, H: int, step: int):
+        """Upscale bilineare di un campo low-res `lo` (hl, wl), dove ogni cella
+        copre `step` pixel, a piena risoluzione (H, W). Niente smoothscale: solo
+        interpolazione numpy (prima lungo X una volta, poi lungo Y)."""
+        hl, wl = lo.shape
+        fx = np.minimum(np.arange(W, dtype=np.float32) / step, wl - 1.0)
+        x0 = np.floor(fx).astype(np.int64); x1 = np.minimum(x0 + 1, wl - 1)
+        wx = (fx - x0)[None, :]
+        colx = lo[:, x0] * (1 - wx) + lo[:, x1] * wx          # (hl, W)
+        fy = np.minimum(np.arange(H, dtype=np.float32) / step, hl - 1.0)
+        y0 = np.floor(fy).astype(np.int64); y1 = np.minimum(y0 + 1, hl - 1)
+        wy = (fy - y0)[:, None]
+        return colx[y0] * (1 - wy) + colx[y1] * wy            # (H, W)
+
+    @staticmethod
+    def _blit_blocks(layer, rgb, alpha, top: int) -> None:
+        """Blitta un'immagine RGBA a piena mappa (array (H,W,3) uint8 + (H,W)
+        uint8) nel layer, un blocco per CHUNK: i blocchi completamente
+        trasparenti NON vengono creati (resta lazy come il resto dei layer).
+        `rgb` puo essere una tupla colore costante o un array (H,W,3)."""
+        import pygame.surfarray as sa
+        H, W = alpha.shape
+        const = not isinstance(rgb, np.ndarray)
+        for by in range(0, H, CHUNK):
+            bh = min(CHUNK, H - by)
+            for bx in range(0, W, CHUNK):
+                bw = min(CHUNK, W - bx)
+                ba = alpha[by:by + bh, bx:bx + bw]
+                if not ba.any():
+                    continue
+                surf = pygame.Surface((bw, bh), pygame.SRCALPHA)
+                v3 = sa.pixels3d(surf)
+                if const:
+                    v3[:, :, 0] = rgb[0]; v3[:, :, 1] = rgb[1]; v3[:, :, 2] = rgb[2]
+                else:
+                    v3[:] = rgb[by:by + bh, bx:bx + bw].transpose(1, 0, 2)
+                del v3
+                va = sa.pixels_alpha(surf); va[:] = ba.T; del va
+                layer.blit(surf, (bx, by + top))
+
+    def _build_ao(self, grid, shadows) -> None:
+        """Ambient occlusion: scurisce il terreno con un gradiente morbido entro
+        ~1.5 tile da muri e cespugli. La distanza euclidea dai tile "alti" e'
+        calcolata a BASSA risoluzione (shifted-min: per ogni offset entro il
+        raggio si aggiorna il minimo), il falloff e' uno smoothstep (max a
+        ridosso dell'ostacolo -> 0 a 1.5 tile), poi si upscala e si blitta."""
+        ts = self.tile_size; top = self._top
+        Wt, Ht = grid.width, grid.height
+        W, H = Wt * ts, Ht * ts
+        tiles = grid.tiles
+        tall = np.zeros((Ht, Wt), bool)
+        for ty in range(Ht):
+            row = tiles[ty]
+            for tx in range(Wt):
+                if row[tx] in TALL_TILES:
+                    tall[ty, tx] = True
+        if not tall.any():
+            return
+        step = max(2, ts // 4)
+        R = AO_RADIUS_TILES * ts / step              # raggio in celle low-res
+        Rc = int(math.ceil(R))
+        wl = (W + step - 1) // step; hl = (H + step - 1) // step
+        cx = np.minimum((np.arange(wl) * step) // ts, Wt - 1)
+        cy = np.minimum((np.arange(hl) * step) // ts, Ht - 1)
+        m = tall[cy][:, cx]                           # (hl, wl) bool
+        big = R + 1.0
+        dist = np.full((hl, wl), big, np.float32)
+        dist[m] = 0.0
+        for dy in range(-Rc, Rc + 1):
+            for dx in range(-Rc, Rc + 1):
+                e = math.hypot(dx, dy)
+                if e == 0.0 or e > R:
+                    continue
+                dy0 = max(0, -dy); dy1 = hl - max(0, dy)
+                dx0 = max(0, -dx); dx1 = wl - max(0, dx)
+                if dy1 <= dy0 or dx1 <= dx0:
+                    continue
+                src = m[dy0 + dy:dy1 + dy, dx0 + dx:dx1 + dx]
+                sub = dist[dy0:dy1, dx0:dx1]
+                np.minimum(sub, np.where(src, np.float32(e), big), out=sub)
+        f = np.clip(1.0 - dist / R, 0.0, 1.0)
+        f = f * f * (3.0 - 2.0 * f)                   # smoothstep
+        a_lo = f * AO_MAXA
+        alpha = np.clip(self._upscale(a_lo, W, H, step), 0, 255).astype(np.uint8)
+        self._blit_blocks(shadows, AO_COL, alpha, top)
+
+    def _build_lighting(self, grid, light) -> None:
+        """Velo d'atmosfera SOPRA le unita (lighting_overlay):
+          - ombre della chioma: rumore a bassa frequenza, scuro e semitrasparente,
+            SOLO sulla giungla (non sulle lane) -> giungla piu cupa delle lane;
+          - macchie di luce calda e tenue vicino ai campi (radura illuminata),
+            che "aprono" la chioma scurita;
+          - alfe contenute, cosi le unita restano leggibili.
+        Calcolato per strisce orizzontali (niente array a piena mappa)."""
+        ts = self.tile_size; top = self._top
+        Wt, Ht = grid.width, grid.height
+        W, H = Wt * ts, Ht * ts
+        tiles = grid.tiles
+        # Giungla = tutto cio che NON e' lane (a livello tile).
+        jungle = np.ones((Ht, Wt), np.float32)
+        for ty in range(Ht):
+            row = tiles[ty]
+            for tx in range(Wt):
+                if row[tx] == TILE_LANE:
+                    jungle[ty, tx] = 0.0
+        # Rumore a bassa frequenza (chiome) per tile -> chiazze d'ombra densa.
+        TX = np.arange(Wt, dtype=np.float32)[None, :]
+        TY = np.arange(Ht, dtype=np.float32)[:, None]
+        canopy = (_np_vnoise(TX / 6.5, TY / 6.5) * 0.6
+                  + _np_vnoise((TX + 30) / 3.1, (TY + 30) / 3.1) * 0.4).astype(np.float32)
+        sden = np.clip((canopy - 0.42) / 0.30, 0.0, 1.0)
+        sden = sden * sden * (3.0 - 2.0 * sden)       # smoothstep
+        camps_px = [((tx + 0.5) * ts, (ty + 0.5) * ts) for (tx, ty) in self._camps]
+        Rpx = CAMP_R_TILES * ts
+        Cd = np.array(CANOPY_DARK, np.float32)
+        Cw = np.array(CAMP_WARM, np.float32)
+        # Interpolazione lungo X, una volta (sden bilineare, giungla nearest).
+        fx = np.arange(W, dtype=np.float32) / ts
+        x0 = np.floor(fx).astype(np.int64); x1 = np.minimum(x0 + 1, Wt - 1)
+        wx = (fx - x0)[None, :]
+        sden_x = sden[:, x0] * (1 - wx) + sden[:, x1] * wx       # (Ht, W)
+        jung_x = jungle[:, np.minimum(np.arange(W) // ts, Wt - 1)]  # (Ht, W) nearest
+        px_x = np.arange(W, dtype=np.float32)[None, :]
+        rgb_full = np.zeros((H, W, 3), np.uint8)
+        a_full = np.zeros((H, W), np.uint8)
+        STRIP = 256
+        for yb in range(0, H, STRIP):
+            ye = min(H, yb + STRIP)
+            rows = np.arange(yb, ye)
+            fy = rows.astype(np.float32) / ts
+            y0 = np.floor(fy).astype(np.int64); y1 = np.minimum(y0 + 1, Ht - 1)
+            wy = (fy - y0)[:, None]
+            sden_px = sden_x[y0] * (1 - wy) + sden_x[y1] * wy    # (strip, W)
+            jung_px = jung_x[np.minimum(rows // ts, Ht - 1)]     # (strip, W)
+            # Luce dei campi: max dei falloff gaussiani (solo campi vicini alla striscia).
+            w = np.zeros((len(rows), W), np.float32)
+            ry = rows.astype(np.float32)[:, None] + 0.5
+            for (cxp, cyp) in camps_px:
+                if cyp < yb - 2.5 * Rpx or cyp > ye + 2.5 * Rpx:
+                    continue
+                dx = px_x - cxp; dy = ry - cyp
+                np.maximum(w, np.exp(-(dx * dx + dy * dy) / (Rpx * Rpx)), out=w)
+            # Ombra della chioma (ridotta vicino ai campi) + luce calda, composite.
+            ad = (CANOPY_BASE + CANOPY_AMP * sden_px) * jung_px * (1.0 - 0.85 * w)
+            aw = CAMP_WARM_A * w
+            ad01 = ad / 255.0; aw01 = aw / 255.0
+            out_a = aw01 + ad01 * (1.0 - aw01)
+            denom = np.where(out_a > 1e-4, out_a, 1.0)
+            for k in range(3):
+                col = (Cw[k] * aw01 + Cd[k] * ad01 * (1.0 - aw01)) / denom
+                rgb_full[yb:ye, :, k] = np.clip(col, 0, 255).astype(np.uint8)
+            a_full[yb:ye, :] = np.clip(out_a * 255.0, 0, 255).astype(np.uint8)
+        self._blit_blocks(light, rgb_full, a_full, top)
+
+    def _vignette(self, vw: int, vh: int):
+        """Vignettatura screen-space: scurimento morbido ai bordi dello schermo.
+        Costruita una volta per dimensione della vista (cache)."""
+        if self._vig is not None and self._vig.get_size() == (vw, vh):
+            return self._vig
+        import pygame.surfarray as sa
+        surf = pygame.Surface((vw, vh), pygame.SRCALPHA)
+        xs = (np.arange(vw, dtype=np.float32) - (vw - 1) / 2) / (vw / 2)
+        ys = (np.arange(vh, dtype=np.float32) - (vh - 1) / 2) / (vh / 2)
+        d = np.sqrt(xs[:, None] ** 2 + ys[None, :] ** 2)     # distanza ellittica normalizzata
+        t = np.clip((d - 0.65) / 0.5, 0.0, 1.0)
+        t = t * t * (3.0 - 2.0 * t)
+        a = (t * VIGNETTE_A).astype(np.uint8)
+        v3 = sa.pixels3d(surf)
+        v3[:, :, 0] = VIGNETTE_COL[0]; v3[:, :, 1] = VIGNETTE_COL[1]; v3[:, :, 2] = VIGNETTE_COL[2]
+        del v3
+        va = sa.pixels_alpha(surf); va[:] = a; del va
+        self._vig = surf
+        return surf
 
     # --- Suolo organico (rumore per pixel in coord mondo) --------------------
     def _build_floor(self, grid, p, inner) -> pygame.Surface:
@@ -743,6 +946,8 @@ class MapRenderer:
         vw, vh = camera.view_w, camera.view_h
         for n in self.ABOVE:
             self.layers[n].draw(screen, ox, oy, vw, vh)
+        # Vignettatura: ultima, ai bordi della VISTA (screen-space, non mappa).
+        screen.blit(self._vignette(vw, vh), (0, 0))
 
     # --- introspezione (per benchmark/report) -------------------------------
     def mem_report(self) -> dict:

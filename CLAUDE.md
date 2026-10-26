@@ -90,10 +90,32 @@ Passaggi completati:
   rumore in coordinate MONDO lungo il bordo -> continua e mossa attraverso tutti
   i tile (mai dritta); transizione a gradini con dithering di Bayer (solido
   vicino all'erba, stipple verso la terra) + ciuffi d'erba che invadono la lane.
+- Ambient occlusion sul layer shadows (game/map_renderer.py _build_ao): ombra di
+  contatto morbida entro ~1.5 tile dai tile "alti" (muri + cespugli), colore
+  #0F1E1A alpha max 110. Distanza euclidea dai tile alti calcolata a BASSA
+  risoluzione (step ~ts/4) con shifted-min (per ogni offset entro il raggio si
+  aggiorna il minimo della distanza), falloff smoothstep (max a ridosso
+  dell'ostacolo -> 0 a 1.5 tile), poi upscale bilineare (_upscale) e blit a
+  blocchi CHUNK saltando i blocchi vuoti (_blit_blocks) -> lazy come gli altri
+  layer. Screenshot: screenshots/step_7.png.
+- Velo d'atmosfera sul layer lighting_overlay (game/map_renderer.py
+  _build_lighting), SOPRA le unita: (a) ombre della chioma = rumore a bassa
+  frequenza (_np_vnoise, chiazze ~6 tile) scuro #0C1613, SOLO sulla giungla
+  (tutto cio che non e' TILE_LANE) con un velo base uniforme -> la giungla resta
+  piu cupa delle lane; (b) poche macchie di luce calda #B68246 vicino ai campi
+  (falloff gaussiano, raggio ~3 tile) che "aprono" la chioma scurita (radura
+  illuminata); (c) composite warm-over-dark premoltiplicato in un'unica RGBA per
+  pixel, calcolato a strisce (niente array a piena mappa) e blittato a blocchi
+  CHUNK lazy. Alfe contenute: le unita restano leggibili. Vignettatura leggera
+  (VIGNETTE_*) scurisce i bordi dello SCHERMO: screen-space, costruita una volta
+  per dimensione vista (_vignette, cache) e blittata per ultima in draw_canopy,
+  NON nei layer di mappa. Screenshot: screenshots/step_7.png (ravvicinato con
+  finte unita) e step_7_over.png (mappa intera).
 
 Scelte tecniche importanti:
-- canopy e lighting_overlay sono RISERVATI e per ora VUOTI: la resa resta
-  identica alla versione pre-layer. Le chiome dei cespugli stanno ancora in
+- canopy resta RISERVATO e VUOTO; lighting_overlay ora porta il velo d'atmosfera
+  (chioma + luce campi, vedi sopra). La vignettatura e' screen-space e vive in
+  draw_canopy, fuori dai layer. Le chiome dei cespugli stanno ancora in
   walls_base (sotto le unita); spostarle in canopy (sopra le unita) sara un
   passaggio futuro a se.
 - I singoli sprite dei tile NON sono stati spostati: restano i builder nel
