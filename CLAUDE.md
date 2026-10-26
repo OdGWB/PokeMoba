@@ -47,8 +47,18 @@ Passaggi completati:
   una FASCIA STRETTA vicino al confine (dlevel: interno a tinta piena) e il
   muschio ha gradini piccoli -> poco contrasto, niente retino a scacchiera.
   Dettagli (ciuffi, fiocchi, granelli) disegnati sopra, saltando i sentieri.
-  Costo una-tantum ~3-6s (solo al build; a frame solo blit). Screenshot:
+  Costo una-tantum ~3-7s (solo al build; a frame solo blit). Screenshot:
   screenshots/step_3.png.
+- Fango ridotto e schiarito (_np_mud/_mud_at soglia 0.70, _build_floor,
+  _scatter_detail, _inner_mask): area ~60% in meno (chiazze piu piccole e
+  sparse), colore schiarito a #4A3D2C (JUNGLE_MUD) con VARIAZIONE interna da
+  rumore fine (_np_mudtone: lerp tra fango chiaro e pozzanghera scura) -> non
+  piu una macchia marrone uniforme che sembra un buco. Nel fango denso: granelli
+  + qualche pozzanghera piu scura; ai BORDI (0.15<mu<0.5) ciuffi d'erba piu
+  fitti che invadono. Il fango e SOLO dentro l'anello delle lane: _inner_mask fa
+  un flood-fill dal bordo mappa con le LANE come barriera -> la zona ESTERNA
+  (corridoio oltre le lane) resta senza fango. Screenshot: screenshots/step_6.png
+  (chiazza ravvicinata) e step_6_over.png (minimappa).
 - Sentieri pixel-art a 3 livelli (game/map_renderer.py _compute_paths/
   _stroke_paths/_catmull): Dijkstra multi-sorgente dai tile-lane. I cespugli
   (oltre ai muri) sono OSTACOLI: il sentiero li AGGIRA, non ci passa sotto. La

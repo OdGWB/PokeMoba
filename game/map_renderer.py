@@ -78,7 +78,11 @@ def _np_moss(TX, TY):      # (= Renderer._moss_at)
 
 def _np_mud(TX, TY):       # (= Renderer._mud_at)
     n = _np_vnoise((TX + 311) / 7.5, (TY + 517) / 7.5) * 0.72 + _np_vnoise((TX + 311) / 2.7, (TY + 517) / 2.7) * 0.28
-    return np.clip((n - 0.60) / 0.17, 0.0, 1.0)
+    return np.clip((n - 0.70) / 0.12, 0.0, 1.0)   # soglia alzata: chiazze più piccole/sparse
+
+
+def _np_mudtone(TX, TY):   # variazione interna del fango (tono + pozzanghere)
+    return _np_vnoise((TX + 90) / 3.2, (TY + 40) / 3.2).astype(np.float32)
 
 # Tile "alti": resi come rilievi 2.5D estrusi verso l'alto (come nel Renderer).
 TALL_TILES = (TILE_WALL, TILE_JUNGLE_WALL, TILE_BUSH)
@@ -222,8 +226,9 @@ class MapRenderer:
         #     un'unica immagine continua, senza cuciture di tile. I dettagli
         #     (ciuffi d'erba, fiocchi di muschio, granelli di fango) si disegnano
         #     sopra, saltando i tile dei sentieri.
-        floor_img = self._build_floor(grid, p)
-        self._scatter_detail(grid, floor_img, p, path_tiles)
+        inner = self._inner_mask(grid)   # dentro l'anello delle lane (no fango fuori)
+        floor_img = self._build_floor(grid, p, inner)
+        self._scatter_detail(grid, floor_img, p, path_tiles, inner)
         ground.blit(floor_img, (0, top))
 
         # --- Passata 1b: tile speciali (lane/acqua) sopra il suolo + rive/bordi/
@@ -302,8 +307,32 @@ class MapRenderer:
 
         self._grid = grid
 
+    def _inner_mask(self, grid):
+        """Maschera (Ht,Wt) dei tile DENTRO l'anello delle lane. Flood-fill dal
+        bordo mappa trattando le LANE come barriera: tutto ciò che si raggiunge
+        da fuori è la zona ESTERNA (corridoio oltre le lane); il resto, racchiuso
+        dall'anello, è l'interno. Serve a NON mettere fango fuori dalle lane."""
+        Wt, Ht = grid.width, grid.height
+        tiles = grid.tiles
+        outer = np.zeros((Ht, Wt), bool)
+        dq = deque()
+
+        def push(x, y):
+            if 0 <= x < Wt and 0 <= y < Ht and not outer[y, x] and tiles[y][x] != TILE_LANE:
+                outer[y, x] = True
+                dq.append((x, y))
+
+        for x in range(Wt):
+            push(x, 0); push(x, Ht - 1)
+        for y in range(Ht):
+            push(0, y); push(Wt - 1, y)
+        while dq:
+            x, y = dq.popleft()
+            push(x + 1, y); push(x - 1, y); push(x, y + 1); push(x, y - 1)
+        return ~outer
+
     # --- Suolo organico (rumore per pixel in coord mondo) --------------------
-    def _build_floor(self, grid, p) -> pygame.Surface:
+    def _build_floor(self, grid, p, inner) -> pygame.Surface:
         """Immagine del suolo di giungla a piena mappa, calcolata PER PIXEL in
         coordinate mondo con numpy (niente smoothscale). Il verde a due scale
         resta continuo; muschio e fango vengono QUANTIZZATI in 2-3 livelli e i
@@ -316,7 +345,12 @@ class MapRenderer:
         W, H = Wt * ts, Ht * ts
         floor = pygame.Surface((W, H))
         GLO = np.array(GRASS_LO, np.float32); GHI = np.array(GRASS_HI, np.float32)
-        MOSS = np.array(JUNGLE_MOSS, np.float32); MUD = np.array(JUNGLE_MUD, np.float32)
+        MOSS = np.array(JUNGLE_MOSS, np.float32)
+        # Fango SCHIARITO (#4A3D2C) con variazione interna: un rumore fine fa
+        # oscillare il tono tra una versione chiara e una più scura (pozzanghere)
+        # -> non più una macchia marrone uniforme che sembra un buco.
+        MUD_L = np.array(JUNGLE_MUD, np.float32)            # #4A3D2C
+        MUD_D = np.array((52, 42, 29), np.float32)          # pozzanghera più scura
         # Forza del livello di chiazza (0=niente .. pieno): pochi gradini netti.
         # Il muschio ha gradini PICCOLI (poco contrasto -> dithering discreto).
         MUD_STR = np.array([0.0, 0.5, 0.78, 1.0], np.float32)   # 3 livelli + 0
@@ -333,6 +367,7 @@ class MapRenderer:
         tone_l = _np_tone(TXl, TYl).astype(np.float32)
         moss_l = _np_moss(TXl, TYl).astype(np.float32)
         mud_l = _np_mud(TXl, TYl).astype(np.float32)
+        mtone_l = _np_mudtone(TXl, TYl).astype(np.float32)   # variazione interna fango
         # Indici/pesi bilineari lungo X (una volta sola).
         fx = np.arange(W, dtype=np.float32) / STEP
         x0 = np.floor(fx).astype(np.int64); x1 = np.minimum(x0 + 1, wl - 1)
@@ -342,7 +377,9 @@ class MapRenderer:
         def up_x(field):
             return field[:, x0] * (1 - wx) + field[:, x1] * wx
         tone_x = up_x(tone_l); moss_x = up_x(moss_l); mud_x = up_x(mud_l)
+        mtone_x = up_x(mtone_l)
         colx = np.arange(W) % 4
+        tx_cols = (np.arange(W) // ts)          # tile-x di ogni colonna (per inner)
         STRIP = 300
         dst = pygame.surfarray.pixels3d(floor)            # vista (W, H, 3) uint8
         for y0 in range(0, H, STRIP):
@@ -371,20 +408,29 @@ class MapRenderer:
             r += (MOSS[0] - r) * ms; g += (MOSS[1] - g) * ms; b += (MOSS[2] - b) * ms
             mud = mud_x[y0i] * (1 - wy) + mud_x[y1i] * wy
             mu = MUD_STR[dlevel(mud * 3.0, 3)]
-            r += (MUD[0] - r) * mu; g += (MUD[1] - g) * mu; b += (MUD[2] - b) * mu
+            # Niente fango fuori dall'anello delle lane (zona esterna).
+            inner_px = inner[(np.arange(y0, y1) // ts)][:, tx_cols]
+            mu = mu * inner_px
+            # Tono del fango variato dal rumore: pozzanghere scure dove mt è basso.
+            mt = mtone_x[y0i] * (1 - wy) + mtone_x[y1i] * wy
+            mcr = MUD_D[0] + (MUD_L[0] - MUD_D[0]) * mt
+            mcg = MUD_D[1] + (MUD_L[1] - MUD_D[1]) * mt
+            mcb = MUD_D[2] + (MUD_L[2] - MUD_D[2]) * mt
+            r += (mcr - r) * mu; g += (mcg - g) * mu; b += (mcb - b) * mu
             dst[:, y0:y1, 0] = np.clip(r, 0, 255).T
             dst[:, y0:y1, 1] = np.clip(g, 0, 255).T
             dst[:, y0:y1, 2] = np.clip(b, 0, 255).T
         del dst
         return floor
 
-    def _scatter_detail(self, grid, floor_img, p, path_tiles) -> None:
+    def _scatter_detail(self, grid, floor_img, p, path_tiles, inner) -> None:
         """Dettagli sul suolo (in coordinate MONDO, disegnati sull'immagine del
         suolo prima del blit): ciuffi d'erba sul verde (NON sui sentieri né sul
-        fango nudo), fiocchi di muschio e granelli di fango dove le chiazze sono
-        dense."""
+        fango nudo), fiocchi di muschio e, SOLO nel fango interno, granelli,
+        qualche pozzanghera più scura e ciuffi d'erba lungo i bordi."""
         from game.renderer import (GRASS_TUFT_LIGHT, GRASS_TUFT_DARK,
                                     MOSS_FLECK_L, MOSS_FLECK_D, MUD_SPECK)
+        MUD_PUDDLE = (46, 37, 25)        # pozzanghera scura (puntino)
         ts = self.tile_size
         Wt, Ht = grid.width, grid.height
         tiles = grid.tiles
@@ -395,11 +441,14 @@ class MapRenderer:
                     continue
                 cx0, cy0 = tx * ts, ty * ts
                 rng = random.Random(((tx * 73856093) ^ (ty * 19349663)) & 0xFFFFFFFF)
-                mu = p._mud_at(tx + 0.5, ty + 0.5)
+                is_inner = bool(inner[ty, tx])
+                mu = p._mud_at(tx + 0.5, ty + 0.5) if is_inner else 0.0  # niente fango fuori
                 mo = p._moss_at(tx + 0.5, ty + 0.5)
                 on_path = (tx, ty) in path_tiles
                 if not on_path and mu < 0.5:    # fili d'erba (non sul sentiero)
-                    for _ in range(rng.randint(2, 4)):
+                    # Più fitti ai BORDI del fango (0.15<mu<0.5): l'erba invade.
+                    n = rng.randint(2, 4) + (2 if 0.15 < mu < 0.5 else 0)
+                    for _ in range(n):
                         x = cx0 + rng.randint(2, ts - 2)
                         y = cy0 + rng.randint(ts // 2, ts - 2)
                         hgt = rng.randint(2, max(3, ts // 4))
@@ -413,6 +462,10 @@ class MapRenderer:
                     for _ in range(rng.randint(1, 3)):
                         x = cx0 + rng.randint(1, ts - 2); y = cy0 + rng.randint(1, ts - 2)
                         floor_img.set_at((x, y), MUD_SPECK)
+                    if mu > 0.6 and rng.random() < 0.5:   # pozzanghera più scura
+                        px = cx0 + rng.randint(3, ts - 4); py = cy0 + rng.randint(3, ts - 4)
+                        pygame.draw.ellipse(floor_img, MUD_PUDDLE,
+                                            pygame.Rect(px, py, rng.randint(3, 5), rng.randint(2, 3)))
 
     # --- Sentieri di terra battuta (strisce continue spline) -----------------
     def _compute_paths(self, grid):

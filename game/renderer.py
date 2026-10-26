@@ -49,7 +49,7 @@ JUNGLE_DARK = (35, 59, 41)       # #233B29 avvallamento in ombra
 JUNGLE_LIGHT = (58, 90, 60)      # #3A5A3C dosso illuminato
 JUNGLE_MOSS = (74, 107, 58)      # #4A6B3A muschio
 JUNGLE_DIRT = (90, 74, 53)       # #5A4A35 terra/sentiero
-JUNGLE_MUD = (62, 53, 39)        # #3E3527 fango
+JUNGLE_MUD = (74, 61, 44)        # #4A3D2C fango (schiarito)
 DIRT_DRY = (112, 93, 66)         # battuto secco e chiaro (nucleo calpestato)
 GRASS_LO = JUNGLE_DARK           # avvallamento in ombra
 GRASS_HI = JUNGLE_LIGHT          # dosso illuminato
@@ -235,7 +235,9 @@ class Renderer:
         a = self._vnoise((tx + 311) / 7.5, (ty + 517) / 7.5)
         b = self._vnoise((tx + 311) / 2.7, (ty + 517) / 2.7)
         n = a * 0.72 + b * 0.28
-        return max(0.0, min(1.0, (n - 0.60) / 0.17))
+        # Soglia alzata (0.70) e rampa più stretta -> chiazze più piccole e
+        # sparse (~60% di area in meno rispetto a prima).
+        return max(0.0, min(1.0, (n - 0.70) / 0.12))
 
     def _floor_color(self, tx: float, ty: float):
         """Colore del suolo in un punto MONDO (coord in tile): verde a due scale
