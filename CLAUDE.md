@@ -255,16 +255,55 @@ Passaggi completati:
   Seme per tile (variant) -> ciuffi diversi dai vicini; sprite in cache come
   prima (chiave mask+variant+H). Screenshot: screenshots/step_13.png (ravvicinato,
   erba accanto a un muro per il confronto) e step_13_over.png (minimappa).
+- CESPUGLI rifatti a SILHOUETTE (step_14), su feedback allo step_13 (prima:
+  rettangoli a scaletta allineati ai tile, fili in righe regolari tipo "lettere",
+  colore troppo saturo). Il rendering dei cespugli PASSA da per-tile (renderer.py)
+  a LIVELLO MAPPA (game/map_renderer.py): rimossi _bush_surf/_build_bush/_blade/
+  _sphere dal Renderer. Nuovi: _bush_solid, _bush_points, _build_bushes,
+  _build_bush_shadow, _grass_tuft. (1) FORMA: _bush_solid usa la STESSA tecnica
+  dei muri (_jungle_solid): maschera tile -> campo di DISCHI sui centri -> blur
+  (_sep_blur) -> soglia 0.5 + rumore (_np_vnoise) SOLO al bordo, con CLAMP ~mezzo
+  tile (core/allowed da _dist_lo). Contorno organico che puo' sporgere fino a
+  mezzo tile; i tile ISOLATI diventano BLOB tondi (core) e i vicini si FONDONO
+  (niente piu' rettangoli; niente chiazze da un solo tile squadrate). (2) CIUFFI:
+  _bush_points posiziona le basi con DART-THROWING (Poisson-disc, spaziatura
+  ~0.26 tile) dentro la sagoma -> fitti ma senza pattern allineato; si disegnano
+  ordinati per y (dal FONDO al DAVANTI: le punte di una fila coprono la base di
+  quella dietro). Ogni ciuffo (_grass_tuft, sprite in cache) e' un ventaglio di
+  4-6 lame a V di altezze diverse, disegnato a BASSA risoluzione e scalato NEAREST
+  (pixel grossi); contorno scuro per lama; colore per altezza della punta
+  (dal basso al chiaro) e POCHE punte col colpo di luce in cima. (3) COLORE
+  desaturato oliva come richiesto: base #3E5228 (GR_BASE), medio #6B7F3A (GR_MID),
+  chiaro #8A9A48 (GR_LIGHT), punte #A8B560 (GR_TIP) -> distinguibile dalla chioma
+  scura dei muri ma integrato nella palette. (4) VOLUME: riempimento della sagoma
+  con gradiente verticale (piu' chiaro in cima, piu' SCURO in basso), ombra
+  morbida a terra verso BASSO-DESTRA (_build_bush_shadow, nel layer shadows) e
+  bordo inferiore irregolare (rumore della maschera). AO (_build_ao) e la silhou-
+  ette dei muri (_jungle_solid) ora SCAVANO attorno ai cespugli con un campo
+  distanza (disco), non piu' per-tile: il muro si CURVA attorno all'erba (niente
+  bordi dritti dove si toccano) e l'AO segue il contorno curvo dei cespugli.
+  (5) BONUS vento: le punte possono OSCILLARE (GRASS_FRAMES fotogrammi, punte
+  sfalsate di ~1px). Di DEFAULT GRASS_FRAMES=1 -> erba STATICA nel layer
+  walls_base (ZERO memoria extra, come prima): ogni fotogramma in piu' e' un layer
+  a se e MOLTIPLICA la memoria dell'erba (3v3: ~+22MB/frame), contro il budget di
+  memoria del progetto. Alzando GRASS_FRAMES a 2-3 si abilita il vento (i punti
+  Poisson si calcolano una volta e si riusano; in draw() si fa solo il blit del
+  fotogramma corrente scelto da get_ticks). Costo build 3v3 ~10s. Screenshot:
+  screenshots/step_14.png (ravvicinato, erba accanto a un muro) e step_14_over.png
+  (minimappa: erba oliva-chiara vs chioma muri scura).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul
   bordo sud (sopra le unita, vedi passo rilievi pseudo-3D). lighting_overlay
   porta il velo d'atmosfera (chioma + luce campi). La vignettatura e'
   screen-space e vive in draw_canopy, fuori dai layer. I CESPUGLI (TILE_BUSH)
-  stanno in walls_base e sono resi per-tile da _build_bush come ERBA ALTA a lame
-  a V (vedi step_13): stile e palette DIVERSI dai muri apposta, per distinguerli
-  a colpo d'occhio e in minimappa. Restano disegnati PRIMA dei muri, quindi un
-  muro che li sovrasta li copre.
+  sono ERBA ALTA a lame a V resa a LIVELLO MAPPA come SILHOUETTE organica
+  (map_renderer: _bush_solid/_build_bushes, vedi step_14), con stile e palette
+  DIVERSI dai muri apposta (distinguibili a colpo d'occhio e in minimappa). Di
+  default (GRASS_FRAMES=1) l'erba e' STATICA nel layer walls_base e si disegna
+  PRIMA dei muri, quindi un muro che la sovrasta la copre; con GRASS_FRAMES>1 va
+  in layer dedicati (uno per fotogramma del vento) disegnati in draw() tra ombre
+  e walls_base.
 - TILE_WALL (muro di confine) NON e' piu reso come pietra per-tile: e' entrato
   nella silhouette vegetata dei muri (foresta+scogliera). I builder di pietra
   (_tall_surf/_paint_stone_tall) e _rock_facet/_round_rock restano in

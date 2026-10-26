@@ -89,16 +89,9 @@ BUSH_HILITE = (84, 128, 74)      # colpo di luce sulla cupola
 BUSH_RIMLIGHT = (104, 146, 86)   # cresta sul bordo alto esposto (giungla, non lime)
 BUSH_RIM = (8, 20, 12)           # contorno/contatto scuro alla base
 BUSH_CONTACT = (0, 0, 0, 110)    # ombra proiettata sull'erba (radica a terra)
-# --- ERBA ALTA (cespugli, stile Pokemon): ciuffi a V, verde CHIARO e tendente
-#     al giallo-oliva, per staccare NETTAMENTE dalla chioma scura dei muri
-#     (anche in minimappa). Niente cerchi: solo lame triangolari.
-GRASS_BASE = (34, 54, 28)        # fondo/radici in ombra (banda a terra)
-GRASS_DARK = (56, 82, 34)        # lame basse / sul retro (oliva scuro)
-GRASS_MID = (92, 124, 46)        # lame a mezza altezza (oliva)
-GRASS_LIGHT = (134, 166, 60)     # lame in alto, verso la luce (giallo-oliva)
-GRASS_HILITE = (184, 206, 92)    # punte illuminate (meta' superiore, alto-sx)
-GRASS_OUT = (20, 36, 18)         # contorno scuro delle lame
-GRASS_CONTACT = (0, 0, 0, 96)    # ombra a terra (basso-destra)
+# NB: i CESPUGLI (erba alta) NON si disegnano piu qui per-tile: la loro
+# silhouette organica e il riempimento a ciuffi vivono in game/map_renderer.py
+# (_bush_solid / _build_bushes), come per i muri.
 # Muro di confine (TILE_WALL): pietra grigia fredda (resta un muro costruito).
 STONE_WALL = ((118, 120, 130), (70, 72, 82), (40, 42, 50), (52, 54, 62))
 # --- Altopiano roccioso della giungla (reso neighbor-aware: un blocco connesso
@@ -267,115 +260,6 @@ class Renderer:
             r += (JUNGLE_MUD[0] - r) * k; g += (JUNGLE_MUD[1] - g) * k; b += (JUNGLE_MUD[2] - b) * k
         return (int(r), int(g), int(b))
 
-    # --- Cespuglio connesso (neighbor-aware): un blocco = un'unica chioma -----
-    def _bush_surf(self, mask: int, variant: int, H: int) -> pygame.Surface:
-        ts = self.tile_size
-        key = (ts, "bush", mask, variant, H)
-        s = self._tile_cache.get(key)
-        if s is None:
-            s = self._build_bush(mask, variant, ts, H)
-            self._tile_cache[key] = s
-        return s
-
-    @staticmethod
-    def _blade(target, bx, by, h, lean, w, col, out):
-        """Una lama d'erba: triangolo sottile dalla base (bx,by) alla punta,
-        inclinato di `lean` px. Prima il contorno scuro (triangolo piu largo),
-        poi il colore dentro -> ogni lama ha il suo bordo netto (pixel-art)."""
-        tipx, tipy = bx + lean, by - h
-        pygame.draw.polygon(target, out, ((bx - w - 1, by), (bx + w + 1, by),
-                                          (tipx, tipy - 1)))
-        if w >= 1:
-            pygame.draw.polygon(target, col, ((bx - w, by - 1), (bx + w, by - 1),
-                                              (tipx, tipy + 1)))
-        else:
-            pygame.draw.line(target, col, (bx, by - 1), (tipx, tipy + 1))
-
-    def _build_bush(self, mask: int, variant: int, ts: int, H: int) -> pygame.Surface:
-        """Un tile di ERBA ALTA (stile Pokemon): ciuffi di lame a V, densi,
-        verde chiaro giallo-oliva. NIENTE cerchi: solo lame triangolari che
-        salgono dalla base. Sagoma irregolare (le punte bucano il bordo alto del
-        tile, entro l'estrusione H). Si disegna a BASSA risoluzione e si scala
-        in modo nearest -> pixel grossi, look retro.
-
-        mask bit: 1=N 2=E 4=S 8=W (vicino anch'esso erba). Sui lati INTERNI la
-        banda di base riempie a filo del bordo (erba continua coi vicini); sui
-        lati ESPOSTI c'e' ombra di contatto (basso-destra) e il bordo resta
-        libero -> i tile insieme leggono come UNA macchia d'erba, ma ogni tile
-        ha il suo seme (ciuffi diversi dai vicini)."""
-        n = bool(mask & 1); e = bool(mask & 2); s = bool(mask & 4); w = bool(mask & 8)
-        surf = pygame.Surface((ts, ts + H), pygame.SRCALPHA)
-        rng = random.Random((variant * 2654435761 ^ 0xB5) & 0xFFFFFFFF)
-
-        # Risoluzione ridotta: PX px schermo per 1 px logico; poi scale nearest.
-        PX = max(2, ts // 12)
-        lw = ts // PX
-        lh = (ts + H) // PX
-        lo = pygame.Surface((lw, lh), pygame.SRCALPHA)
-        B = lh                              # riga di terra (base del tile)
-        tile_top = H // PX                  # confine tile/estrusione in low-res
-        ground = B                          # le lame radicano a terra
-
-        # (1) Ombra di contatto a terra, verso BASSO-DESTRA, solo sui lati esposti.
-        if not s or not e:
-            sh = pygame.Surface((lw, lh), pygame.SRCALPHA)
-            ox = 1 if not e else 0
-            pygame.draw.ellipse(sh, GRASS_CONTACT,
-                                pygame.Rect(ox, B - max(2, lh // 6),
-                                            lw - 1, max(2, lh // 5)))
-            lo.blit(sh, (0, 0))
-
-        # (2) Banda di base scura (radici): riempie tutta la larghezza -> nessun
-        #     buco tra tile vicini. Alta ~1/4 del tile.
-        band_h = max(2, (lh - tile_top) // 4)
-        pygame.draw.rect(lo, GRASS_BASE, pygame.Rect(0, B - band_h, lw, band_h))
-
-        # (3) CIUFFI A V: basi sparse lungo tutta la larghezza; ogni ciuffo e' un
-        #     ventaglio di 2-4 lame. Il colore della lama dipende dall'ALTEZZA
-        #     della punta (bassa=scuro .. alta=chiaro) con BIAS verso ALTO-SINISTRA
-        #     (la luce): le punte alte a sinistra prendono il colpo di luce.
-        #     Raccolgo le lame e le disegno dal RETRO (scure/corte) al FRONTE
-        #     (chiare/alte) cosi' le punte illuminate stanno sopra.
-        hmax = (lh - tile_top) + tile_top * 0.6   # altezza max lama (buca il tile)
-        xl = max(1, lw - 1)
-        blades = []
-        nb = 2 * lw                                # densita' (fitti)
-        for _ in range(nb):
-            bx = rng.randint(0, lw - 1)
-            by = ground - rng.randint(0, max(1, band_h - 1))
-            tufts = rng.randint(2, 4)              # lame del ciuffo (ventaglio a V)
-            base_h = rng.uniform(0.45, 1.0) * hmax
-            for k in range(tufts):
-                spread = (k - (tufts - 1) / 2)
-                lean = int(spread * rng.uniform(2.0, 3.2)) + rng.randint(-1, 1)
-                h = max(2, int(base_h * rng.uniform(0.75, 1.0)))
-                wdt = 1 if h > hmax * 0.4 else 0
-                tipy = by - h
-                tn = max(0.0, min(1.0, (ground - tipy) / max(1.0, hmax)))  # 0 basso..1 alto
-                xn = bx / xl                       # 0 sinistra .. 1 destra
-                score = tn + 0.22 * (1.0 - xn)     # bias verso ALTO-SINISTRA (luce)
-                upper = tipy <= tile_top + (lh - tile_top) * 0.45  # punta in meta' alta
-                if score > 0.92 and upper and xn < 0.6:
-                    col = GRASS_HILITE             # colpo di luce: solo meta' alta, a sx
-                elif score > 0.68:
-                    col = GRASS_LIGHT
-                elif score > 0.40:
-                    col = GRASS_MID
-                else:
-                    col = GRASS_DARK
-                blades.append((score, bx, by, h, lean, wdt, col))
-
-        # disegna dal RETRO (score basso, scuro/corto) al FRONTE (alto, chiaro):
-        # le punte illuminate restano sopra -> strati dal piu' scuro al piu' chiaro.
-        blades.sort(key=lambda t: t[0])
-        for _sc, bx, by, h, lean, wdt, col in blades:
-            self._blade(lo, bx, by, h, lean, wdt, col, GRASS_OUT)
-
-        # (4) Scala a piena risoluzione in modo NEAREST (pixel grossi).
-        big = pygame.transform.scale(lo, (ts, ts + H))
-        surf.blit(big, (0, 0))
-        return surf
-
     def _build_tile(self, t: int, variant: int, ts: int) -> pygame.Surface:
         surf = pygame.Surface((ts, ts))
         rng = random.Random((t << 4) | variant)
@@ -395,8 +279,8 @@ class Renderer:
         pygame.draw.ellipse(sh, PROP_SHADOW,
                             pygame.Rect(ts // 8, H + ts // 2, ts - ts // 4, ts // 2))
         surf.blit(sh, (0, 0))
-        # TILE_WALL -> muro di confine in pietra costruita (il cespuglio ha il
-        # suo builder neighbor-aware, _build_bush).
+        # TILE_WALL -> muro di confine in pietra costruita (i cespugli sono
+        # erba alta, costruita in map_renderer._build_bushes).
         self._paint_stone_tall(surf, ts, H, rng, STONE_WALL)
         return surf
 
