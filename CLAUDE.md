@@ -215,6 +215,22 @@ Passaggi completati:
   li sovrasta). Costo build ~invariato (3v3 ~8s, 5v5 ~19s; densita' alberi
   tarata) nonostante l'area raddoppiata dall'unione di TILE_WALL. Screenshot:
   screenshots/step_11.png (ravvicinato) e step_11_over.png (minimappa).
+- CHIOMA densa e con volume (step_12), su feedback (prima: palline piatte su
+  fondo nero, "pois"). (1) DENSITA': base della chioma verde MEDIO-SCURO (#1F3B24
+  = BUSH_DARK) invece del quasi-nero BUSH_SHADOW, passo tra alberi ridotto a
+  ~0.6 tile e alberi piu grandi -> si sovrappongono, restano solo piccole
+  fessure d'ombra. (2) VOLUME per albero: _draw_tree rifatto -> 3-4 ciuffi, e
+  OGNI ciuffo e' un piccolo rilievo a 3 bande (base/ombra -> corpo -> cappello di
+  luce verso alto-sinistra) + riflesso; i ciuffi in basso-destra usano toni piu
+  scuri, quelli in alto-sinistra piu chiari -> cupola, non disco piatto con un
+  punto. (3) niente piu TAGLI DRITTI: i tile BUSH si scavano dal campo dischi a
+  BASSA risoluzione in _jungle_solid PRIMA del blur (non piu `solid &= ~bpx`
+  sulla sagoma finale, che lasciava spigoli di griglia) -> il muro si curva
+  attorno ai cespugli seguendo la maschera. PRESTAZIONI: gli alberi ora sono
+  SPRITE in CACHE (_tree_sprite, _tree_cache: chiave = raggio quantizzato +
+  variante 0-7 + palette) disegnati poche decine di volte e BLITTATI a migliaia
+  -> build di nuovo ~8s (3v3) / ~17s (5v5) nonostante la densita' molto maggiore.
+  Screenshot: screenshots/step_12.png (ravvicinato) e step_12_over.png (minimappa).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

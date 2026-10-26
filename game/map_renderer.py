@@ -201,6 +201,7 @@ class MapRenderer:
         self._grid_sprite = None     # sprite riga griglia di debug (cache)
         self._camps: list[tuple[int, int]] = []   # centri dei campi (per i sentieri)
         self._vig = None             # vignettatura screen-space (cache per dimensione vista)
+        self._tree_cache: dict = {}  # sprite albero per (R quantizzato, variante, palette)
 
     def set_camps(self, camps) -> None:
         """Posizioni dei campi della giungla (da MapData): servono SOLO a tracciare
@@ -534,6 +535,21 @@ class MapRenderer:
         disc = (dist <= (ts * 0.72 / s)).astype(np.float32)   # dischi uniti
         core = dist <= (ts * 0.42 / s)                   # sempre pieno (blob tondi)
         allowed = dist <= (ts * 1.0 / s)                 # sporgenza max ~mezzo tile
+        # NESSUN muro deve coprire un cespuglio: scavo i tile BUSH dal campo dischi
+        # PRIMA del blur (non con un taglio per-tile sulla sagoma finale, che
+        # lascerebbe bordi DRITTI): cosi la sagoma del muro si CURVA attorno al
+        # cespuglio seguendo la maschera, senza spigoli di griglia.
+        bt = np.zeros((Ht, Wt), bool)
+        for ty in range(Ht):
+            row = tiles[ty]
+            for tx in range(Wt):
+                if row[tx] == TILE_BUSH:
+                    bt[ty, tx] = True
+        if bt.any():
+            cxb = np.minimum((np.arange(wl) * s + s // 2) // ts, Wt - 1)
+            cyb = np.minimum((np.arange(hl) * s + s // 2) // ts, Ht - 1)
+            bush_lo = bt[cyb][:, cxb]
+            disc[bush_lo] = 0.0; core[bush_lo] = False; allowed[bush_lo] = False
         bf = self._sep_blur(disc, max(1, int(ts * 0.55 / s)), passes=3)
         # upscala bf a piena risoluzione (una volta), poi soglia+rumore a strisce.
         bf_full = self._upscale(bf, W, H, s)
@@ -553,19 +569,6 @@ class MapRenderer:
             thr = np.where(b >= 0.80, True,
                            np.where(b <= 0.22, False, (b + nz * 0.33) > 0.5))
             solid[y0:y1] = (thr | core_full[y0:y1]) & allow_full[y0:y1]
-        # NESSUN muro deve coprire un cespuglio: la sagoma (che sborda ~0.5 tile)
-        # viene ritagliata via dai tile BUSH -> il muro si ferma al confine del
-        # cespuglio, i due non si sovrappongono.
-        bush = np.zeros((Ht, Wt), bool)
-        for ty in range(Ht):
-            row = tiles[ty]
-            for tx in range(Wt):
-                if row[tx] == TILE_BUSH:
-                    bush[ty, tx] = True
-        if bush.any():
-            bpx = bush[np.clip(np.arange(H) // ts, 0, Ht - 1)][:,
-                       np.clip(np.arange(W) // ts, 0, Wt - 1)]
-            solid &= ~bpx
         return solid
 
     def _build_jungle_shadow(self, grid, shadows, solid) -> None:
@@ -619,30 +622,49 @@ class MapRenderer:
         return lab
 
     @staticmethod
-    def _draw_tree(surf, cx, cy, R, rng, tones) -> None:
-        """Un ALBERO singolo: gruppo di ciuffi tondi che formano una chioma
-        irregolare (non un cerchio liscio). Illuminazione direzionale sull'INTERO
-        albero: ciuffi in basso-destra scuri, in alto-sinistra chiari, con pochi
-        riflessi. `tones` = (scuro, medio, chiaro, luce, riflesso)."""
-        DK, MD, LT, HI, RF = tones
+    def _draw_tree(surf, cx, cy, R, rng, pal) -> None:
+        """Un ALBERO con VOLUME: 3-4 ciuffi interni, ognuno un piccolo RILIEVO a
+        bande (base/ombra -> corpo -> cappello di luce verso alto-sinistra), non
+        un disco piatto con un punto. I ciuffi in basso-destra usano toni piu
+        scuri, quelli in alto-sinistra piu chiari -> l'albero intero legge come
+        una cupola. `pal` = (SH, DK, MD, LT, HI, RF)."""
+        SH, DK, MD, LT, HI, RF = pal
         R = max(3, int(R))
-        n = max(3, int(R * 0.42))
-        tufts = [(0.0, R * 0.12, R * 0.66)]              # corpo centrale
-        for _ in range(n):
-            a = rng.random() * math.tau
-            rad = (rng.random() ** 0.5) * R * 0.72
-            tr = R * (0.36 + rng.random() * 0.30)
-            tufts.append((math.cos(a) * rad, math.sin(a) * rad * 0.92, tr))
-        # retro (basso-destra, scuro) -> fronte (alto-sinistra, chiaro)
-        tufts.sort(key=lambda t: (t[0] + t[1]), reverse=True)
+        k = rng.randint(3, 4)
+        tufts = [(0.0, R * 0.05, R * 0.62)]              # corpo centrale
+        for i in range(k):
+            a = (i + rng.uniform(-0.28, 0.28)) / k * math.tau
+            rad = R * 0.4
+            tufts.append((math.cos(a) * rad, math.sin(a) * rad * 0.92,
+                          R * (0.46 + rng.random() * 0.14)))
+        tufts.sort(key=lambda t: (t[0] + t[1]), reverse=True)   # BR dietro, TL davanti
         for ox, oy, tr in tufts:
-            li = -(ox + oy) / (R * 1.25)                 # -1 basso-dx .. +1 alto-sx
-            col = DK if li < -0.28 else MD if li < 0.12 else LT if li < 0.5 else HI
-            pygame.draw.circle(surf, col, (int(cx + ox), int(cy + oy)), int(tr))
-        for _ in range(max(1, n // 4)):                  # riflessi in alto-sinistra
-            hx = cx - rng.random() * R * 0.5
-            hy = cy - rng.random() * R * 0.5
-            pygame.draw.circle(surf, RF, (int(hx), int(hy)), max(1, int(R * 0.12)))
+            tr = int(tr); x = int(cx + ox); y = int(cy + oy)
+            li = -(ox + oy) / (R * 0.9)                  # -1 basso-dx .. +1 alto-sx
+            if li < -0.18:   c0, c1, c2 = SH, DK, MD     # ciuffo in ombra
+            elif li < 0.4:   c0, c1, c2 = DK, MD, LT     # corpo
+            else:            c0, c1, c2 = MD, LT, HI      # ciuffo illuminato
+            pygame.draw.circle(surf, c0, (x, y), tr)                        # base/ombra
+            pygame.draw.circle(surf, c1, (x - int(tr * 0.22), y - int(tr * 0.22)), int(tr * 0.74))
+            pygame.draw.circle(surf, c2, (x - int(tr * 0.4), y - int(tr * 0.4)), int(tr * 0.42))
+            if c2 is HI:                                  # riflesso in alto-sinistra
+                pygame.draw.circle(surf, RF, (x - int(tr * 0.5), y - int(tr * 0.5)), max(1, int(tr * 0.2)))
+
+    def _tree_sprite(self, Rq, variant, pal, palid):
+        """Sprite di un albero (cache): forma/volume dipendono solo da raggio
+        quantizzato + variante + palette, non dalla posizione (la luce e' sempre
+        da alto-sinistra). Cosi si DISEGNA l'albero poche decine di volte e poi si
+        BLITTA a migliaia -> build molto piu veloce del draw per-pixel."""
+        key = (Rq, variant, palid)
+        s = self._tree_cache.get(key)
+        if s is None:
+            pad = 2
+            D = 2 * Rq + 2 * pad
+            s = pygame.Surface((D, D), pygame.SRCALPHA)
+            rng = random.Random((variant * 2654435761 ^ palid * 40503 ^ Rq) & 0xFFFFFFFF)
+            self._draw_tree(s, Rq + pad, Rq + pad, Rq, rng, pal)
+            self._tree_cache[key] = s
+        return s
 
     def _build_jungle_walls(self, grid, walls, canopy, p, solid) -> None:
         """Muri (giungla + confine) come RILIEVI pseudo-3D in stile LoL:
@@ -743,12 +765,14 @@ class MapRenderer:
             np.minimum(ma, cliff.T.astype(np.uint8) * 255, out=ma); del ma
 
         # --- (2) CIMA VEGETATA: ALBERI singoli, grandi dentro / piccoli al bordo -
-        tones = (BUSH_DARK, BUSH_MID, BUSH_LIGHT, BUSH_HILITE, BUSH_RIMLIGHT)
+        pal = (BUSH_SHADOW, BUSH_DARK, BUSH_MID, BUSH_LIGHT, BUSH_HILITE, BUSH_RIMLIGHT)
         fol = pygame.Surface((W, H), pygame.SRCALPHA)
         f3 = sa.pixels3d(fol); fa = sa.pixels_alpha(fol)
-        f3[solid.T] = np.array(BUSH_SHADOW, np.uint8); fa[solid.T] = 255  # base scura
+        # Base verde MEDIO-SCURO (#1F3B24 = BUSH_DARK), non quasi-nera: le fessure
+        # tra le chiome restano verdi scure, non buchi neri (niente effetto pois).
+        f3[solid.T] = np.array(BUSH_DARK, np.uint8); fa[solid.T] = 255
         del f3, fa
-        sp = max(5, int(ts * 0.76))                       # passo tra gli alberi
+        sp = max(5, int(ts * 0.6))                        # passo fitto: alberi sovrapposti
         jcx = np.arange(0, W, sp); jcy = np.arange(0, H, sp)
         GY, GX = np.meshgrid(jcy, jcx, indexing="ij")     # nord->sud (ordine chiome)
         sel = solid[GY, GX]
@@ -762,8 +786,10 @@ class MapRenderer:
                 continue
             dtile = distlo[min(hl - 1, cy // sdl), min(wl - 1, cx // sdl)] * sdl / ts
             szf = 0.82 + 0.4 * (((sseed >> 10) & 0xFF) / 255.0)     # per muro
-            R = ts * (0.30 + 0.36 * min(1.0, dtile / 2.2)) * szf    # grande dentro
-            self._draw_tree(fol, cx, cy, R, random.Random(hh), tones)
+            R = ts * (0.40 + 0.34 * min(1.0, dtile / 2.2)) * szf    # grande dentro
+            Rq = max(3, int(round(R / 2.0)) * 2)                    # quantizzato (cache)
+            spr = self._tree_sprite(Rq, (hh >> 12) & 7, pal, 0)
+            fol.blit(spr, (cx - Rq - 2, cy - Rq - 2))
         # Ritaglio alla sagoma + CONTORNO esterno scuro #12281A (tutto il bordo).
         fa = sa.pixels_alpha(fol)
         np.minimum(fa, solid.T.astype(np.uint8) * 255, out=fa); del fa
@@ -786,7 +812,7 @@ class MapRenderer:
         #     sopra le unita alla base del muro. Alberelli scuri (sotto-chioma in
         #     ombra) centrati alla BASE della parete, debordano un po' in basso.
         #     I centri stanno SOTTO la sagoma -> niente tagli orizzontali.
-        tones_dk = (BUSH_SHADOW, BUSH_DARK, BUSH_DARK, BUSH_MID, BUSH_MID)
+        pal_dk = (BUSH_SHADOW, BUSH_SHADOW, BUSH_DARK, BUSH_DARK, BUSH_MID, BUSH_MID)
         over = pygame.Surface((W, Hf), pygame.SRCALPHA)
         if len(xs_c):
             step_o = max(3, ts // 3)
@@ -797,9 +823,11 @@ class MapRenderer:
                 hh = ((x * 374761393) ^ (yb * 668265263) ^ sseed) & 0xFFFFFFFF
                 szf = 0.7 + 0.5 * (((sseed >> 10) & 0xFF) / 255.0)
                 R = ts * 0.3 * szf
+                Rq = max(3, int(round(R / 2.0)) * 2)
                 oy = yb + RELIEF - int(R * 0.4) + ((hh >> 7) & 3)  # alla base, deborda
                 ox = x + ((hh >> 9) & 3) - 1
-                self._draw_tree(over, ox, oy, R, random.Random(hh ^ 0x0A11), tones_dk)
+                spr = self._tree_sprite(Rq, (hh >> 12) & 7, pal_dk, 1)
+                over.blit(spr, (ox - Rq - 2, oy - Rq - 2))
             for by in range(0, Hf, CHUNK):
                 bh = min(CHUNK, Hf - by)
                 for bx in range(0, W, CHUNK):
