@@ -119,33 +119,43 @@ Passaggi completati:
   per dimensione vista (_vignette, cache) e blittata per ultima in draw_canopy,
   NON nei layer di mappa. Screenshot: screenshots/step_7.png (ravvicinato con
   finte unita) e step_7_over.png (mappa intera).
-- Autotiling a 8 vicini sui MURI DI GIUNGLA (bitmask blob, game/renderer.py
-  _autotile_footprint/_carve_autotile; maschera a 8 bit in map_renderer.py
-  _mask8): i bordi non sono piu a scaletta ma hanno diagonali e curve morbide,
-  con contorno IRREGOLARE (non liscio). map_renderer passa a _jwall_surf una
-  bitmask a 8 vicini (cardinali 1/2/4/8 + diagonali 16/32/64/128); i builder
-  texturizzano come prima e poi _carve_autotile RIMODELLA l'impronta dello
-  sprite gia pronto (niente riscrittura della texture): (1) ritaglia la forma a
-  un'IMPRONTA blob dove gli angoli CONVESSI esposti (entrambi i cardinali
-  adiacenti assenti) sono arrotondati con un arco il cui raggio OSCILLA con
-  l'angolo (sin a 2 frequenze, fase per-variante) -> curve irregolari, bordi
-  pixel-art netti (soglia booleana, niente AA). Due tile in diagonale (staircase)
-  arrotondano gli angoli che si TOCCANO -> la scaletta diventa una diagonale
-  morbida. I lati CONDIVISI con un vicino solido restano a filo (nessuna
-  cucitura ne linea di griglia). (2) Ridisegna un RIM chiaro (JW_RIM, verso la
-  luce N/O) / scuro (JW_EDGE_SH, verso l'ombra S/E) SOLO lungo i nuovi bordi
-  curvi INTERNI (mai sul perimetro del tile: li' o e' un lato condiviso o una
-  faccia piatta gia texturizzata) -> niente linee di griglia reintrodotte. (3)
-  Sugli angoli INTERNI (due cardinali presenti, diagonale assente) posa un'ombra
-  concava ad anello, come una fenditura tra due bracci di roccia. La PARETE
-  (cliff, righe >= ts) segue l'impronta: resta solo sotto le colonne che toccano
-  ancora il bordo sud (foot[:, ts-1]), cosi gli angoli SW/SE arrotondati sollevano
-  la parete. Varianti generate proceduralmente (seed = variant^mask) e messe in
-  cache nel Renderer come prima (key include la mask a 8 bit). I CESPUGLI restano
-  sul loro builder a 4 bit (gia silhouette ellittica tonda): il carve e' solo per
-  i muri di giungla. Il MURO DI CONFINE in pietra (TILE_WALL, _build_tall, senza
-  mask) non e' ancora autotilato: resta a scaletta, rifacimento a un passo futuro.
-  Screenshot: screenshots/step_8.png (diagonale ravvicinata) e step_8_over.png.
+- [SUPERATO dal passo seguente] Primo tentativo: autotiling a 8 vicini per-tile
+  sui muri di giungla (angoli tondi per sprite). Migliorava i bordi ma le
+  diagonali restavano scalini da un tile e i muri isolati rettangoli, quindi e'
+  stato sostituito dalla SILHOUETTE a maschera (sotto). Screenshot d'epoca:
+  step_8.png.
+- SILHOUETTE dei MURI DI GIUNGLA a maschera (game/map_renderer.py
+  _jungle_solid/_build_jungle_walls/_build_jungle_shadow; _build_ao ora prende la
+  silhouette). La SAGOMA non e' piu per-tile: si ricava da una maschera binaria e
+  si ammorbidisce, cosi diagonali e muri isolati non mostrano la griglia.
+  _jungle_solid: (1) maschera binaria dei TILE muro-giungla; (2) a bassa
+  risoluzione (STEP ts/4) blur ~gaussiano (3 box blur separabili via somme
+  cumulate, _sep_blur, raggio ~0.6 tile) su (quadrati UNION dischi ai centri),
+  upscalata bilineare a piena risoluzione, poi SOGLIA 0.5 col rumore di bordo
+  (_np_vnoise, ampiezza 0.33) -> diagonali vere, angoli tondi, contorno
+  IRREGOLARE pixel-art (soglia booleana, niente AA). CLAMP mezzo tile (la
+  COLLISIONE resta sui tile): distanza low-res dai centri-muro (_dist_lo); ogni
+  cella entro ~0.4 tile da un centro resta piena (i muri piccoli diventano BLOB
+  tondi, non spariscono, non rettangoli) e la sagoma non sborda oltre ~mezzo tile
+  (allowed, dist<=0.98 tile dal centro). _build_jungle_walls riempie la
+  silhouette: cima = roccia mottled (rumore low-res a strisce, lerp
+  JW_TOP..JW_TOP_HI + avvallamenti JW_TOP_SH + muschio JW_MOSS/_DK + fessure
+  JW_CLIFF_DK) ritagliata alla sagoma, con FACCETTE _rock_facet sparse per dare
+  volume; MASSI _round_rock lungo il NUOVO contorno (chiari verso N/O, scuri
+  verso S/E); PARETE 2.5D (cliff) che segue il bordo sud della sagoma (depth per
+  colonna, spalla JW_CLIFF_HI in alto, piu scura in basso, ombra di contatto alla
+  base) estrusa su di H. Tutto su un'unica Surface a piena mappa, poi blit LAZY
+  per chunk (solo i blocchi con alpha). _build_jungle_shadow: ombra proiettata a
+  SUD-EST dalla SILHOUETTE (non dai tile), accumulata a bassa risoluzione con
+  alfa calante e upscalata. _build_ao: l'occupazione low-res viene dalla
+  silhouette (+ cespugli e pietra per-tile) -> l'AO segue il contorno curvo, non
+  piu rettangoli allineati ai tile (risolve il "pilastro" con AO quadrata). Il
+  MURO DI CONFINE in pietra (TILE_WALL) e i CESPUGLI restano per-tile come prima.
+  Rimossi i vecchi builder per-tile dei jungle wall (_jwall_surf/_build_jwall) e
+  l'autotiling (_carve_autotile/_autotile_footprint/_mask8); _rock_facet/
+  _round_rock/_jitter restano, riusati dalla silhouette. Costo build una-tantum:
+  3v3 ~8s, 5v5 ~18s (noise a bassa risoluzione). Screenshot: screenshots/step_9.png
+  (diagonale lungo il fiume) e step_9_over.png (minimappa).
 
 Scelte tecniche importanti:
 - canopy resta RISERVATO e VUOTO; lighting_overlay ora porta il velo d'atmosfera

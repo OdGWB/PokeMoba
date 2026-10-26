@@ -275,29 +275,43 @@ class MapRenderer:
         # --- Sentieri di terra battuta: strisce continue (spline) camp->lane --
         self._stroke_paths(decor, grid, routes, p)
 
-        # --- Passata ombre: un muro proietta ombra a sud/est sul terreno ------
-        def is_wall(x, y):
-            return (0 <= x < Wt and 0 <= y < Ht
-                    and tiles[y][x] in (TILE_WALL, TILE_JUNGLE_WALL))
+        # --- SAGOMA DEI MURI DI GIUNGLA: maschera binaria a risoluzione tile ->
+        #     blur gaussiano + soglia 0.5 + rumore -> silhouette morbida con
+        #     diagonali vere e angoli tondi (niente scaletta per-tile). La
+        #     collisione resta sulla griglia: la grafica puo sporgere/rientrare
+        #     al massimo ~mezzo tile (clamp in _jungle_solid). Ombre e AO si
+        #     ricalcolano da QUESTA maschera, non dai tile.
+        solid = self._jungle_solid(grid)
+
+        # --- Passata ombre proiettate -----------------------------------------
+        # (a) muro di confine in PIETRA (TILE_WALL): ombra per-tile come prima.
+        def is_stone(x, y):
+            return 0 <= x < Wt and 0 <= y < Ht and tiles[y][x] == TILE_WALL
 
         for ty in range(Ht):
             row = tiles[ty]
             for tx in range(Wt):
                 if row[tx] in TALL_TILES:
                     continue
-                nw = ((1 if is_wall(tx, ty - 1) else 0)
-                      | (2 if is_wall(tx - 1, ty) else 0))
+                nw = ((1 if is_stone(tx, ty - 1) else 0)
+                      | (2 if is_stone(tx - 1, ty) else 0))
                 if nw:
                     shadows.blit(p._shadow_surf(nw), (tx * ts, ty * ts + top))
 
-        # --- Ambient occlusion: gradiente d'ombra morbido entro ~1.5 tile dai
-        #     tile "alti" (muri e cespugli), sotto le ombre proiettate.
-        self._build_ao(grid, shadows)
+        # (b) muri di giungla: ombra proiettata a sud-est dalla SILHOUETTE.
+        if solid is not None:
+            self._build_jungle_shadow(grid, shadows, solid)
 
-        # --- Passata 2: rilievi 2.5D (walls_base), dall'alto in basso ---------
-        def is_jw(x, y):
-            return 0 <= x < Wt and 0 <= y < Ht and tiles[y][x] == TILE_JUNGLE_WALL
+        # --- Ambient occlusion: gradiente morbido attorno ai tile "alti"
+        #     (silhouette dei muri di giungla + cespugli + pietra).
+        self._build_ao(grid, shadows, solid)
 
+        # --- Muri di giungla: riempimento della silhouette (texture di roccia +
+        #     massi sul contorno + parete 2.5D), PRIMA dei cespugli/pietra.
+        if solid is not None:
+            self._build_jungle_walls(grid, walls, p, solid)
+
+        # --- Passata 2: rilievi 2.5D per-tile (cespugli e muro di pietra) ------
         def is_bush(x, y):
             return 0 <= x < Wt and 0 <= y < Ht and tiles[y][x] == TILE_BUSH
 
@@ -310,15 +324,11 @@ class MapRenderer:
             row = tiles[ty]
             for tx in range(Wt):
                 t = row[tx]
-                if t not in TALL_TILES:
+                if t not in TALL_TILES or t == TILE_JUNGLE_WALL:
                     continue
                 ax = tx * ts
                 ay = ty * ts - H + top
-                if t == TILE_JUNGLE_WALL:
-                    mask = self._mask8(is_jw, tx, ty)
-                    variant = sym_seed(tx, ty, 31)
-                    walls.blit(p._jwall_surf(mask, variant, H), (ax, ay))
-                elif t == TILE_BUSH:
+                if t == TILE_BUSH:
                     mask = ((1 if is_bush(tx, ty - 1) else 0)
                             | (2 if is_bush(tx + 1, ty) else 0)
                             | (4 if is_bush(tx, ty + 1) else 0)
@@ -334,21 +344,6 @@ class MapRenderer:
         self._build_lighting(grid, self.layers["lighting_overlay"])
 
         self._grid = grid
-
-    @staticmethod
-    def _mask8(same, tx, ty) -> int:
-        """Bitmask a 8 vicini per l'autotiling. `same(x,y)` dice se il vicino e'
-        dello stesso tipo. Bit cardinali 1=N 2=E 4=S 8=W (usati dai builder per i
-        lati esposti) + diagonali 16=NE 32=SE 64=SW 128=NW (usati dal carve per
-        decidere angoli convessi/concavi -> contorno con diagonali e curve)."""
-        return ((1 if same(tx, ty - 1) else 0)
-                | (2 if same(tx + 1, ty) else 0)
-                | (4 if same(tx, ty + 1) else 0)
-                | (8 if same(tx - 1, ty) else 0)
-                | (16 if same(tx + 1, ty - 1) else 0)
-                | (32 if same(tx + 1, ty + 1) else 0)
-                | (64 if same(tx - 1, ty + 1) else 0)
-                | (128 if same(tx - 1, ty - 1) else 0))
 
     def _inner_mask(self, grid):
         """Maschera (Ht,Wt) dei tile DENTRO l'anello delle lane. Flood-fill dal
@@ -416,24 +411,24 @@ class MapRenderer:
                 va = sa.pixels_alpha(surf); va[:] = ba.T; del va
                 layer.blit(surf, (bx, by + top))
 
-    def _build_ao(self, grid, shadows) -> None:
+    def _build_ao(self, grid, shadows, solid=None) -> None:
         """Ambient occlusion: scurisce il terreno con un gradiente morbido entro
-        ~1.5 tile da muri e cespugli. La distanza euclidea dai tile "alti" e'
-        calcolata a BASSA risoluzione (shifted-min: per ogni offset entro il
-        raggio si aggiorna il minimo), il falloff e' uno smoothstep (max a
-        ridosso dell'ostacolo -> 0 a 1.5 tile), poi si upscala e si blitta."""
+        ~1.5 tile dai corpi "alti". L'occupazione a BASSA risoluzione viene presa
+        dalla SILHOUETTE morbida dei muri di giungla (non dai tile, cosi l'AO
+        segue il contorno curvo) PIU i cespugli e il muro di pietra a livello
+        tile. La distanza euclidea e' calcolata con shifted-min, il falloff e'
+        uno smoothstep (max a ridosso dell'ostacolo -> 0 a 1.5 tile), poi si
+        upscala e si blitta."""
         ts = self.tile_size; top = self._top
         Wt, Ht = grid.width, grid.height
         W, H = Wt * ts, Ht * ts
         tiles = grid.tiles
-        tall = np.zeros((Ht, Wt), bool)
+        tall = np.zeros((Ht, Wt), bool)               # cespugli + pietra (per-tile)
         for ty in range(Ht):
             row = tiles[ty]
             for tx in range(Wt):
-                if row[tx] in TALL_TILES:
+                if row[tx] in (TILE_BUSH, TILE_WALL):
                     tall[ty, tx] = True
-        if not tall.any():
-            return
         step = max(2, ts // 4)
         R = AO_RADIUS_TILES * ts / step              # raggio in celle low-res
         Rc = int(math.ceil(R))
@@ -441,6 +436,12 @@ class MapRenderer:
         cx = np.minimum((np.arange(wl) * step) // ts, Wt - 1)
         cy = np.minimum((np.arange(hl) * step) // ts, Ht - 1)
         m = tall[cy][:, cx]                           # (hl, wl) bool
+        if solid is not None:                         # silhouette muri di giungla
+            sy = np.minimum(np.arange(hl) * step, H - 1)
+            sx = np.minimum(np.arange(wl) * step, W - 1)
+            m = m | solid[sy][:, sx]
+        if not m.any():
+            return
         big = R + 1.0
         dist = np.full((hl, wl), big, np.float32)
         dist[m] = 0.0
@@ -461,6 +462,272 @@ class MapRenderer:
         a_lo = f * AO_MAXA
         alpha = np.clip(self._upscale(a_lo, W, H, step), 0, 255).astype(np.uint8)
         self._blit_blocks(shadows, AO_COL, alpha, top)
+
+    # --- Muri di giungla come SILHOUETTE (maschera -> blur -> soglia) ---------
+    @staticmethod
+    def _box1d(a, r, axis):
+        """Media mobile (box blur) 1D separabile via somme cumulate (O(N))."""
+        if axis == 0:
+            a = a.T
+        H, W = a.shape
+        c = np.zeros((H, W + 1), np.float32)
+        np.cumsum(a, axis=1, out=c[:, 1:])
+        idx = np.arange(W)
+        lo = np.clip(idx - r, 0, W); hi = np.clip(idx + r + 1, 0, W)
+        out = (c[:, hi] - c[:, lo]) / (hi - lo)[None, :].astype(np.float32)
+        return out.T if axis == 0 else out
+
+    @classmethod
+    def _sep_blur(cls, a, r, passes=3):
+        """Blur ~gaussiano: 3 passate di box blur separabile (teorema del limite
+        centrale). `r` = raggio del box in pixel."""
+        a = a.astype(np.float32)
+        for _ in range(passes):
+            a = cls._box1d(a, r, 1)
+            a = cls._box1d(a, r, 0)
+        return a
+
+    @staticmethod
+    def _dist_lo(mask, Rc):
+        """Distanza euclidea (troncata a Rc) da ogni cella alle celle `mask` True,
+        a bassa risoluzione, con shifted-min (come _build_ao)."""
+        hl, wl = mask.shape
+        big = Rc + 2.0
+        d = np.full((hl, wl), big, np.float32); d[mask] = 0.0
+        for dy in range(-Rc, Rc + 1):
+            for dx in range(-Rc, Rc + 1):
+                e = math.hypot(dx, dy)
+                if e == 0.0 or e > Rc:
+                    continue
+                dy0 = max(0, -dy); dy1 = hl - max(0, dy)
+                dx0 = max(0, -dx); dx1 = wl - max(0, dx)
+                if dy1 <= dy0 or dx1 <= dx0:
+                    continue
+                src = mask[dy0 + dy:dy1 + dy, dx0 + dx:dx1 + dx]
+                sub = d[dy0:dy1, dx0:dx1]
+                np.minimum(sub, np.where(src, np.float32(e), big), out=sub)
+        return d
+
+    def _jungle_solid(self, grid):
+        """Silhouette (H,W) bool dei muri di giungla a risoluzione pixel.
+
+        1) maschera binaria a risoluzione TILE; 2) blur gaussiano (raggio ~0.6
+        tile, a bassa risoluzione) + soglia 0.5 -> diagonali vere e angoli tondi;
+        3) deformazione del bordo con rumore (non troppo liscio), contorno pixel
+        art (soglia booleana, niente antialiasing). CLAMP mezzo tile: ogni cella
+        entro ~0.4 tile da un centro-muro resta piena (i muri piccoli diventano
+        BLOB tondi, non rettangoli, e non spariscono) e la sagoma non sborda oltre
+        ~mezzo tile dal bordo di collisione. La collisione resta sulla griglia."""
+        ts = self.tile_size
+        Wt, Ht = grid.width, grid.height
+        W, H = Wt * ts, Ht * ts
+        tiles = grid.tiles
+        tm = np.zeros((Ht, Wt), bool)
+        for ty in range(Ht):
+            row = tiles[ty]
+            for tx in range(Wt):
+                if row[tx] == TILE_JUNGLE_WALL:
+                    tm[ty, tx] = True
+        if not tm.any():
+            return None
+        s = max(2, ts // 4)
+        hl = (H + s - 1) // s; wl = (W + s - 1) // s
+        cyl = np.minimum((np.arange(hl) * s) // ts, Ht - 1)
+        cxl = np.minimum((np.arange(wl) * s) // ts, Wt - 1)
+        sq = tm[cyl][:, cxl].astype(np.float32)          # quadrati (hl,wl)
+        # centri-muro a bassa risoluzione -> distanza (per blob tondi + clamp).
+        ys, xs = np.where(tm)
+        cmask = np.zeros((hl, wl), bool)
+        ccx = np.clip(((xs + 0.5) * ts / s).astype(int), 0, wl - 1)
+        ccy = np.clip(((ys + 0.5) * ts / s).astype(int), 0, hl - 1)
+        cmask[ccy, ccx] = True
+        dist = self._dist_lo(cmask, int(math.ceil(ts * 1.1 / s)))
+        core = dist <= (ts * 0.40 / s)                   # sempre pieno (blob tondi)
+        allowed = dist <= (ts * 0.98 / s)                # sporgenza max ~mezzo tile
+        field = np.maximum(sq, core.astype(np.float32))
+        bf = self._sep_blur(field, max(1, int(ts * 0.6 / s)), passes=3)
+        # upscala bf a piena risoluzione (una volta), poi soglia+rumore a strisce.
+        bf_full = self._upscale(bf, W, H, s)
+        core_full = core[np.minimum(np.arange(H) // s, hl - 1)][:, np.minimum(np.arange(W) // s, wl - 1)]
+        allow_full = allowed[np.minimum(np.arange(H) // s, hl - 1)][:, np.minimum(np.arange(W) // s, wl - 1)]
+        solid = np.zeros((H, W), bool)
+        TXf = (np.arange(W, dtype=np.float32) / ts)[None, :]
+        STRIP = 300
+        for y0 in range(0, H, STRIP):
+            y1 = min(H, y0 + STRIP)
+            TYf = (np.arange(y0, y1, dtype=np.float32) / ts)[:, None]
+            nz = _np_vnoise(TXf / 1.5 + 11.0, TYf / 1.5 + 7.0) - 0.5     # [-0.5,0.5]
+            thr = (bf_full[y0:y1] + nz * 0.33) > 0.5
+            solid[y0:y1] = (thr | core_full[y0:y1]) & allow_full[y0:y1]
+        return solid
+
+    def _build_jungle_shadow(self, grid, shadows, solid) -> None:
+        """Ombra proiettata dai muri di giungla, ricalcolata dalla SILHOUETTE:
+        la sagoma spostata verso SUD-EST (luce da alto-sinistra) e non coperta
+        dalla sagoma stessa, con alfa che scema con la distanza."""
+        ts = self.tile_size; top = self._top
+        H, W = solid.shape
+        # A BASSA risoluzione: la sagoma spostata verso SUD-EST, accumulata con
+        # alfa calante, poi upscalata (l'ombra e' morbida: la grana fine non serve).
+        s = max(2, ts // 3)
+        hl = (H + s - 1) // s; wl = (W + s - 1) // s
+        sly = np.minimum(np.arange(hl) * s, H - 1); slx = np.minimum(np.arange(wl) * s, W - 1)
+        sm = solid[sly][:, slx]                           # solid low-res
+        L = max(2, int(ts * 0.5 / s))
+        acc = np.zeros((hl, wl), np.float32)
+        for k in range(1, L + 1):
+            dy = k; dx = int(round(k * 0.75))
+            sh = np.zeros((hl, wl), bool)
+            sh[dy:, dx:] = sm[:hl - dy, :wl - dx]
+            a = 1.0 - (k - 1) / float(L + 1)
+            np.maximum(acc, np.where(sh, np.float32(a), 0.0), out=acc)
+        acc[sm] = 0.0                                     # niente ombra sotto il muro
+        alpha = np.clip(self._upscale(acc * 95.0, W, H, s), 0, 255).astype(np.uint8)
+        self._blit_blocks(shadows, (0, 0, 0), alpha, top)
+
+    def _build_jungle_walls(self, grid, walls, p, solid) -> None:
+        """Riempie la silhouette con la texture di roccia esistente, disegna i
+        massi lungo il NUOVO contorno e la parete 2.5D (cliff) che segue la
+        sagoma. Tutto su un'unica Surface a piena mappa, poi blit LAZY per chunk
+        (solo i blocchi con contenuto)."""
+        import pygame.surfarray as sa
+        from game.renderer import (JW_TOP, JW_TOP_HI, JW_TOP_SH, JW_MOSS,
+                                    JW_MOSS_DK, JW_CLIFF, JW_CLIFF_DK, JW_CLIFF_HI,
+                                    JW_HILITE, JW_RIM, JW_EDGE_SH, JW_CONTACT)
+        ts = self.tile_size; top = self._top; Hh = self._H
+        H, W = solid.shape
+        Hf = H + Hh
+        # --- Facce/bordi dalla maschera (shift a 1px) -------------------------
+        up = np.zeros_like(solid); up[1:, :] = ~solid[:-1, :]; up[0, :] = True
+        dn = np.zeros_like(solid); dn[:-1, :] = ~solid[1:, :]; dn[-1, :] = True
+        lf = np.zeros_like(solid); lf[:, 1:] = ~solid[:, :-1]; lf[:, 0] = True
+        rt = np.zeros_like(solid); rt[:, :-1] = ~solid[:, 1:]; rt[:, -1] = True
+        boundary = solid & (up | dn | lf | rt)
+
+        # --- (1) CIMA: base roccia mottled + muschio, ritagliata alla sagoma ---
+        TOPc = np.array(JW_TOP, np.float32); TOPhi = np.array(JW_TOP_HI, np.float32)
+        TOPsh = np.array(JW_TOP_SH, np.float32); MOSSc = np.array(JW_MOSS, np.float32)
+        MOSSdk = np.array(JW_MOSS_DK, np.float32); CRACK = np.array(JW_CLIFF_DK, np.float32)
+        top_surf = pygame.Surface((W, H), pygame.SRCALPHA)
+        v3 = sa.pixels3d(top_surf)
+        # Noise calcolato a BASSA risoluzione (STEP) e interpolato bilineare a
+        # strisce (come _build_floor): stessa resa, molto piu veloce del per-pixel.
+        STEP = 4
+        wl = W // STEP + 2; hl = H // STEP + 2
+        TXl = (np.arange(wl, dtype=np.float32) * STEP / ts)[None, :]
+        TYl = (np.arange(hl, dtype=np.float32) * STEP / ts)[:, None]
+        mott_l = (_np_vnoise(TXl / 2.2, TYl / 2.2) * 0.6
+                  + _np_vnoise(TXl / 0.8 + 5, TYl / 0.8 + 5) * 0.4).astype(np.float32)
+        mo_l = _np_vnoise(TXl / 3.2 + 20, TYl / 3.2 + 20).astype(np.float32)
+        crk_l = _np_vnoise(TXl / 1.1 + 70, TYl / 1.1 + 70).astype(np.float32)
+        fx = np.arange(W, dtype=np.float32) / STEP
+        x0 = np.floor(fx).astype(np.int64); x1 = np.minimum(x0 + 1, wl - 1)
+        wx = (fx - x0)[None, :]
+
+        def up_x(f):
+            return f[:, x0] * (1 - wx) + f[:, x1] * wx
+        mott_x = up_x(mott_l); mo_x = up_x(mo_l); crk_x = up_x(crk_l)
+        STRIP = 300
+        for y0 in range(0, H, STRIP):
+            y1 = min(H, y0 + STRIP)
+            fy = np.arange(y0, y1, dtype=np.float32) / STEP
+            y0i = np.floor(fy).astype(np.int64); y1i = np.minimum(y0i + 1, hl - 1)
+            wy = (fy - y0i)[:, None]
+            mott = mott_x[y0i] * (1 - wy) + mott_x[y1i] * wy
+            t = np.clip((mott - 0.28) / 0.42, 0.0, 1.0)[..., None]
+            col = TOPc + (TOPhi - TOPc) * t              # roccia illuminata
+            col = col + (TOPsh - col) * np.clip((0.3 - mott) / 0.3, 0, 1)[..., None]  # avvallamenti scuri
+            mo = mo_x[y0i] * (1 - wy) + mo_x[y1i] * wy
+            mk = np.clip((mo - 0.56) / 0.22, 0.0, 1.0)[..., None]
+            moss = MOSSdk + (MOSSc - MOSSdk) * t         # muschio chiaro/scuro
+            col = col + (moss - col) * (mk * 0.8)
+            cr = (crk_x[y0i] * (1 - wy) + crk_x[y1i] * wy < 0.16)[..., None]  # fessure
+            col = np.where(cr, CRACK, col)
+            v3[:, y0:y1, :] = np.clip(col, 0, 255).astype(np.uint8).transpose(1, 0, 2)
+        del v3
+        va = sa.pixels_alpha(top_surf); va[:] = (solid.T.astype(np.uint8) * 255); del va
+        # Faccette di roccia sparse sulla cima (volume), ritagliate alla sagoma.
+        ys_s, xs_s = np.where(solid)
+        if len(xs_s):
+            frng = random.Random(0xF00D ^ (len(xs_s) & 0xFFFFFFFF))
+            nf = min(3500, max(6, int(len(xs_s) / (ts * ts) * 0.9)))
+            for _ in range(nf):
+                j = frng.randrange(len(xs_s))
+                fx = int(xs_s[j]); fy = int(ys_s[j])
+                fr = frng.randint(max(3, ts // 4), max(5, int(ts * 0.5)))
+                p._rock_facet(top_surf, fx, fy, fr, frng, JW_TOP, JW_HILITE, JW_TOP_SH)
+            va2 = sa.pixels_alpha(top_surf)
+            np.minimum(va2, solid.T.astype(np.uint8) * 255, out=va2); del va2
+
+        # --- (2) CLIFF: parete sotto il bordo sud, segue la sagoma ------------
+        south = solid & dn
+        cliff = np.zeros((Hf, W), bool)
+        depth = np.zeros((Hf, W), np.int16)
+        for k in range(1, Hh + 1):
+            seg = cliff[k:H + k]
+            newly = south & ~seg
+            seg |= south
+            depth[k:H + k][newly] = k
+        solid_full = np.zeros((Hf, W), bool); solid_full[:H] = solid
+        cliff &= ~solid_full
+        CL = np.array(JW_CLIFF, np.float32); CLdk = np.array(JW_CLIFF_DK, np.float32)
+        CLhi = np.array(JW_CLIFF_HI, np.float32)
+        ms = pygame.Surface((W, Hf), pygame.SRCALPHA)
+        c3 = sa.pixels3d(ms); ca = sa.pixels_alpha(ms)
+        dfrac = (depth.astype(np.float32) / max(1, Hh))[..., None]
+        clrgb = (CL + (CLdk - CL) * np.clip(dfrac * 1.5, 0, 1))   # piu scura in basso
+        clrgb = np.where((depth == 1)[..., None], CLhi, clrgb)    # spalla illuminata
+        cmask3 = cliff[..., None]
+        c3[:] = np.where(cmask3, clrgb, 0).astype(np.uint8).transpose(1, 0, 2)
+        ca[:] = (cliff.T.astype(np.uint8) * 255)
+        del c3, ca
+        # cima sopra la parete.
+        ms.blit(top_surf, (0, 0))
+        # ombra di contatto scura dove la parete tocca terra (ultima riga utile).
+        base = cliff & ~np.vstack([cliff[1:], np.zeros((1, W), bool)])
+        if base.any():
+            cs = pygame.Surface((W, Hf), pygame.SRCALPHA)
+            cb = sa.pixels3d(cs); cab = sa.pixels_alpha(cs)
+            cb[base.T] = (0, 0, 0); cab[base.T] = JW_CONTACT[3]
+            del cb, cab
+            ms.blit(cs, (0, 0))
+
+        # --- (3) RIM chiaro/scuro lungo il NUOVO contorno (definizione) -------
+        rim = pygame.Surface((W, H), pygame.SRCALPHA)
+        r3 = sa.pixels3d(rim); ra = sa.pixels_alpha(rim)
+        light = boundary & (up | lf)
+        dark = boundary & (dn | rt) & ~light
+        RIMc = np.array(JW_RIM, np.uint8); EDGEc = np.array(JW_EDGE_SH, np.uint8)
+        r3[light.T] = RIMc; ra[light.T] = 200
+        r3[dark.T] = EDGEc; ra[dark.T] = 160
+        del r3, ra
+        ms.blit(rim, (0, 0))
+
+        # --- (4) MASSI lungo il contorno (massi tondi, luce alto-sinistra) ----
+        ys, xs = np.where(boundary)
+        if len(xs):
+            rng = random.Random(0x5EED ^ (W * 2654435761 ^ H) & 0xFFFFFFFF)
+            n = max(8, int(len(xs) / max(1.0, ts * 0.45)))
+            er = max(2, int(ts * 0.22))
+            sel = rng.sample(range(len(xs)), min(n, len(xs)))
+            for i in sel:
+                x = int(xs[i]); y = int(ys[i])
+                jr = er + rng.randint(-1, 2)
+                xx = x + rng.randint(-1, 1); yy = y + rng.randint(-1, 1)
+                if up[y, x] or lf[y, x]:                  # verso la luce -> chiaro
+                    p._round_rock(ms, xx, yy, jr, rng, JW_TOP, JW_HILITE, JW_TOP_SH)
+                else:                                     # in ombra -> scuro
+                    p._round_rock(ms, xx, yy, jr, rng, JW_TOP_SH, JW_TOP, JW_EDGE_SH)
+
+        # --- (5) blit LAZY per chunk (solo blocchi con pixel) nel layer walls --
+        off_y = top - Hh                                  # = 0: la cima e' estrusa su di H
+        for by in range(0, Hf, CHUNK):
+            bh = min(CHUNK, Hf - by)
+            for bx in range(0, W, CHUNK):
+                bw = min(CHUNK, W - bx)
+                sub = ms.subsurface(pygame.Rect(bx, by, bw, bh))
+                if sub.get_bounding_rect(min_alpha=1).width > 0:
+                    walls.blit(sub.copy(), (bx, by + off_y))
 
     def _build_lighting(self, grid, light) -> None:
         """Velo d'atmosfera SOPRA le unita (lighting_overlay):

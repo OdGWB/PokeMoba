@@ -11,9 +11,6 @@ import pygame
 import math
 import random
 
-import numpy as np
-import pygame.surfarray
-
 import config
 from engine.entities import Core, Pokemon, Structure, Unit
 from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
@@ -431,182 +428,8 @@ class Renderer:
         self._paint_stone_tall(surf, ts, H, rng, STONE_WALL)
         return surf
 
-    # --- Altopiano roccioso della giungla (neighbor-aware) -------------------
-    def _jwall_surf(self, mask: int, variant: int, H: int) -> pygame.Surface:
-        ts = self.tile_size
-        key = (ts, "jw", mask, variant, H)
-        surf = self._tile_cache.get(key)
-        if surf is None:
-            surf = self._build_jwall(mask, variant, ts, H)
-            self._tile_cache[key] = surf
-        return surf
-
-    # --- Autotiling blob a 8 vicini: rimodella l'IMPRONTA del tile ------------
-    def _autotile_footprint(self, mask, variant, ts, H, rscale, wob):
-        """Impronta (footprint) dell'autotiling a 8 vicini, come maschera alpha.
-
-        Gli angoli CONVESSI esposti (entrambi i cardinali adiacenti assenti) sono
-        arrotondati con un arco il cui raggio OSCILLA con l'angolo (rumore per
-        variante) -> contorno con diagonali e curve, irregolare e non liscio.
-        I lati CONDIVISI con un vicino solido restano a filo: nessuna cucitura, e
-        due tile in diagonale (staircase) arrotondano gli angoli che si toccano
-        -> la scaletta diventa una diagonale morbida.
-
-        Ritorna (alpha, foot): `foot` bool (ts,ts) = impronta della cima; `alpha`
-        uint8 (ts, ts+H) = cima mascherata + parete (cliff) sotto le colonne che
-        toccano il bordo sud quando S e' esposto (cosi la parete segue l'impronta).
-        """
-        N = bool(mask & 1); E = bool(mask & 2); S = bool(mask & 4); W = bool(mask & 8)
-        X = np.arange(ts, dtype=np.float32)[:, None]
-        Y = np.arange(ts, dtype=np.float32)[None, :]
-        foot = np.ones((ts, ts), bool)
-        rng = random.Random((variant * 2654435761 ^ (mask * 2246822519)) & 0xFFFFFFFF)
-        rr = ts * rscale
-
-        def convex(qx, qy, cx, cy):
-            dx = X - cx; dy = Y - cy
-            d = np.hypot(dx, dy)
-            ang = np.arctan2(dy, dx)
-            ph1 = rng.random() * math.tau; ph2 = rng.random() * math.tau
-            rw = rr * (1.0 + wob * np.sin(ang * 3 + ph1) + 0.5 * wob * np.sin(ang * 7 + ph2))
-            foot[qx & qy & (d > rw)] = False
-
-        if not N and not W: convex(X <= rr, Y <= rr, rr, rr)
-        if not N and not E: convex(X >= ts - 1 - rr, Y <= rr, ts - 1 - rr, rr)
-        if not S and not W: convex(X <= rr, Y >= ts - 1 - rr, rr, ts - 1 - rr)
-        if not S and not E: convex(X >= ts - 1 - rr, Y >= ts - 1 - rr, ts - 1 - rr, ts - 1 - rr)
-
-        alpha = np.zeros((ts, ts + H), np.uint8)
-        alpha[:, :ts][foot] = 255
-        if not S:                                   # parete sotto le colonne piene
-            alpha[foot[:, ts - 1], ts:] = 255
-        return alpha, foot
-
-    def _carve_autotile(self, surf, mask, variant, ts, H, rscale, wob,
-                        rim_hi, rim_lo, crevice):
-        """Applica l'autotiling allo sprite gia texturizzato: (1) ritaglia la
-        forma all'impronta arrotondata; (2) ridisegna un rim chiaro/scuro lungo
-        i NUOVI bordi curvi (mai sui lati condivisi -> niente linee di griglia);
-        (3) sugli angoli INTERNI (due cardinali presenti, diagonale assente)
-        posa un'ombra concava, come una fenditura dove due bracci di roccia si
-        incontrano. Usa gli 8 vicini per decidere convesso/concavo."""
-        N = bool(mask & 1); E = bool(mask & 2); S = bool(mask & 4); W = bool(mask & 8)
-        NE = bool(mask & 16); SE = bool(mask & 32); SW = bool(mask & 64); NW = bool(mask & 128)
-        alpha, foot = self._autotile_footprint(mask, variant, ts, H, rscale, wob)
-        sa = pygame.surfarray
-        va = sa.pixels_alpha(surf)
-        np.minimum(va, alpha, out=va)               # ritaglio alla forma
-        # Rim lungo i bordi curvi INTERNI (non sui lati del tile: li' o e' un
-        # lato condiviso, o e' una faccia piatta gia texturizzata).
-        up = np.zeros_like(foot); up[:, 1:] = ~foot[:, :-1]
-        dn = np.zeros_like(foot); dn[:, :-1] = ~foot[:, 1:]
-        lf = np.zeros_like(foot); lf[1:, :] = ~foot[:-1, :]
-        rt = np.zeros_like(foot); rt[:-1, :] = ~foot[1:, :]
-        inner = np.zeros_like(foot)
-        inner[1:-1, 1:-1] = True
-        bnd = foot & (up | dn | lf | rt) & inner
-        dark = bnd & (dn | rt)
-        light = bnd & (up | lf) & ~dark
-        v3 = sa.pixels3d(surf)
-        for sel, col in ((light, rim_hi), (dark, rim_lo)):
-            idx = np.zeros((ts, ts + H), bool); idx[:, :ts] = sel
-            v3[idx] = col
-            va[idx] = 255
-        del v3, va
-        # Fenditure agli angoli interni: ombra concava (nessun ritaglio).
-        crev = []
-        if N and W and not NW: crev.append((0, 0))
-        if N and E and not NE: crev.append((ts, 0))
-        if S and W and not SW: crev.append((0, ts))
-        if S and E and not SE: crev.append((ts, ts))
-        if crev:
-            cr = int(ts * 0.34)
-            for (cx, cy) in crev:
-                sh = pygame.Surface((ts, ts), pygame.SRCALPHA)
-                pygame.draw.circle(sh, crevice, (cx, cy), cr)
-                pygame.draw.circle(sh, (0, 0, 0, 0), (cx, cy), max(1, cr - 3))
-                surf.blit(sh, (0, 0))
-
-    def _build_jwall(self, mask: int, variant: int, ts: int, H: int):
-        """Un tile come pezzo di un unico altopiano roccioso.
-
-        mask bit: 1=N 2=E 4=S 8=W (vicino anch'esso muro-giungla). La cima è
-        continua tra tile adiacenti; la parete (cliff) e i bordi-luce/ombra si
-        disegnano solo sui lati ESPOSTI, così un blocco connesso legge come una
-        formazione sola invece di tanti blocchi.
-        """
-        n = bool(mask & 1); e = bool(mask & 2); s = bool(mask & 4); w = bool(mask & 8)
-        surf = pygame.Surface((ts, ts + H), pygame.SRCALPHA)
-        rng = random.Random(variant * 2654435761 & 0xFFFFFFFF)
-        top_h = ts                      # la cima occupa [0, ts]; il cliff [ts, ts+H]
-
-        # (1) CIMA: facce rocciose grosse e spigolose + massi in rilievo.
-        pygame.draw.rect(surf, JW_TOP, pygame.Rect(0, 0, ts, top_h))
-        clip = surf.get_clip()
-        surf.set_clip(pygame.Rect(0, 0, ts, top_h))
-        for _ in range(rng.randint(2, 4)):
-            fcx = rng.randint(-ts // 4, ts + ts // 4)
-            fcy = rng.randint(-ts // 5, top_h + ts // 5)
-            fr = rng.randint(max(4, ts // 3), max(7, int(ts * 0.62)))
-            self._rock_facet(surf, fcx, fcy, fr, rng, JW_TOP, JW_HILITE, JW_TOP_SH)
-        for _ in range(rng.randint(2, 4)):     # muschio nelle fessure
-            mx = rng.randint(1, ts - 2); my = rng.randint(1, top_h - 2)
-            mc = JW_MOSS if rng.random() < 0.6 else JW_MOSS_DK
-            pygame.draw.circle(surf, mc, (mx, my), rng.randint(1, max(2, ts // 8)))
-        for _ in range(1 if (variant % 2 == 0) else 0):   # masso in rilievo
-            bx = rng.randint(ts // 4, 3 * ts // 4)
-            by = rng.randint(top_h // 3, 2 * top_h // 3)
-            br = rng.randint(max(4, ts // 3), max(6, int(ts * 0.5)))
-            self._boulder(surf, bx, by, br, rng)
-        surf.set_clip(clip)
-
-        # (2) BORDI ESPOSTI: su OGNI lato che tocca un altro terreno la roccia
-        # non è uno spigolo dritto ma una fila di massi tondi che "rotolano"
-        # oltre il bordo e bombano in fuori (la roccia vera curva, non è verticale).
-        er = max(3, int(ts * 0.3))             # raggio dei massi di bordo
-        step = max(4, int(ts * 0.5))
-        if not n:                              # bordo nord (verso la luce -> chiaro)
-            for bx in range(0, ts + 1, step):
-                self._round_rock(surf, bx + rng.randint(-2, 2), rng.randint(-1, 2),
-                                  er, rng, JW_TOP, JW_HILITE, JW_TOP_SH)
-        if not w:                              # bordo ovest (verso la luce -> chiaro)
-            for by in range(0, top_h + 1, step):
-                self._round_rock(surf, rng.randint(-1, 2), by + rng.randint(-2, 2),
-                                  er, rng, JW_TOP, JW_HILITE, JW_TOP_SH)
-        if not e:                              # bordo est (in ombra)
-            for by in range(0, top_h + 1, step):
-                self._round_rock(surf, ts - 1 + rng.randint(-2, 1), by + rng.randint(-2, 2),
-                                  er, rng, JW_TOP_SH, JW_TOP, JW_EDGE_SH)
-
-        # (3) FRONTE SUD: la parete che il giocatore vede. Non un muro verticale
-        # ma grossi massi arrotondati che partono da terra, bombano in fuori e
-        # curvano rotolando sopra lo spigolo della cima.
-        if not s:
-            cy0, cy1 = top_h, ts + H
-            pygame.draw.rect(surf, JW_CLIFF_DK, pygame.Rect(0, cy0 + 1, ts, cy1 - cy0 - 1))
-            nb = rng.randint(2, 3)
-            for i in range(nb + 2):
-                bx = int(i * ts / (nb + 1)) + rng.randint(-3, 3)
-                br = rng.randint(int(ts * 0.3), int(ts * 0.42))
-                # cupola che bomba in fuori e rotola appena oltre lo spigolo cima
-                by = cy1 - int(br * 0.6) + rng.randint(-1, 2)
-                self._round_rock(surf, bx, by, br, rng, JW_CLIFF, JW_CLIFF_HI, JW_CLIFF_DK)
-            # ombreggiatura verticale: più scuro verso il basso (dà la curvatura)
-            grad = pygame.Surface((ts, cy1 - cy0), pygame.SRCALPHA)
-            h2 = cy1 - cy0
-            for yy in range(h2):
-                a = int(80 * (yy / max(1, h2 - 1)) ** 1.4)
-                pygame.draw.line(grad, (0, 0, 0, a), (0, yy), (ts, yy))
-            surf.blit(grad, (0, cy0))
-            # ombra di contatto sull'erba, alla base.
-            contact = pygame.Surface((ts, 3), pygame.SRCALPHA)
-            contact.fill(JW_CONTACT)
-            surf.blit(contact, (0, cy1 - 2))
-        # Autotiling: rimodella l'impronta (angoli convessi tondi, fenditure agli
-        # angoli interni, rim sui bordi curvi) -> diagonali e curve, niente scaletta.
-        self._carve_autotile(surf, mask, variant, ts, H, 0.58, 0.16,
-                             JW_RIM, JW_EDGE_SH, (10, 14, 10, 115))
-        return surf
+    # --- Massi/faccette di roccia: mattoni condivisi dal builder della
+    #     SILHOUETTE dei muri di giungla (MapRenderer._build_jungle_walls).
 
     def _rock_facet(self, surf, cx, cy, r, rng, base_col, hi_col, sh_col):
         """Faccia di roccia irregolare e spigolosa (poligono) con fessura netta
@@ -642,22 +465,6 @@ class Renderer:
                         math.pi * 1.05, math.pi * 1.95, max(1, r // 3))
         # cupola illuminata (verso la luce)
         pygame.draw.circle(surf, hi_col, (int(cx) - r // 3, int(cy) - r // 3), max(1, r // 2))
-
-    def _boulder(self, surf, cx, cy, r, rng):
-        """Masso tondeggiante che SPORGE sulla cima: ombra proiettata + cupola
-        illuminata, per dare rilievo 3D vero."""
-        # ombra proiettata (verso basso-destra, lato opposto alla luce)
-        sh = pygame.Surface((r * 3, r * 3), pygame.SRCALPHA)
-        pygame.draw.ellipse(sh, (0, 0, 0, 80),
-                            pygame.Rect(r, int(r * 1.3), int(r * 1.9), int(r * 1.2)))
-        surf.blit(sh, (cx - r, cy - r))
-        # corpo
-        pygame.draw.circle(surf, JW_BOULDER, (cx, cy), r)
-        # cupola illuminata alto-sinistra
-        pygame.draw.circle(surf, JW_BOULDER_HI, (cx - r // 3, cy - r // 3), max(1, r // 2))
-        # bordo in ombra basso-destra
-        pygame.draw.arc(surf, JW_CLIFF_DK,
-                        pygame.Rect(cx - r, cy - r, r * 2, r * 2), math.pi * 1.1, math.pi * 1.9, 2)
 
     @staticmethod
     def _jitter(col, rng, amt=8):
