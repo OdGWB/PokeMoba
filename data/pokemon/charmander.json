@@ -7,13 +7,12 @@
   "radius": 0.42,
   "base_speed": 3.6,
   "sprite_dir": "assets/pokemon/0004",
-  "base_stats":  {"hp": 520, "attack": 55, "defense": 34, "sp_attack": 62, "sp_defense": 40, "speed": 60},
-  "growth":      {"hp": 55,  "attack": 5,  "defense": 3,  "sp_attack": 6,  "sp_defense": 3.5, "speed": 0},
+  "base_stats": {"hp": 39, "attack": 52, "defense": 43, "sp_attack": 60, "sp_defense": 50, "speed": 65},
 
   "evolutions": [
-    {"stage": 0, "level": 1, "name": "Charmander", "dex": 4, "sprite_dir": "assets/pokemon/0004", "stat_mult": 1.0,  "radius": 0.42},
-    {"stage": 1, "level": 4, "name": "Charmeleon", "dex": 5, "sprite_dir": "assets/pokemon/0005", "stat_mult": 1.25, "radius": 0.50},
-    {"stage": 2, "level": 8, "name": "Charizard",  "dex": 6, "sprite_dir": "assets/pokemon/0006", "stat_mult": 1.55, "radius": 0.60}
+    {"stage": 0, "level": 1, "name": "Charmander", "dex": 4, "sprite_dir": "assets/pokemon/0004", "radius": 0.42, "base_stats": {"hp": 39, "attack": 52, "defense": 43, "sp_attack": 60, "sp_defense": 50, "speed": 65}},
+    {"stage": 1, "level": 4, "name": "Charmeleon", "dex": 5, "sprite_dir": "assets/pokemon/0005", "radius": 0.5, "base_stats": {"hp": 58, "attack": 64, "defense": 58, "sp_attack": 80, "sp_defense": 65, "speed": 80}},
+    {"stage": 2, "level": 8, "name": "Charizard", "dex": 6, "sprite_dir": "assets/pokemon/0006", "radius": 0.6, "base_stats": {"hp": 78, "attack": 84, "defense": 78, "sp_attack": 109, "sp_defense": 85, "speed": 100}}
   ],
 
   "moves": {

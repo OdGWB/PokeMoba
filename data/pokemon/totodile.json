@@ -10,19 +10,12 @@
   "sprite_dir": "assets/pokemon/0158",
   "passive": "forzabruta",
 
-  "base_stats": {"hp": 550, "attack": 65, "defense": 64, "sp_attack": 44, "sp_defense": 48, "speed": 43},
-  "growth":     {"hp": 35,  "attack": 3,  "defense": 3,  "sp_attack": 2,  "sp_defense": 2,  "speed": 0},
+  "base_stats": {"hp": 50, "attack": 65, "defense": 64, "sp_attack": 44, "sp_defense": 48, "speed": 43},
 
   "evolutions": [
-    {"stage": 0, "level": 1, "name": "Totodile",   "dex": 158, "sprite_dir": "assets/pokemon/0158", "stat_mult": 1.0, "radius": 0.44,
-     "base_stats": {"hp": 550, "attack": 65, "defense": 64, "sp_attack": 44, "sp_defense": 48, "speed": 43},
-     "growth":     {"hp": 35,  "attack": 3,  "defense": 3,  "sp_attack": 2,  "sp_defense": 2,  "speed": 0}},
-    {"stage": 1, "level": 4, "name": "Croconaw",   "dex": 159, "sprite_dir": "assets/pokemon/0159", "stat_mult": 1.0, "radius": 0.52,
-     "base_stats": {"hp": 655, "attack": 80, "defense": 80, "sp_attack": 59, "sp_defense": 63, "speed": 58},
-     "growth":     {"hp": 38,  "attack": 3.2, "defense": 3.2, "sp_attack": 2.2, "sp_defense": 2.2, "speed": 0}},
-    {"stage": 2, "level": 8, "name": "Feraligatr", "dex": 160, "sprite_dir": "assets/pokemon/0160", "stat_mult": 1.0, "radius": 0.62,
-     "base_stats": {"hp": 795, "attack": 105, "defense": 100, "sp_attack": 79, "sp_defense": 83, "speed": 78},
-     "growth":     {"hp": 42,  "attack": 3.6, "defense": 3.4, "sp_attack": 2.4, "sp_defense": 2.4, "speed": 0}}
+    {"stage": 0, "level": 1, "name": "Totodile", "dex": 158, "sprite_dir": "assets/pokemon/0158", "radius": 0.44, "base_stats": {"hp": 50, "attack": 65, "defense": 64, "sp_attack": 44, "sp_defense": 48, "speed": 43}},
+    {"stage": 1, "level": 4, "name": "Croconaw", "dex": 159, "sprite_dir": "assets/pokemon/0159", "radius": 0.52, "base_stats": {"hp": 65, "attack": 80, "defense": 80, "sp_attack": 59, "sp_defense": 63, "speed": 58}},
+    {"stage": 2, "level": 8, "name": "Feraligatr", "dex": 160, "sprite_dir": "assets/pokemon/0160", "radius": 0.62, "base_stats": {"hp": 85, "attack": 105, "defense": 100, "sp_attack": 79, "sp_defense": 83, "speed": 78}}
   ],
 
   "moves": {

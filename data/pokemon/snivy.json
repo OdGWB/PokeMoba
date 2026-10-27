@@ -13,22 +13,12 @@
   "passive": "inversione",
   "attack_fx": "leaf",
 
-  "base_stats": {"hp": 515, "attack": 45, "defense": 55, "sp_attack": 45, "sp_defense": 55, "speed": 63},
-  "growth":     {"hp": 34,  "attack": 3,  "defense": 3.5, "sp_attack": 3, "sp_defense": 3.5, "speed": 0},
+  "base_stats": {"hp": 45, "attack": 45, "defense": 55, "sp_attack": 45, "sp_defense": 55, "speed": 63},
 
   "evolutions": [
-    {"stage": 0, "level": 1, "name": "Snivy",     "dex": 495, "sprite_dir": "assets/pokemon/0495", "radius": 0.40,
-     "types": ["Grass"],
-     "base_stats": {"hp": 515, "attack": 45, "defense": 55, "sp_attack": 45, "sp_defense": 55, "speed": 63},
-     "growth":     {"hp": 34,  "attack": 3,  "defense": 3.5, "sp_attack": 3, "sp_defense": 3.5, "speed": 0}},
-    {"stage": 1, "level": 4, "name": "Servine",   "dex": 496, "sprite_dir": "assets/pokemon/0496", "radius": 0.50,
-     "types": ["Grass"],
-     "base_stats": {"hp": 620, "attack": 60, "defense": 75, "sp_attack": 60, "sp_defense": 75, "speed": 83},
-     "growth":     {"hp": 38,  "attack": 3.5, "defense": 4, "sp_attack": 3.5, "sp_defense": 4, "speed": 0}},
-    {"stage": 2, "level": 8, "name": "Serperior", "dex": 497, "sprite_dir": "assets/pokemon/0497", "radius": 0.60,
-     "types": ["Grass"],
-     "base_stats": {"hp": 725, "attack": 75, "defense": 95, "sp_attack": 60, "sp_defense": 95, "speed": 113},
-     "growth":     {"hp": 40,  "attack": 4, "defense": 5, "sp_attack": 3, "sp_defense": 5, "speed": 0}}
+    {"stage": 0, "level": 1, "name": "Snivy", "dex": 495, "sprite_dir": "assets/pokemon/0495", "types": ["Grass"], "radius": 0.4, "base_stats": {"hp": 45, "attack": 45, "defense": 55, "sp_attack": 45, "sp_defense": 55, "speed": 63}},
+    {"stage": 1, "level": 4, "name": "Servine", "dex": 496, "sprite_dir": "assets/pokemon/0496", "types": ["Grass"], "radius": 0.5, "base_stats": {"hp": 60, "attack": 60, "defense": 75, "sp_attack": 60, "sp_defense": 75, "speed": 83}},
+    {"stage": 2, "level": 8, "name": "Serperior", "dex": 497, "sprite_dir": "assets/pokemon/0497", "types": ["Grass"], "radius": 0.6, "base_stats": {"hp": 75, "attack": 75, "defense": 95, "sp_attack": 75, "sp_defense": 95, "speed": 113}}
   ],
 
   "moves": {

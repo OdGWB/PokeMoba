@@ -7,13 +7,12 @@
   "radius": 0.42,
   "base_speed": 3.55,
   "sprite_dir": "assets/pokemon/0001",
-  "base_stats":  {"hp": 560, "attack": 49, "defense": 44, "sp_attack": 60, "sp_defense": 50, "speed": 50},
-  "growth":      {"hp": 60,  "attack": 4.5, "defense": 4, "sp_attack": 5.5, "sp_defense": 4.5, "speed": 0},
+  "base_stats": {"hp": 45, "attack": 49, "defense": 49, "sp_attack": 65, "sp_defense": 65, "speed": 45},
 
   "evolutions": [
-    {"stage": 0, "level": 1, "name": "Bulbasaur", "dex": 1, "sprite_dir": "assets/pokemon/0001", "stat_mult": 1.0,  "radius": 0.42},
-    {"stage": 1, "level": 4, "name": "Ivysaur",   "dex": 2, "sprite_dir": "assets/pokemon/0002", "stat_mult": 1.25, "radius": 0.50},
-    {"stage": 2, "level": 8, "name": "Venusaur",  "dex": 3, "sprite_dir": "assets/pokemon/0003", "stat_mult": 1.5,  "radius": 0.62}
+    {"stage": 0, "level": 1, "name": "Bulbasaur", "dex": 1, "sprite_dir": "assets/pokemon/0001", "radius": 0.42, "base_stats": {"hp": 45, "attack": 49, "defense": 49, "sp_attack": 65, "sp_defense": 65, "speed": 45}},
+    {"stage": 1, "level": 4, "name": "Ivysaur", "dex": 2, "sprite_dir": "assets/pokemon/0002", "radius": 0.5, "base_stats": {"hp": 60, "attack": 62, "defense": 63, "sp_attack": 80, "sp_defense": 80, "speed": 60}},
+    {"stage": 2, "level": 8, "name": "Venusaur", "dex": 3, "sprite_dir": "assets/pokemon/0003", "radius": 0.62, "base_stats": {"hp": 80, "attack": 82, "defense": 83, "sp_attack": 100, "sp_defense": 100, "speed": 80}}
   ],
 
   "moves": {

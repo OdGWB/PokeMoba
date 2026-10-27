@@ -32,12 +32,16 @@ def check_evolution(p) -> bool:
     # Erba/Spettro): aggiorna debolezze, STAB ed effetti del meteo.
     if "types" in st:
         p.types = list(st["types"])
-    # Statistiche proprie della forma evoluta (se definite nel JSON).
+    # Statistiche base REALI proprie della forma evoluta (se definite nel JSON):
+    # il Match ricalcola tutte le stat derivate da queste. La classe di gittata
+    # puo' cambiare con la forma (aggiorna la penalita' AD ranged).
     if "base_stats" in st:
-        from .stats import Stats
+        from .stats import Stats, range_class
         p.base_stats = Stats.from_dict(st["base_stats"])
-        if "growth" in st:
-            p.growth = Stats.from_dict(st["growth"])
+        if "ranged" in st:
+            p.ranged = bool(st["ranged"])
+        else:
+            p.ranged = range_class(p.base_stats) == "ranged"
     return True
 
 

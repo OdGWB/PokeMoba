@@ -11,7 +11,7 @@ from .entities import Core, Entity, Minion, Pokemon, Structure, Unit, Wild
 from .grid import Grid
 from .moves import build_moveset
 from .spatial import SpatialHash
-from .stats import Stats, stats_at_level
+from .stats import Stats, derive
 from .vec import Vec2
 
 
@@ -48,19 +48,26 @@ class World:
                       growth: dict | None = None, moves: dict | None = None,
                       evolutions: list | None = None, role: str = "",
                       passive: str = "", attack_fx: str = "") -> Pokemon:
+        # `growth` e `speed`/`attack_cooldown` dei parametri sono ignorati: ora
+        # tutto si deriva dalle 6 stat base REALI (vedi engine/stats.derive).
         base = Stats.from_dict(base_stats or {})
-        grow = Stats.from_dict(growth or {})
-        cur = stats_at_level(base, grow, 1)
+        d = derive(base, 1)
         p = Pokemon(pos=pos, team=team, dex=dex, name=name, color=color,
-                    speed=speed, hp=cur.hp, max_hp=cur.hp,
-                    attack_damage=cur.attack, attack_range=attack_range,
-                    attack_cooldown=attack_cooldown, is_bot=is_bot,
+                    speed=d.move_speed_tiles, hp=d.stats.hp, max_hp=d.stats.hp,
+                    attack_damage=d.stats.attack, attack_range=attack_range,
+                    attack_cooldown=d.attack_cooldown, is_bot=is_bot,
                     assigned_lane=assigned_lane, spawn_pos=pos, vision=9.0,
                     types=list(types or []), level=1, xp=0.0,
-                    base_stats=base, growth=grow, stats=cur,
+                    base_stats=base, stats=d.stats, ranged=d.ranged,
+                    attack_speed=d.attack_speed, ability_mult=d.ability_mult,
+                    max_mana=d.max_mana, mana=d.max_mana, mana_regen5=d.mana_regen5,
+                    tenacity=d.tenacity, hp_regen5=d.hp_regen5,
+                    flat_reduction=d.flat_reduction, lethality=d.lethality,
+                    lethality_physical=d.lethality_physical, heal_power=d.heal_power,
+                    range_cls=d.range_cls, range_val=d.range_val,
                     moveset=build_moveset(moves or {}),
                     evolutions=list(evolutions or []),
-                    move_speed_base=speed, role=role, passive_id=passive,
+                    move_speed_base=d.move_speed_tiles, role=role, passive_id=passive,
                     attack_fx=attack_fx)
         self.add(p)
         return p

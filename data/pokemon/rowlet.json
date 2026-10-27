@@ -13,22 +13,12 @@
   "passive": "distacco",
   "attack_fx": "arrow",
 
-  "base_stats": {"hp": 676, "attack": 55, "defense": 55, "sp_attack": 50, "sp_defense": 50, "speed": 42},
-  "growth":     {"hp": 32,  "attack": 3,  "defense": 2.5, "sp_attack": 2.5, "sp_defense": 2.5, "speed": 0},
+  "base_stats": {"hp": 68, "attack": 55, "defense": 55, "sp_attack": 50, "sp_defense": 50, "speed": 42},
 
   "evolutions": [
-    {"stage": 0, "level": 1, "name": "Rowlet",    "dex": 722, "sprite_dir": "assets/pokemon/0722", "radius": 0.40,
-     "types": ["Grass", "Flying"],
-     "base_stats": {"hp": 676, "attack": 55, "defense": 55, "sp_attack": 50, "sp_defense": 50, "speed": 42},
-     "growth":     {"hp": 32,  "attack": 3,  "defense": 2.5, "sp_attack": 2.5, "sp_defense": 2.5, "speed": 0}},
-    {"stage": 1, "level": 4, "name": "Dartrix",   "dex": 723, "sprite_dir": "assets/pokemon/0723", "radius": 0.48,
-     "types": ["Grass", "Flying"],
-     "base_stats": {"hp": 746, "attack": 75, "defense": 75, "sp_attack": 70, "sp_defense": 70, "speed": 52},
-     "growth":     {"hp": 36,  "attack": 3.5, "defense": 3, "sp_attack": 3, "sp_defense": 3, "speed": 0}},
-    {"stage": 2, "level": 8, "name": "Decidueye", "dex": 724, "sprite_dir": "assets/pokemon/0724", "radius": 0.56,
-     "types": ["Grass", "Ghost"],
-     "base_stats": {"hp": 746, "attack": 107, "defense": 75, "sp_attack": 100, "sp_defense": 100, "speed": 70},
-     "growth":     {"hp": 36,  "attack": 4.5, "defense": 3, "sp_attack": 4, "sp_defense": 4, "speed": 0}}
+    {"stage": 0, "level": 1, "name": "Rowlet", "dex": 722, "sprite_dir": "assets/pokemon/0722", "types": ["Grass", "Flying"], "radius": 0.4, "base_stats": {"hp": 68, "attack": 55, "defense": 55, "sp_attack": 50, "sp_defense": 50, "speed": 42}},
+    {"stage": 1, "level": 4, "name": "Dartrix", "dex": 723, "sprite_dir": "assets/pokemon/0723", "types": ["Grass", "Flying"], "radius": 0.48, "base_stats": {"hp": 78, "attack": 75, "defense": 75, "sp_attack": 70, "sp_defense": 70, "speed": 52}},
+    {"stage": 2, "level": 8, "name": "Decidueye", "dex": 724, "sprite_dir": "assets/pokemon/0724", "types": ["Grass", "Ghost"], "radius": 0.56, "base_stats": {"hp": 78, "attack": 107, "defense": 75, "sp_attack": 100, "sp_defense": 100, "speed": 70}}
   ],
 
   "moves": {

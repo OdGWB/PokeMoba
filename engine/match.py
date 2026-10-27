@@ -25,8 +25,8 @@ from .items import ITEM_SLOTS, ItemCatalog
 from .jungle import JungleSystem
 from .pathfinding import find_path, smooth_path
 from .spatial import SpatialHash
-from .stats import (STAB_MULT, Stats, damage as stat_damage, level_from_xp,
-                    respawn_time, stats_at_level)
+from .stats import (STAB_MULT, Stats, damage as stat_damage, derive,
+                    level_from_xp, respawn_time)
 from .types import TypeChart
 from .vec import Vec2, direction_index
 from .vision import VisionSystem
@@ -829,11 +829,29 @@ class Match:
         """
         old_max = p.max_hp
         old_hp = p.hp
-        s = stats_at_level(p.base_stats, p.growth, p.level)
+        d = derive(p.base_stats, p.level, ranged=p.ranged)
+        # M (stat_mult dell'evoluzione) si applica a HP, AD, armatura, RM, mana e
+        # rigenerazione; NON a MS/AS, gittata e moltiplicatore abilita', cosi' il
+        # "feeling" del Pokémon resta stabile fra gli stadi.
         m = p.stat_mult
-        p.stats = Stats(hp=s.hp * m, attack=s.attack * m, defense=s.defense * m,
-                        sp_attack=s.sp_attack * m, sp_defense=s.sp_defense * m,
-                        speed=s.speed * m)
+        p.stats = Stats(hp=d.stats.hp * m, attack=d.stats.attack * m,
+                        defense=d.stats.defense * m, sp_attack=d.stats.sp_attack * m,
+                        sp_defense=d.stats.sp_defense * m, speed=d.stats.speed)
+        p.move_speed_base = d.move_speed_tiles
+        p.attack_cooldown = d.attack_cooldown
+        p.attack_speed = d.attack_speed
+        p.ability_mult = d.ability_mult
+        p.max_mana = d.max_mana * m
+        p.mana = min(p.mana, p.max_mana) if p.mana > 0 else p.max_mana
+        p.mana_regen5 = d.mana_regen5 * m
+        p.tenacity = d.tenacity
+        p.hp_regen5 = d.hp_regen5
+        p.flat_reduction = d.flat_reduction
+        p.lethality = d.lethality
+        p.lethality_physical = d.lethality_physical
+        p.heal_power = d.heal_power
+        p.range_cls = d.range_cls
+        p.range_val = d.range_val
         bonus_hp = p.item_bonus.get("hp", 0.0) + p.passive_bonus.get("hp", 0.0)
         p.max_hp = p.stats.hp + bonus_hp
         p.attack_damage = p.stats.attack

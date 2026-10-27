@@ -83,9 +83,26 @@ class Pokemon(Unit):
     types: list = field(default_factory=list)
     level: int = 1
     xp: float = 0.0
-    base_stats: Stats = field(default_factory=Stats)
-    growth: Stats = field(default_factory=Stats)
-    stats: Stats = field(default_factory=Stats)
+    base_stats: Stats = field(default_factory=Stats)   # 6 stat base REALI del Pokémon
+    stats: Stats = field(default_factory=Stats)         # bundle "vivo" derivato per livello
+    ranged: bool = False                                # attacco a distanza (AD ×0,95)
+    # Stat di gioco derivate (vedi engine/stats.derive). Mana/AP/critico sono
+    # calcolate e memorizzate ma non ancora consumate dal combattimento.
+    attack_speed: float = 1.0                           # attacchi/secondo
+    max_mana: float = 0.0
+    mana: float = 0.0
+    mana_regen5: float = 0.0
+    ap: float = 0.0
+    crit: float = 0.0
+    ability_mult: float = 1.0
+    tenacity: float = 0.0
+    hp_regen5: float = 0.0
+    flat_reduction: float = 0.0
+    lethality: float = 0.0
+    lethality_physical: bool = True
+    heal_power: float = 1.0
+    range_cls: str = "mid"
+    range_val: float = 350.0
     # Mosse / evoluzioni / gradi (Fase 3b)
     moveset: dict = field(default_factory=dict)       # {slot: MoveSlot}
     evolutions: list = field(default_factory=list)    # stadi (dict dal JSON)

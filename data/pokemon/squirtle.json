@@ -7,13 +7,12 @@
   "radius": 0.44,
   "base_speed": 3.5,
   "sprite_dir": "assets/pokemon/0007",
-  "base_stats":  {"hp": 620, "attack": 48, "defense": 55, "sp_attack": 50, "sp_defense": 58, "speed": 43},
-  "growth":      {"hp": 70,  "attack": 4,  "defense": 5,  "sp_attack": 4.5, "sp_defense": 5, "speed": 0},
+  "base_stats": {"hp": 44, "attack": 48, "defense": 65, "sp_attack": 50, "sp_defense": 64, "speed": 43},
 
   "evolutions": [
-    {"stage": 0, "level": 1, "name": "Squirtle",  "dex": 7, "sprite_dir": "assets/pokemon/0007", "stat_mult": 1.0,  "radius": 0.44},
-    {"stage": 1, "level": 4, "name": "Wartortle", "dex": 8, "sprite_dir": "assets/pokemon/0008", "stat_mult": 1.25, "radius": 0.52},
-    {"stage": 2, "level": 8, "name": "Blastoise", "dex": 9, "sprite_dir": "assets/pokemon/0009", "stat_mult": 1.5,  "radius": 0.64}
+    {"stage": 0, "level": 1, "name": "Squirtle", "dex": 7, "sprite_dir": "assets/pokemon/0007", "radius": 0.44, "base_stats": {"hp": 44, "attack": 48, "defense": 65, "sp_attack": 50, "sp_defense": 64, "speed": 43}},
+    {"stage": 1, "level": 4, "name": "Wartortle", "dex": 8, "sprite_dir": "assets/pokemon/0008", "radius": 0.52, "base_stats": {"hp": 59, "attack": 63, "defense": 80, "sp_attack": 65, "sp_defense": 80, "speed": 58}},
+    {"stage": 2, "level": 8, "name": "Blastoise", "dex": 9, "sprite_dir": "assets/pokemon/0009", "radius": 0.64, "base_stats": {"hp": 79, "attack": 83, "defense": 100, "sp_attack": 85, "sp_defense": 105, "speed": 78}}
   ],
 
   "moves": {
