@@ -399,9 +399,20 @@ Passaggi completati:
   spawn/riciclo, scaling lowres->finestra incluso): costo isolato ~55 us/frame,
   CALO FPS misurato ~4.0-4.3% su 5 run (baseline headless piu' leggera del frame
   reale, quindi il calo in gioco e' minore; al cap di 120 FPS con margine e'
-  ~0%). Per ora solo su MatchScene (gioco locale); net_match_scene non toccato.
-  Screenshot: screenshots/step_19.png (giungla illuminata, senza nebbia) e
+  ~0%). Screenshot: screenshots/step_19.png (giungla illuminata, senza nebbia) e
   step_19_zoom.png (dettaglio lucciole/polline accanto al fiume).
+- PARTICELLE anche in MULTIPLAYER (step_20): le particelle d'atmosfera, prima
+  solo su MatchScene (gioco locale), ora girano IDENTICHE anche su
+  game/scenes/net_match_scene.py (partita online). Aggiunto ParticleSystem al
+  NetMatchScene (creazione in __init__, update in update() con map_data.grid,
+  draw in draw() DOPO renderer.draw -> sopra mappa/unita, sotto il mirino e la
+  UI), stesso ordine della scena locale. Il resto della grafica della giungla
+  (suolo, muri, cespugli, fiume, sottobosco, chioma, luci, nebbia, minimappa)
+  era GIA' condiviso: entrambe le scene usano lo stesso Renderer/MapRenderer, le
+  uniche due istanze di Renderer() nel progetto. La griglia online cambia col
+  meteo (_sync_terrain): le particelle leggono grid.tiles live e nascono solo
+  su TILE_FLOOR/TILE_BUSH, quindi seguono il terreno aggiornato. Nessun costo di
+  memoria extra sul percorso di rete (sprite pre-renderizzati, <=60 particelle).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

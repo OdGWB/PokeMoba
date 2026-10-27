@@ -22,6 +22,7 @@ from engine.vision import VisionSystem
 from ..camera import Camera
 from ..minimap import Minimap
 from ..networld import NetWorld
+from ..particles import ParticleSystem
 from ..renderer import Renderer
 from ..shop_ui import ShopUI
 from ..sprites.animator import FallbackAnimator, SpriteAnimator
@@ -58,6 +59,10 @@ class NetMatchScene:
         self.camera = Camera(config.LOWRES_WIDTH, config.LOWRES_HEIGHT, mw, mh)
         self.renderer = Renderer()
         self.renderer.map.set_camps(self.map_data.camps)   # sentieri di terra verso le lane
+        # Particelle d'atmosfera (lucciole/polline/foglie): cosmetiche, aggiornate
+        # solo dentro la camera, al massimo ~60 a schermo. Stesse della partita
+        # locale: la grafica della giungla e' identica anche online.
+        self.particles = ParticleSystem()
         self.animators = {}
         self.camera_locked = True
         self.aiming_slot = None
@@ -242,6 +247,8 @@ class NetMatchScene:
             if u.id not in self.animators:
                 self.animators[u.id] = self._net_animator(u)
             self.animators[u.id].update(dt, u.moving, u.facing)
+        # Particelle d'atmosfera: aggiornate solo nel rettangolo visibile.
+        self.particles.update(dt, self.camera, self.map_data.grid)
         self.vision.update(self.world, self.team)
         v = self.vision.version.get(self.team, 0)
         if v != self._mm_version:
@@ -254,6 +261,8 @@ class NetMatchScene:
                            selected_id=me.id if me else None,
                            dens=self.map_data.dens or None,
                            vision=self.vision, player_team=self.team)
+        # Particelle d'atmosfera della giungla (sopra mappa e unita, sotto la UI).
+        self.particles.draw(surface, self.camera)
         if self.aiming_slot is not None and me is not None:
             s = self.world.hud["slots"][["Q", "W", "E", "R"][self.aiming_slot]]
             ms = self.disp_moveset.get(["Q", "W", "E", "R"][self.aiming_slot])
