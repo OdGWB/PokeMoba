@@ -318,6 +318,37 @@ Passaggi completati:
   memoria invariata (3v3 140MB). Screenshot: step_16.png (ravvicinato erba+muro),
   step_16_3v3.png/step_16_5v5.png (zone reali) e step_16_3v3_over.png/
   step_16_5v5_over.png (minimappe).
+- FIUME rifatto a LIVELLO MAPPA (step_17), prima era per-tile nel Renderer
+  (_paint_water + rive per-tile in _shore). Nuovo game/map_renderer.py:
+  _water_solid, _build_river, _scatter_river, _draw_reeds/_draw_lily/_draw_rock,
+  _build_foam, _draw_foam. (1) BORDI SMUSSATI (autotiling implicito): _water_solid
+  usa la STESSA tecnica di muri/cespugli (maschera tile -> dischi sui centri ->
+  blur _sep_blur -> soglia 0.5 + rumore SOLO al bordo, clamp ~mezzo tile) -> rive
+  curve e organiche, niente scaletta per-tile; la collisione resta sui tile.
+  (2) PROFONDITA': gradiente dal campo-distanza dall'acqua alla terra (_dist_lo):
+  bordi CHIARI (RIV_EDGE bassofondo) -> centro SCURO (RIV_DEEP), lerp a 3 stop
+  (EDGE->MID->DEEP). (3) CORRENTE: sottili increspature = cresta di un seno
+  diagonale deformato da rumore (sin^3), tenui e assenti sul bordo (niente grandi
+  riflessi). (4) RIVA sfumata: alfa dell'acqua che SFUMA sulla riva (l'erba
+  traspare al contatto: i tile fiume lasciano il suolo di giungla sotto, come i
+  muri) + banda di FANGO bagnato sul lato terra (SHORE_WET2->SHORE_MUD2 dal
+  campo-distanza dalla terra all'acqua) + CANNE (steli sottili verdi con punta
+  illuminata, griglia fine lungo il bordo). (5) SCHIUMA ANIMATA: anello ~2px sul
+  bordo interno (erosione della silhouette), spezzato in trattini da un rumore
+  mosso di fase -> FOAM_FRAMES=3 fotogrammi pre-renderizzati; in draw() si sceglie
+  il fotogramma da get_ticks (FOAM_MS=240) e si blitta tra ground_decor e shadows
+  (sotto le unita). Sprite di schiuma per CELLA (FCELL=256, bbox stretto) -> poca
+  memoria (niente 3 layer-chunk interi lungo la diagonale). (6) NINFEE e SASSI
+  RADI (griglia LARGA ~2.3 tile, pochi): ninfea = foglia ellittica con bordo
+  scuro + colpo di luce + tacca, raro fiore; sasso = Renderer._round_rock (luce
+  alto-sx) con tenue anello di schiuma. Tutto STATICO nel layer decor (una volta,
+  poi solo blit), tranne la schiuma. Il Renderer._shore NON genera piu' la riva
+  per-tile del fiume (TILE_RIVER tolto dal set `water`); _paint_water/_shore
+  restano per la pozza dinamica (TILE_PUDDLE, Pioggia). Costo build: 3v3 ~+?s,
+  invariato in pratica (noise a bassa risoluzione, sprite in loop vettoriali).
+  Screenshot: step_17.png (sintetico ravvicinato), step_17_3v3.png/step_17_5v5.png
+  (zone reali), step_17_3v3_over.png/step_17_5v5_over.png (minimappe),
+  step_17_foam0.png/step_17_foam1.png (due fotogrammi della schiuma).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul
@@ -332,9 +363,11 @@ Scelte tecniche importanti:
 - TILE_WALL (muro di confine) NON e' piu reso come pietra per-tile: e' entrato
   nella silhouette vegetata dei muri (foresta+scogliera). I builder di pietra
   (_tall_surf/_paint_stone_tall) e _rock_facet/_round_rock restano in
-  renderer.py ma non sono piu usati dalla mappa. Gli altri sprite dei tile
-  (lane/acqua) restano invariati, costruiti dal Renderer; i cespugli sono ora
-  erba alta (step_13).
+  renderer.py ma non sono piu usati dalla mappa. Lo sprite della LANE resta
+  costruito dal Renderer; i cespugli sono ora erba alta (step_13) e il FIUME
+  (TILE_RIVER) e' reso a livello mappa (map_renderer._build_river, step_17): sotto
+  i tile fiume resta il suolo di giungla e l'acqua ci si sfuma sopra. Resta nel
+  Renderer _paint_water/_shore solo per la pozza dinamica (TILE_PUDDLE, Pioggia).
 - Offset camera: camera.snap() arrotonda l'offset a interi UNA volta per
   frame (camera.ox/oy); mappa e unita (world_to_screen) usano lo stesso
   valore -> niente tremolio di 1px ne seam tra chunk su scroll sub-pixel

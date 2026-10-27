@@ -35,7 +35,7 @@ import pygame.surfarray
 
 import config
 from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
-                         TILE_WALL)
+                         TILE_RIVER, TILE_WALL)
 
 COL_GRID = (0, 0, 0)
 COL_BG = (18, 20, 24)            # sfondo (riempie il bordo del layer opaco)
@@ -77,6 +77,33 @@ GB_MID = (47, 125, 91)           # #2F7D5B ciuffi a mezza luce
 GB_LIGHT = (79, 163, 110)        # #4FA36E ciuffi illuminati (alto-sinistra)
 GB_TIP = (143, 208, 138)         # #8FD08A punte chiare (poche, qua e la')
 GR_SHADOW = (0, 0, 0, 70)        # ombra morbida a terra
+
+# --- FIUME (acqua resa a LIVELLO MAPPA, come muri/cespugli) --------------------
+# La silhouette (maschera -> dischi -> blur -> soglia + rumore) smussa i bordi
+# del fiume (autotiling implicito: niente scaletta per-tile). Il corpo d'acqua ha
+# un gradiente di PROFONDITA' (centro scuro, bordi chiari), increspature di
+# corrente, una riva sfumata (fango + canne), ninfee e sassi affioranti, e una
+# sottile linea di schiuma ANIMATA (piu' fotogrammi pre-renderizzati).
+RIV_EDGE = (96, 150, 170)        # bassofondo chiaro al bordo (riva)
+RIV_MID = (54, 108, 150)         # acqua a mezza profondita
+RIV_DEEP = (32, 72, 114)         # centro profondo, piu' scuro
+RIV_FLOW = (124, 172, 196)       # increspature/riflessi di corrente (chiaro)
+FOAM_COL = (204, 226, 232)       # schiuma chiara al bordo
+SHORE_WET2 = (66, 86, 66)        # terra bagnata scura proprio al contatto
+SHORE_MUD2 = (98, 104, 76)       # fango/sabbia bagnata sulla riva (lato terra)
+REED_DK = (32, 56, 32)           # stelo canna in ombra / contorno
+REED_MD = (56, 92, 46)           # canna a mezza luce
+REED_TIP = (126, 156, 78)        # punta illuminata della canna
+LILY_PAD = (46, 98, 64)          # foglia di ninfea
+LILY_RIM = (24, 62, 40)          # bordo scuro della foglia
+LILY_HI = (92, 150, 102)         # colpo di luce sulla foglia (alto-sinistra)
+LILY_FLOWER = (224, 212, 224)    # fiore (raro)
+ROCK_BASE = (88, 98, 106)        # sasso affiorante (grigio-blu desaturato)
+ROCK_HI = (134, 144, 152)        # cupola illuminata (alto-sinistra)
+ROCK_SH = (50, 58, 68)           # fondo in ombra
+FOAM_FRAMES = 3                  # fotogrammi della schiuma animata
+FOAM_MS = 240                    # durata di un fotogramma (ms)
+FCELL = 256                      # lato cella per gli sprite di schiuma (memoria)
 
 # Matrice di Bayer 4x4 (ordered dithering) in [0,1): soglia per-pixel con cui si
 # "sgranano" i confini tra i livelli di colore -> transizioni a gradini in stile
@@ -215,6 +242,7 @@ class MapRenderer:
         self._vig = None             # vignettatura screen-space (cache per dimensione vista)
         self._tree_cache: dict = {}  # sprite albero per (R quantizzato, variante, palette)
         self._grass_cache: dict = {} # sprite ciuffo d'erba per (tier, variante)
+        self._foam: list = []        # schiuma animata: [(ax, ay_layer, [surf per frame])]
 
     def set_camps(self, camps) -> None:
         """Posizioni dei campi della giungla (da MapData): servono SOLO a tracciare
@@ -284,7 +312,11 @@ class MapRenderer:
                 ay = ty * ts + top
                 t = row[tx]
                 h = (tx * 73856093) ^ (ty * 19349663)
-                g = TILE_FLOOR if t in TALL_TILES else t
+                # I tile "alti" e il FIUME lasciano il suolo di giungla sotto: i
+                # muri/cespugli si estrudono dopo (walls_base), il fiume si disegna
+                # a livello mappa (_build_river) con bordi smussati e alfa che
+                # sfuma sulla riva, cosi l'erba traspare al contatto con l'acqua.
+                g = TILE_FLOOR if (t in TALL_TILES or t == TILE_RIVER) else t
                 if g != TILE_FLOOR:
                     variant = (h >> 4) & 3
                     ground.blit(p._tile_surf(g, variant), (ax, ay))
@@ -294,6 +326,12 @@ class MapRenderer:
 
         # --- Sentieri di terra battuta: strisce continue (spline) camp->lane --
         self._stroke_paths(decor, grid, routes, p)
+
+        # --- FIUME: corpo d'acqua a livello mappa (silhouette smussata, gradiente
+        #     di profondita, riva sfumata con fango e canne, ninfee e sassi, piu'
+        #     schiuma animata). Dopo i sentieri (che gia' evitano l'acqua).
+        self._foam = []
+        self._build_river(grid, decor)
 
         # --- SAGOMA DEI MURI DI GIUNGLA: maschera binaria a risoluzione tile ->
         #     blur gaussiano + soglia 0.5 + rumore -> silhouette morbida con
@@ -614,6 +652,261 @@ class MapRenderer:
                            np.where(b <= 0.20, False, (b + nz * 0.40) > 0.5))
             solid[y0:y1] = (thr | core_full[y0:y1]) & allow_full[y0:y1]
         return solid
+
+    # --- FIUME: acqua a livello mappa (silhouette smussata + profondita +
+    #     riva + ninfee/sassi + schiuma animata) -------------------------------
+    def _water_solid(self, grid):
+        """Silhouette (H,W) bool del FIUME (TILE_RIVER), stessa tecnica di
+        _jungle_solid/_bush_solid: maschera tile -> dischi sui centri -> blur ->
+        soglia + rumore SOLO al bordo, clamp ~mezzo tile. Smussa le rive (bordi
+        curvi: autotiling implicito, niente scaletta per-tile)."""
+        ts = self.tile_size
+        Wt, Ht = grid.width, grid.height
+        W, H = Wt * ts, Ht * ts
+        tiles = grid.tiles
+        tm = np.zeros((Ht, Wt), bool)
+        for ty in range(Ht):
+            row = tiles[ty]
+            for tx in range(Wt):
+                if row[tx] == TILE_RIVER:
+                    tm[ty, tx] = True
+        if not tm.any():
+            return None
+        s = max(2, ts // 4)
+        hl = (H + s - 1) // s; wl = (W + s - 1) // s
+        ys, xs = np.where(tm)
+        cmask = np.zeros((hl, wl), bool)
+        ccx = np.clip(((xs + 0.5) * ts / s).astype(int), 0, wl - 1)
+        ccy = np.clip(((ys + 0.5) * ts / s).astype(int), 0, hl - 1)
+        cmask[ccy, ccx] = True
+        dist = self._dist_lo(cmask, int(math.ceil(ts * 1.2 / s)))
+        disc = (dist <= (ts * 0.74 / s)).astype(np.float32)
+        core = dist <= (ts * 0.44 / s)
+        allowed = dist <= (ts * 1.0 / s)
+        bf = self._sep_blur(disc, max(1, int(ts * 0.5 / s)), passes=3)
+        bf_full = self._upscale(bf, W, H, s)
+        core_full = core[np.minimum(np.arange(H) // s, hl - 1)][:, np.minimum(np.arange(W) // s, wl - 1)]
+        allow_full = allowed[np.minimum(np.arange(H) // s, hl - 1)][:, np.minimum(np.arange(W) // s, wl - 1)]
+        solid = np.zeros((H, W), bool)
+        TXf = (np.arange(W, dtype=np.float32) / ts)[None, :]
+        STRIP = 300
+        for y0 in range(0, H, STRIP):
+            y1 = min(H, y0 + STRIP)
+            TYf = (np.arange(y0, y1, dtype=np.float32) / ts)[:, None]
+            nz = _np_vnoise(TXf / 1.3 + 2.0, TYf / 1.3 + 4.0) - 0.5
+            b = bf_full[y0:y1]
+            thr = np.where(b >= 0.80, True,
+                           np.where(b <= 0.22, False, (b + nz * 0.30) > 0.5))
+            solid[y0:y1] = (thr | core_full[y0:y1]) & allow_full[y0:y1]
+        return solid
+
+    def _build_river(self, grid, decor) -> None:
+        """Rende il fiume nel layer decor: corpo d'acqua con gradiente di
+        PROFONDITA (centro scuro, bordi chiari) e increspature di corrente, riva
+        sfumata (fango bagnato + canne), ninfee e sassi affioranti; la schiuma
+        animata finisce in self._foam (blittata in draw)."""
+        ts = self.tile_size; top = self._top
+        Wt, Ht = grid.width, grid.height
+        W, H = Wt * ts, Ht * ts
+        solid = self._water_solid(grid)
+        if solid is None:
+            return
+        s = max(2, ts // 4)
+        hl = (H + s - 1) // s; wl = (W + s - 1) // s
+        syc = np.minimum(np.arange(hl) * s, H - 1)
+        sxc = np.minimum(np.arange(wl) * s, W - 1)
+        wlo = solid[syc][:, sxc]                       # acqua a bassa risoluzione
+        # Profondita = distanza dall'acqua alla TERRA (cresce verso il centro);
+        # riva = distanza dalla terra all'ACQUA (cresce allontanandosi dal bordo).
+        depth = self._dist_lo(~wlo, int(math.ceil(ts * 1.7 / s)))
+        sdist = self._dist_lo(wlo, int(math.ceil(ts * 1.2 / s)))
+        depth_full = self._upscale(depth, W, H, s) * s     # distanza in pixel
+        sdist_full = self._upscale(sdist, W, H, s) * s
+        # --- Corpo d'acqua + riva in un unico array RGBA (H,W), a strisce ------
+        rgb = np.zeros((H, W, 3), np.uint8)
+        alpha = np.zeros((H, W), np.uint8)
+        STRIP = 300
+        for y0 in range(0, H, STRIP):
+            y1 = min(H, y0 + STRIP)
+            inw = solid[y0:y1]
+            WX = np.arange(W, dtype=np.float32)[None, :]
+            WY = np.arange(y0, y1, dtype=np.float32)[:, None]
+            dn = np.clip(depth_full[y0:y1] / (ts * 1.3), 0.0, 1.0)   # 0 riva ..1 centro
+            t2 = dn * 2.0
+            lo = dn < 0.5
+
+            def mix(a, b, c):   # EDGE->MID (bordo) poi MID->DEEP (centro)
+                return np.where(lo, a + (b - a) * t2, b + (c - b) * np.clip(t2 - 1.0, 0.0, 1.0))
+            r = mix(RIV_EDGE[0], RIV_MID[0], RIV_DEEP[0])
+            g = mix(RIV_EDGE[1], RIV_MID[1], RIV_DEEP[1])
+            bch = mix(RIV_EDGE[2], RIV_MID[2], RIV_DEEP[2])
+            # Increspature di corrente: SOTTILI linee diagonali ondulate (cresta
+            # di un seno deformato da rumore) -> senso di flusso, non grandi
+            # riflessi. Presenti a mezza/alta profondita, assenti sul bordo.
+            wob = _np_vnoise(WX / (ts * 1.3) + 3.0, WY / (ts * 1.3) + 6.0)
+            rip = np.sin((WX * 0.8 - WY * 1.4) / (ts * 0.5) + wob * 4.0)
+            streak = (np.clip(rip, 0.0, 1.0) ** 3
+                      * np.clip((dn - 0.12) / 0.3, 0.0, 1.0) * 0.30)
+            r += (RIV_FLOW[0] - r) * streak
+            g += (RIV_FLOW[1] - g) * streak
+            bch += (RIV_FLOW[2] - bch) * streak
+            wa = np.clip(depth_full[y0:y1] / 6.0, 0.0, 1.0) * 255.0   # sfuma la riva
+            # Riva (lato terra): fango bagnato che sfuma sull'erba.
+            sd = sdist_full[y0:y1]
+            band = np.clip(1.0 - sd / (ts * 0.7), 0.0, 1.0) * (~inw)
+            sw = np.clip(sd / (ts * 0.35), 0.0, 1.0)
+            scr = SHORE_WET2[0] + (SHORE_MUD2[0] - SHORE_WET2[0]) * sw
+            scg = SHORE_WET2[1] + (SHORE_MUD2[1] - SHORE_WET2[1]) * sw
+            scb = SHORE_WET2[2] + (SHORE_MUD2[2] - SHORE_WET2[2]) * sw
+            salp = (band ** 1.3) * 150.0
+            rgb[y0:y1, :, 0] = np.clip(np.where(inw, r, scr), 0, 255).astype(np.uint8)
+            rgb[y0:y1, :, 1] = np.clip(np.where(inw, g, scg), 0, 255).astype(np.uint8)
+            rgb[y0:y1, :, 2] = np.clip(np.where(inw, bch, scb), 0, 255).astype(np.uint8)
+            alpha[y0:y1] = np.clip(np.where(inw, wa, salp), 0, 255).astype(np.uint8)
+        self._blit_blocks(decor, rgb, alpha, top)
+        del rgb, alpha
+        # --- Ninfee, sassi, canne: sprite vettoriali distribuiti irregolari ----
+        deco = pygame.Surface((W, H), pygame.SRCALPHA)
+        self._scatter_river(deco, solid, depth_full, sdist_full)
+        for by in range(0, H, CHUNK):
+            bh = min(CHUNK, H - by)
+            for bx in range(0, W, CHUNK):
+                bw = min(CHUNK, W - bx)
+                sub = deco.subsurface(pygame.Rect(bx, by, bw, bh))
+                if sub.get_bounding_rect(min_alpha=1).width > 0:
+                    decor.blit(sub.copy(), (bx, by + top))
+        # --- Schiuma animata (fotogrammi pre-renderizzati) ---------------------
+        self._foam = self._build_foam(solid)
+
+    def _scatter_river(self, deco, solid, depth_full, sdist_full) -> None:
+        """Distribuisce in modo IRREGOLARE gli ornamenti del fiume: CANNE fitte
+        nell'acqua bassa e sulla riva (griglia fine), NINFEE e SASSI RADI
+        sull'acqua aperta (griglia larga: pochi, 'qualche'), con seme per punto +
+        jitter -> niente pattern allineato."""
+        ts = self.tile_size
+        H, W = solid.shape
+        ys, xs = np.where(solid)
+        if not len(xs):
+            return
+        x0, x1 = int(xs.min()), int(xs.max())
+        y0, y1 = int(ys.min()), int(ys.max())
+        p = self.painter
+        # --- CANNE: griglia FINE lungo il bordo (acqua bassa + riva) ----------
+        gap = max(6, int(ts * 0.75))
+        for gy in range(y0, y1 + 1, gap):
+            for gx in range(x0, x1 + 1, gap):
+                rng = random.Random(((gx * 73856093) ^ (gy * 19349663) ^ 0x5EED) & 0xFFFFFFFF)
+                x = gx + rng.randint(-gap // 2, gap // 2)
+                y = gy + rng.randint(-gap // 2, gap // 2)
+                if not (0 <= x < W and 0 <= y < H):
+                    continue
+                dp = float(depth_full[y, x]); sd = float(sdist_full[y, x])
+                if solid[y, x]:
+                    if 2.0 < dp <= ts * 0.5 and rng.random() < 0.42:
+                        self._draw_reeds(deco, x, y, rng)
+                elif sd < ts * 0.26 and rng.random() < 0.32:
+                    self._draw_reeds(deco, x, y, rng)
+        # --- NINFEE e SASSI: griglia LARGA -> radi (qualche elemento) ---------
+        fgap = max(10, int(ts * 2.3))
+        for gy in range(y0, y1 + 1, fgap):
+            for gx in range(x0, x1 + 1, fgap):
+                rng = random.Random(((gx * 2654435761) ^ (gy * 40503)) & 0xFFFFFFFF)
+                x = gx + rng.randint(-fgap // 2, fgap // 2)
+                y = gy + rng.randint(-fgap // 2, fgap // 2)
+                if not (0 <= x < W and 0 <= y < H) or not solid[y, x]:
+                    continue
+                dp = float(depth_full[y, x])
+                k = rng.random()
+                if dp > ts * 0.55 and k < 0.38:
+                    self._draw_lily(deco, x, y, rng)
+                elif dp > ts * 0.4 and k < 0.62:
+                    self._draw_rock(deco, x, y, rng, p)
+
+    def _draw_reeds(self, deco, x, y, rng) -> None:
+        """Ciuffo di canne: pochi steli sottili che salgono dalla base, contorno
+        scuro + corpo verde + punta illuminata, leggermente inclinati verso la
+        luce (alto-sinistra)."""
+        H = deco.get_height()
+        for _ in range(rng.randint(3, 6)):
+            bx = x + rng.randint(-3, 3)
+            hgt = rng.randint(5, 11)
+            tipx = bx + rng.randint(-2, 1)           # inclina verso sinistra
+            tipy = y - hgt
+            pygame.draw.line(deco, (*REED_DK, 220), (bx, y), (tipx, tipy), 2)
+            pygame.draw.line(deco, (*REED_MD, 235), (bx, y), (tipx, tipy), 1)
+            if 0 <= tipx < deco.get_width() and 0 <= tipy < H:
+                deco.set_at((tipx, tipy), (*REED_TIP, 255))
+
+    def _draw_lily(self, deco, x, y, rng) -> None:
+        """Foglia di ninfea: ellisse con bordo scuro, colpo di luce alto-sinistra,
+        una tacca; raramente un fiorellino."""
+        rw = rng.randint(3, 5); rh = rng.randint(2, 4)
+        pygame.draw.ellipse(deco, (*LILY_PAD, 235), pygame.Rect(x - rw, y - rh, rw * 2, rh * 2))
+        pygame.draw.ellipse(deco, (*LILY_RIM, 235), pygame.Rect(x - rw, y - rh, rw * 2, rh * 2), 1)
+        pygame.draw.ellipse(deco, (*LILY_HI, 170), pygame.Rect(x - rw, y - rh, rw, rh))
+        pygame.draw.line(deco, (*LILY_RIM, 235), (x, y), (x + rw, y + rh), 1)   # tacca
+        if rng.random() < 0.22:
+            pygame.draw.circle(deco, (*LILY_FLOWER, 255),
+                               (x - rng.randint(0, 2), y - rng.randint(0, 2)), 2)
+
+    def _draw_rock(self, deco, x, y, rng, p) -> None:
+        """Sasso affiorante: masso tondo (riuso di Renderer._round_rock, luce
+        alto-sinistra) con un anello di schiuma attorno alla base sull'acqua."""
+        r = rng.randint(3, 5)
+        pygame.draw.circle(deco, (*FOAM_COL, 55), (x, y + 1), r + 2, 1)   # anello tenue
+        p._round_rock(deco, x, y, r, rng, ROCK_BASE, ROCK_HI, ROCK_SH)
+
+    def _build_foam(self, solid):
+        """Fotogrammi pre-renderizzati della schiuma: sottile linea chiara lungo
+        il bordo INTERNO dell'acqua (anello ~2px), spezzata in trattini che
+        SCORRONO tra un fotogramma e l'altro. Sprite piccoli per cella (memoria):
+        in draw() si blitta solo il fotogramma corrente delle celle visibili."""
+        import pygame.surfarray as sa
+        ts = self.tile_size; top = self._top
+        H, W = solid.shape
+
+        def erode(m):
+            o = m.copy()
+            o[1:, :] &= m[:-1, :]; o[:-1, :] &= m[1:, :]
+            o[:, 1:] &= m[:, :-1]; o[:, :-1] &= m[:, 1:]
+            o[0, :] = False; o[-1, :] = False; o[:, 0] = False; o[:, -1] = False
+            return o
+        er = solid
+        for _ in range(2):
+            er = erode(er)
+        band = solid & ~er                       # anello ~2px dentro il bordo
+        if not band.any():
+            return []
+        foam = []
+        for cy0 in range(0, H, FCELL):
+            cy1 = min(H, cy0 + FCELL)
+            for cx0 in range(0, W, FCELL):
+                cx1 = min(W, cx0 + FCELL)
+                sub = band[cy0:cy1, cx0:cx1]
+                if not sub.any():
+                    continue
+                yy, xx = np.where(sub)
+                ry0, ry1 = int(yy.min()), int(yy.max()) + 1
+                rx0, rx1 = int(xx.min()), int(xx.max()) + 1
+                bsub = sub[ry0:ry1, rx0:rx1]
+                ah, aw = bsub.shape
+                WX = (cx0 + rx0 + np.arange(aw, dtype=np.float32))[None, :]
+                WY = (cy0 + ry0 + np.arange(ah, dtype=np.float32))[:, None]
+                frames = []
+                for f in range(FOAM_FRAMES):
+                    ph = f * (2.0 / FOAM_FRAMES)
+                    nz = _np_vnoise(WX / (ts * 0.45) + ph, WY / (ts * 0.45) + ph * 0.3)
+                    a = (np.where(nz > 0.58, 150.0, 0.0) + 85.0) * bsub   # base + trattini
+                    surf = pygame.Surface((aw, ah), pygame.SRCALPHA)
+                    v3 = sa.pixels3d(surf)
+                    v3[:, :, 0] = FOAM_COL[0]; v3[:, :, 1] = FOAM_COL[1]; v3[:, :, 2] = FOAM_COL[2]
+                    del v3
+                    va = sa.pixels_alpha(surf)
+                    va[:] = np.clip(a, 0, 255).astype(np.uint8).T
+                    del va
+                    frames.append(surf)
+                foam.append((cx0 + rx0, cy0 + ry0 + top, frames))
+        return foam
 
     def _grass_tuft(self, tier, variant):
         """Sprite (cache) di un CIUFFO corto: 2-3 lame a punta col contorno scuro,
@@ -1546,8 +1839,25 @@ class MapRenderer:
         (l'erba alta e' dentro walls_base, disegnata prima dei muri)."""
         ox, oy = self._offset(camera)
         vw, vh = camera.view_w, camera.view_h
-        for n in self.BELOW:
-            self.layers[n].draw(screen, ox, oy, vw, vh)
+        self.layers["ground"].draw(screen, ox, oy, vw, vh)
+        self.layers["ground_decor"].draw(screen, ox, oy, vw, vh)
+        # Schiuma animata del fiume: SOPRA il corpo d'acqua, sotto le unita.
+        self._draw_foam(screen, ox, oy, vw, vh)
+        self.layers["shadows"].draw(screen, ox, oy, vw, vh)
+        self.layers["walls_base"].draw(screen, ox, oy, vw, vh)
+
+    def _draw_foam(self, screen, ox: int, oy: int, vw: int, vh: int) -> None:
+        """Blitta il fotogramma corrente della schiuma per le celle visibili."""
+        if not self._foam:
+            return
+        idx = (pygame.time.get_ticks() // FOAM_MS) % FOAM_FRAMES
+        for ax, ay, frames in self._foam:
+            sx = ax + ox; sy = ay + oy
+            surf = frames[idx]
+            w, h = surf.get_size()
+            if sx + w <= 0 or sy + h <= 0 or sx >= vw or sy >= vh:
+                continue
+            screen.blit(surf, (sx, sy))
 
     def draw_canopy(self, screen, camera) -> None:
         """Layer SOPRA le unita: chiome e velo di luce (vuoti per ora)."""

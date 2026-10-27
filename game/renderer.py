@@ -384,7 +384,10 @@ class Renderer:
         """Riva graduale dove fiume e terra si incontrano: bassofondo chiaro sul
         lato acqua + fango/sabbia bagnata sul lato terra. Passaggio morbido (non
         un bordo netto), così acqua e giungla sembrano comunicare."""
-        water = (TILE_RIVER, TILE_PUDDLE)
+        # Il FIUME (TILE_RIVER) e' ora reso a livello mappa (MapRenderer._build_river:
+        # silhouette smussata + riva sfumata), quindi qui NON genera piu' la riva
+        # per-tile. Resta la pozza (TILE_PUDDLE, dinamica con la Pioggia).
+        water = (TILE_PUDDLE,)
         is_water = t in water
         land_ground = ground in (TILE_FLOOR, TILE_LANE)
         if not (is_water or land_ground):
