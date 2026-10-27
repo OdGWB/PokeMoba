@@ -291,19 +291,44 @@ Passaggi completati:
   fotogramma corrente scelto da get_ticks). Costo build 3v3 ~10s. Screenshot:
   screenshots/step_14.png (ravvicinato, erba accanto a un muro) e step_14_over.png
   (minimappa: erba oliva-chiara vs chioma muri scura).
+- CESPUGLI come MASSA COMPATTA stile MOBA (step_16), su feedback (step_14 e un
+  tentativo intermedio a tile 16x16 disegnati a mano risultavano "piatti/una fila
+  di punte": non si leggeva un'AREA). Rifatto a LIVELLO MAPPA in game/map_renderer.py
+  (_bush_solid, _grass_tuft, _build_bushes, _px1); palette SMERALDO FREDDA nuova
+  (GB_FILL #16402E, GB_OUT #0F2A20, GB_DARK #1E5A3F, GB_MID #2F7D5B, GB_LIGHT
+  #4FA36E, GB_TIP #8FD08A), distinta dalla chioma dei muri anche in minimappa.
+  (1) AREA: _bush_solid = stessa maschera organica dei muri (dischi sui centri ->
+  blur -> soglia + rumore SOLO al bordo, clamp ~mezzo tile): tile isolati -> blob,
+  vicini fusi. (2) FONDO PIENO scuro GB_FILL su tutta la sagoma (gradiente un filo
+  piu' scuro in basso = ombra interna) col CONTORNO GB_OUT tutt'intorno (anello =
+  dilatazione-sagoma): niente terreno visibile dentro. (3) SUPERFICIE: file di
+  CIUFFI (_grass_tuft, sprite in cache: 2-3 lame a punta, corpo+cappello chiaro,
+  contorno scuro) ogni ~5px, SFALSATE (stagger), scansione per riga VETTORIALE
+  (solo celle della sagoma; seme da hash -> veloce), disegnate dal fondo (y
+  piccola) al davanti; tier piu' CHIARO verso ALTO e SINISTRA (luce alto-sx), con
+  GB_TIP solo qua e la'. (4) FRONTE: sotto il bordo inferiore uno SKIRT (fascia
+  piu' scura, altezza da rumore ~0.2-0.5 tile) + fili (_px1) piu' lunghi e scuri
+  che SCENDONO oltre il contorno e si scuriscono verso la punta -> l'area ha
+  ALTEZZA come la parete dei muri. (5) OMBRA morbida a terra (sagoma spostata a
+  sud-est, corta, sfumata) nel layer shadows. Resta nel layer walls_base PRIMA dei
+  muri (un muro sovrapposto copre). _jungle_solid scava ancora attorno ai cespugli
+  con campo-distanza (muro curvo attorno all'erba); _build_ao li include per-tile.
+  Rimossi _bush_tile/GRASS_FULL/GRASS_EDGE (tentativo a tile a mano) dal Renderer.
+  Attivo su ENTRAMBE le mappe (3v3 e 5v5). Costo build +~2s (profilato),
+  memoria invariata (3v3 140MB). Screenshot: step_16.png (ravvicinato erba+muro),
+  step_16_3v3.png/step_16_5v5.png (zone reali) e step_16_3v3_over.png/
+  step_16_5v5_over.png (minimappe).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul
   bordo sud (sopra le unita, vedi passo rilievi pseudo-3D). lighting_overlay
   porta il velo d'atmosfera (chioma + luce campi). La vignettatura e'
   screen-space e vive in draw_canopy, fuori dai layer. I CESPUGLI (TILE_BUSH)
-  sono ERBA ALTA a lame a V resa a LIVELLO MAPPA come SILHOUETTE organica
-  (map_renderer: _bush_solid/_build_bushes, vedi step_14), con stile e palette
-  DIVERSI dai muri apposta (distinguibili a colpo d'occhio e in minimappa). Di
-  default (GRASS_FRAMES=1) l'erba e' STATICA nel layer walls_base e si disegna
-  PRIMA dei muri, quindi un muro che la sovrasta la copre; con GRASS_FRAMES>1 va
-  in layer dedicati (uno per fotogramma del vento) disegnati in draw() tra ombre
-  e walls_base.
+  sono una MASSA COMPATTA di erba alta stile MOBA, resa a LIVELLO MAPPA come
+  silhouette organica a fondo pieno + ciuffi + fronte (map_renderer:
+  _bush_solid/_build_bushes, vedi step_16), con palette smeraldo DIVERSA dai muri
+  (distinguibili a colpo d'occhio e in minimappa). Stanno nel layer walls_base e
+  si disegnano PRIMA dei muri, quindi un muro che li sovrasta li copre.
 - TILE_WALL (muro di confine) NON e' piu reso come pietra per-tile: e' entrato
   nella silhouette vegetata dei muri (foresta+scogliera). I builder di pietra
   (_tall_surf/_paint_stone_tall) e _rock_facet/_round_rock restano in

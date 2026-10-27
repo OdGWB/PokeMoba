@@ -66,25 +66,17 @@ VIGNETTE_A = 92
 # roccia + ombra lunga. Contorno scuro delle chiome (#12281A).
 CANOPY_OUTLINE = (18, 40, 26)
 
-# --- ERBA ALTA (cespugli, stile Pokemon) --------------------------------------
-# Silhouette ORGANICA (come i muri: maschera -> blur -> soglia + rumore) riempita
-# di ciuffi a V a altezze diverse, posizionati con dart-throwing (Poisson-disc) e
-# disegnati dal fondo verso il davanti. Palette desaturata oliva: distinguibile
-# dalla chioma scura dei muri ma integrata nella palette della giungla.
-GR_BASE = (62, 82, 40)           # #3E5228 base/fondo (riempie la sagoma)
-GR_DARK = (46, 60, 30)           # base piu' scura (volume, meta' bassa)
-GR_MID = (107, 127, 58)          # #6B7F3A lame a mezza altezza
-GR_LIGHT = (138, 154, 72)        # #8A9A48 lame in alto (verso la luce)
-GR_TIP = (168, 181, 96)          # #A8B560 punte illuminate (poche, in cima)
-GR_OUT = (28, 40, 20)            # contorno scuro delle lame
-GR_SHADOW = (6, 12, 8)           # ombra morbida a terra (basso-destra)
-# Oscillazione delle punte (vento): numero di fotogrammi pre-renderizzati. Con 1
-# l'erba e' STATICA e vive nel layer walls_base (nessuna memoria extra, come
-# prima). Con >1 ogni fotogramma e' un layer a se (le punte sfalsate di ~1px):
-# si anima, ma la memoria dell'erba si MOLTIPLICA per il numero di fotogrammi.
-# Default 1 per rispettare il budget di memoria del progetto; alza a 2-3 per il
-# vento (vedi draw()).
-GRASS_FRAMES = 1
+# --- ERBA ALTA (cespugli, stile MOBA) -----------------------------------------
+# Massa COMPATTA di erba alta: area dalla maschera organica (come i muri),
+# riempita di fondo scuro pieno (niente terreno dentro) e texturizzata con file
+# fitte di ciuffi sfalsate. Palette smeraldo fredda (distinta dalla chioma).
+GB_FILL = (22, 64, 46)           # #16402E fondo pieno interno (niente terreno)
+GB_OUT = (15, 42, 32)            # #0F2A20 contorno scuro
+GB_DARK = (30, 90, 63)           # #1E5A3F ciuffi in ombra / fronte
+GB_MID = (47, 125, 91)           # #2F7D5B ciuffi a mezza luce
+GB_LIGHT = (79, 163, 110)        # #4FA36E ciuffi illuminati (alto-sinistra)
+GB_TIP = (143, 208, 138)         # #8FD08A punte chiare (poche, qua e la')
+GR_SHADOW = (0, 0, 0, 70)        # ombra morbida a terra
 
 # Matrice di Bayer 4x4 (ordered dithering) in [0,1): soglia per-pixel con cui si
 # "sgranano" i confini tra i livelli di colore -> transizioni a gradini in stile
@@ -222,8 +214,7 @@ class MapRenderer:
         self._camps: list[tuple[int, int]] = []   # centri dei campi (per i sentieri)
         self._vig = None             # vignettatura screen-space (cache per dimensione vista)
         self._tree_cache: dict = {}  # sprite albero per (R quantizzato, variante, palette)
-        self._grass_cache: dict = {} # sprite ciuffo d'erba per (taglia, variante, frame)
-        self._grass_frames: list = []  # layer d'erba, uno per fotogramma di oscillazione
+        self._grass_cache: dict = {} # sprite ciuffo d'erba per (tier, variante)
 
     def set_camps(self, camps) -> None:
         """Posizioni dei campi della giungla (da MapData): servono SOLO a tracciare
@@ -312,41 +303,23 @@ class MapRenderer:
         #     ricalcolano da QUESTA maschera, non dai tile.
         solid = self._jungle_solid(grid)
 
-        # --- SAGOMA DEI CESPUGLI (erba alta): stessa tecnica dei muri (maschera
-        #     -> blur -> soglia + rumore), cosi il contorno e' organico, i tile
-        #     isolati diventano BLOB e i vicini si fondono (niente rettangoli).
-        bush_solid = self._bush_solid(grid)
-
         # --- Ombra proiettata a sud-est dalla SILHOUETTE (muro di giungla E muro
         #     di confine, ora unificati nella stessa sagoma vegetata: niente piu
         #     ombra per-tile della vecchia pietra).
         if solid is not None:
             self._build_jungle_shadow(grid, shadows, solid)
 
-        # --- Ombra morbida a terra dei cespugli (verso basso-destra).
-        if bush_solid is not None:
-            self._build_bush_shadow(shadows, bush_solid)
-
         # --- Ambient occlusion: gradiente morbido attorno ai corpi "alti"
-        #     (silhouette dei muri + silhouette dei cespugli).
-        self._build_ao(grid, shadows, solid, bush_solid)
+        #     (silhouette dei muri + cespugli per-tile).
+        self._build_ao(grid, shadows, solid)
 
-        # --- CESPUGLI (erba alta). Disegnati PRIMA dei muri (z-order): i muri,
-        #     opachi sulla loro sagoma, li COPRONO dove si sovrappongono -> nessun
-        #     cespuglio sopra un muro. I punti dei ciuffi (Poisson) si calcolano
-        #     UNA volta e si riusano per tutti i fotogrammi.
-        #     GRASS_FRAMES==1: erba STATICA nel layer walls_base (zero memoria
-        #     extra). >1: un layer per fotogramma (vento), memoria x N.
-        self._grass_frames = []
+        # --- CESPUGLI: massa COMPATTA di erba alta (stile MOBA). Area dalla
+        #     maschera organica (blur+soglia+rumore come i muri), fondo pieno
+        #     scuro + file fitte di ciuffi + fronte piu' lungo in basso. Disegnati
+        #     PRIMA dei muri (z-order in walls_base): un muro sovrapposto li copre.
+        bush_solid = self._bush_solid(grid)
         if bush_solid is not None:
-            pts = self._bush_points(bush_solid)
-            if GRASS_FRAMES > 1:
-                for f in range(GRASS_FRAMES):
-                    gl = _Layer(map_w, map_h, opaque=False)
-                    self._build_bushes(gl, bush_solid, pts, f)
-                    self._grass_frames.append(gl)
-            else:
-                self._build_bushes(walls, bush_solid, pts, 0)
+            self._build_bushes(grid, walls, shadows, bush_solid)
 
         # --- Muri (giungla + confine) come rilievi vegetati: riempiono la
         #     silhouette, COPRENDO i cespugli sovrapposti.
@@ -425,27 +398,34 @@ class MapRenderer:
                 va = sa.pixels_alpha(surf); va[:] = ba.T; del va
                 layer.blit(surf, (bx, by + top))
 
-    def _build_ao(self, grid, shadows, solid=None, bush_solid=None) -> None:
+    def _build_ao(self, grid, shadows, solid=None) -> None:
         """Ambient occlusion: scurisce il terreno con un gradiente morbido entro
         ~1.5 tile dai corpi "alti". L'occupazione a BASSA risoluzione viene presa
-        dalle SILHOUETTE morbide (non dai tile, cosi l'AO segue il contorno
-        curvo): muri di giungla/confine PIU i cespugli (erba alta). La distanza
+        dalla SILHOUETTE morbida dei muri di giungla/confine (non dai tile, cosi
+        l'AO segue il contorno curvo) PIU i cespugli per-tile. La distanza
         euclidea e' calcolata con shifted-min, il falloff e' uno smoothstep (max a
         ridosso dell'ostacolo -> 0 a 1.5 tile), poi si upscala e si blitta."""
         ts = self.tile_size; top = self._top
         Wt, Ht = grid.width, grid.height
         W, H = Wt * ts, Ht * ts
+        tiles = grid.tiles
         step = max(2, ts // 4)
         R = AO_RADIUS_TILES * ts / step              # raggio in celle low-res
         Rc = int(math.ceil(R))
         wl = (W + step - 1) // step; hl = (H + step - 1) // step
-        m = np.zeros((hl, wl), bool)
-        sy = np.minimum(np.arange(hl) * step, H - 1)
-        sx = np.minimum(np.arange(wl) * step, W - 1)
+        tall = np.zeros((Ht, Wt), bool)               # cespugli per-tile
+        for ty in range(Ht):
+            trow = tiles[ty]
+            for tx in range(Wt):
+                if trow[tx] == TILE_BUSH:
+                    tall[ty, tx] = True
+        cx = np.minimum((np.arange(wl) * step) // ts, Wt - 1)
+        cy = np.minimum((np.arange(hl) * step) // ts, Ht - 1)
+        m = tall[cy][:, cx]
         if solid is not None:                         # silhouette muri di giungla
+            sy = np.minimum(np.arange(hl) * step, H - 1)
+            sx = np.minimum(np.arange(wl) * step, W - 1)
             m = m | solid[sy][:, sx]
-        if bush_solid is not None:                    # silhouette erba alta
-            m = m | bush_solid[sy][:, sx]
         if not m.any():
             return
         big = R + 1.0
@@ -590,13 +570,11 @@ class MapRenderer:
             solid[y0:y1] = (thr | core_full[y0:y1]) & allow_full[y0:y1]
         return solid
 
-    # --- CESPUGLI: erba alta come SILHOUETTE organica + ciuffi a V ------------
+    # --- CESPUGLI: massa compatta di erba alta (stile MOBA) ------------------
     def _bush_solid(self, grid):
         """Silhouette (H,W) bool dei CESPUGLI, stessa tecnica di _jungle_solid:
-        maschera tile -> campo di DISCHI sui centri -> blur -> soglia + rumore,
-        con CLAMP ~mezzo tile. I tile isolati restano BLOB tondi (core), i vicini
-        si fondono: niente rettangoli a scaletta allineati ai tile. La logica
-        (collisione/visione) resta sui tile; questo e' solo grafica."""
+        maschera tile -> dischi sui centri -> blur -> soglia + rumore, clamp
+        ~mezzo tile. Tile isolati -> blob tondi; vicini fusi (area organica)."""
         ts = self.tile_size
         Wt, Ht = grid.width, grid.height
         W, H = Wt * ts, Ht * ts
@@ -617,9 +595,9 @@ class MapRenderer:
         ccy = np.clip(((ys + 0.5) * ts / s).astype(int), 0, hl - 1)
         cmask[ccy, ccx] = True
         dist = self._dist_lo(cmask, int(math.ceil(ts * 1.2 / s)))
-        disc = (dist <= (ts * 0.70 / s)).astype(np.float32)   # dischi uniti
-        core = dist <= (ts * 0.46 / s)                        # sempre pieno (blob)
-        allowed = dist <= (ts * 0.95 / s)                     # sporgenza ~mezzo tile
+        disc = (dist <= (ts * 0.72 / s)).astype(np.float32)
+        core = dist <= (ts * 0.46 / s)
+        allowed = dist <= (ts * 0.95 / s)
         bf = self._sep_blur(disc, max(1, int(ts * 0.5 / s)), passes=3)
         bf_full = self._upscale(bf, W, H, s)
         core_full = core[np.minimum(np.arange(H) // s, hl - 1)][:, np.minimum(np.arange(W) // s, wl - 1)]
@@ -637,156 +615,162 @@ class MapRenderer:
             solid[y0:y1] = (thr | core_full[y0:y1]) & allow_full[y0:y1]
         return solid
 
-    def _build_bush_shadow(self, shadows, solid) -> None:
-        """Ombra morbida a terra dei cespugli: la sagoma spostata verso
-        BASSO-DESTRA (luce da alto-sinistra), corta e sfumata (l'erba e' bassa)."""
-        ts = self.tile_size; top = self._top
-        H, W = solid.shape
-        s = max(2, ts // 3)
-        hl = (H + s - 1) // s; wl = (W + s - 1) // s
-        sly = np.minimum(np.arange(hl) * s, H - 1); slx = np.minimum(np.arange(wl) * s, W - 1)
-        sm = solid[sly][:, slx]
-        L = max(2, int(ts * 0.5 / s))                 # ombra corta (~mezzo tile)
-        acc = np.zeros((hl, wl), np.float32)
-        for k in range(1, L + 1):
-            dy = k; dx = k
-            sh = np.zeros((hl, wl), bool)
-            sh[dy:, dx:] = sm[:hl - dy, :wl - dx]
-            a = 1.0 - (k - 1) / float(L + 1)
-            np.maximum(acc, np.where(sh, np.float32(a), 0.0), out=acc)
-        acc[sm] = 0.0
-        acc = self._sep_blur(acc, 1, passes=2)
-        alpha = np.clip(self._upscale(acc * 90.0, W, H, s), 0, 255).astype(np.uint8)
-        self._blit_blocks(shadows, GR_SHADOW, alpha, top)
-
-    def _grass_tuft(self, hq, variant, frame):
-        """Sprite (cache) di un CIUFFO di erba alta: ventaglio di lame a V. Si
-        disegna a BASSA risoluzione e si scala NEAREST -> pixel grossi (pixel
-        art). `hq` = altezza quantizzata (in px schermo); `variant` varia il
-        numero/inclinazione delle lame e quali punte si accendono; `frame`
-        sposta le PUNTE di ~1px (oscillazione da vento). La base e' scura, le
-        lame salgono a toni via via piu' chiari, poche punte col colpo di luce."""
-        key = (hq, variant, frame)
+    def _grass_tuft(self, tier, variant):
+        """Sprite (cache) di un CIUFFO corto: 2-3 lame a punta col contorno scuro,
+        corpo del tono `tier` e cappello piu' chiaro in cima; qualche punta GB_TIP.
+        Piccolo (~11x12) e fitto: tante file sovrapposte leggono come MASSA, non
+        come fili isolati. `tier`: 0 scuro, 1 medio, 2 chiaro."""
+        key = (tier, variant)
         sp = self._grass_cache.get(key)
         if sp is not None:
             return sp
-        ts = self.tile_size
-        PX = max(2, ts // 12)
-        th = hq                                   # altezza piena (px schermo)
-        tw = int(ts * 0.52)                       # larghezza del ciuffo
-        lh = th // PX + 1
-        lw = tw // PX + 2
-        lo = pygame.Surface((lw, lh), pygame.SRCALPHA)
-        rng = random.Random((variant * 2654435761 ^ hq * 97 ^ 0x51) & 0xFFFFFFFF)
-        bx = lw // 2
-        by = lh - 1
-        k = 4 + (variant % 3)                     # 4-6 lame (ciuffo fitto)
-        sway = (frame - (GRASS_FRAMES - 1) / 2.0)  # -1 .. +1 (centrato)
-        blades = []
-        for i in range(k):
-            frac = (i / (k - 1) - 0.5) if k > 1 else 0.0     # -0.5 .. 0.5
-            bh = int((0.55 + 0.45 * rng.random()) * (lh - 1))  # altezza lama
-            bh = max(2, bh)
-            # la punta si apre a ventaglio + oscillazione (solo in cima)
-            tip = bx + int(frac * (lw - 2)) + int(round(sway * (0.6 + abs(frac))))
-            blades.append((bh, frac, tip))
-        blades.sort()                             # corte (dietro) -> alte (davanti)
-        hi_budget = 1 if (variant % 2 == 0) else 0   # poche punte illuminate
-        for bh, frac, tip in blades:
-            tipy = by - bh
-            hn = bh / max(1, lh - 1)              # 0 corta .. 1 alta
-            if hn > 0.80 and hi_budget > 0:
-                col = GR_TIP; hi_budget -= 1
-            elif hn > 0.58:
-                col = GR_LIGHT
-            elif hn > 0.32:
-                col = GR_MID
-            else:
-                col = GR_DARK
-            wd = 1 if bh > lh * 0.32 else 0
-            # contorno scuro (triangolo piu largo) poi il colore dentro
-            pygame.draw.polygon(lo, GR_OUT, ((bx - wd - 1, by), (bx + wd + 1, by),
-                                             (tip, tipy - 1)))
-            if wd >= 1:
-                pygame.draw.polygon(lo, col, ((bx - wd, by - 1), (bx + wd, by - 1),
-                                              (tip, tipy + 1)))
-            else:
-                pygame.draw.line(lo, col, (bx, by - 1), (tip, tipy + 1))
-        big = pygame.transform.scale(lo, (lw * PX, lh * PX))   # NEAREST (no smooth)
-        self._grass_cache[key] = big
-        return big
+        body = (GB_DARK, GB_MID, GB_LIGHT)[tier]
+        cap = (GB_MID, GB_LIGHT, GB_TIP)[tier]
+        w, h = 11, 12
+        s = pygame.Surface((w, h), pygame.SRCALPHA)
+        rng = random.Random((tier * 2654435761 ^ variant * 40503 ^ 0x7E) & 0xFFFFFFFF)
+        bx = w // 2
+        nb = 2 + (variant & 1)                     # 2-3 lame
+        for i in range(nb):
+            frac = (i - (nb - 1) / 2.0)
+            cx = bx + int(round(frac * 2.4)) + rng.randint(-1, 1)
+            bh = rng.randint(6, h - 1)
+            lean = int(round(frac * 1.6))
+            tipx = cx + lean
+            tipy = h - 1 - bh
+            pygame.draw.polygon(s, GB_OUT, ((cx - 2, h - 1), (cx + 2, h - 1), (tipx, tipy - 1)))
+            pygame.draw.polygon(s, body, ((cx - 1, h - 1), (cx + 1, h - 1), (tipx, tipy + 1)))
+            pygame.draw.line(s, cap, (tipx, tipy + 1), (tipx, tipy + max(1, bh // 3)))
+            if tier == 2 and (variant & 2) and 0 <= tipx < w and 0 <= tipy < h:
+                s.set_at((tipx, max(0, tipy)), GB_TIP)
+        self._grass_cache[key] = s
+        return s
 
-    def _bush_points(self, solid):
-        """Punti di base dei ciuffi d'erba: dart-throwing (Poisson-disc) DENTRO la
-        sagoma -> fitti ma senza alcun pattern allineato. Calcolati una volta e
-        riusati per tutti i fotogrammi (la posizione non cambia col vento)."""
-        ts = self.tile_size
-        ys, xs = np.where(solid)
-        if ys.size == 0:
-            return []
-        y0, y1 = int(ys.min()), int(ys.max()); x0, x1 = int(xs.min()), int(xs.max())
-        min_d = ts * 0.26
-        cell = min_d / math.sqrt(2.0)
-        occ = {}
-        area = max(1, (x1 - x0 + 1) * (y1 - y0 + 1))
-        tries = int(area / (min_d * min_d) * 12) + 40
-        rng = random.Random((solid.shape[1] * 2654435761 ^ solid.shape[0] * 40503 ^ 0x9E) & 0xFFFFFFFF)
-        pts = []
-        md2 = min_d * min_d
-        for _ in range(tries):
-            px = rng.randint(x0, x1); py = rng.randint(y0, y1)
-            if not solid[py, px]:
-                continue
-            gx = int((px - x0) / cell); gyc = int((py - y0) / cell)
-            ok = True
-            for oy in range(-2, 3):
-                for ox in range(-2, 3):
-                    for (qx, qy) in occ.get((gx + ox, gyc + oy), ()):
-                        if (qx - px) ** 2 + (qy - py) ** 2 < md2:
-                            ok = False; break
-                    if not ok:
-                        break
-                if not ok:
-                    break
-            if ok:
-                occ.setdefault((gx, gyc), []).append((px, py))
-                pts.append((px, py))
-        # dal FONDO (y piccola = retro) al DAVANTI (y grande): le file davanti
-        # coprono la base di quelle dietro.
-        pts.sort(key=lambda q: q[1])
-        return pts
-
-    def _build_bushes(self, layer, solid, pts, frame) -> None:
-        """Riempie la silhouette dei cespugli con ERBA ALTA: una base (piu' chiara
-        in cima, piu' scura in basso -> volume) che copre la sagoma senza buchi +
-        i ciuffi a V nei punti `pts`, disegnati dal fondo verso il davanti. Le lame
-        salgono OLTRE la sagoma (le punte bucano il bordo alto) -> contorno
-        superiore irregolare. `frame` sceglie il fotogramma di oscillazione."""
+    def _build_bushes(self, grid, walls, shadows, solid) -> None:
+        """Riempie la silhouette con una MASSA compatta di erba alta:
+          1) ombra morbida a terra (proiettata a sud-est);
+          2) FRONTE: sotto il bordo inferiore, una fascia di fili piu' lunghi e
+             SCURI che scende oltre il contorno -> altezza come la parete dei muri;
+          3) FONDO pieno scuro (GB_FILL) sulla sagoma+fronte: niente terreno dentro,
+             con contorno scuro (GB_OUT) tutt'intorno;
+          4) SUPERFICIE: file di ciuffi ogni ~5px, sfalsate, dal fondo al davanti,
+             piu' chiare verso l'alto e verso sinistra (luce alto-sx), punte chiare
+             sparse."""
         ts = self.tile_size; top = self._top
         H, W = solid.shape
         s = max(2, ts // 4)
         hl = (H + s - 1) // s; wl = (W + s - 1) // s
+
+        # (1) ombra morbida a terra (sagoma spostata a sud-est, corta e sfumata)
         sly = np.minimum(np.arange(hl) * s, H - 1); slx = np.minimum(np.arange(wl) * s, W - 1)
         sm = solid[sly][:, slx]
-        if not sm.any():
-            return
-        rgb = np.zeros((hl, wl, 3), np.uint8)
-        gy = (np.arange(hl, dtype=np.float32) / max(1, hl - 1))[:, None]
-        base = np.array(GR_BASE, np.float32)
-        col_top = base + (np.array(GR_MID, np.float32) - base) * 0.35
-        col_bot = base + (np.array(GR_DARK, np.float32) - base) * 0.7
+        L = max(2, int(ts * 0.5 / s))
+        acc = np.zeros((hl, wl), np.float32)
+        for k in range(1, L + 1):
+            sh = np.zeros((hl, wl), bool)
+            sh[k:, k:] = sm[:hl - k, :wl - k]
+            np.maximum(acc, np.where(sh, 1.0 - (k - 1) / float(L + 1), 0.0), out=acc)
+        acc[sm] = 0.0
+        acc = self._sep_blur(acc, 1, passes=2)
+        alpha_sh = np.clip(self._upscale(acc * 90.0, W, H, s), 0, 255).astype(np.uint8)
+        self._blit_blocks(shadows, (0, 0, 0), alpha_sh, top)
+
+        # (2) FRONTE: per ogni colonna, sotto il bordo inferiore della sagoma,
+        #     aggiungo una fascia (skirt) di altezza variabile -> parete frontale.
+        anyc = solid.any(axis=0)
+        bottom = np.full(W, -1, np.int64)
+        ys_idx = np.arange(H)[:, None]
+        bottom[anyc] = (ys_idx * solid[:, anyc]).max(axis=0)
+        skirt = np.zeros((H, W), bool)
+        xs_all = np.where(anyc)[0]
+        sk_noise = _np_vnoise((xs_all / 2.3 + 3.0).astype(np.float32),
+                              np.full(xs_all.shape, 1.5, np.float32))
+        sklen = (ts * 0.22 + ts * 0.3 * sk_noise).astype(np.int64)   # ~0.2..0.5 tile
+        for j, x in enumerate(xs_all):
+            by = bottom[x]
+            if by < 0:
+                continue
+            y1 = min(H, by + 1 + int(sklen[j]))
+            skirt[by + 1:y1, x] = True
+        fillmask = solid | skirt
+
+        # (3) FONDO pieno + contorno. Gradiente lieve (piu' scuro in basso = ombra
+        #     interna); lo skirt e' piu' scuro (fronte, come la parete dei muri).
+        dil = fillmask.copy()
+        dil[1:, :] |= fillmask[:-1, :]; dil[:-1, :] |= fillmask[1:, :]
+        dil[:, 1:] |= fillmask[:, :-1]; dil[:, :-1] |= fillmask[:, 1:]
+        outline = dil & ~fillmask
+        rgb = np.zeros((H, W, 3), np.uint8)
+        fillc = np.array(GB_FILL, np.float32); darkc = np.array(GB_OUT, np.float32)
+        gy = (np.arange(H, dtype=np.float32) / max(1, H - 1))[:, None]
         for c in range(3):
-            rgb[:, :, c] = (col_top[c] + (col_bot[c] - col_top[c]) * gy).astype(np.uint8)
-        rgb_full = rgb[np.minimum(np.arange(H) // s, hl - 1)][:, np.minimum(np.arange(W) // s, wl - 1)]
-        alpha_full = self._upscale(np.where(sm, 255.0, 0.0), W, H, s)
-        alpha_full = np.where(alpha_full > 160, np.uint8(255), np.uint8(0))  # bordo netto
-        self._blit_blocks(layer, rgb_full, alpha_full, top)
-        for (px, py) in pts:
-            v = (px * 73856093) ^ (py * 19349663)
-            variant = (v >> 5) & 7
-            hq = int(ts * (0.5 + 0.10 * ((v >> 9) & 3)))   # 0.5 .. 0.8 tile
-            sp = self._grass_tuft(hq, variant, frame)
-            layer.blit(sp, (px - sp.get_width() // 2, py - sp.get_height() + top))
+            base = fillc[c] + (darkc[c] - fillc[c]) * (0.12 + 0.20 * gy)
+            rgb[:, :, c] = np.clip(base, 0, 255).astype(np.uint8)
+        for c in range(3):
+            ch = rgb[:, :, c]
+            ch[skirt] = (ch[skirt].astype(np.float32) * 0.72).astype(np.uint8)
+        ocol = np.array(GB_OUT, np.uint8)
+        for c in range(3):
+            rgb[:, :, c][outline] = ocol[c]
+        alpha = np.where(fillmask | outline, np.uint8(255), np.uint8(0))
+        self._blit_blocks(walls, rgb, alpha, top)
+
+        # (4) SUPERFICIE: file di ciuffi sfalsate, dal fondo (y piccola) al davanti.
+        #     Scansione per RIGA vettoriale (solo le celle della sagoma), seme da
+        #     hash deterministico -> veloce anche su tutta la mappa.
+        ys, xs = np.where(solid)
+        y0, y1 = int(ys.min()), int(ys.max()); x0, x1 = int(xs.min()), int(xs.max())
+        dy = max(1.0, y1 - y0); dx = max(1.0, x1 - x0)
+        row_step = 5; col_step = 6
+        for ry, y in enumerate(range(y0, y1 + 1, row_step)):
+            xoff = (ry % 2) * (col_step // 2)
+            xs_row = np.arange(x0 + xoff, x1 + 1, col_step)
+            if xs_row.size == 0:
+                continue
+            xs_sel = xs_row[solid[y, xs_row]]            # solo celle di erba
+            vf = 1.0 - (y - y0) / dy                     # 1 in cima
+            for xi in xs_sel:
+                xx = int(xi)
+                h = ((xx * 2654435761) ^ (y * 40503)) & 0xFFFFFF
+                hf = 1.0 - (xx - x0) / dx                # 1 a sinistra
+                score = 0.55 * vf + 0.25 * hf + 0.20 * ((h & 0xFF) / 255.0)
+                tier = 2 if score > 0.70 else 1 if score > 0.40 else 0
+                variant = (h >> 8) & 3
+                xj = xx + ((h >> 10) & 1) - ((h >> 11) & 1)   # jitter -1..1
+                sp = self._grass_tuft(tier, variant)
+                walls.blit(sp, (xj - sp.get_width() // 2, y - sp.get_height() + 3 + top))
+
+        # (5) FRONTE: fili piu' lunghi e SCURI che SCENDONO oltre il bordo
+        #     inferiore (sopra lo skirt) -> l'area ha ALTEZZA come la parete dei
+        #     muri. Serpeggiano un filo e si scuriscono verso la punta.
+        frng = random.Random((W * 2654435761 ^ H * 2246822519 ^ 0xF7) & 0xFFFFFFFF)
+        for j in range(0, len(xs_all), 3):
+            x = int(xs_all[j]); by = int(bottom[x])
+            if by < 0:
+                continue
+            ln = int(sklen[j]) + 2
+            cxf = float(x)
+            for i in range(ln):
+                yy = by + 1 + i
+                if yy >= H:
+                    break
+                cxf += frng.uniform(-0.5, 0.5)
+                px = int(round(cxf))
+                f = i / max(1, ln - 1)                 # 0 radice .. 1 punta
+                col = GB_MID if f < 0.25 else GB_DARK if f < 0.7 else GB_OUT
+                if 0 <= px < W:
+                    walls.blit(self._px1(col), (px, yy + top))
+                    if f > 0.3 and px + 1 < W:          # spessore 2px verso valle
+                        walls.blit(self._px1(GB_OUT), (px + 1, yy + top))
+
+    def _px1(self, col):
+        """1 pixel colorato in cache (per i fili del fronte)."""
+        s = self._grass_cache.get(("px", col))
+        if s is None:
+            s = pygame.Surface((1, 1), pygame.SRCALPHA)
+            s.set_at((0, 0), col)
+            self._grass_cache[("px", col)] = s
+        return s
 
     def _build_jungle_shadow(self, grid, shadows, solid) -> None:
         """Ombra proiettata dai muri di giungla, ricalcolata dalla SILHOUETTE:
@@ -1558,20 +1542,12 @@ class MapRenderer:
         return (-camera.ox, -camera.oy - self._top)
 
     def draw(self, screen, camera) -> None:
-        """Layer SOTTO le unita: ground, decor, ombre, ERBA (fotogramma di
-        oscillazione), muri/vegetazione base. L'erba sta fra le ombre e i muri:
-        i muri la coprono dove si sovrappongono."""
+        """Layer SOTTO le unita: ground, decor, ombre, muri/vegetazione base
+        (l'erba alta e' dentro walls_base, disegnata prima dei muri)."""
         ox, oy = self._offset(camera)
         vw, vh = camera.view_w, camera.view_h
-        self.layers["ground"].draw(screen, ox, oy, vw, vh)
-        self.layers["ground_decor"].draw(screen, ox, oy, vw, vh)
-        self.layers["shadows"].draw(screen, ox, oy, vw, vh)
-        if self._grass_frames:
-            # Fotogramma corrente dell'oscillazione (vento): ogni frame e' gia'
-            # pre-renderizzato in un layer, qui si fa SOLO il blit del chunk.
-            fi = (pygame.time.get_ticks() // 220) % len(self._grass_frames)
-            self._grass_frames[fi].draw(screen, ox, oy, vw, vh)
-        self.layers["walls_base"].draw(screen, ox, oy, vw, vh)
+        for n in self.BELOW:
+            self.layers[n].draw(screen, ox, oy, vw, vh)
 
     def draw_canopy(self, screen, camera) -> None:
         """Layer SOPRA le unita: chiome e velo di luce (vuoti per ora)."""

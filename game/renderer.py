@@ -89,9 +89,6 @@ BUSH_HILITE = (84, 128, 74)      # colpo di luce sulla cupola
 BUSH_RIMLIGHT = (104, 146, 86)   # cresta sul bordo alto esposto (giungla, non lime)
 BUSH_RIM = (8, 20, 12)           # contorno/contatto scuro alla base
 BUSH_CONTACT = (0, 0, 0, 110)    # ombra proiettata sull'erba (radica a terra)
-# NB: i CESPUGLI (erba alta) NON si disegnano piu qui per-tile: la loro
-# silhouette organica e il riempimento a ciuffi vivono in game/map_renderer.py
-# (_bush_solid / _build_bushes), come per i muri.
 # Muro di confine (TILE_WALL): pietra grigia fredda (resta un muro costruito).
 STONE_WALL = ((118, 120, 130), (70, 72, 82), (40, 42, 50), (52, 54, 62))
 # --- Altopiano roccioso della giungla (reso neighbor-aware: un blocco connesso
