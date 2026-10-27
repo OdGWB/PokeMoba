@@ -24,6 +24,7 @@ from ..camera import Camera
 from ..fx import FXSystem, type_color
 from ..input_controller import InputController
 from ..minimap import Minimap
+from ..particles import ParticleSystem
 from ..renderer import Renderer
 from ..shop_ui import ShopUI
 from ..sprites.animator import FallbackAnimator, SpriteAnimator
@@ -67,6 +68,9 @@ class MatchScene:
         self.renderer = Renderer()
         self.renderer.map.set_camps(map_data.camps)   # sentieri di terra verso le lane
         self.fx = FXSystem()
+        # Particelle d'atmosfera (lucciole/polline/foglie): cosmetiche, aggiornate
+        # solo dentro la camera, al massimo ~60 a schermo.
+        self.particles = ParticleSystem()
         self._menu_seq = 0
         # Nebbia di guerra + minimappa solo nelle mappe MOBA. La visione è
         # calcolata dal Match (motore), così la condividono bot e client.
@@ -304,6 +308,8 @@ class MatchScene:
             self.fx.spawn_events(self.match.fx_events)
             self.match.fx_events.clear()
         self.fx.update(dt)
+        # Particelle d'atmosfera: aggiornate solo nel rettangolo visibile.
+        self.particles.update(dt, self.camera, self.map_data.grid)
 
         # La visione la calcola il Match; qui rigenero la nebbia della minimappa
         # solo quando è davvero cambiata (versione).
@@ -336,6 +342,9 @@ class MatchScene:
                            dens=self.map_data.dens or None, respawning=respawning,
                            vision=self.vision, player_team=self.player.team,
                            now=self.match.time if self.match else 1e9)
+        # Particelle d'atmosfera della giungla (ambientali, sopra mappa e unita,
+        # sotto gli effetti delle mosse e la UI).
+        self.particles.draw(surface, self.camera)
         # Unità in morte: Hurt che svanisce (sopra la mappa).
         ts = config.TILE_SIZE
         for d in self._dying.values():

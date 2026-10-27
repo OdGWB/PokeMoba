@@ -375,6 +375,33 @@ Passaggi completati:
   Attivo su ENTRAMBE le mappe. Screenshot: screenshots/step_18.png (ravvicinato
   erba+muro) e step_18_over.png (minimappa 3v3); step_18_5v5.png/
   step_18_5v5_over.png (5v5).
+- PARTICELLE D'ATMOSFERA (step_19): particelle leggere e COSMETICHE nelle zone di
+  giungla. Nuovo game/particles.py (classe ParticleSystem), integrato in
+  game/scenes/match_scene.py (creazione in __init__, update in update(), draw in
+  draw() DOPO renderer.draw -> sopra mappa/unita, sotto gli effetti delle mosse e
+  la UI). Tre tipi: (1) LUCCIOLE = puntini caldi che fluttuano piano e PULSANO
+  lentamente (sin lenta su una fase per-particella), alone radiale morbido con
+  nucleo quasi bianco; (2) POLLINE = minuscoli granelli chiari che derivano
+  nell'aria con leggera oscillazione; (3) FOGLIE = qualche foglia (ellisse con
+  nervatura) che CADE ondeggiando e ruotando. VINCOLI rispettati: (a) al massimo
+  ~60 a schermo (MAX_PARTICLES=60); (b) aggiornate SOLO dentro la camera -> si
+  generano nel rettangolo visibile e, appena ne escono (oltre MARGIN px) o finita
+  la vita, vengono riciclate; (c) nascono SOLO su tile di giungla (TILE_FLOOR/
+  TILE_BUSH), mai su lane, acqua o muri -> se la vista inquadra poca giungla se ne
+  generano meno. Dissolvenza in entrata/uscita (_fade) per evitare il 'pop'.
+  PRESTAZIONI (requisito: calo FPS < 5%): niente allocazioni per-frame; gli
+  sprite sono PRE-RENDERIZZATI una volta (alone e polline a GLOW_LEVELS=6 gradini
+  di luminosita' -> blit SRCALPHA veloce, niente set_alpha sul percorso di blend
+  lento; foglie ruotate in cache per angolo quantizzato a 16 passi; set_alpha solo
+  durante la dissolvenza). Hot loop di update/draw con variabili locali e
+  world_to_screen inline (ox/oy del frame). Benchmark headless (MatchScene reale,
+  A/B interlacciato ON/OFF, camera che PANORAMICA ogni frame = caso peggiore di
+  spawn/riciclo, scaling lowres->finestra incluso): costo isolato ~55 us/frame,
+  CALO FPS misurato ~4.0-4.3% su 5 run (baseline headless piu' leggera del frame
+  reale, quindi il calo in gioco e' minore; al cap di 120 FPS con margine e'
+  ~0%). Per ora solo su MatchScene (gioco locale); net_match_scene non toccato.
+  Screenshot: screenshots/step_19.png (giungla illuminata, senza nebbia) e
+  step_19_zoom.png (dettaglio lucciole/polline accanto al fiume).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul
