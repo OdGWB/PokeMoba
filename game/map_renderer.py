@@ -105,6 +105,42 @@ FOAM_FRAMES = 3                  # fotogrammi della schiuma animata
 FOAM_MS = 240                    # durata di un fotogramma (ms)
 FCELL = 256                      # lato cella per gli sprite di schiuma (memoria)
 
+# --- DECORAZIONI del sottobosco (layer ground_decor) --------------------------
+# Oggetti sparsi senza collisione: radici, tronchi caduti, felci, funghi, sassi
+# e foglie secche. Densita' ALTA vicino ai muri (sottobosco fitto al margine) e
+# BASSA al centro degli spazi aperti; zero su lane e sentieri. Posizionamento a
+# Poisson-disc (raggio variabile con la distanza dai muri) -> niente
+# sovrapposizioni ne pattern ripetitivi. Palette cupa, luce da alto-sinistra.
+DECO_NEAR_TILES = 1.6            # entro questa distanza dai muri: mix "margine"
+DECO_DMAX_TILES = 5.0            # oltre questa distanza: densita' minima (aperto)
+DECO_R_NEAR = 0.60              # spaziatura minima (tile) a ridosso dei muri
+DECO_R_FAR = 2.7                # spaziatura minima (tile) in campo aperto
+# Foglie secche (bruno-arancio desaturato) con contorno scuro.
+LEAF_OUT = (62, 44, 24)
+LEAF_COLS = ((120, 86, 44), (138, 104, 52), (98, 72, 38), (146, 96, 42))
+# Sassi di terra (grigio-bruno, piu' caldi dei sassi di fiume).
+DROCK_BASE = (92, 92, 84)
+DROCK_HI = (128, 128, 116)
+DROCK_SH = (54, 54, 48)
+# Felci: fronde verdi con punta illuminata.
+FERN_DK = (28, 62, 36)
+FERN_MD = (52, 104, 56)
+FERN_HI = (104, 156, 92)
+# Funghi: gambo chiaro, cappello rosso o bruno con riflesso alto-sinistra.
+MUSH_STEM = (210, 202, 176)
+MUSH_RED = (160, 66, 52); MUSH_RED_SH = (108, 40, 32)
+MUSH_TAN = (150, 102, 62); MUSH_TAN_SH = (104, 68, 40)
+MUSH_HI = (228, 212, 192)
+# Radici affioranti: bastoncini legnosi nodosi (bruno-grigio, poco saturo).
+ROOT_DK = (50, 40, 30)
+ROOT_MD = (86, 72, 54)
+# Tronchi caduti: corteccia bruna, cima illuminata, fondo in ombra, anelli.
+LOG_DK = (56, 40, 26)
+LOG_MD = (92, 68, 44)
+LOG_HI = (124, 98, 64)
+LOG_RING = (140, 112, 76); LOG_RING_D = (76, 56, 36)
+LOG_MOSS = (58, 96, 52)
+
 # Matrice di Bayer 4x4 (ordered dithering) in [0,1): soglia per-pixel con cui si
 # "sgranano" i confini tra i livelli di colore -> transizioni a gradini in stile
 # pixel art invece di sfumature morbide.
@@ -358,6 +394,12 @@ class MapRenderer:
         bush_solid = self._bush_solid(grid)
         if bush_solid is not None:
             self._build_bushes(grid, walls, shadows, bush_solid)
+
+        # --- DECORAZIONI del sottobosco sul decor: radici, tronchi, felci,
+        #     funghi, sassi e foglie, a Poisson-disc (fitte ai muri, rade al
+        #     centro, zero su lane/sentieri). Nessuna collisione. Calcolate qui
+        #     perche' usano la distanza dalle SILHOUETTE di muri e cespugli.
+        self._build_decor(grid, decor, solid, bush_solid, path_tiles, p)
 
         # --- Muri (giungla + confine) come rilievi vegetati: riempiono la
         #     silhouette, COPRENDO i cespugli sovrapposti.
@@ -907,6 +949,265 @@ class MapRenderer:
                     frames.append(surf)
                 foam.append((cx0 + rx0, cy0 + ry0 + top, frames))
         return foam
+
+    # --- DECORAZIONI del sottobosco (Poisson-disc a raggio variabile) --------
+    def _build_decor(self, grid, decor, solid, bush_solid, path_tiles, p) -> None:
+        """Popola ground_decor di oggetti sparsi (radici, tronchi, felci, funghi,
+        sassi, foglie) senza collisione. La DENSITA e' modulata dalla distanza
+        dalle silhouette di muri/cespugli: spaziatura PICCOLA (fitto) a ridosso
+        dei muri, GRANDE (rado) in campo aperto. Niente decorazioni su lane e
+        sentieri. Campionamento Poisson-disc a raggio variabile (griglia jitterata
+        visitata in ordine casuale + rifiuto per vicinanza) -> distribuzione
+        blue-noise senza sovrapposizioni ne pattern. Disegna su una Surface a
+        piena mappa, poi blitta solo i chunk non vuoti (lazy)."""
+        ts = self.tile_size; top = self._top
+        Wt, Ht = grid.width, grid.height
+        W, H = Wt * ts, Ht * ts
+        # --- Campo distanza dai muri/cespugli (bassa risoluzione, in tile) -----
+        s = max(2, ts // 4)
+        hl = (H + s - 1) // s; wl = (W + s - 1) // s
+        obst = np.zeros((hl, wl), bool)
+        sy = np.minimum(np.arange(hl) * s, H - 1)
+        sx = np.minimum(np.arange(wl) * s, W - 1)
+        if solid is not None:
+            obst |= solid[sy][:, sx]
+        if bush_solid is not None:
+            obst |= bush_solid[sy][:, sx]
+        Rc = int(math.ceil(DECO_DMAX_TILES * ts / s))
+        if obst.any():
+            dlo = self._dist_lo(obst, Rc)            # distanza in celle low-res
+        else:
+            dlo = np.full((hl, wl), Rc + 2.0, np.float32)
+        # --- Maschera dei tile su cui si PUO decorare: solo terreno aperto, mai
+        #     lane, acqua, muri, cespugli ne i tile dei sentieri. ----------------
+        ok = (np.array(grid.tiles, dtype=np.int32) == TILE_FLOOR)
+        for (tx, ty) in path_tiles:
+            if 0 <= tx < Wt and 0 <= ty < Ht:
+                ok[ty, tx] = False
+        if not ok.any():
+            return
+        # --- Poisson-disc a raggio variabile -----------------------------------
+        r_near = DECO_R_NEAR * ts; r_far = DECO_R_FAR * ts
+        step = max(5, int(r_near * 0.68))            # passo della griglia jitterata
+        cell = r_far                                 # hash spaziale: vicini in 3x3
+        buckets: dict[tuple[int, int], list] = {}
+
+        def far_enough(x, y, sp):
+            gx = int(x // cell); gy = int(y // cell)
+            for oy in (-1, 0, 1):
+                for ox in (-1, 0, 1):
+                    lst = buckets.get((gx + ox, gy + oy))
+                    if not lst:
+                        continue
+                    for px, py, psp in lst:
+                        dx = px - x; dy = py - y
+                        m = sp if sp > psp else psp
+                        if dx * dx + dy * dy < m * m:
+                            return False
+            return True
+
+        rng = random.Random((Wt * 73856093) ^ (Ht * 19349663) ^ 0xDEC0DE)
+        cells = [(gx, gy) for gy in range(0, H, step) for gx in range(0, W, step)]
+        rng.shuffle(cells)
+        deco = pygame.Surface((W, H), pygame.SRCALPHA)
+        for gx, gy in cells:
+            x = gx + rng.randint(0, step - 1)
+            y = gy + rng.randint(0, step - 1)
+            if x >= W or y >= H:
+                continue
+            tx = x // ts; ty = y // ts
+            if not ok[ty, tx]:
+                continue
+            # La silhouette di muri/cespugli puo' sporgere ~mezzo tile sul terreno:
+            # evita di decorare dentro la sagoma (finirebbe sotto il muro).
+            if solid is not None and solid[y, x]:
+                continue
+            if bush_solid is not None and bush_solid[y, x]:
+                continue
+            dt = float(dlo[min(y // s, hl - 1), min(x // s, wl - 1)]) * s / ts
+            f = min(dt / DECO_DMAX_TILES, 1.0)
+            f = f * f * (3.0 - 2.0 * f)              # smoothstep: fitto->rado
+            sp = r_near + (r_far - r_near) * f
+            kind = self._pick_decor(dt, rng)
+            if kind == "log":                        # i tronchi occupano piu' spazio
+                sp = max(sp, 1.3 * ts)
+            if not far_enough(x, y, sp):
+                continue
+            buckets.setdefault((int(x // cell), int(y // cell)), []).append((x, y, sp))
+            self._draw_decor(deco, kind, x, y, rng, p)
+        # --- Blit lazy per chunk (solo i blocchi con qualcosa dentro) ----------
+        for by in range(0, H, CHUNK):
+            bh = min(CHUNK, H - by)
+            for bx in range(0, W, CHUNK):
+                bw = min(CHUNK, W - bx)
+                sub = deco.subsurface(pygame.Rect(bx, by, bw, bh))
+                if sub.get_bounding_rect(min_alpha=1).width > 0:
+                    decor.blit(sub.copy(), (bx, by + top))
+
+    @staticmethod
+    def _pick_decor(dt, rng) -> str:
+        """Sceglie il tipo di decorazione in base alla distanza dai muri `dt`
+        (tile). Vicino ai muri: piu' radici/felci/funghi/tronchi (sottobosco
+        fitto); in campo aperto: soprattutto foglie secche e sassi."""
+        r = rng.random()
+        if dt < DECO_NEAR_TILES:
+            if r < 0.22: return "root"
+            if r < 0.42: return "fern"
+            if r < 0.60: return "mushroom"
+            if r < 0.74: return "rock"
+            if r < 0.84: return "log"
+            return "leaf"
+        if r < 0.44: return "leaf"
+        if r < 0.68: return "rock"
+        if r < 0.82: return "fern"
+        if r < 0.92: return "log"
+        if r < 0.97: return "mushroom"
+        return "root"
+
+    def _draw_decor(self, deco, kind, x, y, rng, p) -> None:
+        if kind == "leaf":
+            self._deco_leaf(deco, x, y, rng)
+        elif kind == "rock":
+            self._deco_rock(deco, x, y, rng, p)
+        elif kind == "fern":
+            self._deco_fern(deco, x, y, rng)
+        elif kind == "mushroom":
+            self._deco_mushroom(deco, x, y, rng)
+        elif kind == "root":
+            self._deco_root(deco, x, y, rng)
+        elif kind == "log":
+            self._deco_log(deco, x, y, rng)
+
+    @staticmethod
+    def _safe_px(surf, x, y, col) -> None:
+        if 0 <= x < surf.get_width() and 0 <= y < surf.get_height():
+            surf.set_at((int(x), int(y)), col)
+
+    def _deco_leaf(self, deco, x, y, rng) -> None:
+        """Foglia secca: piccolo rombo bruno-arancio col contorno scuro e nervatura."""
+        col = LEAF_COLS[rng.randrange(len(LEAF_COLS))]
+        ang = rng.uniform(0.0, math.pi)
+        L = rng.randint(3, 5); Wd = rng.randint(2, 3)
+        ca, sa = math.cos(ang), math.sin(ang)
+
+        def rot(ux, uy):
+            return (x + ux * ca - uy * sa, y + ux * sa + uy * ca)
+        outer = [rot(L, 0), rot(0, Wd), rot(-L, 0), rot(0, -Wd)]
+        pygame.draw.polygon(deco, (*LEAF_OUT, 235), [(int(a), int(b)) for a, b in outer])
+        inner = [rot(L - 1, 0), rot(0, Wd - 1), rot(-(L - 1), 0), rot(0, -(Wd - 1))]
+        pygame.draw.polygon(deco, (*col, 235), [(int(a), int(b)) for a, b in inner])
+        pygame.draw.line(deco, (*LEAF_OUT, 200),
+                         (int(x - L * ca), int(y - L * sa)),
+                         (int(x + L * ca), int(y + L * sa)), 1)
+
+    def _deco_rock(self, deco, x, y, rng, p) -> None:
+        """Sasso di terra: ombra di contatto + masso tondo illuminato (riuso di
+        Renderer._round_rock, luce alto-sinistra)."""
+        r = rng.randint(2, 4)
+        pygame.draw.ellipse(deco, (0, 0, 0, 50),
+                            pygame.Rect(x - r, y + r - 1, r * 2, max(2, r)))
+        p._round_rock(deco, x, y, r, rng, DROCK_BASE, DROCK_HI, DROCK_SH)
+
+    def _deco_fern(self, deco, x, y, rng) -> None:
+        """Felce: ventaglio di fronde che salgono dalla base; ogni fronda ha il
+        contorno scuro, il corpo verde e una punta illuminata, piu' una serie di
+        pinnule (trattini laterali) che la rendono riconoscibile come felce."""
+        n = rng.randint(4, 6)
+        spread = rng.uniform(0.7, 1.05)
+        for i in range(n):
+            t = (i / (n - 1)) * 2.0 - 1.0 if n > 1 else 0.0
+            ang = -math.pi / 2 + t * spread
+            L = rng.randint(8, 13)
+            ca, sa = math.cos(ang), math.sin(ang)
+            tipx = x + ca * L; tipy = y + sa * L
+            mx = (x + tipx) / 2 - sa * rng.uniform(0.5, 1.8)   # leggera curvatura
+            my = (y + tipy) / 2 + ca * rng.uniform(0.5, 1.8)
+            pygame.draw.line(deco, (*FERN_DK, 235), (x, y), (int(mx), int(my)), 2)
+            pygame.draw.line(deco, (*FERN_DK, 235), (int(mx), int(my)), (int(tipx), int(tipy)), 1)
+            pygame.draw.line(deco, (*FERN_MD, 240), (x, y), (int(tipx), int(tipy)), 1)
+            # pinnule: corti trattini perpendicolari lungo la fronda
+            for k in range(2, L - 1, 3):
+                bx = x + ca * k; by = y + sa * k
+                plen = max(1.0, (L - k) * 0.35)
+                self._safe_px(deco, bx - sa * plen, by + ca * plen, (*FERN_MD, 230))
+                self._safe_px(deco, bx + sa * plen, by - ca * plen, (*FERN_MD, 230))
+            self._safe_px(deco, tipx, tipy, (*FERN_HI, 255))
+
+    def _deco_mushroom(self, deco, x, y, rng) -> None:
+        """Fungo (o piccolo gruppo): gambo chiaro + cappello a cupola con riflesso
+        in alto-sinistra. Cappello rosso o bruno a seconda della variante."""
+        red = rng.random() < 0.5
+        cap = MUSH_RED if red else MUSH_TAN
+        caps = MUSH_RED_SH if red else MUSH_TAN_SH
+        for i in range(rng.randint(1, 3)):
+            mx = x + (rng.randint(-3, 3) if i else 0)
+            my = y + (rng.randint(-1, 1) if i else 0)
+            h = rng.randint(2, 4); cr = rng.randint(2, 3)
+            pygame.draw.line(deco, (*MUSH_STEM, 240), (mx, my), (mx, my - h), 2)
+            cy = my - h
+            pygame.draw.ellipse(deco, (*caps, 250), pygame.Rect(mx - cr, cy - cr + 1, cr * 2, cr + 1))
+            pygame.draw.ellipse(deco, (*cap, 250), pygame.Rect(mx - cr, cy - cr, cr * 2, cr + 1))
+            self._safe_px(deco, mx - 1, cy - cr + 1, (*MUSH_HI, 255))
+
+    def _deco_root(self, deco, x, y, rng) -> None:
+        """Radice affiorante: bastoncino legnoso nodoso che serpeggia, con 0-1
+        ramo. Tratto scuro spesso + nucleo piu' chiaro sottile."""
+        seg = rng.randint(3, 5)
+
+        def grow(sx, sy, ang, n):
+            pts = [(sx, sy)]
+            px, py = sx, sy
+            for _ in range(n):
+                ang += rng.uniform(-0.7, 0.7)
+                px += math.cos(ang) * seg; py += math.sin(ang) * seg
+                pts.append((px, py))
+            return pts, ang
+
+        def stroke(pts):
+            ip = [(int(a), int(b)) for a, b in pts]
+            if len(ip) >= 2:
+                pygame.draw.lines(deco, (*ROOT_DK, 235), False, ip, 3)
+                pygame.draw.lines(deco, (*ROOT_MD, 235), False, ip, 1)
+        main, ang = grow(x, y, rng.uniform(0.0, 2.0 * math.pi), rng.randint(3, 5))
+        stroke(main)
+        if len(main) >= 3 and rng.random() < 0.7:
+            bi = rng.randrange(1, len(main) - 1)
+            bx, by = main[bi]
+            branch, _ = grow(bx, by, ang + rng.uniform(-1.4, 1.4), rng.randint(2, 3))
+            stroke(branch)
+
+    def _deco_log(self, deco, x, y, rng) -> None:
+        """Tronco caduto: capsula di corteccia bruna con cima illuminata, fondo in
+        ombra, estremi tondi con anelli e qualche fiocco di muschio sopra. Ombra
+        di contatto a terra. Per lo piu' orizzontale (a volte verticale)."""
+        ang = rng.uniform(-0.5, 0.5) + (math.pi / 2 if rng.random() < 0.28 else 0.0)
+        ts = self.tile_size
+        L = rng.randint(int(1.0 * ts), int(1.4 * ts))
+        Wd = rng.randint(4, 6)
+        ca, sa = math.cos(ang), math.sin(ang)
+        x0 = x - ca * L / 2; y0 = y - sa * L / 2
+        x1 = x + ca * L / 2; y1 = y + sa * L / 2
+        px, py = -sa, ca                              # perpendicolare (+ = verso il basso)
+
+        def off(ex, ey, d):
+            return (int(ex + px * d), int(ey + py * d))
+
+        def quad(d0, d1):
+            return [off(x0, y0, d0), off(x1, y1, d0), off(x1, y1, d1), off(x0, y0, d1)]
+        pygame.draw.polygon(deco, (0, 0, 0, 55), quad(Wd * 0.2, Wd + 2))   # ombra a terra
+        pygame.draw.polygon(deco, (*LOG_MD, 255), quad(-Wd, Wd))           # corpo
+        for ex, ey in ((x0, y0), (x1, y1)):                                # estremi tondi
+            pygame.draw.circle(deco, (*LOG_MD, 255), (int(ex), int(ey)), Wd)
+        pygame.draw.polygon(deco, (*LOG_DK, 255), quad(Wd * 0.35, Wd))     # fondo in ombra
+        pygame.draw.polygon(deco, (*LOG_HI, 255), quad(-Wd, -Wd * 0.35))   # cima illuminata
+        pygame.draw.circle(deco, (*LOG_RING_D, 255), (int(x0), int(y0)), Wd)   # anelli (estremo chiaro)
+        pygame.draw.circle(deco, (*LOG_RING, 255), (int(x0), int(y0)), max(1, Wd - 2))
+        self._safe_px(deco, x0, y0, (*LOG_RING_D, 255))
+        for _ in range(rng.randint(2, 5)):            # muschio sulla cima
+            tt = rng.random()
+            mxp = x0 + (x1 - x0) * tt; myp = y0 + (y1 - y0) * tt
+            mo = off(mxp, myp, -rng.uniform(0.0, Wd * 0.6))
+            self._safe_px(deco, mo[0], mo[1], (*LOG_MOSS, 255))
 
     def _grass_tuft(self, tier, variant):
         """Sprite (cache) di un CIUFFO corto: 2-3 lame a punta col contorno scuro,

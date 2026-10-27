@@ -349,6 +349,32 @@ Passaggi completati:
   Screenshot: step_17.png (sintetico ravvicinato), step_17_3v3.png/step_17_5v5.png
   (zone reali), step_17_3v3_over.png/step_17_5v5_over.png (minimappe),
   step_17_foam0.png/step_17_foam1.png (due fotogrammi della schiuma).
+- SOTTOBOSCO: decorazioni sparse sul layer ground_decor (step_18). Nuovo
+  game/map_renderer.py _build_decor + helper (_pick_decor/_draw_decor/_deco_leaf/
+  _deco_rock/_deco_fern/_deco_mushroom/_deco_root/_deco_log/_safe_px); palette
+  dedicata (LEAF_*, DROCK_*, FERN_*, MUSH_*, ROOT_*, LOG_*). Oggetti SENZA
+  collisione (solo cosmetici): foglie secche, sassi di terra, felci, funghi,
+  radici affioranti e tronchi caduti. (1) DENSITA' modulata dalla distanza dalle
+  SILHOUETTE di muri+cespugli (campo distanza low-res _dist_lo -> smoothstep):
+  spaziatura PICCOLA a ridosso dei muri (sottobosco fitto al margine), GRANDE in
+  campo aperto; ZERO su lane e sentieri (maschera dai TILE_FLOOR meno path_tiles)
+  e mai dentro la sagoma di muri/cespugli (che sborda ~mezzo tile). (2) POISSON-
+  DISC a raggio variabile: griglia jitterata visitata in ordine casuale +
+  rifiuto per vicinanza (hash spaziale a celle r_far, controllo 3x3; raggio =
+  max(sp_candidato, sp_vicino)) -> distribuzione blue-noise, niente
+  sovrapposizioni ne pattern. I TRONCHI riservano piu' spazio (sp>=1.3 tile).
+  (3) MIX per contesto (_pick_decor): vicino ai muri piu' radici/felci/funghi/
+  tronchi; in aperto soprattutto foglie e sassi. (4) Sprite pixel-art con luce
+  alto-sinistra: felce = ventaglio di fronde con pinnule e punta chiara; fungo =
+  gambo chiaro + cappello a cupola (rosso o bruno) con riflesso; tronco = capsula
+  di corteccia con cima illuminata, fondo in ombra, anelli e muschio + ombra di
+  contatto; sasso = Renderer._round_rock; radice = bastoncino nodoso serpeggiante;
+  foglia = rombo bruno col contorno scuro e nervatura. Disegnate su una Surface a
+  piena mappa, poi blit LAZY per chunk (solo i blocchi non vuoti). Nessuna memoria
+  extra apprezzabile; costo build una-tantum ~qualche secondo (loop Poisson).
+  Attivo su ENTRAMBE le mappe. Screenshot: screenshots/step_18.png (ravvicinato
+  erba+muro) e step_18_over.png (minimappa 3v3); step_18_5v5.png/
+  step_18_5v5_over.png (5v5).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul
