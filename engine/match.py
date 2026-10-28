@@ -106,6 +106,7 @@ class Match:
                 tw = self.world.spawn_tower(pos, team, s.get("lane", "mid"), tier,
                                             hp=hp, attack_damage=config.TOWER_DAMAGE)
                 setattr(tw, "color", config.TEAM_COLORS[team])
+                setattr(tw, "plates_left", config.PLATE_COUNT)   # placche (punto 6)
 
     def oriented_lane(self, lane_name: str, team: int) -> list[Vec2]:
         """Waypoint della lane dalla propria base a quella nemica."""
@@ -139,6 +140,7 @@ class Match:
         self._update_status(dt)      # scadenza stati + velocità effettiva + ricariche
         self.world.tick(dt)          # movimento + collisioni
         self._update_regen(dt)
+        self._update_plates(dt)      # placche delle torri (oro ai vicini)
         self._update_gold(dt)
         self._update_bot_shop(dt)
         self._update_respawns(dt)
@@ -995,12 +997,69 @@ class Match:
         elif isinstance(victim, Pokemon):
             self._award_kill(victim, killer)
         elif isinstance(victim, Structure):
-            if isinstance(killer, Pokemon):
-                killer.gold += config.GOLD_TOWER
+            self._award_structure(victim, killer)
+
+    def _award_structure(self, victim, killer) -> None:
+        """Torre: 150 oro a tutta la squadra che l'ha distrutta, +100 a chi era
+        vicino. Il nucleo non dà oro. Le placche residue (entro i 14 min) cadono
+        alla distruzione, divise tra i vicini."""
+        if isinstance(victim, Core):
+            return
+        team = 1 - victim.team   # la torre muore solo per mano della squadra avversaria
+        for p in self.world.pokemons():
+            if p.team != team:
+                continue
+            p.gold += config.TOWER_GOLD_TEAM
+            if p.alive and p.pos.dist(victim.pos) <= config.OBJECTIVE_NEAR_RADIUS:
+                p.gold += config.TOWER_GOLD_LOCAL
+        # Placche ancora in piedi (burst che salta le soglie): cadono tutte ora.
+        left = getattr(victim, "plates_left", 0)
+        if left > 0 and self.time < config.PLATE_WINDOW:
+            self._award_plates(victim, left)
+            victim.plates_left = 0
+
+    def _award_plates(self, tower, n: int) -> None:
+        """Assegna `n` placche (120 oro l'una) divise tra i nemici vicini."""
+        team = 1 - tower.team
+        near = [p for p in self.world.pokemons()
+                if p.team == team and p.alive
+                and p.pos.dist(tower.pos) <= config.OBJECTIVE_NEAR_RADIUS]
+        if not near:
+            return                      # nessuno vicino: oro perso
+        share = config.PLATE_GOLD * n / len(near)
+        for p in near:
+            p.gold += share
+
+    def _update_plates(self, dt: float) -> None:
+        """Le placche cadono man mano che la torre perde vita, nei primi 14 min.
+        Una placca cade quando l'HP scende sotto max_hp × placche/(PLATE_COUNT+1)."""
+        if self.time >= config.PLATE_WINDOW:
+            return
+        step = config.PLATE_COUNT + 1
+        for s in self.world.structures():
+            if isinstance(s, Core) or not s.alive:
+                continue
+            left = getattr(s, "plates_left", 0)
+            if left <= 0 or s.max_hp <= 0:
+                continue
+            # Fa cadere tutte le placche le cui soglie sono state superate.
+            while left > 0 and s.hp <= s.max_hp * left / step:
+                self._award_plates(s, 1)
+                left -= 1
+            s.plates_left = left
 
     def _avg_player_gold(self) -> float:
         gs = [p.gold for p in self.world.pokemons()]
         return sum(gs) / len(gs) if gs else 0.0
+
+    def _team_total_gold(self, team: int) -> float:
+        return sum(p.gold for p in self.world.pokemons() if p.team == team)
+
+    def _comeback_mult(self, team: int) -> float:
+        """Taglie di recupero: gli obiettivi neutrali danno il doppio alla
+        squadra indietro di oltre 3000 oro."""
+        behind = self._team_total_gold(1 - team) - self._team_total_gold(team)
+        return 2.0 if behind > config.COMEBACK_THRESHOLD else 1.0
 
     def _victim_bounty(self, victim) -> float:
         """Taglia per aver ucciso `victim`: base 300, su con la serie di

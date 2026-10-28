@@ -224,11 +224,14 @@ class JungleSystem:
     def on_wild_death(self, victim, killer):
         # Ricompensa: oro all'ultimo colpo, XP alla squadra del killer vicina.
         if isinstance(killer, Pokemon):
-            # I campi danno +2% di oro per ogni livello medio dei giocatori.
-            gold = victim.reward_gold
+            # Oro al last-hit SOLO per i campi: +2% per livello medio dei
+            # giocatori, raddoppiato dalla taglia di recupero se la squadra è
+            # indietro. I leggendari danno oro di squadra (sotto).
             if victim.kind == "camp":
+                gold = victim.reward_gold
                 gold *= 1.0 + config.CAMP_GOLD_PER_LEVEL * self.m._avg_player_level()
-            killer.gold += gold
+                gold *= self.m._comeback_mult(killer.team)
+                killer.gold += gold
             # I campi danno +3% XP per ogni livello medio dei giocatori; chi e' 2+
             # livelli sotto la media prende il bonus recupero (+15%).
             lvl_mult = (1.0 + 0.03 * self.m._avg_player_level()
@@ -247,17 +250,21 @@ class JungleSystem:
             self._pending_weather = random.choice([w for w in WEATHERS if w != victim.weather])
             self.set_weather(victim.weather)
             if isinstance(killer, Pokemon):
+                mult = self.m._comeback_mult(killer.team)
                 for p in self.world.pokemons():
-                    if p.alive and p.team == killer.team:
-                        p.gold += 120   # piccolo bonus di squadra (placeholder del buff permanente)
+                    if p.team == killer.team:
+                        p.gold += config.LEGENDARY_TEAM_GOLD * mult   # oro di squadra
         elif victim.kind == "arceus":
             self._arceus = None
             self._next_arceus = self.m.time + config.ARCEUS_RESPAWN
             if isinstance(killer, Pokemon):
+                mult = self.m._comeback_mult(killer.team)
                 for p in self.world.pokemons():
-                    if p.alive and p.team == killer.team:
-                        p.judgment_until = self.m.time + config.JUDGMENT_DURATION
-                        p.judgment_plate = victim.plate
+                    if p.team == killer.team:
+                        p.gold += config.LEGENDARY_TEAM_GOLD * mult   # oro di squadra
+                        if p.alive:
+                            p.judgment_until = self.m.time + config.JUDGMENT_DURATION
+                            p.judgment_plate = victim.plate
                 self.announcements.append((self.m.time,
                                            f"Giudizio ({victim.plate}) per la squadra {killer.team}!"))
         elif victim.kind == "camp":
