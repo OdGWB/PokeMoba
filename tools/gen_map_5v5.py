@@ -10,12 +10,24 @@ from __future__ import annotations
 
 import json
 import math
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "data" / "maps" / "map_5v5.json"
 
 N = 150
+
+
+def _refuse_overwrite(path):
+    """Protezione: se la mappa esiste gia' (editata a mano), NON la sovrascrive.
+    Per rigenerare davvero da zero (perdendo le modifiche manuali): --force."""
+    if path.exists() and "--force" not in sys.argv:
+        print(f"!! {path} esiste gia' (probabile mappa editata a mano).")
+        print("   NON la sovrascrivo per non cancellare le modifiche manuali.")
+        print("   Per rigenerare DAVVERO da zero: python tools/gen_map_5v5.py --force")
+        return True
+    return False
 FLOOR, WALL, LANE, RIVER, BUSH, JWALL, PUDDLE = 0, 1, 2, 3, 4, 5, 6
 
 BASE0 = (18, 132)
@@ -265,6 +277,8 @@ def build():
         "spawns": {"team0": list(BASE0), "team1": list(BASE1)},
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
+    if _refuse_overwrite(OUT):
+        return
     OUT.write_text(json.dumps(data), encoding="utf-8")
     print(f"Scritta {OUT}  ({N}x{N}, {len(structures)} strutture, {len(camps)} campi)")
 
