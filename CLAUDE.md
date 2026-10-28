@@ -413,6 +413,27 @@ Passaggi completati:
   meteo (_sync_terrain): le particelle leggono grid.tiles live e nascono solo
   su TILE_FLOOR/TILE_BUSH, quindi seguono il terreno aggiornato. Nessun costo di
   memoria extra sul percorso di rete (sprite pre-renderizzati, <=60 particelle).
+- LEGGIBILITA' COMBATTIMENTO (step_21): gittata delle torri nemiche + proiettili
+  dei minion a distanza + sfera d'energia delle torri (stile LoL), tutto COSMETICO.
+  (1) GITTATA TORRI: game/renderer.py _TOWER_RANGE_DEFAULT + Renderer.draw_tower_ranges
+  disegna attorno a OGNI torre nemica viva un cerchio di pericolo (decalco rosso
+  translucido + anello rosso pulsante, sin su `now`); appare solo quando il
+  giocatore e' vicino al bordo della gittata (near=6 tile, da player_pos) per non
+  intasare lo schermo, cosi "sai dove fermarti". Chiamato da match_scene.draw e
+  net_match_scene.draw dopo renderer.draw (sopra la mappa). In rete le Structure
+  non portano attack_range -> fallback 6.5 tile. (2) EVENTI FX (engine/match.py
+  _try_attack): oltre al colpo dei Pokemon, ora emette anche "tower_shot" (torre,
+  con team) e "minion_shot" (solo minion caster/cannone, con team e `big` per il
+  cannone); i melee NON sparano. Sono eventi COSMETICI (lista fx_events, il danno
+  resta istantaneo come prima: nessun cambto di logica). (3) DISEGNO (game/fx.py):
+  MINION_SHOT_COLORS/TOWER_SHOT_COLORS colorano per SQUADRA (blu=0, rosso=1, non
+  per tipo); _minion_shot = pallino "orb" piccolo (0.15) o piu' grosso per il
+  cannone (0.22); _tower_shot = sfera "orb" grande (0.5) e luminosa + impatto.
+  Riusano la forma orb esistente (alone + nucleo chiaro) che viaggia da A a B.
+  NOTA: la scena di rete non trasmette ancora gli fx_events, quindi li' si vede
+  la gittata delle torri ma non (per ora) i proiettili. Screenshot:
+  screenshots/step_21.png (vista), step_21_zoom.png (ravvicinato: sfera torre +
+  pallini blu/rossi + anello gittata) e step_21_over.png (mappa).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

@@ -30,6 +30,11 @@ TYPE_COLORS = {
 MAX_PARTICLES = 1200
 MAX_SHAPES = 120
 
+# Colori dei proiettili per SQUADRA (non per tipo): blu = squadra 0, rosso = 1.
+# Usati dai pallini dei minion a distanza e dalla sfera d'energia delle torri.
+MINION_SHOT_COLORS = {0: (90, 170, 255), 1: (255, 110, 95)}
+TOWER_SHOT_COLORS = {0: (120, 205, 255), 1: (255, 135, 70)}
+
 # Stile d'attacco di default per ciascun tipo: usato per i colpi da tiro quando la
 # mossa non dichiara un "fx" esplicito. Un "fx" sulla mossa (o "attack_fx" sul
 # Pokémon) ha sempre la precedenza. Gli stili sono definiti in FXSystem._FX_STYLES.
@@ -128,6 +133,34 @@ class FXSystem:
             elif kind == "buff":
                 self._shape(kind="ring", c=e["c"], r0=1.4, r1=0.3, col=col, life=0.5, wd=0.2)
                 self._rise(e["c"], col)
+            elif kind == "minion_shot":
+                self._minion_shot(e)
+            elif kind == "tower_shot":
+                self._tower_shot(e)
+
+    def _minion_shot(self, e) -> None:
+        """Pallino d'energia dei minion a distanza: piccolo (caster) o un po' piu
+        grosso (cannone), blu o rosso per squadra, che vola verso il bersaglio."""
+        seg = self._ab(e)
+        if seg is None:
+            return
+        ax, ay, bx, by = seg
+        col = MINION_SHOT_COLORS.get(e.get("team", 0), (230, 230, 230))
+        big = e.get("big", False)
+        self._shape(kind="orb", a=(ax, ay), b=(bx, by), col=col,
+                    life=0.26, sz=0.22 if big else 0.15)
+        self._splash((bx, by), 0.25 if big else 0.18, col, n=5 if big else 3)
+
+    def _tower_shot(self, e) -> None:
+        """Sfera d'energia della torre (stile LoL): proiettile piu grande e
+        luminoso, colorato per squadra, con un piccolo impatto sul bersaglio."""
+        seg = self._ab(e)
+        if seg is None:
+            return
+        ax, ay, bx, by = seg
+        col = TOWER_SHOT_COLORS.get(e.get("team", 0), (230, 230, 230))
+        self._shape(kind="orb", a=(ax, ay), b=(bx, by), col=col, life=0.34, sz=0.5)
+        self._splash((bx, by), 0.6, col, n=10)
 
     # --- libreria stili d'attacco (ricolorabili) ----------------------------
     # Ogni stile è un metodo (self, evento, colore) che traduce un evento della

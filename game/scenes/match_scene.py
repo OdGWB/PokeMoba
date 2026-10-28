@@ -342,6 +342,11 @@ class MatchScene:
                            dens=self.map_data.dens or None, respawning=respawning,
                            vision=self.vision, player_team=self.player.team,
                            now=self.match.time if self.match else 1e9)
+        # Gittata delle torri nemiche: cerchio di pericolo quando ti avvicini.
+        if self.match is not None:
+            self.renderer.draw_tower_ranges(surface, self.camera, self.world,
+                                             self.player.team, now=self.match.time,
+                                             player_pos=self.player.pos, near=6.0)
         # Particelle d'atmosfera della giungla (ambientali, sopra mappa e unita,
         # sotto gli effetti delle mosse e la UI).
         self.particles.draw(surface, self.camera)

@@ -639,6 +639,21 @@ class Match:
                                    "b": (target.pos.x, target.pos.y), "mtype": mt,
                                    "melee": attacker.attack_range <= 2.2,
                                    "fx": attacker.attack_fx})
+        elif isinstance(attacker, Structure) and attacker.kind == "tower":
+            # Sfera d'energia della torre (cosmetica): vola verso il bersaglio,
+            # colorata per squadra (stile LoL), cosi si vede quando la torre spara.
+            self.fx_events.append({"kind": "tower_shot",
+                                   "a": (attacker.pos.x, attacker.pos.y),
+                                   "b": (target.pos.x, target.pos.y),
+                                   "team": attacker.team})
+        elif isinstance(attacker, Minion) and attacker.minion_type in ("caster", "cannon"):
+            # Proiettile dei minion a distanza (caster/cannone): pallino blu/rosso
+            # per squadra, cosi si vede quando colpiscono. I melee non sparano.
+            self.fx_events.append({"kind": "minion_shot",
+                                   "a": (attacker.pos.x, attacker.pos.y),
+                                   "b": (target.pos.x, target.pos.y),
+                                   "team": attacker.team,
+                                   "big": attacker.minion_type == "cannon"})
         dmg = self._basic_damage(attacker, target)
         self._deal_damage(attacker, target, dmg)
         self._vamp(attacker, dmg, physical=True)

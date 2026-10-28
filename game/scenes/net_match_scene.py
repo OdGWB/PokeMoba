@@ -261,6 +261,10 @@ class NetMatchScene:
                            selected_id=me.id if me else None,
                            dens=self.map_data.dens or None,
                            vision=self.vision, player_team=self.team)
+        # Gittata delle torri nemiche: cerchio di pericolo quando ti avvicini.
+        self.renderer.draw_tower_ranges(surface, self.camera, self.world, self.team,
+                                        now=self.world.match_time,
+                                        player_pos=me.pos if me else None, near=6.0)
         # Particelle d'atmosfera della giungla (sopra mappa e unita, sotto la UI).
         self.particles.draw(surface, self.camera)
         if self.aiming_slot is not None and me is not None:

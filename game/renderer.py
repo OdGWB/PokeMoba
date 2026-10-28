@@ -20,6 +20,7 @@ from .map_renderer import MapRenderer
 
 # Palette greybox (sostituita dai tileset in futuro).
 COL_BG = (18, 20, 24)
+_TOWER_RANGE_DEFAULT = 6.5   # tile: gittata torre (fallback quando non nota, es. in rete)
 TILE_COLORS = {
     0: (58, 92, 62),     # erba / giungla
     TILE_LANE: (150, 134, 92),    # strada
@@ -545,6 +546,47 @@ class Renderer:
             col = DEN_COLORS.get(name, (220, 220, 220))
             pygame.draw.circle(surface, col, (sx, sy), ts, 2)
             pygame.draw.circle(surface, col, (sx, sy), 3)
+
+    # --- gittata delle torri nemiche -----------------------------------------
+    def draw_tower_ranges(self, surface, camera, world, player_team, now=0.0,
+                          player_pos=None, near=None):
+        """Cerchio di pericolo attorno alle torri NEMICHE vive (stile LoL): mostra
+        fin dove la torre spara, cosi sai dove fermarti. Con `near` appare solo
+        quando il giocatore (player_pos) si avvicina a meno di `near` tile oltre il
+        bordo della gittata, per non intasare lo schermo.
+
+        Decalco a terra translucido (rosso pericolo) + anello pulsante: cosmetico,
+        disegnato sopra la mappa. `near` None = sempre visibile.
+        """
+        ts = self.tile_size
+        W, H = surface.get_size()
+        overlay = None
+        pulse = 0.5 + 0.5 * math.sin(now * 3.0)
+        edge_a = int(70 + 60 * pulse)
+        danger = (230, 70, 60)
+        for s in world.structures():
+            if (getattr(s, "kind", None) != "tower" or not getattr(s, "alive", False)
+                    or s.team == player_team):
+                continue
+            # In rete le strutture non portano attack_range: usa il default della torre.
+            rng = s.attack_range or _TOWER_RANGE_DEFAULT
+            cx, cy = camera.world_to_screen(s.pos.x * ts, s.pos.y * ts)
+            r = int(rng * ts)
+            if cx + r < 0 or cx - r > W or cy + r < 0 or cy - r > H:
+                continue   # fuori schermo
+            if near is not None and player_pos is not None:
+                # mostra solo se il giocatore e' vicino al bordo della gittata
+                if player_pos.dist(s.pos) - rng > near:
+                    continue
+            if overlay is None:
+                overlay = pygame.Surface((W, H), pygame.SRCALPHA)
+            pygame.draw.circle(overlay, (*danger, 26), (cx, cy), r)
+            pygame.draw.circle(overlay, (*danger, edge_a), (cx, cy), r, 2)
+            # breve tratteggio interno per leggibilita' del bordo
+            pygame.draw.circle(overlay, (255, 180, 160, edge_a // 2), (cx, cy),
+                               max(1, r - 3), 1)
+        if overlay is not None:
+            surface.blit(overlay, (0, 0))
 
     # --- percorso di debug ---------------------------------------------------
     def draw_aim(self, surface, camera, origin, mouse_tile, move):
