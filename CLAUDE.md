@@ -415,25 +415,29 @@ Passaggi completati:
   memoria extra sul percorso di rete (sprite pre-renderizzati, <=60 particelle).
 - LEGGIBILITA' COMBATTIMENTO (step_21): gittata delle torri nemiche + proiettili
   dei minion a distanza + sfera d'energia delle torri (stile LoL), tutto COSMETICO.
-  (1) GITTATA TORRI: game/renderer.py _TOWER_RANGE_DEFAULT + Renderer.draw_tower_ranges
-  disegna attorno a OGNI torre nemica viva un cerchio di pericolo (decalco rosso
-  translucido + anello rosso pulsante, sin su `now`); appare solo quando il
-  giocatore e' vicino al bordo della gittata (near=6 tile, da player_pos) per non
-  intasare lo schermo, cosi "sai dove fermarti". Chiamato da match_scene.draw e
-  net_match_scene.draw dopo renderer.draw (sopra la mappa). In rete le Structure
-  non portano attack_range -> fallback 6.5 tile. (2) EVENTI FX (engine/match.py
-  _try_attack): oltre al colpo dei Pokemon, ora emette anche "tower_shot" (torre,
-  con team) e "minion_shot" (solo minion caster/cannone, con team e `big` per il
-  cannone); i melee NON sparano. Sono eventi COSMETICI (lista fx_events, il danno
-  resta istantaneo come prima: nessun cambto di logica). (3) DISEGNO (game/fx.py):
-  MINION_SHOT_COLORS/TOWER_SHOT_COLORS colorano per SQUADRA (blu=0, rosso=1, non
-  per tipo); _minion_shot = pallino "orb" piccolo (0.15) o piu' grosso per il
-  cannone (0.22); _tower_shot = sfera "orb" grande (0.5) e luminosa + impatto.
-  Riusano la forma orb esistente (alone + nucleo chiaro) che viaggia da A a B.
-  NOTA: la scena di rete non trasmette ancora gli fx_events, quindi li' si vede
-  la gittata delle torri ma non (per ora) i proiettili. Screenshot:
-  screenshots/step_21.png (vista), step_21_zoom.png (ravvicinato: sfera torre +
-  pallini blu/rossi + anello gittata) e step_21_over.png (mappa).
+  GITTATA definita in "unit" stile LoL: config.TOWER_RANGE = TOWER_RANGE_UNITS(750)
+  / UNITS_PER_TILE(125) = 6.0 tile. La passa match._build_structures a spawn_tower
+  (default world.spawn_tower allineato a 6.0); renderer _TOWER_RANGE_DEFAULT =
+  config.TOWER_RANGE (fallback in rete, dove le Structure non portano attack_range).
+  (1) GITTATA TORRI: Renderer.draw_tower_ranges disegna attorno a OGNI torre nemica
+  viva un cerchio di pericolo (decalco rosso translucido + anello rosso pulsante,
+  sin su `now`); appare solo quando il giocatore e' vicino al bordo (near=6 tile, da
+  player_pos), cosi "sai dove fermarti". Chiamato da match_scene.draw e
+  net_match_scene.draw dopo renderer.draw (sopra la mappa). (2) EVENTI FX
+  (engine/match.py _try_attack): oltre al colpo dei Pokemon, emette anche
+  "tower_shot" (torre, con team) e "minion_shot" (solo minion caster/cannone, con
+  team e `big` per il cannone); i melee NON sparano. Eventi COSMETICI (lista
+  fx_events, il danno resta istantaneo: nessun cambio di logica). (3) DISEGNO
+  (game/fx.py): MINION_SHOT_COLORS/TOWER_SHOT_COLORS colorano per SQUADRA (blu=0,
+  rosso=1, non per tipo). Nuova forma "shot" in _draw_shapes: proiettile OPACO e
+  netto (sfera piena alfa 255 + contorno scuro _darken + luce in alto-sinistra),
+  SENZA particelle/scia; dissolve solo nell'ultimo 22% di vita. _minion_shot = shot
+  piccolo (0.18) o piu' grosso per il cannone (0.26); _tower_shot = shot MOLTO piu'
+  grande (0.8) con alone luminoso (glow 0.7). NOTA: la scena di rete non trasmette
+  ancora gli fx_events, quindi li' si vede la gittata delle torri ma non (per ora)
+  i proiettili. Screenshot: screenshots/step_21.png (vista), step_21_zoom.png
+  (ravvicinato: sfera torre grande + pallini opachi blu/rossi + anello gittata) e
+  step_21_over.png (mappa).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

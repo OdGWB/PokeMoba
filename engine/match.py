@@ -104,7 +104,8 @@ class Match:
                 tier = s.get("tier", 1)
                 hp = config.TOWER_HP_INNER if tier >= 2 else config.TOWER_HP_OUTER
                 tw = self.world.spawn_tower(pos, team, s.get("lane", "mid"), tier,
-                                            hp=hp, attack_damage=config.TOWER_DAMAGE)
+                                            hp=hp, attack_damage=config.TOWER_DAMAGE,
+                                            attack_range=config.TOWER_RANGE)
                 setattr(tw, "color", config.TEAM_COLORS[team])
                 setattr(tw, "plates_left", config.PLATE_COUNT)   # placche (punto 6)
 

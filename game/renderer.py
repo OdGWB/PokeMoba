@@ -20,7 +20,7 @@ from .map_renderer import MapRenderer
 
 # Palette greybox (sostituita dai tileset in futuro).
 COL_BG = (18, 20, 24)
-_TOWER_RANGE_DEFAULT = 6.5   # tile: gittata torre (fallback quando non nota, es. in rete)
+_TOWER_RANGE_DEFAULT = config.TOWER_RANGE   # tile: fallback gittata (es. in rete)
 TILE_COLORS = {
     0: (58, 92, 62),     # erba / giungla
     TILE_LANE: (150, 134, 92),    # strada

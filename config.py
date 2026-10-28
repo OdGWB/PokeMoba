@@ -155,6 +155,10 @@ CORE_EXPOSE_TOWERS_LEFT = 0
 TOWER_HP_OUTER = 2900       # torre esterna (tier 1)
 TOWER_HP_INNER = 3900       # torre interna (tier 2), più vicina al nucleo
 TOWER_DAMAGE = 110
+# Gittata delle torri, definita in "unit" stile LoL (750) con 1 tile = 125 unit.
+UNITS_PER_TILE = 125
+TOWER_RANGE_UNITS = 750
+TOWER_RANGE = TOWER_RANGE_UNITS / UNITS_PER_TILE   # = 6.0 tile
 CORE_HP = 9500
 # I minion grattano le strutture (pressione lenta) ma cresce col tempo.
 STRUCT_MINION_DMG_MULT = 0.5

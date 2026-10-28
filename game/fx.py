@@ -57,6 +57,10 @@ def _lighten(c, f=0.55):
             int(c[2] + (255 - c[2]) * f))
 
 
+def _darken(c, f=0.5):
+    return (int(c[0] * (1 - f)), int(c[1] * (1 - f)), int(c[2] * (1 - f)))
+
+
 class FXSystem:
     def __init__(self):
         self.particles: list[list] = []  # [x, y, vx, vy, life, maxlife, (r,g,b), size]
@@ -140,27 +144,27 @@ class FXSystem:
 
     def _minion_shot(self, e) -> None:
         """Pallino d'energia dei minion a distanza: piccolo (caster) o un po' piu
-        grosso (cannone), blu o rosso per squadra, che vola verso il bersaglio."""
+        grosso (cannone), blu o rosso per squadra, che vola verso il bersaglio.
+        Pallino OPACO e netto (niente particelle che lo seguono)."""
         seg = self._ab(e)
         if seg is None:
             return
         ax, ay, bx, by = seg
         col = MINION_SHOT_COLORS.get(e.get("team", 0), (230, 230, 230))
         big = e.get("big", False)
-        self._shape(kind="orb", a=(ax, ay), b=(bx, by), col=col,
-                    life=0.26, sz=0.22 if big else 0.15)
-        self._splash((bx, by), 0.25 if big else 0.18, col, n=5 if big else 3)
+        self._shape(kind="shot", a=(ax, ay), b=(bx, by), col=col,
+                    life=0.26, sz=0.26 if big else 0.18, glow=0.0)
 
     def _tower_shot(self, e) -> None:
-        """Sfera d'energia della torre (stile LoL): proiettile piu grande e
-        luminoso, colorato per squadra, con un piccolo impatto sul bersaglio."""
+        """Sfera d'energia della torre (stile LoL): proiettile OPACO molto piu
+        grande, colorato per squadra, con un alone luminoso. Niente particelle."""
         seg = self._ab(e)
         if seg is None:
             return
         ax, ay, bx, by = seg
         col = TOWER_SHOT_COLORS.get(e.get("team", 0), (230, 230, 230))
-        self._shape(kind="orb", a=(ax, ay), b=(bx, by), col=col, life=0.34, sz=0.5)
-        self._splash((bx, by), 0.6, col, n=10)
+        self._shape(kind="shot", a=(ax, ay), b=(bx, by), col=col,
+                    life=0.36, sz=0.8, glow=0.7)
 
     # --- libreria stili d'attacco (ricolorabili) ----------------------------
     # Ogni stile è un metodo (self, evento, colore) che traduce un evento della
@@ -509,6 +513,28 @@ class FXSystem:
                            (cx - px * r * 0.8, cy - py * r * 0.8)]
                     pygame.draw.polygon(overlay, (*lite, a), pts)
                     pygame.draw.polygon(overlay, (*col, a), pts, 2)
+            elif kind == "shot":
+                # Proiettile OPACO (minion/torre): sfera piena netta che avanza
+                # da A a B. Niente scia di particelle; dissolve solo a fine volo.
+                ax, ay = S(*s["a"])
+                bx, by = S(*s["b"])
+                t = 1 - f
+                cx = int(ax + (bx - ax) * t)
+                cy = int(ay + (by - ay) * t)
+                r = max(2, int(s.get("sz", 0.2) * ts))
+                aa = 255 if f > 0.22 else int(255 * max(0.0, f / 0.22))
+                glow = s.get("glow", 0.0)
+                if glow > 0.0:
+                    pygame.draw.circle(overlay, (*col, int(aa * 0.35 * glow)),
+                                       (cx, cy), int(r * 1.8))
+                    pygame.draw.circle(overlay, (*col, int(aa * 0.45 * glow)),
+                                       (cx, cy), int(r * 1.35))
+                pygame.draw.circle(overlay, (*_darken(col, 0.45), aa), (cx, cy), r)
+                pygame.draw.circle(overlay, (*col, aa), (cx, cy), max(1, r - max(1, r // 5)))
+                # luce in alto-sinistra (coerente con l'illuminazione del gioco)
+                hr = max(1, r // 2)
+                pygame.draw.circle(overlay, (*_lighten(col, 0.6), aa),
+                                   (cx - r // 3, cy - r // 3), hr)
             elif kind == "bolt":
                 # saetta: polilinea spezzata da A a B (istantanea)
                 ax, ay = S(*s["a"])

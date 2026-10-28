@@ -88,7 +88,7 @@ class World:
 
     def spawn_tower(self, pos: Vec2, team: int, lane: str, tier: int,
                     hp: float = 2600.0, attack_damage: float = 80.0,
-                    attack_range: float = 6.5, attack_cooldown: float = 0.9) -> Structure:
+                    attack_range: float = 6.0, attack_cooldown: float = 0.9) -> Structure:
         t = Structure(pos=pos, team=team, kind="tower", lane=lane, tier=tier,
                       hp=hp, max_hp=hp, attack_damage=attack_damage,
                       attack_range=attack_range, attack_cooldown=attack_cooldown,
