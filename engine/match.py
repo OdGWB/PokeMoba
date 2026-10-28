@@ -74,6 +74,7 @@ class Match:
         self.map = map_data
         self.time = 0.0
         self.winner: int | None = None
+        self._first_blood_done = False   # prima uccisione della partita (punto 4)
         self.announcements: list[tuple[float, str]] = []  # (tempo, testo) per l'HUD
         self._wave_timer = config.FIRST_WAVE_TIME
         self._wave_number = 0
@@ -992,20 +993,83 @@ class Match:
             if isinstance(killer, Pokemon):
                 killer.gold += self._minion_gold(victim)
         elif isinstance(victim, Pokemon):
-            if isinstance(killer, Pokemon) and killer.team != victim.team:
-                killer.gold += config.GOLD_KILL_BASE + config.GOLD_KILL_PER_LEVEL * victim.level
-                self._add_soul(killer, config.SOUL_PER_KILL)   # Corpofunesto: uccisione
-            dmg = getattr(victim, "_damagers", {})
-            for aid, t in list(dmg.items()):
-                if self.time - t <= config.ASSIST_WINDOW and (killer is None or aid != killer.id):
-                    a = self.world.get(aid)
-                    if isinstance(a, Pokemon) and a.alive and a.team != victim.team:
-                        a.gold += config.GOLD_ASSIST
-                        self._add_soul(a, config.SOUL_PER_ASSIST)   # Corpofunesto: assist
-            setattr(victim, "_damagers", {})
+            self._award_kill(victim, killer)
         elif isinstance(victim, Structure):
             if isinstance(killer, Pokemon):
                 killer.gold += config.GOLD_TOWER
+
+    def _avg_player_gold(self) -> float:
+        gs = [p.gold for p in self.world.pokemons()]
+        return sum(gs) / len(gs) if gs else 0.0
+
+    def _victim_bounty(self, victim) -> float:
+        """Taglia per aver ucciso `victim`: base 300, su con la serie di
+        uccisioni (max 600), giù con la serie di morti (min 150)."""
+        bounty = float(config.KILL_BASE_BOUNTY)
+        if victim.kill_streak >= 2:          # era in serie di uccisioni
+            bounty *= 1.0 + config.KILL_STREAK_STEP * (victim.kill_streak - 1)
+            bounty = min(bounty, config.BOUNTY_MAX)
+        deaths = victim.death_streak + 1     # questa morte compresa
+        if deaths >= 2:                      # in serie di morti
+            bounty *= 1.0 - config.DEATH_STREAK_STEP * (deaths - 1)
+            bounty = max(bounty, config.BOUNTY_MIN)
+        return bounty
+
+    def _award_kill(self, victim, killer) -> None:
+        """Assegna oro per l'uccisione di un campione: taglia al killer (con
+        prima uccisione e taglia sul vantaggio) e 50% agli assistenti. Se a
+        uccidere è una torre/minion, la taglia va divisa tra gli assistenti;
+        se non ce ne sono, si perde. Poi aggiorna le serie."""
+        bounty = self._victim_bounty(victim)
+        killer_is_champ = isinstance(killer, Pokemon) and killer.team != victim.team
+        first_blood = not self._first_blood_done
+        if first_blood:
+            self._first_blood_done = True
+            self.announcements.append((self.time, "Prima uccisione!"))
+
+        # Assistenti: chi ha colpito la vittima negli ultimi ASSIST_WINDOW
+        # secondi (escluso il killer), vivo e della squadra avversaria.
+        dmg = getattr(victim, "_damagers", {})
+        assisters = []
+        for aid, t in list(dmg.items()):
+            if self.time - t > config.ASSIST_WINDOW:
+                continue
+            if killer is not None and aid == getattr(killer, "id", None):
+                continue
+            a = self.world.get(aid)
+            if isinstance(a, Pokemon) and a.alive and a.team != victim.team:
+                assisters.append(a)
+        setattr(victim, "_damagers", {})
+
+        fb_assist = config.FIRST_BLOOD_ASSIST if first_blood else 0
+        if killer_is_champ:
+            gain = bounty
+            if first_blood:
+                gain += config.FIRST_BLOOD_BONUS
+            avg = self._avg_player_gold()
+            if victim.gold > avg:            # taglia sul vantaggio (shutdown)
+                gain += min(config.SHUTDOWN_MAX,
+                            config.SHUTDOWN_FACTOR * (victim.gold - avg))
+            killer.gold += gain
+            self._add_soul(killer, config.SOUL_PER_KILL)
+            if assisters:                    # gli assistenti si dividono il 50%
+                share = bounty * config.ASSIST_SHARE / len(assisters)
+                for a in assisters:
+                    a.gold += share + fb_assist
+                    self._add_soul(a, config.SOUL_PER_ASSIST)
+        elif assisters:
+            # Uccisione da torre/minion: la taglia intera si divide tra gli assist.
+            share = bounty / len(assisters)
+            for a in assisters:
+                a.gold += share + fb_assist
+                self._add_soul(a, config.SOUL_PER_ASSIST)
+
+        # Aggiorna le serie (la vittima perde la sua serie di uccisioni).
+        victim.kill_streak = 0
+        victim.death_streak += 1
+        if killer_is_champ:
+            killer.kill_streak += 1
+            killer.death_streak = 0
 
     @staticmethod
     def _add_soul(p, n: int) -> None:

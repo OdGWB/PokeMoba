@@ -132,6 +132,8 @@ class Pokemon(Unit):
     passive_bonus: dict = field(default_factory=dict)   # {stat: valore} permanente (mosse)
     # Oro e oggetti (Fase 6)
     gold: float = 500.0
+    kill_streak: int = 0                # uccisioni consecutive (serie di uccisioni)
+    death_streak: int = 0               # morti consecutive (serie di morti)
     items: list = field(default_factory=list)           # id degli oggetti (max 6)
     item_bonus: dict = field(default_factory=dict)       # {stat: valore} dagli oggetti
     # Buff Giudizio di Arceus (Fase 7)
