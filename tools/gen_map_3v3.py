@@ -35,6 +35,10 @@ TOWER_FRACTIONS = {
     0: [("inner", 0.28, 2), ("outer", 0.44, 1)],
     1: [("inner", 0.72, 2), ("outer", 0.56, 1)],
 }
+# La lane MID e' corta: con l'outer a 0.44/0.56 (6.5 tile dal centro) la gittata
+# delle due torri (6.0 tile) copre quasi tutto il centro. Si tira l'outer di mid
+# un po' piu' indietro (9.2 tile dal centro -> ~6 tile di corridoio neutro aperto).
+MID_OUTER_FRAC = {0: 0.415, 1: 0.585}
 # Pozzi sul fiume: tana bassa = leggendario meteo; tana alta = Arceus.
 DENS = {"low": [62, 62], "high": [37, 37]}
 
@@ -326,6 +330,8 @@ def build():
         structures.append({"type": "core", "team": team, "pos": [base[0], base[1]]})
         for lane, poly in LANES.items():
             for name, frac, tier in TOWER_FRACTIONS[team]:
+                if lane == "mid" and name == "outer":
+                    frac = MID_OUTER_FRAC[team]   # outer di mid piu' indietro
                 px, py = point_at_fraction(poly, frac)
                 px, py = round(px, 1), round(py, 1)
                 stamp_disk(tiles, px, py, 3, LANE)

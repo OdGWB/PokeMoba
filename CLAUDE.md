@@ -438,6 +438,16 @@ Passaggi completati:
   i proiettili. Screenshot: screenshots/step_21.png (vista), step_21_zoom.png
   (ravvicinato: sfera torre grande + pallini opachi blu/rossi + anello gittata) e
   step_21_over.png (mappa).
+- TORRI OUTER DI MID piu' indietro (3v3), cosi il centro della lane mid non e'
+  coperto dalla gittata (step_22). Con range 6.0 tile gli outer di mid stavano a
+  ~6.5 tile dal centro -> le due gittate si toccavano quasi al centro. Spostati a
+  ~9.2 tile dal centro -> corridoio neutro aperto di ~6 tile. tools/gen_map_3v3.py:
+  nuovo MID_OUTER_FRAC = {0: 0.415, 1: 0.585} usato SOLO per lane mid + name outer
+  (top/bot restano a 0.44/0.56: erano gia' a ~9 tile dal rispettivo angolo).
+  data/maps/map_3v3.json rigenerato (solo le 2 torri outer di mid cambiano pos:
+  [45.4,54.6]->[43.5,56.5] e [54.6,45.4]->[56.5,43.5], entrambe su tile LANE).
+  Il 5v5 non serviva (lane piu' lunga: outer gia' a ~9.8 tile dal centro).
+  Screenshot: screenshots/step_22_mid.png (mid con le due gittate e il centro aperto).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul
