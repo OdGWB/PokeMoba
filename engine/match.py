@@ -970,6 +970,9 @@ class Match:
 
     # --- oro / negozio -------------------------------------------------------
     def _update_gold(self, dt: float) -> None:
+        # L'oro passivo matura solo a partire da 1:30 (vale per tutti).
+        if self.time < config.GOLD_PASSIVE_START:
+            return
         for p in self.world.pokemons():
             if p.alive:
                 p.gold += config.GOLD_PASSIVE_PER_SEC * dt

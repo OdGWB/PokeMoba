@@ -72,6 +72,7 @@ POKEMON_RESPAWN_TIME = 8.0  # respawn fisso in Fase 2 (cresce col livello in Fas
 # --- Oro e negozio (Fase 6) --------------------------------------------------
 STARTING_GOLD = 500
 GOLD_PASSIVE_PER_SEC = 3.0   # guadagno passivo nel tempo
+GOLD_PASSIVE_START = 90.0    # s: l'oro passivo inizia a 1:30 (come in LoL)
 GOLD_KILL_BASE = 120
 GOLD_KILL_PER_LEVEL = 15
 GOLD_ASSIST = 60
