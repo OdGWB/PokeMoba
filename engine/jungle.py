@@ -185,10 +185,11 @@ class JungleSystem:
                 hp = config.CAMP_HP * (config.CAMP_BIG_MULT if big else 1.0)
                 dmg = config.CAMP_DMG * (config.CAMP_BIG_MULT if big else 1.0)
                 rw = config.CAMP_BIG_REWARD_MULT if big else 1.0
+                gold = config.CAMP_GOLD_BIG if big else config.CAMP_GOLD_SMALL
                 col = (210, 180, 90) if big else (170, 160, 120)
                 rad = 0.95 if big else 0.7
                 w = self.world.spawn_wild(camp["pos"], "camp", hp, dmg, 1.6, 1.2,
-                                          config.CAMP_XP * rw, int(config.CAMP_GOLD * rw),
+                                          config.CAMP_XP * rw, gold,
                                           radius=rad, color=col)
                 camp["id"] = w.id
 
@@ -223,7 +224,11 @@ class JungleSystem:
     def on_wild_death(self, victim, killer):
         # Ricompensa: oro all'ultimo colpo, XP alla squadra del killer vicina.
         if isinstance(killer, Pokemon):
-            killer.gold += victim.reward_gold
+            # I campi danno +2% di oro per ogni livello medio dei giocatori.
+            gold = victim.reward_gold
+            if victim.kind == "camp":
+                gold *= 1.0 + config.CAMP_GOLD_PER_LEVEL * self.m._avg_player_level()
+            killer.gold += gold
             # I campi danno +3% XP per ogni livello medio dei giocatori; chi e' 2+
             # livelli sotto la media prende il bonus recupero (+15%).
             lvl_mult = (1.0 + 0.03 * self.m._avg_player_level()

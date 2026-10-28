@@ -92,7 +92,7 @@ WEATHER_RESPAWN = 300.0      # ricompare 5 min dopo (meteo diverso)
 ARCEUS_OPEN_3V3 = 900.0      # 15:00 - si apre la tana di Arceus (3v3)
 ARCEUS_OPEN_5V5 = 1200.0     # 20:00 - si apre la tana di Arceus (5v5)
 ARCEUS_RESPAWN = 360.0       # 6 min dopo la sconfitta
-CAMP_RESPAWN = 70.0          # ricrescita dei campi neutrali
+CAMP_RESPAWN = 120.0         # ricrescita dei campi neutrali (2 min)
 JUDGMENT_DURATION = 180.0    # buff Giudizio (3 min)
 
 LEGENDARY_HP = 4200
@@ -106,10 +106,12 @@ ARCEUS_GOLD = 420
 CAMP_HP = 900
 CAMP_DMG = 42
 CAMP_XP = 170               # campo piccolo (punto 9); un giro completo ~1160 XP
-CAMP_GOLD = 90
+CAMP_GOLD_SMALL = 70        # campo piccolo (×4)
+CAMP_GOLD_BIG = 90          # campo buff (×2)
+CAMP_GOLD_PER_LEVEL = 0.02  # +2% di oro per livello medio dei giocatori
 # Campi "grandi" (buff), più tosti e redditizi dei piccoli.
 CAMP_BIG_MULT = 1.8         # hp/danno dei campi grandi
-CAMP_BIG_REWARD_MULT = 240.0 / 170.0  # buff camp = 240 XP (xp); oro proporzionale
+CAMP_BIG_REWARD_MULT = 240.0 / 170.0  # buff camp = 240 XP (solo XP)
 # Passiva Corpofunesto (linea Gastly): cariche d'anima.
 SOUL_PER_KILL = 10
 SOUL_PER_ASSIST = 5
