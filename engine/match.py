@@ -25,8 +25,11 @@ from .items import ITEM_SLOTS, ItemCatalog
 from .jungle import JungleSystem
 from .pathfinding import find_path, smooth_path
 from .spatial import SpatialHash
-from .stats import (STAB_MULT, Stats, damage as stat_damage, derive,
-                    level_from_xp, respawn_time)
+from .stats import (CRIT_MULT, HIGH_CRIT_CHANCE, STAB_MULT, Stats,
+                    ability_haste_factor, combine_tenacity as stat_combine_ten,
+                    derive, evolution_mult as stat_evo_mult,
+                    level_from_xp, mitigate as stat_mitigate,
+                    penetrate as stat_penetrate, respawn_time)
 from .types import TypeChart
 from .vec import Vec2, direction_index
 from .vision import VisionSystem
@@ -40,7 +43,7 @@ MINION_STATS = {
     "melee":  dict(hp=170, attack_damage=12, attack_range=1.1, attack_cooldown=1.0,
                    speed=3.1, radius=0.28, gold=20, xp=60),
     "caster": dict(hp=90,  attack_damage=18, attack_range=3.4, attack_cooldown=1.3,
-                   speed=3.1, radius=0.24, gold=22, xp=55),
+                   speed=3.1, radius=0.24, gold=22, xp=30),
     "cannon": dict(hp=460, attack_damage=34, attack_range=3.0, attack_cooldown=1.6,
                    speed=2.9, radius=0.34, gold=50, xp=95),
 }
@@ -633,7 +636,9 @@ class Match:
                                    "b": (target.pos.x, target.pos.y), "mtype": mt,
                                    "melee": attacker.attack_range <= 2.2,
                                    "fx": attacker.attack_fx})
-        self._deal_damage(attacker, target, self._basic_damage(attacker, target))
+        dmg = self._basic_damage(attacker, target)
+        self._deal_damage(attacker, target, dmg)
+        self._vamp(attacker, dmg, physical=True)
 
     def _pokemon_auto_attack(self, u) -> None:
         """Auto-attacco con windup/recovery (stile LoL). Il danno è garantito solo
@@ -657,6 +662,7 @@ class Match:
                         u.stealth_shot_ready = False
                         u.reveal_block_until = self.time + config.DISTACCO_REVEAL_BLOCK
                     self._deal_damage(u, tgt, dmg)
+                    self._vamp(u, dmg, physical=True)
                     mt = u.types[0] if u.types else "Normal"
                     self.fx_events.append({"kind": "attack", "a": (u.pos.x, u.pos.y),
                                            "b": (tgt.pos.x, tgt.pos.y), "mtype": mt,
@@ -716,8 +722,45 @@ class Match:
                 # Giudizio: i minion della squadra buffata fanno doppio alle torri.
                 if isinstance(attacker, Minion) and self.jungle.team_has_judgment(attacker.team):
                     power *= 2.0
-        defense = target.eff_defense() if isinstance(target, Pokemon) else 0.0
-        return stat_damage(power, defense)
+        if isinstance(target, Pokemon):
+            # Gli auto-attacchi sono fisici e senza tipo (niente STAB/efficacia);
+            # possono fare critico e beneficiano di penetrazione armatura.
+            return self._mitigate_hit(attacker, target, power, magic=False,
+                                      can_crit=True)
+        return max(1.0, power)
+
+    def _mitigate_hit(self, caster, target, raw: float, *, magic: bool,
+                      crit_bonus: float = 0.0, can_crit: bool = False) -> float:
+        """Critico -> penetrazione difesa -> mitigazione -> riduzione fissa.
+
+        La penetrazione (percentuale poi fissa/letalita') non porta mai la difesa
+        sotto 0; la riduzione danni fissa del difensore agisce dopo la mitigazione.
+        """
+        if isinstance(caster, Pokemon):
+            chance = (caster.crit if can_crit else 0.0) + crit_bonus
+            if chance > 0.0 and random.random() < chance:
+                raw *= CRIT_MULT
+        if not isinstance(target, Pokemon):
+            return max(1.0, raw)
+        defense = target.eff_sp_defense() if magic else target.eff_defense()
+        if isinstance(caster, Pokemon):
+            if magic:
+                flat = caster.magic_pen_flat + (0.0 if caster.lethality_physical
+                                                else caster.lethality)
+                defense = stat_penetrate(defense, caster.magic_pen_pct, flat)
+            else:
+                flat = caster.lethality if caster.lethality_physical else 0.0
+                defense = stat_penetrate(defense, caster.armor_pen_pct, flat)
+        out = stat_mitigate(raw, defense) - target.flat_reduction
+        return max(1.0, out)
+
+    def _vamp(self, caster, dmg: float, physical: bool) -> None:
+        """Rubavita (solo fisico/auto) e omnivamp (ogni danno): cura = danno × %."""
+        if not isinstance(caster, Pokemon) or dmg <= 0.0 or not caster.alive:
+            return
+        frac = caster.omnivamp + (caster.lifesteal if physical else 0.0)
+        if frac > 0.0:
+            caster.hp = min(caster.max_hp, caster.hp + dmg * frac)
 
     @staticmethod
     def _tower_ramp(tower, target) -> float:
@@ -774,7 +817,7 @@ class Match:
         if isinstance(victim, Wild):
             self.jungle.on_wild_death(victim, killer)
             return
-        self._award_xp(victim)
+        self._award_xp(victim, killer)
         self._award_gold(victim, killer)
         if isinstance(victim, Pokemon):
             victim.stop()
@@ -801,17 +844,41 @@ class Match:
                 self.world.remove(e.id)
 
     # --- esperienza / livelli ------------------------------------------------
-    def _award_xp(self, victim) -> None:
+    # XP condivisa tra i presenti: 100% da solo, 65% a testa in due, 47% in tre+.
+    _XP_SHARE = {1: 1.0, 2: 0.65}
+
+    def _team_avg_level(self, team: int) -> float:
+        lv = [p.level for p in self.world.pokemons() if p.team == team]
+        return sum(lv) / len(lv) if lv else 1.0
+
+    def _avg_player_level(self) -> float:
+        lv = [p.level for p in self.world.pokemons()]
+        return sum(lv) / len(lv) if lv else 1.0
+
+    def _recovery_mult(self, p: Pokemon) -> float:
+        """Recupero: +15% XP da minion/giungla per chi e' 2+ livelli sotto la media."""
+        return 1.15 if p.level <= self._team_avg_level(p.team) - 2.0 else 1.0
+
+    def _award_xp(self, victim, killer=None) -> None:
+        recipients = [p for p in self.world.pokemons()
+                      if p.alive and p.team != victim.team
+                      and p.pos.dist(victim.pos) <= XP_RADIUS]
+        if not recipients:
+            return
         if isinstance(victim, Minion):
-            amount = float(victim.xp)
+            # XP dei minion condivisa tra i presenti, con bonus recupero.
+            frac = self._XP_SHARE.get(len(recipients), 0.47)
+            for p in recipients:
+                self._gain_xp(p, victim.xp * frac * self._recovery_mult(p))
         elif isinstance(victim, Pokemon):
-            amount = 120.0 + 20.0 * victim.level
-        else:
-            return  # strutture: niente esperienza (per ora)
-        for p in self.world.pokemons():
-            if (p.alive and p.team != victim.team
-                    and p.pos.dist(victim.pos) <= XP_RADIUS):
-                self._gain_xp(p, amount)
+            # Uccisione: 140 + 40×liv. vittima, +20% se la vittima e' di livello
+            # piu' alto del killer. Non condivisa, niente recupero.
+            base = 140.0 + 40.0 * victim.level
+            if isinstance(killer, Pokemon) and victim.level > killer.level:
+                base *= 1.2
+            for p in recipients:
+                self._gain_xp(p, base)
+        # strutture: niente esperienza (per ora)
 
     def _gain_xp(self, p: Pokemon, amount: float) -> None:
         p.xp += amount
@@ -819,6 +886,12 @@ class Match:
         while p.level < new_level:
             p.level += 1
             self._recompute_stats(p, heal_delta=True)
+
+    @staticmethod
+    def _n_stages(p: Pokemon) -> int:
+        """Numero di stadi della linea evolutiva (per M, punto 8)."""
+        stages = {int(e.get("stage", 0)) for e in p.evolutions} if p.evolutions else set()
+        return max(1, len(stages))
 
     def _recompute_stats(self, p: Pokemon, heal_delta: bool = False,
                          preserve_ratio: bool = False) -> None:
@@ -830,26 +903,43 @@ class Match:
         old_max = p.max_hp
         old_hp = p.hp
         d = derive(p.base_stats, p.level, ranged=p.ranged)
-        # M (stat_mult dell'evoluzione) si applica a HP, AD, armatura, RM, mana e
-        # rigenerazione; NON a MS/AS, gittata e moltiplicatore abilita', cosi' il
-        # "feeling" del Pokémon resta stabile fra gli stadi.
-        m = p.stat_mult
+        # M (moltiplicatore d'evoluzione, punto 8) si applica a HP, AD, armatura,
+        # RM, mana e rigenerazione; NON a MS/AS, gittata, AP e moltiplicatore
+        # abilita', cosi' il "feeling" del Pokémon resta stabile fra gli stadi.
+        m = stat_evo_mult(p.stage, self._n_stages(p))
+        p.stat_mult = m
         p.stats = Stats(hp=d.stats.hp * m, attack=d.stats.attack * m,
-                        defense=d.stats.defense * m, sp_attack=d.stats.sp_attack * m,
+                        defense=d.stats.defense * m, sp_attack=d.stats.sp_attack,
                         sp_defense=d.stats.sp_defense * m, speed=d.stats.speed)
-        p.move_speed_base = d.move_speed_tiles
-        p.attack_cooldown = d.attack_cooldown
-        p.attack_speed = d.attack_speed
+
+        def _b(k):   # somma dei bonus da oggetti e mosse di potenziamento
+            return p.item_bonus.get(k, 0.0) + p.passive_bonus.get(k, 0.0)
+
+        # Velocita' (con eventuali extra MS/AS dagli oggetti; non toccati da M).
+        p.move_speed_base = d.move_speed_tiles + _b("move_speed")
+        as_total = min(2.5, d.attack_speed * (1.0 + _b("attack_speed")))
+        p.attack_speed = as_total
+        p.attack_cooldown = 1.0 / as_total if as_total > 0 else 1.0
         p.ability_mult = d.ability_mult
         p.max_mana = d.max_mana * m
         p.mana = min(p.mana, p.max_mana) if p.mana > 0 else p.max_mana
         p.mana_regen5 = d.mana_regen5 * m
-        p.tenacity = d.tenacity
+        # Stat di combattimento dagli oggetti (AP = SpA degli oggetti + AP puro).
+        p.ap = _b("sp_attack") + _b("ap")
+        p.crit = max(0.0, min(1.0, _b("crit")))
+        p.armor_pen_pct = max(0.0, _b("armor_pen_pct"))
+        p.magic_pen_pct = max(0.0, _b("magic_pen_pct"))
+        p.magic_pen_flat = max(0.0, _b("magic_pen_flat"))
+        p.lifesteal = max(0.0, _b("lifesteal"))
+        p.omnivamp = max(0.0, _b("omnivamp"))
+        p.ability_haste = max(0.0, _b("ability_haste"))
+        # Identita' innate (non dagli oggetti), con extra sommati dagli oggetti.
+        p.tenacity = stat_combine_ten(d.tenacity, _b("tenacity"))
         p.hp_regen5 = d.hp_regen5
         p.flat_reduction = d.flat_reduction
-        p.lethality = d.lethality
+        p.lethality = d.lethality + _b("lethality")
         p.lethality_physical = d.lethality_physical
-        p.heal_power = d.heal_power
+        p.heal_power = d.heal_power + _b("heal_power")
         p.range_cls = d.range_cls
         p.range_val = d.range_val
         bonus_hp = p.item_bonus.get("hp", 0.0) + p.passive_bonus.get("hp", 0.0)
@@ -1023,7 +1113,7 @@ class Match:
             if ms.charges_cur < 0:
                 ms.charges_cur = float(mv.charges)
             ms.charges_cur = max(0.0, ms.charges_cur - 1.0)
-        ms.cooldown_remaining = mv.cooldown_at(rank)
+        ms.cooldown_remaining = mv.cooldown_at(rank) * ability_haste_factor(p.ability_haste)
         origin = Vec2(p.pos.x, p.pos.y)
         tgt = Vec2(tx, ty)
         to = tgt - origin
@@ -1176,8 +1266,9 @@ class Match:
             if p.curse_until > 0.0 and self.time >= p.curse_until:
                 src = self.world.get(p.curse_src) if p.curse_src is not None else None
                 if p.alive and src is not None:
-                    dmg = stat_damage(p.curse_power, p.eff_sp_defense(), 1.0, 1.0)
+                    dmg = self._mitigate_hit(src, p, p.curse_power, magic=True)
                     self._deal_damage(src, p, dmg)
+                    self._vamp(src, dmg, physical=False)
                     self.fx_events.append({"kind": "area", "c": (p.pos.x, p.pos.y),
                                            "radius": 1.6, "mtype": "Ghost"})
                 p.curse_until = -1.0
@@ -1520,33 +1611,41 @@ class Match:
         fx = mv.effects
         power = mv.power_at(rank)
         if power > 0:
-            stat = caster.eff_sp_attack() if mv.category == "special" else caster.eff_attack()
-            raw = power + mv.ratio * stat
-            if isinstance(target, Pokemon):
-                defense = (target.eff_sp_defense() if mv.category == "special"
-                           else target.eff_defense())
-                eff = self.types.multiplier(mv.type, target.types)
-            else:
-                defense, eff = 0.0, 1.0
+            # Danno abilita' = (base + ratio × stat offensiva). Le speciali usano
+            # l'AP (eff_sp_attack) e poi il moltiplicatore SpA (ability_mult); le
+            # fisiche usano l'AD. Sopra: STAB ×1,15, efficacia dei tipi compressa
+            # (×0,6..×1,5) e meteo. La mitigazione (con penetrazione e riduzione
+            # fissa) ed eventuale critico sono in _mitigate_hit.
+            magic = mv.category == "special"
+            raw = power + mv.ratio * (caster.eff_sp_attack() if magic
+                                      else caster.eff_attack())
+            if magic and isinstance(caster, Pokemon):
+                raw *= caster.ability_mult
+            eff = (self.types.moba_multiplier(mv.type, target.types)
+                   if isinstance(target, Pokemon) else 1.0)
             has_plate = (isinstance(caster, Pokemon) and caster.judgment_until > self.time
                          and mv.type == caster.judgment_plate)
             stab = STAB_MULT if (mv.type in caster.types or has_plate) else 1.0
-            dmg = stat_damage(raw, defense, eff, stab) * self.jungle.weather_damage_mult(mv.type)
+            raw *= eff * stab * self.jungle.weather_damage_mult(mv.type)
             # Bonus contro bersagli con stati alterati (Sciagura) o addormentati (Mangiasogni).
             if isinstance(target, Pokemon):
                 if "bonus_vs_status" in fx and self._has_status(target):
-                    dmg *= float(fx["bonus_vs_status"])
+                    raw *= float(fx["bonus_vs_status"])
                 if "bonus_vs_sleep" in fx and target.sleep_until > self.time:
-                    dmg *= float(fx["bonus_vs_sleep"])
+                    raw *= float(fx["bonus_vs_sleep"])
                 if "bonus_vs_attacking" in fx and target.aa_active:   # Sbigoattacco
-                    dmg *= float(fx["bonus_vs_attacking"])
+                    raw *= float(fx["bonus_vs_attacking"])
             bat = fx.get("bonus_if_ally_type")   # Erbapatto: +% con un alleato Acqua/Fuoco
             if bat and isinstance(caster, Pokemon):
                 need = set(bat.get("types", []))
                 if any(a is not caster and a.team == caster.team and a.alive
                        and need & set(a.types) for a in self.world.pokemons()):
-                    dmg *= float(bat.get("mult", 1.05))
+                    raw *= float(bat.get("mult", 1.05))
+            crit_bonus = HIGH_CRIT_CHANCE if mv.d.get("high_crit") else 0.0
+            dmg = self._mitigate_hit(caster, target, raw, magic=magic,
+                                     crit_bonus=crit_bonus)
             self._deal_damage(caster, target, dmg)
+            self._vamp(caster, dmg, physical=not magic)
             if "heal_self_ratio" in fx and isinstance(caster, Pokemon):  # Mangiasogni
                 caster.hp = min(caster.max_hp, caster.hp + dmg * float(fx["heal_self_ratio"]))
         # Effetti di controllo/debuff sui nemici colpiti.
@@ -1616,19 +1715,22 @@ class Match:
                 targets.append(caster)
         else:
             targets = [caster]
+        # Potere cure/scudi del lanciatore: cure e scudi × heal_power.
+        hp_power = caster.heal_power if isinstance(caster, Pokemon) else 1.0
         heal = eff.get("heal")
         if heal:
-            amt = self._rank_val(heal, rank)
+            amt = self._rank_val(heal, rank) * hp_power
             if eff.get("weather_heal"):   # Sintesi: x2 col Sole, dimezzata con la Pioggia
                 w = self.jungle.weather
                 amt *= 2.0 if w == "sun" else (0.5 if w == "rain" else 1.0)
             for a in targets:
                 a.hp = min(a.max_hp, a.hp + amt)
         if "heal_self_ratio" in eff:
-            caster.hp = min(caster.max_hp, caster.hp + mv.power_at(rank) * float(eff["heal_self_ratio"]))
+            caster.hp = min(caster.max_hp,
+                            caster.hp + mv.power_at(rank) * float(eff["heal_self_ratio"]) * hp_power)
         sh = eff.get("shield")
         if sh:
-            amt = self._rank_val(sh.get("amount", []), rank)
+            amt = self._rank_val(sh.get("amount", []), rank) * hp_power
             dur = float(sh.get("duration", 3.0))
             for a in targets:
                 self._apply_shield(a, amt, dur)
@@ -1653,20 +1755,28 @@ class Match:
     def _cc_immune(self, p):
         return getattr(p, "cc_immune_until", -1) > self.time
 
+    def _tenacity_dur(self, p, dur):
+        """Tenacia: accorcia la durata dei CC (durata × (1 − tenacia))."""
+        ten = getattr(p, "tenacity", 0.0) if isinstance(p, Pokemon) else 0.0
+        return dur * (1.0 - ten)
+
     def _apply_slow(self, p, mult, dur):
         if self._cc_immune(p):
             return
+        dur = self._tenacity_dur(p, dur)
         p.slow_mult = min(p.slow_mult, mult) if self.time <= p.slow_until else mult
         p.slow_until = max(p.slow_until, self.time + dur)
 
     def _apply_stun(self, p, dur):
         if self._cc_immune(p):
             return
+        dur = self._tenacity_dur(p, dur)
         p.stun_until = max(p.stun_until, self.time + dur)
 
     def _apply_confuse(self, p, dur):
         if self._cc_immune(p):
             return
+        dur = self._tenacity_dur(p, dur)
         p.confuse_until = max(p.confuse_until, self.time + dur)
 
     def _apply_def_debuff(self, p, amt, dur, mult=1.0):
@@ -1685,11 +1795,13 @@ class Match:
     def _apply_root(self, p, dur):          # paralisi (rooted): fermo ma può agire
         if self._cc_immune(p):
             return
+        dur = self._tenacity_dur(p, dur)
         p.root_until = max(p.root_until, self.time + dur)
 
     def _apply_sleep(self, p, dur, delay=0.0):
         if self._cc_immune(p):
             return
+        dur = self._tenacity_dur(p, dur)
         if delay > 0.0:
             p.sleep_arm_at = self.time + delay   # Ipnosi: dorme dopo il ritardo
             p.sleep_arm_dur = dur
@@ -1704,6 +1816,7 @@ class Match:
     def _apply_fear(self, p, src_pos, dur):     # spavento: fugge dalla fonte
         if self._cc_immune(p):
             return
+        dur = self._tenacity_dur(p, dur)
         p.fear_until = max(p.fear_until, self.time + dur)
         p.fear_src = Vec2(src_pos.x, src_pos.y)
 

@@ -4,9 +4,12 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from engine.stats import (CUMULATIVE_XP, GROWTH_SCALE, MAX_LEVEL, STAB_MULT,
-                          Stats, bst, damage, derive, level_from_xp, normalize,
+from engine.stats import (CRIT_MULT, CUMULATIVE_XP, GROWTH_SCALE, MAX_LEVEL,
+                          STAB_MULT, Stats, ability_haste_factor, bst,
+                          combine_tenacity, damage, derive, evolution_mult,
+                          level_from_xp, mitigate, normalize, penetrate,
                           range_class, respawn_time)
+from engine.types import TypeChart
 
 S = GROWTH_SCALE  # 17/15
 
@@ -135,10 +138,50 @@ class TestDamage(unittest.TestCase):
     def test_effectiveness_and_stab(self):
         base = damage(100, 0)
         self.assertAlmostEqual(damage(100, 0, effectiveness=2.0), base * 2)
-        self.assertAlmostEqual(damage(100, 0, stab=STAB_MULT), base * 1.5)
+        self.assertAlmostEqual(STAB_MULT, 1.15)
+        self.assertAlmostEqual(damage(100, 0, stab=STAB_MULT), base * 1.15)
 
     def test_minimum_one(self):
         self.assertEqual(damage(0, 9999), 1.0)
+
+
+class TestCombat(unittest.TestCase):
+    def test_mitigate_positive_negative(self):
+        self.assertAlmostEqual(mitigate(100, 0), 100)
+        self.assertAlmostEqual(mitigate(100, 100), 50)
+        self.assertAlmostEqual(mitigate(100, -100), 100 * (2 - 100 / 200))  # 150
+        self.assertLessEqual(mitigate(100, -1e9), 200)  # tetto ×2
+
+    def test_penetration_never_below_zero(self):
+        self.assertAlmostEqual(penetrate(100, 0.3, 10), 100 * 0.7 - 10)  # 60
+        self.assertEqual(penetrate(5, 0.0, 50), 0.0)                      # non sotto 0
+        self.assertEqual(penetrate(-20, 0.5, 10), -20)                    # difesa <0 intatta
+
+    def test_evolution_mult(self):
+        self.assertEqual(evolution_mult(0, 3), 0.82)
+        self.assertEqual(evolution_mult(2, 3), 1.03)
+        self.assertEqual(evolution_mult(0, 2), 0.87)
+        self.assertEqual(evolution_mult(0, 1), 1.0)
+
+    def test_tenacity_multiplies(self):
+        self.assertAlmostEqual(combine_tenacity(0.2, 0.2), 1 - 0.8 * 0.8)  # 0.36
+        self.assertAlmostEqual(combine_tenacity(0.0), 0.0)
+
+    def test_ability_haste(self):
+        self.assertAlmostEqual(ability_haste_factor(0), 1.0)
+        self.assertAlmostEqual(ability_haste_factor(100), 0.5)   # -50% ricarica
+
+    def test_crit_const(self):
+        self.assertAlmostEqual(CRIT_MULT, 1.75)
+
+    def test_type_moba_clamp(self):
+        tc = TypeChart.load(os.path.join(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__))), "data", "types.json"))
+        # Superefficace su un tipo -> ×1,25; su due -> ×1,5 (tetto).
+        m1 = tc.moba_multiplier("Fire", ["Grass"])
+        self.assertAlmostEqual(m1, 1.25)
+        self.assertLessEqual(tc.moba_multiplier("Fire", ["Grass", "Ice"]), 1.5)
+        self.assertGreaterEqual(tc.moba_multiplier("Normal", ["Rock", "Steel"]), 0.6)
 
 
 if __name__ == "__main__":

@@ -32,3 +32,24 @@ class TypeChart:
         for d in (defender_types or []):
             mult *= row.get(d, 1.0)
         return mult
+
+    def moba_multiplier(self, attack_type: str, defender_types) -> float:
+        """Efficacia compressa stile MOBA (punto 7): per ciascun tipo difensore
+        superefficace ×1,25, poco efficace ×0,8, immunita' ×0,6; con doppio tipo
+        i valori si moltiplicano, ma il totale resta tra ×0,6 e ×1,5.
+        """
+        from .stats import (TYPE_IMMUNE, TYPE_MAX, TYPE_MIN, TYPE_SUPER,
+                            TYPE_WEAK)
+        if not attack_type:
+            return 1.0
+        row = self.table.get(attack_type, {})
+        mult = 1.0
+        for d in (defender_types or []):
+            raw = row.get(d, 1.0)
+            if raw == 0.0:
+                mult *= TYPE_IMMUNE
+            elif raw > 1.0:
+                mult *= TYPE_SUPER
+            elif raw < 1.0:
+                mult *= TYPE_WEAK
+        return max(TYPE_MIN, min(TYPE_MAX, mult))

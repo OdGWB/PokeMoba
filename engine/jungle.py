@@ -224,9 +224,16 @@ class JungleSystem:
         # Ricompensa: oro all'ultimo colpo, XP alla squadra del killer vicina.
         if isinstance(killer, Pokemon):
             killer.gold += victim.reward_gold
+            # I campi danno +3% XP per ogni livello medio dei giocatori; chi e' 2+
+            # livelli sotto la media prende il bonus recupero (+15%).
+            lvl_mult = (1.0 + 0.03 * self.m._avg_player_level()
+                        if victim.kind == "camp" else 1.0)
             for p in self.world.pokemons():
                 if p.alive and p.team == killer.team and p.pos.dist(victim.pos) <= 10.0:
-                    self.m._gain_xp(p, victim.reward_xp)
+                    amt = victim.reward_xp * lvl_mult
+                    if victim.kind == "camp":
+                        amt *= self.m._recovery_mult(p)
+                    self.m._gain_xp(p, amt)
 
         if victim.kind == "meteo":
             self._meteo = None

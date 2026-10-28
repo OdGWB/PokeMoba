@@ -93,8 +93,15 @@ class Pokemon(Unit):
     mana: float = 0.0
     mana_regen5: float = 0.0
     ap: float = 0.0
-    crit: float = 0.0
+    crit: float = 0.0                 # probabilita' di critico (0..1)
     ability_mult: float = 1.0
+    # Penetrazione e sostentamento (dagli oggetti; punto 6)
+    armor_pen_pct: float = 0.0
+    magic_pen_pct: float = 0.0
+    magic_pen_flat: float = 0.0
+    lifesteal: float = 0.0            # rubavita sugli attacchi base/fisici
+    omnivamp: float = 0.0             # cura da ogni danno inflitto
+    ability_haste: float = 0.0
     tenacity: float = 0.0
     hp_regen5: float = 0.0
     flat_reduction: float = 0.0
@@ -206,10 +213,13 @@ class Pokemon(Unit):
         return atk
 
     def eff_sp_attack(self) -> float:
-        spa = (self.stats.sp_attack + self._bonus("sp_attack")) * self.atk_mult
+        # Nel modello MOBA la statistica speciale per livello e' sparita: le
+        # abilita' speciali scalano sull'AP (0 base + oggetti), poi il danno
+        # finale e' moltiplicato per ability_mult (vedi Match._ability_damage).
+        ap = self.ap * self.atk_mult
         if self.passive_id == "inversione" and self.inversion_stacks:
-            spa *= 1.0 + 0.01 * self.inversion_stacks
-        return spa
+            ap *= 1.0 + 0.01 * self.inversion_stacks
+        return ap
 
     def _soul(self) -> int:
         # Corpofunesto: ogni carica dà +1 Difesa e +1 Dif.Sp.

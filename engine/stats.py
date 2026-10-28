@@ -30,8 +30,17 @@ from dataclasses import dataclass, field
 MAX_LEVEL = 16
 GROWTH_SCALE = 17.0 / 15.0
 
-# STAB attuale del combattimento (il passo combattimento portera' a 1.15).
-STAB_MULT = 1.5
+# STAB del combattimento (nuovo modello MOBA: +15%).
+STAB_MULT = 1.15
+
+# Critico ed efficacia dei tipi (modello MOBA compresso).
+CRIT_MULT = 1.75          # danno × 1,75 su un critico
+HIGH_CRIT_CHANCE = 0.25   # critico innato delle mosse "ad alto tasso di critico"
+TYPE_SUPER = 1.25         # superefficace (per tipo)
+TYPE_WEAK = 0.8           # poco efficace (per tipo)
+TYPE_IMMUNE = 0.6         # "immunita'" ammorbidita (per tipo)
+TYPE_MIN = 0.6            # tetti del moltiplicatore totale di tipo
+TYPE_MAX = 1.5
 
 # Tetti e conversioni della velocita'.
 MS_CAP = 365.0            # movement speed massimo (unita' "LoL")
@@ -265,9 +274,51 @@ def respawn_time(level: int) -> float:
     return 6.0 + level * 2.3
 
 
-# --- Danno (combattimento attuale; il passo combattimento lo riscrivera') ----
+# --- Evoluzioni: moltiplicatore di potenza per stadio (punto 8) --------------
+# M si applica a HP, AD, armatura, RM, mana e rigenerazione; NON a MS/AS,
+# gittata e moltiplicatore abilita'. `n_stages` = numero di stadi della linea.
+_EVO_MULT = {
+    1: [1.00],                # non si evolve
+    2: [0.87, 1.02],          # 2 stadi
+    3: [0.82, 0.92, 1.03],    # 3 stadi
+}
+
+
+def evolution_mult(stage: int, n_stages: int) -> float:
+    table = _EVO_MULT.get(max(1, min(3, n_stages)), _EVO_MULT[1])
+    return table[max(0, min(len(table) - 1, stage))]
+
+
+# --- Combattimento -----------------------------------------------------------
+def ability_haste_factor(haste: float) -> float:
+    """Fattore di ricarica: ricarica × 100/(100+haste) (riduzione haste/(100+haste))."""
+    return 100.0 / (100.0 + max(0.0, haste))
+
+
+def combine_tenacity(*sources: float) -> float:
+    """Piu' fonti di tenacia si moltiplicano: 1 − Π(1 − t). Risultato in 0..1."""
+    keep = 1.0
+    for t in sources:
+        keep *= (1.0 - max(0.0, min(1.0, t)))
+    return 1.0 - keep
+
+
+def penetrate(defense: float, pct_pen: float = 0.0, flat_pen: float = 0.0) -> float:
+    """Applica penetrazione %% poi fissa. La penetrazione non porta mai sotto 0."""
+    if defense <= 0.0:
+        return defense
+    defense *= (1.0 - max(0.0, pct_pen))
+    return max(0.0, defense - max(0.0, flat_pen))
+
+
+def mitigate(dmg: float, defense: float) -> float:
+    """Danno dopo la difesa. Difesa >=0 riduce; difesa <0 amplifica (fino a ×2)."""
+    if defense >= 0.0:
+        return dmg * 100.0 / (100.0 + defense)
+    return dmg * (2.0 - 100.0 / (100.0 - defense))
+
+
 def damage(power: float, defense: float, effectiveness: float = 1.0,
            stab: float = 1.0) -> float:
-    """Danno mitigato dalla difesa (formula ad armatura) con efficacia e STAB."""
-    mitigated = power * (100.0 / (100.0 + max(0.0, defense)))
-    return max(1.0, mitigated * effectiveness * stab)
+    """Danno mitigato dalla difesa (per minion/strutture: niente penetrazione)."""
+    return max(1.0, mitigate(power * effectiveness * stab, max(0.0, defense)))

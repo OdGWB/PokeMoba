@@ -100,11 +100,11 @@ ARCEUS_XP = 750
 ARCEUS_GOLD = 420
 CAMP_HP = 900
 CAMP_DMG = 42
-CAMP_XP = 220
+CAMP_XP = 170               # campo piccolo (punto 9); un giro completo ~1160 XP
 CAMP_GOLD = 90
 # Campi "grandi" (buff), più tosti e redditizi dei piccoli.
 CAMP_BIG_MULT = 1.8         # hp/danno dei campi grandi
-CAMP_BIG_REWARD_MULT = 2.0  # xp/oro dei campi grandi
+CAMP_BIG_REWARD_MULT = 240.0 / 170.0  # buff camp = 240 XP (xp); oro proporzionale
 # Passiva Corpofunesto (linea Gastly): cariche d'anima.
 SOUL_PER_KILL = 10
 SOUL_PER_ASSIST = 5
