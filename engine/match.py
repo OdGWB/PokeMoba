@@ -20,7 +20,7 @@ from pathlib import Path
 import config
 from . import evolution, skills
 from .entities import Core, Minion, Pokemon, Structure, Unit, Wild
-from .grid import TILE_BUSH
+from .grid import TILE_BUSH, TILE_RIVER
 from .items import ITEM_SLOTS, ItemCatalog
 from .jungle import JungleSystem
 from .pathfinding import find_path, smooth_path
@@ -31,7 +31,7 @@ from .stats import (CRIT_MULT, HIGH_CRIT_CHANCE, STAB_MULT, Stats,
                     level_from_xp, mitigate as stat_mitigate,
                     penetrate as stat_penetrate, respawn_time)
 from .types import TypeChart
-from .vec import Vec2, direction_index
+from .vec import DIR_VECTORS, Vec2, direction_index
 from .vision import VisionSystem
 
 # Priorità di bersaglio (numero più basso = preferito).
@@ -60,6 +60,28 @@ XP_RADIUS = 8.0             # tile: raggio entro cui i nemici ricevono esperienz
 SLOT_UPGRADE_LEVEL = {"Q": 5, "W": 6, "E": 7, "R": 8}
 AA_WINDUP_FRAC = 0.2   # frazione dell'attacco spesa nel windup (danno a fine windup)
 
+# --- Forma Shedinja (passiva Muta / R Rancore, linea Nincada) ----------------
+# Statistiche base REALI dello Shedinja (HP a 1 FISSO: non derivato). Coleottero/
+# Spettro. La forma dura MUTA_DURATION; la passiva/ult condividono la ricarica.
+SHEDINJA_BASE = {"hp": 1, "attack": 90, "defense": 45,
+                 "sp_attack": 30, "sp_defense": 30, "speed": 40}
+SHEDINJA_TYPES = ["Bug", "Ghost"]
+SHEDINJA_DEX = 292
+# Tipi superefficaci contro Coleottero/Spettro: bucano la Magidifesa (letali).
+_SHEDINJA_WEAK = {"Fire", "Flying", "Rock", "Ghost", "Dark"}
+MUTA_DURATION = 5.0        # s in forma Shedinja
+MUTA_COOLDOWN = 150.0      # ricarica condivisa Muta/Rancore
+MUTA_REVERT_HP = 0.30      # Muta: torna Ninjask col 30% degli HP max
+RANCORE_REVIVE_HP = 0.10   # Rancore: rivive Ninjask col 10% degli HP max
+
+# --- linea Poliwag: pioggia, aura Piovischio, Roccia di Re --------------------
+PIOVISCHIO_RADIUS = 4.0       # raggio dell'aura di pioggia permanente di Politoad
+WATER_BOOST = 1.2             # mosse Acqua alleate in pioggia (Piovischio/Pioggiadanza): +20%
+FIRE_REDUCE = 0.8             # mosse Fuoco nemiche dentro l'aura Piovischio: -20%
+NUOTOVELOX_SPEED = 1.2        # +20% velocità in acqua/pioggia (Poliwag/Poliwhirl)
+KINGROCK_SHIELD_FRAC = 0.30   # Roccia di Re: scudo pari al 30% della cura data a un alleato
+KINGROCK_SHIELD_DUR = 3.0
+
 
 def _prio(entity) -> int:
     for cls, p in _PRIO.items():
@@ -87,6 +109,9 @@ class Match:
         self.fx_events: list[dict] = []   # effetti visivi per il client (cosmetici)
         self.projectiles: list[dict] = []  # proiettili che viaggiano (es. bolla Idropulsar)
         self.area_effects: list[dict] = []  # aree persistenti (es. Pioggia di Frecce)
+        self.rain_zones: list[dict] = []    # zone di pioggia a tempo (Pioggiadanza): boost Acqua + Nuotovelox
+        self.air_landings: list[dict] = []  # Rimbalzo: atterraggi programmati (salto in aria)
+        self.tosses: list[dict] = []        # Ribaltiro: nemici scaraventati in arco (animazione)
         self.vision = VisionSystem(self.world.grid)
         self._build_structures()
         self.jungle = JungleSystem(self)
@@ -132,14 +157,19 @@ class Match:
         self._update_waves(dt)
         self._update_ai(dt)
         self._update_submerge(dt)    # SUB: riemersione (prima dei cast)
+        self._update_air_landings(dt)  # Rimbalzo: atterraggio dopo il salto (prima dei cast)
         self._update_casts(dt)       # esecuzione mosse Q/W/E/R
         self._update_projectiles(dt) # proiettili che viaggiano (bolla)
-        self._update_area_effects(dt)  # aree persistenti (Pioggia di Frecce)
+        self._update_area_effects(dt)  # aree persistenti (Pioggia di Frecce, Acquanello, Ultimocanto)
+        self._update_rain_zones(dt)    # Pioggiadanza: scadenza delle zone di pioggia a tempo
         self._update_blink_return(dt)  # Spettrotuffo: ritorno automatico
         self._update_curses(dt)        # Maledizione: danno ritardato
+        self._update_forms(dt)         # forma Shedinja: ritorno a Ninjask (Muta/Rancore)
+        self._update_decoys(dt)        # Doppioteam: scadenza dei cloni esca
         self._update_combat(dt)      # attacchi base
         self._update_status(dt)      # scadenza stati + velocità effettiva + ricariche
         self.world.tick(dt)          # movimento + collisioni
+        self._update_tosses(dt)      # Ribaltiro: arco del nemico lanciato (dopo le collisioni)
         self._update_regen(dt)
         self._update_plates(dt)      # placche delle torri (oro ai vicini)
         self._update_gold(dt)
@@ -210,6 +240,8 @@ class Match:
         for p in self.world.pokemons():
             if not p.alive:
                 continue
+            if p.is_decoy:
+                continue              # il clone esca segue solo il suo percorso
             if p.fear_until > self.time and p.fear_src is not None:
                 self._flee(p, dt)     # spavento: fuga automatica dalla fonte
                 continue
@@ -795,9 +827,35 @@ class Match:
         return sum(1 for e in self.world.structures()
                    if e.kind == "tower" and e.team == team and e.alive)
 
-    def _deal_damage(self, attacker, target, amount: float) -> None:
+    def _deal_damage(self, attacker, target, amount: float,
+                     dmg_type: str | None = None) -> None:
+        """Infligge danno. `dmg_type` è il tipo del danno (per le mosse dei
+        Pokémon) oppure None = "senza tipo" (auto-attacchi, torri, minion,
+        neutrali, stati alterati). Il tipo serve alla Magidifesa dello Shedinja."""
         # Bersaglio non bersagliabile (es. SUB sotto terra): nessun danno.
         if isinstance(target, Pokemon) and target.untargetable_until > self.time:
+            return
+        # Clone esca (Doppioteam): qualunque danno lo dissolve, senza ricompense.
+        if isinstance(target, Pokemon) and target.is_decoy:
+            if amount > 0.0:
+                self._pop_decoy(target)
+            return
+        # Magidifesa (forma Shedinja): ignora i danni TIPATI delle mosse dei
+        # Pokémon, tranne quelli superefficaci contro Coleottero/Spettro (Fuoco,
+        # Volante, Roccia, Spettro, Buio), che sono letali. Il danno senza tipo
+        # (auto-attacchi, torri, minion, neutrali, veleno/stati) passa normale.
+        if (isinstance(target, Pokemon) and target.form == "shedinja"
+                and dmg_type is not None):
+            if dmg_type not in _SHEDINJA_WEAK:
+                return   # assorbito dalla Magidifesa
+            amount = max(amount, target.hp + target.shield)   # superefficace: letale
+        # Assorbacqua (Poliwrath): il danno delle mosse Acqua NEMICHE lo cura
+        # invece di ferirlo (il danno senza tipo e quello alleato passano normali).
+        if (isinstance(target, Pokemon) and target.passive_id == "assorbacqua"
+                and dmg_type == "Water" and attacker is not None
+                and getattr(attacker, "team", target.team) != target.team
+                and amount > 0.0):
+            target.hp = min(target.max_hp, target.hp + amount)
             return
         # Il nucleo è invulnerabile finché restano abbastanza torri della squadra.
         if isinstance(target, Core) and self._alive_towers(target.team) > config.CORE_EXPOSE_TOWERS_LEFT:
@@ -828,6 +886,9 @@ class Match:
                     setattr(target, "_damagers", dmg)
                 dmg[attacker.id] = self.time
         if target.hp <= 0.0 and target.alive:
+            # Passiva Muta / Rancore: lo Shedinja può "barare la morte".
+            if self._cheat_death(target, attacker):
+                return
             self._on_death(target, attacker)
 
     def _on_death(self, victim, killer) -> None:
@@ -842,6 +903,10 @@ class Match:
             victim.stop()
             victim.target_id = None
             victim.judgment_until = -1.0   # perde il Giudizio morendo
+            # Se muore in forma Shedinja, ripristina l'identità di Ninjask così il
+            # respawn avviene normale (max_hp corretto, non 1).
+            if victim.form == "shedinja":
+                self._exit_shedinja(victim, 0.0)
             victim.respawn_timer = respawn_time(victim.level)
             victim.respawn_max = victim.respawn_timer
         elif isinstance(victim, Core):
@@ -861,6 +926,150 @@ class Match:
                 self.world.remove(e.id)
             elif isinstance(e, Structure) and not isinstance(e, Core) and not e.alive:
                 self.world.remove(e.id)
+
+    # --- passiva Muta / forma Shedinja (linea Nincada) -----------------------
+    def _muta_ready(self, p) -> bool:
+        """Muta attiva solo da Ninjask (stage >= 1, cioè dal livello 8) a ricarica pronta."""
+        return (isinstance(p, Pokemon) and p.passive_id == "muta" and p.stage >= 1
+                and p.form != "shedinja" and self.time >= p.muta_cd_until)
+
+    def _cheat_death(self, target, killer) -> bool:
+        """Lo Shedinja può "barare la morte". Ritorna True se la morte è annullata."""
+        if not isinstance(target, Pokemon) or target.is_decoy:
+            return False
+        if target.form == "shedinja":
+            # Rancore: punisce il killer e rivive come Ninjask al 10% HP.
+            if target.rancore_form:
+                self._grudge_punish(killer)
+                self._exit_shedinja(target, RANCORE_REVIVE_HP)
+                self.announcements.append((self.time, f"{target.name}: Rancore!"))
+                return True
+            return False   # Shedinja da Muta: muore normalmente
+        # Ninjask con Muta pronta: diventa Shedinja invece di morire.
+        if self._muta_ready(target):
+            self._enter_shedinja(target, rancore=False)
+            return True
+        return False
+
+    def _grudge_punish(self, killer) -> None:
+        """Rancore: tutte le mosse del killer vanno in ricarica completa."""
+        if not isinstance(killer, Pokemon):
+            return
+        for ms in killer.moveset.values():
+            mv = ms.chosen
+            if mv is not None and ms.rank > 0:
+                ms.cooldown_remaining = mv.cooldown_at(ms.rank)
+                if mv.charges > 0:
+                    ms.charges_cur = 0.0
+        if killer.passive_id == "muta":
+            killer.muta_cd_until = self.time + MUTA_COOLDOWN
+
+    def _enter_shedinja(self, p, rancore: bool) -> None:
+        # Salva l'identità di Ninjask per il ritorno.
+        p.ninjask_stats = {k: getattr(p.base_stats, k) for k in
+                           ("hp", "attack", "defense", "sp_attack", "sp_defense", "speed")}
+        p.ninjask_types = list(p.types)
+        p.ninjask_dex = p.dex
+        p.form = "shedinja"
+        p.form_until = self.time + MUTA_DURATION
+        p.rancore_form = rancore
+        p.muta_cd_until = self.time + MUTA_COOLDOWN
+        rms = p.moveset.get("R")   # ricarica condivisa, mostrata sulla R
+        if rms is not None:
+            rms.cooldown_remaining = max(rms.cooldown_remaining, MUTA_COOLDOWN)
+        p.base_stats = Stats.from_dict(SHEDINJA_BASE)
+        p.types = list(SHEDINJA_TYPES)
+        p.dex = SHEDINJA_DEX
+        p.ranged = False
+        self._recompute_stats(p)
+        p.hp = 1.0
+        p.max_hp = 1.0
+        p.shield = 0.0
+        self.fx_events.append({"kind": "area", "c": (p.pos.x, p.pos.y),
+                               "radius": 1.4, "mtype": "Ghost"})
+        self.fx_events.append({"eid": p.id, "form": "shedinja"})
+        self.announcements.append(
+            (self.time, f"{p.name} -> Shedinja ({'Rancore' if rancore else 'Muta'})!"))
+
+    def _exit_shedinja(self, p, hp_frac: float) -> None:
+        from .stats import range_class
+        if p.ninjask_stats:
+            p.base_stats = Stats.from_dict(p.ninjask_stats)
+        if p.ninjask_types:
+            p.types = list(p.ninjask_types)
+        if p.ninjask_dex:
+            p.dex = p.ninjask_dex
+        p.form = ""
+        p.form_until = -1.0
+        p.rancore_form = False
+        p.ranged = range_class(p.base_stats) == "ranged"
+        self._recompute_stats(p)
+        p.hp = max(1.0, p.max_hp * hp_frac)
+        p.untargetable_until = self.time   # torna bersagliabile all'istante
+        self.fx_events.append({"eid": p.id, "form": ""})
+
+    def _update_forms(self, dt: float) -> None:
+        for p in self.world.pokemons():
+            if p.is_decoy:
+                continue
+            if p.form == "shedinja" and p.alive and self.time >= p.form_until:
+                self._exit_shedinja(p, MUTA_REVERT_HP)   # torna Ninjask al 30%
+
+    def force_shedinja(self, p) -> bool:
+        """Debug/test: entra subito in forma Shedinja ignorando la ricarica."""
+        if isinstance(p, Pokemon) and p.alive and p.form != "shedinja":
+            self._enter_shedinja(p, rancore=False)
+            p.muta_cd_until = self.time   # in test: niente ricarica
+            return True
+        return False
+
+    # --- Doppioteam: clone esca ---------------------------------------------
+    def _spawn_decoy(self, caster, dirv, dur: float) -> None:
+        pos = Vec2(caster.pos.x, caster.pos.y)
+        d = self.world.spawn_pokemon(
+            pos=pos, team=caster.team, dex=caster.dex, name=caster.name,
+            color=getattr(caster, "color", (200, 200, 200)),
+            speed=caster.move_speed_base, is_bot=True,
+            assigned_lane=caster.assigned_lane, types=list(caster.types))
+        d.radius = caster.radius
+        d.is_decoy = True
+        d.decoy_until = self.time + dur
+        d.stage = caster.stage
+        d.level = caster.level
+        d.form = ""            # il clone non ha forma (nessuna logica Muta)
+        d.attack_range = 0.0   # non attacca
+        d.vision = 2.0
+        dest = self._nearest_walkable(pos + dirv * 4.0, pos)
+        d.set_path([dest])
+        self.fx_events.append({"eid": d.id, "anim": "Walk"})
+
+    def _pop_decoy(self, d) -> None:
+        self.fx_events.append({"kind": "area", "c": (d.pos.x, d.pos.y),
+                               "radius": 0.8, "mtype": "Normal"})
+        self._remove_decoy(d)
+
+    def _remove_decoy(self, d) -> None:
+        d.alive = False
+        self.world.remove(d.id)
+        self._ai.pop(d.id, None)
+
+    def _update_decoys(self, dt: float) -> None:
+        for d in list(self.world.pokemons()):
+            if d.is_decoy and (not d.alive or self.time >= d.decoy_until):
+                self._remove_decoy(d)
+
+    def _fury_mult(self, caster, target) -> float:
+        """Sfuriate: ogni colpo consecutivo sullo stesso bersaglio aumenta il
+        danno, fino a 5×. Si azzera cambiando bersaglio o dopo 3s di pausa."""
+        if not isinstance(caster, Pokemon):
+            return 1.0
+        if caster.fury_target == target.id and self.time <= caster.fury_until:
+            caster.fury_stacks = min(5, caster.fury_stacks + 1)
+        else:
+            caster.fury_target = target.id
+            caster.fury_stacks = 1
+        caster.fury_until = self.time + 3.0
+        return float(caster.fury_stacks)
 
     # --- esperienza / livelli ------------------------------------------------
     # XP condivisa tra i presenti: 100% da solo, 65% a testa in due, 47% in tre+.
@@ -963,6 +1172,8 @@ class Match:
         p.range_val = d.range_val
         bonus_hp = p.item_bonus.get("hp", 0.0) + p.passive_bonus.get("hp", 0.0)
         p.max_hp = p.stats.hp + bonus_hp
+        if p.form == "shedinja":
+            p.max_hp = 1.0   # lo Shedinja ha SEMPRE 1 HP (non derivato)
         p.attack_damage = p.stats.attack
         if preserve_ratio and old_max > 0:
             p.hp = min(p.max_hp, old_hp / old_max * p.max_hp)
@@ -1256,6 +1467,8 @@ class Match:
         ms = p.moveset.get(slot)
         if ms is None or ms.chosen is None or not ms.ready:
             return
+        if p.silence_until > self.time:   # Ripeti: silenziato, solo autoattacchi
+            return
         mv = ms.chosen
         rank = ms.rank
         if p.aa_active:              # lanciare annulla un auto-attacco in windup
@@ -1275,7 +1488,9 @@ class Match:
         anim = {"projectile": "Shoot", "bubble": "Shoot",
                 "cone": "Attack", "dash": "Attack", "bolt": "Shoot",
                 "curse": "Shoot", "fan": "Shoot", "dashback": "Attack",
-                "rain": "Shoot", "storm": "Shoot", "leap": "Attack"}.get(shape)
+                "rain": "Shoot", "storm": "Shoot", "leap": "Attack",
+                "arc": "Shoot", "throwback": "Attack", "raindance": "Charge",
+                "healzone": "Charge"}.get(shape)
         if anim:
             self.fx_events.append({"eid": p.id, "anim": anim})
         # Gli eventi visivi aggiunti dai _cast_* qui sotto vengono "taggati" con lo
@@ -1290,6 +1505,8 @@ class Match:
             self._cast_cone(p, mv, rank, origin, dirv)
         elif shape == "area":
             self._cast_area(p, mv, rank, origin, tgt)
+        elif shape == "whirlpool":
+            self._cast_whirlpool(p, mv, rank, origin, tgt)
         elif shape == "dash":
             self._cast_dash(p, mv, rank, origin, tgt, dirv)
         elif shape == "sub":
@@ -1310,10 +1527,38 @@ class Match:
             self._cast_storm(p, mv, rank, origin, tgt)
         elif shape == "leap":
             self._cast_leap(p, mv, rank, origin, tgt, dirv)
+        elif shape == "chain":
+            self._cast_chain(p, mv, rank, origin, tgt, dirv)
+        elif shape == "rancore":
+            self._cast_rancore(p, mv, rank)
+        elif shape == "arc":
+            self._cast_arc(p, mv, rank, origin, tgt)
+        elif shape == "raindance":
+            self._cast_raindance(p, mv, rank, origin, tgt)
+        elif shape == "healzone":
+            self._cast_healzone(p, mv, rank, origin, tgt)
+        elif shape == "throwback":
+            self._cast_throwback(p, mv, rank, origin, tgt, dirv)
+        elif shape == "bounce":
+            self._cast_bounce(p, mv, rank, origin, tgt)
+        elif shape == "perish":
+            self._cast_perish(p, mv, rank, origin, tgt)
         elif shape == "buff":
             self._apply_support(p, mv, rank, origin)
             self.fx_events.append({"kind": "buff", "c": (origin.x, origin.y),
                                    "mtype": mv.type, "radius": 1.0})
+        # Autodebuff (Zuffa): chi la lancia resta scoperto per qualche secondo.
+        sdb = mv.effects.get("self_debuff")
+        if sdb:
+            dd = sdb.get("def_debuff")
+            if dd:
+                self._apply_def_debuff(p, float(dd.get("amount", 0)),
+                                       float(dd.get("duration", 4.0)),
+                                       float(dd.get("mult", 1.0)))
+            sd = sdb.get("spdef_debuff")
+            if sd:
+                self._apply_spdef_debuff(p, float(sd.get("amount", 0)),
+                                         float(sd.get("duration", 4.0)))
         if mv.fx:
             for ev in self.fx_events[_fx0:]:
                 if "kind" in ev:
@@ -1396,6 +1641,7 @@ class Match:
         best.curse_power = base + p.soul_charges * float(mv.effects.get("charge_power", 2.0))
         best.curse_until = self.time + float(mv.effects.get("delay", 3.0))
         best.curse_src = p.id
+        setattr(best, "curse_type", mv.type)
         self.fx_events.append({"kind": "buff", "c": (best.pos.x, best.pos.y),
                                "mtype": mv.type, "radius": 1.2})
 
@@ -1419,7 +1665,7 @@ class Match:
                 src = self.world.get(p.curse_src) if p.curse_src is not None else None
                 if p.alive and src is not None:
                     dmg = self._mitigate_hit(src, p, p.curse_power, magic=True)
-                    self._deal_damage(src, p, dmg)
+                    self._deal_damage(src, p, dmg, dmg_type=getattr(p, "curse_type", "Ghost"))
                     self._vamp(src, dmg, physical=False)
                     self.fx_events.append({"kind": "area", "c": (p.pos.x, p.pos.y),
                                            "radius": 1.6, "mtype": "Ghost"})
@@ -1510,9 +1756,331 @@ class Match:
         self.fx_events.append({"kind": "area", "c": (dest.x, dest.y),
                                "radius": mv.radius, "mtype": mv.type})
 
+    def _cast_chain(self, p, mv, rank, origin, tgt, dirv):
+        """Aeroassalto: scatta tra un massimo di `max_targets` nemici vicini,
+        colpendoli in sequenza; durante la sequenza non è bersagliabile."""
+        if p.dashlock_until > self.time:
+            return
+        max_t = int(mv.d.get("max_targets", 4))
+        hop = float(mv.effects.get("hop", 4.5))
+        cur = Vec2(origin.x, origin.y)
+        pool = []
+        for e in self._combat_hash.query_radius(origin.x, origin.y, mv.range + hop * max_t):
+            if e.team == p.team or not getattr(e, "alive", False):
+                continue
+            if not isinstance(e, (Pokemon, Minion, Wild, Structure)):
+                continue
+            if isinstance(e, Pokemon) and e.is_decoy:
+                continue
+            pool.append(e)
+        chain, used = [], set()
+        for _ in range(max_t):
+            best, bd = None, 1e9
+            for e in pool:
+                if id(e) in used:
+                    continue
+                d = cur.dist(e.pos)
+                if d <= hop + getattr(e, "radius", 0.0) and d < bd:
+                    best, bd = e, d
+            if best is None:
+                break
+            used.add(id(best))
+            chain.append(best)
+            cur = Vec2(best.pos.x, best.pos.y)
+        if not chain:   # nessun bersaglio: breve scatto in avanti
+            dest = self._clamp_to_wall(origin, origin + dirv * hop)
+            p.pos = dest
+            p.stop()
+            self.fx_events.append({"kind": "dash", "a": (origin.x, origin.y),
+                                   "b": (dest.x, dest.y), "mtype": mv.type})
+            return
+        prev = origin
+        for e in chain:
+            tp = Vec2(e.pos.x, e.pos.y)
+            self.fx_events.append({"kind": "dash", "a": (prev.x, prev.y),
+                                   "b": (tp.x, tp.y), "mtype": mv.type})
+            self._hit(p, mv, rank, e)
+            prev = tp
+        p.pos = self._nearest_walkable(prev, origin)
+        p.stop()
+        self._apply_untargetable(p, 0.15 * len(chain) + 0.2)   # intargetabile durante
+        self.fx_events.append({"eid": p.id, "anim": "Hop", "anim_speed": 2.5})
+
+    def _cast_rancore(self, p, mv, rank):
+        """Rancore: attiva subito la forma Shedinja (condivide la ricarica con
+        Muta). La punizione al killer è gestita in _cheat_death."""
+        self._enter_shedinja(p, rancore=True)
+
+    # --- mosse / passive della linea Poliwag ---------------------------------
+    def _cast_arc(self, p, mv, rank, origin, tgt):
+        """Bolla: una bolla in ARCO verso il punto mirato (telegrafato). Dopo un
+        breve ritardo atterra, fa pochi danni nell'area e fa saltare (knock-up =
+        breve stordimento, negli effects)."""
+        to = tgt - origin
+        center = (origin + to.normalized() * min(to.length(), mv.range)
+                  if to.length() > 1e-6 else Vec2(tgt.x, tgt.y))
+        delay = float(mv.effects.get("delay", 0.55))
+        # Impatto singolo ritardato (riusa le aree persistenti con un solo tick).
+        self.area_effects.append({
+            "center": Vec2(center.x, center.y), "radius": mv.radius,
+            "start": self.time + delay, "end": self.time + delay + 0.05,
+            "next": self.time + delay, "interval": 1e9,
+            "caster_id": p.id, "mv": mv, "rank": rank, "mtype": mv.type,
+            "fx": mv.fx})
+        # Bolla in ARCO + telegraph del punto d'atterraggio (un unico evento con
+        # la durata dell'arco; l'impatto lo emette l'area_effect quando atterra).
+        self.fx_events.append({"kind": "arcbubble", "a": (origin.x, origin.y),
+                               "b": (center.x, center.y), "radius": mv.radius,
+                               "delay": delay, "mtype": mv.type})
+
+    def _cast_raindance(self, p, mv, rank, origin, tgt):
+        """Pioggiadanza: zona di pioggia a tempo centrata su di sé. Dentro, le
+        mosse Acqua degli alleati sono potenziate e conta come pioggia per
+        Nuotovelox (gestito in _hit / _in_rain via self.rain_zones)."""
+        dur = float(mv.effects.get("duration", 3.0))
+        rad = mv.radius if mv.radius > 0 else 3.0
+        self.rain_zones.append({"center": Vec2(origin.x, origin.y), "radius": rad,
+                                "end": self.time + dur, "team": p.team})
+        self.fx_events.append({"kind": "zone", "c": (origin.x, origin.y),
+                               "radius": rad, "mtype": mv.type, "fx": mv.fx})
+
+    def _cast_healzone(self, p, mv, rank, origin, tgt):
+        """Acquanello: cura nel tempo a sé e agli alleati vicini (la zona segue
+        chi la lancia)."""
+        dur = float(mv.effects.get("duration", 4.0))
+        rad = mv.radius if mv.radius > 0 else 3.0
+        amt = self._rank_val(mv.effects.get("heal", []), rank)
+        interval = float(mv.effects.get("interval", 1.0))
+        self.area_effects.append({
+            "center": Vec2(origin.x, origin.y), "radius": rad,
+            "start": self.time, "end": self.time + dur + 1e-3,
+            "next": self.time, "interval": interval,
+            "caster_id": p.id, "heal_ally": amt, "follow": p.id,
+            "mtype": mv.type, "fx": mv.fx})
+        self.fx_events.append({"kind": "zone", "c": (origin.x, origin.y),
+                               "radius": rad, "mtype": mv.type, "fx": mv.fx})
+
+    def _cast_throwback(self, p, mv, rank, origin, tgt, dirv):
+        """Ribaltiro: afferra il nemico più vicino a portata e lo scaraventa
+        DIETRO di sé, con danno e breve confusione (negli effects)."""
+        best, bd = None, 1e9
+        for e in self._combat_hash.query_radius(origin.x, origin.y, mv.range + 1.0):
+            if e.team == p.team or not getattr(e, "alive", False) or not isinstance(e, Pokemon):
+                continue
+            if e.is_decoy:
+                continue
+            d = origin.dist(e.pos)
+            if d <= mv.range + e.radius and d < bd:
+                best, bd = e, d
+        if best is None:
+            return
+        can_move = best.untargetable_until <= self.time
+        start = Vec2(best.pos.x, best.pos.y)
+        self._hit(p, mv, rank, best)   # danno + confusione (negli effects)
+        if best.alive and can_move:
+            behind = self._nearest_walkable(origin - dirv * float(mv.d.get("toss", 2.5)), origin)
+            # Non teletrasporta: il nemico si BLOCCA, viene sollevato in arco e
+            # atterra dietro al lanciatore (vedi _update_tosses). Durante il volo
+            # è fermo (stun) così si vede il movimento.
+            dur = float(mv.effects.get("toss_time", 0.4))
+            best.stop()
+            best.stun_until = max(best.stun_until, self.time + dur)
+            self.tosses.append({"pid": best.id, "start": start,
+                                "end": Vec2(behind.x, behind.y),
+                                "t0": self.time, "dur": dur, "peak": 2.2})
+            self.fx_events.append({"kind": "dash", "a": (origin.x, origin.y),
+                                   "b": (behind.x, behind.y), "mtype": mv.type})
+
+    def _cast_bounce(self, p, mv, rank, origin, tgt):
+        """Rimbalzo: salta in aria (non bersagliabile e fermo) per `air_time` e
+        poi atterra nell'area scelta (vedi _update_air_landings)."""
+        dur = float(mv.effects.get("air_time", 1.0))
+        to = tgt - origin
+        dest = (origin + to.normalized() * min(to.length(), mv.range)
+                if to.length() > 1e-6 else Vec2(tgt.x, tgt.y))
+        dest = self._nearest_walkable(dest, origin)
+        p.stop()
+        self._apply_untargetable(p, dur + 0.05)
+        p.stun_until = max(p.stun_until, self.time + dur)   # in aria: fermo e inattivo
+        self.air_landings.append({"pid": p.id, "pos": Vec2(dest.x, dest.y),
+                                  "mv": mv, "rank": rank, "at": self.time + dur})
+        self.fx_events.append({"eid": p.id, "anim": "Hop", "anim_speed": 1.5})
+        self.fx_events.append({"kind": "area", "c": (dest.x, dest.y),
+                               "radius": mv.radius, "mtype": mv.type})
+
+    def _update_air_landings(self, dt: float) -> None:
+        pend = []
+        for al in self.air_landings:
+            if self.time < al["at"]:
+                pend.append(al)
+                continue
+            p = self.world.get(al["pid"])
+            if p is None or not p.alive:
+                continue
+            mv, rank, dest = al["mv"], al["rank"], al["pos"]
+            p.pos = Vec2(dest.x, dest.y)
+            p.untargetable_until = self.time   # atterra: torna bersagliabile
+            p.stop()
+            self._apply_support(p, mv, rank, dest)   # cura + scudo agli alleati
+            for e in self._combat_hash.query_radius(dest.x, dest.y, mv.radius + 1.0):
+                if e.team == p.team or not getattr(e, "alive", False):
+                    continue
+                if dest.dist(e.pos) <= mv.radius + getattr(e, "radius", 0.0):
+                    self._hit(p, mv, rank, e)   # danno + stordimento (negli effects)
+            self.fx_events.append({"kind": "area", "c": (dest.x, dest.y),
+                                   "radius": mv.radius, "mtype": mv.type, "fx": mv.fx})
+        self.air_landings = pend
+
+    def _update_tosses(self, dt: float) -> None:
+        """Ribaltiro: muove il nemico scaraventato lungo un arco (parabola) dal
+        punto di presa fino a dietro il lanciatore, sollevandolo visivamente
+        (air_z) durante il volo. Finito l'arco, lo posa e azzera il sollevamento."""
+        pend = []
+        for ts in self.tosses:
+            p = self.world.get(ts["pid"])
+            if p is None or not getattr(p, "alive", False):
+                continue
+            t = (self.time - ts["t0"]) / ts["dur"] if ts["dur"] > 0 else 1.0
+            if t >= 1.0:
+                p.pos = Vec2(ts["end"].x, ts["end"].y)
+                p.air_z = 0.0
+                p.stop()
+                continue
+            s, e = ts["start"], ts["end"]
+            p.pos = Vec2(s.x + (e.x - s.x) * t, s.y + (e.y - s.y) * t)
+            p.air_z = ts["peak"] * 4.0 * t * (1.0 - t)   # parabola (0 ai capi, max a metà)
+            p.stop()
+            pend.append(ts)
+        self.tosses = pend
+
+    def _update_rain_zones(self, dt: float) -> None:
+        self.rain_zones = [rz for rz in self.rain_zones if self.time < rz["end"]]
+
+    # --- pioggia / Piovischio / Nuotovelox / Roccia di Re --------------------
+    def _iter_politoads(self):
+        return [q for q in self.world.pokemons()
+                if q.alive and q.passive_id == "piovischio"]
+
+    def _in_rain(self, p) -> bool:
+        """Vero se il Pokémon è in acqua o sotto la pioggia (Nuotovelox)."""
+        if self.jungle.weather == "rain":
+            return True
+        tx, ty = int(p.pos.x), int(p.pos.y)
+        if self.world.grid.tile_at(tx, ty) == TILE_RIVER:
+            return True
+        for rz in self.rain_zones:
+            if p.pos.dist(rz["center"]) <= rz["radius"]:
+                return True
+        for pt in self._iter_politoads():
+            if p.pos.dist(pt.pos) <= PIOVISCHIO_RADIUS:
+                return True
+        return False
+
+    def _water_boost(self, pos, team) -> float:
+        """+20% alle mosse Acqua lanciate da `team` dentro una sua pioggia
+        (aura Piovischio di Politoad alleato o zona Pioggiadanza)."""
+        for pt in self._iter_politoads():
+            if pt.team == team and pos.dist(pt.pos) <= PIOVISCHIO_RADIUS:
+                return WATER_BOOST
+        for rz in self.rain_zones:
+            if rz.get("team") == team and pos.dist(rz["center"]) <= rz["radius"]:
+                return WATER_BOOST
+        return 1.0
+
+    def _fire_reduce(self, target_pos, target_team) -> float:
+        """-20% alle mosse Fuoco che colpiscono un'unità dentro l'aura
+        Piovischio della sua stessa squadra."""
+        for pt in self._iter_politoads():
+            if pt.team == target_team and target_pos.dist(pt.pos) <= PIOVISCHIO_RADIUS:
+                return FIRE_REDUCE
+        return 1.0
+
+    def _give_heal(self, caster, target, amount: float) -> None:
+        """Cura `target` e, se il curatore ha la Roccia di Re, dà all'alleato
+        anche uno scudo pari al 30% della cura effettiva."""
+        if amount <= 0.0 or not getattr(target, "alive", False):
+            return
+        before = target.hp
+        target.hp = min(target.max_hp, target.hp + amount)
+        healed = target.hp - before
+        if (healed > 0.0 and isinstance(caster, Pokemon) and target is not caster
+                and "king_rock" in caster.items):
+            self._apply_shield(target, healed * KINGROCK_SHIELD_FRAC, KINGROCK_SHIELD_DUR)
+
+    def _apply_silence(self, p, dur):   # Ripeti: solo autoattacchi, niente mosse
+        if self._cc_immune(p):
+            return
+        dur = self._tenacity_dur(p, dur)
+        p.silence_until = max(p.silence_until, self.time + dur)
+
+    def _cast_perish(self, p, mv, rank, origin, tgt):
+        """Ultimocanto: area con conto alla rovescia; alla fine i nemici ancora
+        dentro subiscono danno pari a una grossa % dei loro HP massimi."""
+        to = tgt - origin
+        center = (origin + to.normalized() * min(to.length(), mv.range)
+                  if to.length() > 1e-6 else Vec2(tgt.x, tgt.y))
+        countdown = float(mv.effects.get("countdown", 3.0))
+        self.area_effects.append({
+            "center": Vec2(center.x, center.y), "radius": mv.radius,
+            "perish": float(mv.effects.get("hp_frac", 0.45)),
+            "detonate_at": self.time + countdown,
+            "next": self.time, "interval": 0.5,
+            "caster_id": p.id, "mtype": mv.type, "fx": mv.fx})
+        self.fx_events.append({"kind": "zone", "c": (center.x, center.y),
+                               "radius": mv.radius, "mtype": mv.type, "fx": mv.fx})
+
     def _update_area_effects(self, dt: float) -> None:
+        now = self.time
         alive = []
         for ae in self.area_effects:
+            # Acquanello: cura nel tempo agli alleati (la zona segue il lanciatore).
+            if ae.get("heal_ally") is not None:
+                caster = self.world.get(ae["caster_id"])
+                if now >= ae["end"] or caster is None or not caster.alive:
+                    continue
+                fol = ae.get("follow")
+                if fol is not None:
+                    src = self.world.get(fol)
+                    if src is not None and src.alive:
+                        ae["center"] = Vec2(src.pos.x, src.pos.y)
+                c = ae["center"]
+                if now >= ae["next"]:
+                    ae["next"] = now + ae["interval"]
+                    amt = ae["heal_ally"] * (caster.heal_power
+                                             if isinstance(caster, Pokemon) else 1.0)
+                    for a in self._combat_hash.query_radius(c.x, c.y, ae["radius"] + 1.0):
+                        if (isinstance(a, Pokemon) and a.team == caster.team and a.alive
+                                and c.dist(a.pos) <= ae["radius"] + a.radius):
+                            self._give_heal(caster, a, amt)
+                    self.fx_events.append({"kind": "zone", "c": (c.x, c.y),
+                                           "radius": ae["radius"], "mtype": ae["mtype"],
+                                           "fx": ae.get("fx", "")})
+                alive.append(ae)
+                continue
+            # Ultimocanto: conto alla rovescia, poi danno %HP max ai nemici dentro.
+            if ae.get("perish") is not None:
+                caster = self.world.get(ae["caster_id"])
+                c = ae["center"]
+                if now >= ae["detonate_at"]:
+                    if caster is not None:
+                        frac = float(ae["perish"])
+                        for e in self._combat_hash.query_radius(c.x, c.y, ae["radius"] + 1.0):
+                            if e.team == caster.team or not getattr(e, "alive", False):
+                                continue
+                            if c.dist(e.pos) <= ae["radius"] + getattr(e, "radius", 0.0):
+                                self._deal_damage(caster, e,
+                                                  getattr(e, "max_hp", 0.0) * frac, dmg_type=None)
+                    self.fx_events.append({"kind": "area", "c": (c.x, c.y),
+                                           "radius": ae["radius"], "mtype": ae["mtype"],
+                                           "fx": ae.get("fx", "")})
+                    continue   # detonata: rimuovi
+                if now >= ae["next"]:
+                    ae["next"] = now + ae["interval"]
+                    self.fx_events.append({"kind": "zone", "c": (c.x, c.y),
+                                           "radius": ae["radius"], "mtype": ae["mtype"],
+                                           "fx": ae.get("fx", "")})
+                alive.append(ae)
+                continue
             if self.time >= ae["end"]:
                 continue
             if self.time >= ae["start"] and self.time >= ae["next"]:
@@ -1526,12 +2094,20 @@ class Match:
                             and c.dist(caster.pos) <= ae["radius"] + getattr(caster, "radius", 0.0)):
                         caster.inversion_oc_until = self.time + ae["interval"] + 0.25
                         self._add_inversion(caster, int(ae["mv"].effects.get("overcharge", 5)))
+                    slow = ae["mv"].effects.get("slow") if ae.get("slow_only") else None
                     for e in self._combat_hash.query_radius(c.x, c.y, ae["radius"] + 1.0):
                         if e.team == caster.team or not getattr(e, "alive", False):
                             continue
                         if c.dist(e.pos) <= ae["radius"] + getattr(e, "radius", 0.0):
-                            self._hit(caster, ae["mv"], ae["rank"], e)
-                if ae.get("inversion_owner"):
+                            if slow is not None:   # Mulinello: solo rallentamento ricorrente
+                                if isinstance(e, Pokemon):
+                                    self._apply_slow(e, float(slow.get("mult", 1.0)),
+                                                     float(slow.get("duration", 1.0)))
+                            else:
+                                self._hit(caster, ae["mv"], ae["rank"], e)
+                if ae.get("silent"):
+                    pass   # Mulinello: il vortice è un unico FX persistente, niente anelli
+                elif ae.get("inversion_owner"):
                     # VerdeBufera: ripulsa la zona intera a ogni tick (campo animato continuo).
                     self.fx_events.append({"kind": "zone", "c": (c.x, c.y),
                                            "radius": ae["radius"], "mtype": ae["mtype"], "fx": ""})
@@ -1593,6 +2169,14 @@ class Match:
             return
         mv, rank = data
         center = Vec2(p.pos.x, p.pos.y)
+        # Doppioteam: niente onda d'urto; riemerge lasciando un clone esca.
+        if "decoy" in mv.effects:
+            dirv = DIR_VECTORS[p.facing].normalized()
+            self._spawn_decoy(p, dirv, float(mv.effects["decoy"].get("duration", 4.0)))
+            p.stop()
+            self.fx_events.append({"kind": "area", "c": (center.x, center.y),
+                                   "radius": 1.0, "mtype": mv.type})
+            return
         for e in self._combat_hash.query_radius(center.x, center.y, mv.radius + 1.0):
             if e.team == p.team or not getattr(e, "alive", False):
                 continue
@@ -1700,6 +2284,32 @@ class Match:
         self.fx_events.append({"kind": "area", "c": (center.x, center.y),
                                "radius": mv.radius, "mtype": mv.type})
 
+    def _cast_whirlpool(self, p, mv, rank, origin, tgt):
+        """Mulinello: un vortice PERSISTENTE a terra per tutta la sua durata.
+        Registra una zona che pulsa danno/rallentamento a intervalli e un unico
+        effetto visivo "vortex" che gira per lo stesso tempo (non un lampo)."""
+        to = tgt - origin
+        d = to.length()
+        center = (origin + to.normalized() * mv.range if d > mv.range
+                  else Vec2(tgt.x, tgt.y))
+        dur = float(mv.effects.get("duration", 1.5))
+        interval = float(mv.effects.get("interval", 0.3))
+        # Danno UNA volta (come prima), poi la zona resta e RI-APPLICA solo il
+        # rallentamento a chi ci sta dentro: il vortice morde ma non martella.
+        for e in self._combat_hash.query_radius(center.x, center.y, mv.radius + 1.0):
+            if e.team == p.team or not getattr(e, "alive", False):
+                continue
+            if center.dist(e.pos) <= mv.radius + getattr(e, "radius", 0.0):
+                self._hit(p, mv, rank, e)
+        self.area_effects.append({
+            "center": Vec2(center.x, center.y), "radius": mv.radius,
+            "start": self.time + interval, "end": self.time + dur,
+            "next": self.time + interval, "interval": interval,
+            "caster_id": p.id, "mv": mv, "rank": rank, "mtype": mv.type,
+            "fx": mv.fx, "silent": True, "slow_only": True})
+        self.fx_events.append({"kind": "vortex", "c": (center.x, center.y),
+                               "radius": mv.radius, "dur": dur, "mtype": mv.type})
+
     def _cast_dash(self, p, mv, rank, origin, tgt, dirv):
         if p.dashlock_until > self.time:   # Cucitombra: scatti bloccati
             return
@@ -1779,6 +2389,15 @@ class Match:
                          and mv.type == caster.judgment_plate)
             stab = STAB_MULT if (mv.type in caster.types or has_plate) else 1.0
             raw *= eff * stab * self.jungle.weather_damage_mult(mv.type)
+            # Pioggia locale (Piovischio/Pioggiadanza): +20% alle mosse Acqua
+            # alleate; -20% alle mosse Fuoco che colpiscono un alleato nell'aura.
+            if self.rain_zones or (mv.type in ("Water", "Fire")
+                                   and any(q.passive_id == "piovischio"
+                                           for q in self.world.pokemons())):
+                if mv.type == "Water" and isinstance(caster, Pokemon):
+                    raw *= self._water_boost(caster.pos, caster.team)
+                elif mv.type == "Fire" and isinstance(target, Pokemon):
+                    raw *= self._fire_reduce(target.pos, target.team)
             # Bonus contro bersagli con stati alterati (Sciagura) o addormentati (Mangiasogni).
             if isinstance(target, Pokemon):
                 if "bonus_vs_status" in fx and self._has_status(target):
@@ -1793,10 +2412,12 @@ class Match:
                 if any(a is not caster and a.team == caster.team and a.alive
                        and need & set(a.types) for a in self.world.pokemons()):
                     raw *= float(bat.get("mult", 1.05))
+            if mv.d.get("fury") and isinstance(target, Pokemon):  # Sfuriate: ramp fino a 5×
+                raw *= self._fury_mult(caster, target)
             crit_bonus = HIGH_CRIT_CHANCE if mv.d.get("high_crit") else 0.0
             dmg = self._mitigate_hit(caster, target, raw, magic=magic,
                                      crit_bonus=crit_bonus)
-            self._deal_damage(caster, target, dmg)
+            self._deal_damage(caster, target, dmg, dmg_type=mv.type)
             self._vamp(caster, dmg, physical=not magic)
             if "heal_self_ratio" in fx and isinstance(caster, Pokemon):  # Mangiasogni
                 caster.hp = min(caster.max_hp, caster.hp + dmg * float(fx["heal_self_ratio"]))
@@ -1812,6 +2433,9 @@ class Match:
             cf = fx.get("confuse")
             if cf:
                 self._apply_confuse(target, float(cf.get("duration", 1.0)))
+            si = fx.get("silence")
+            if si:
+                self._apply_silence(target, float(si.get("duration", 2.0)))
             dd = fx.get("def_debuff")
             if dd:
                 self._apply_def_debuff(target, float(dd.get("amount", 0)),
@@ -1867,6 +2491,10 @@ class Match:
                 targets.append(caster)
         else:
             targets = [caster]
+        # Panciamburo: sacrifica una frazione degli HP ATTUALI prima del buff.
+        hc = eff.get("hp_cost_frac")
+        if hc and isinstance(caster, Pokemon):
+            caster.hp = max(1.0, caster.hp * (1.0 - float(hc)))
         # Potere cure/scudi del lanciatore: cure e scudi × heal_power.
         hp_power = caster.heal_power if isinstance(caster, Pokemon) else 1.0
         heal = eff.get("heal")
@@ -1876,7 +2504,7 @@ class Match:
                 w = self.jungle.weather
                 amt *= 2.0 if w == "sun" else (0.5 if w == "rain" else 1.0)
             for a in targets:
-                a.hp = min(a.max_hp, a.hp + amt)
+                self._give_heal(caster, a, amt)   # + scudo Roccia di Re sugli alleati
         if "heal_self_ratio" in eff:
             caster.hp = min(caster.max_hp,
                             caster.hp + mv.power_at(rank) * float(eff["heal_self_ratio"]) * hp_power)
@@ -1893,6 +2521,10 @@ class Match:
         if spd:
             for a in targets:
                 self._apply_speed(a, float(spd.get("mult", 1.2)), float(spd.get("duration", 3.0)))
+        dfb = eff.get("def")   # Indurimento: difesa temporanea
+        if dfb:
+            for a in targets:
+                self._apply_def_buff(a, float(dfb.get("mult", 1.2)), float(dfb.get("duration", 4.0)))
         ram = eff.get("rampage")
         if ram:   # Oltraggio: inarrestabile per qualche secondo
             self._apply_rampage(caster, float(ram.get("duration", 4.0)))
@@ -1998,6 +2630,10 @@ class Match:
         p.atk_mult = mult
         p.atk_until = self.time + dur
 
+    def _apply_def_buff(self, p, mult, dur):   # Indurimento: +difesa temporanea
+        p.def_buff_mult = mult
+        p.def_buff_until = self.time + dur
+
     def _apply_speed(self, p, mult, dur):
         p.speed_mult = mult
         p.speed_until = self.time + dur
@@ -2042,6 +2678,7 @@ class Match:
             p.def_debuff_active = p.def_debuff_until > self.time
             p.spdef_debuff_active = p.spdef_debuff_until > self.time
             p.atk_debuff_active = p.atk_debuff_until > self.time
+            p.def_buff_active = p.def_buff_until > self.time
             # Sonno ritardato (Ipnosi): scatta dopo il ritardo.
             if p.sleep_arm_at >= 0.0 and self.time >= p.sleep_arm_at:
                 if not self._cc_immune(p):
@@ -2066,6 +2703,8 @@ class Match:
                            or p.confuse_until > self.time)
             p.speed = (p.move_speed_base * p.slow_mult * p.speed_mult
                        * self.jungle.terrain_speed_mult(p))
+            if p.passive_id == "nuotovelox" and self._in_rain(p):
+                p.speed *= NUOTOVELOX_SPEED   # +20% in acqua/pioggia
             if p.fear_until > self.time:
                 p.speed *= 0.5   # spavento: fuga rallentata del 50%
                 p.cc_active = True
@@ -2108,7 +2747,7 @@ class Match:
                 break
 
     def _bot_try_cast(self, p, target) -> None:
-        if p.pending_cast is not None:
+        if p.pending_cast is not None or p.silence_until > self.time:
             return
         for slot in ("R", "Q", "W", "E"):
             ms = p.moveset.get(slot)

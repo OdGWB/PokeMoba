@@ -64,6 +64,7 @@ class NetMatchScene:
         # locale: la grafica della giungla e' identica anche online.
         self.particles = ParticleSystem()
         self.animators = {}
+        self._unit_dex = {}   # dex per unità (per ricreare lo sprite al cambio forma)
         self.camera_locked = True
         self.aiming_slot = None
         self._sprite_cache = {}
@@ -244,8 +245,15 @@ class NetMatchScene:
                                me.pos.y * config.TILE_SIZE, pygame.mouse.get_pos(),
                                pygame.key.get_pressed()[pygame.K_SPACE])
         for u in self.world.units():
+            from engine.entities import Pokemon
+            # Ricrea l'animatore se il dex cambia (es. forma Shedinja: 291 -> 292).
+            if (u.id in self.animators and isinstance(u, Pokemon)
+                    and self._unit_dex.get(u.id) != u.dex):
+                self.animators.pop(u.id, None)
             if u.id not in self.animators:
                 self.animators[u.id] = self._net_animator(u)
+                if isinstance(u, Pokemon):
+                    self._unit_dex[u.id] = u.dex
             self.animators[u.id].update(dt, u.moving, u.facing)
         # Particelle d'atmosfera: aggiornate solo nel rettangolo visibile.
         self.particles.update(dt, self.camera, self.map_data.grid)

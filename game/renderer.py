@@ -725,6 +725,12 @@ class Renderer:
                 # velato di verde (gli altri non ti vedono, vision.py).
                 in_bush = (e.team == player_team and isinstance(e, Pokemon)
                            and world.grid.tile_at(int(e.pos.x), int(e.pos.y)) == TILE_BUSH)
+                # Sollevamento in aria (Ribaltiro/Rimbalzo): ombra a terra + sprite
+                # alzato, così il salto/lancio è visibile (non un teletrasporto).
+                lift = int(getattr(e, "air_z", 0.0) * ts)
+                if lift > 0:
+                    self._draw_air_shadow(surface, e, gx, gy)
+                    gy -= lift
                 anim = animators.get(e.id)
                 if anim is not None:
                     anim.draw(surface, gx, gy)
@@ -749,6 +755,19 @@ class Renderer:
             lx = gx + int(math.cos(ang) * r * 0.7)
             ly = gy - int(abs(math.sin(ang)) * r * 0.6)
             pygame.draw.circle(surface, (90, 150, 80), (lx, ly), 1)
+
+    def _draw_air_shadow(self, surface, u, gx, gy):
+        """Ombra ellittica a terra sotto un'unità sollevata in aria (più piccola
+        e tenue man mano che sale)."""
+        ts = self.tile_size
+        r = max(3, int(u.radius * ts))
+        z = getattr(u, "air_z", 0.0)
+        scale = max(0.4, 1.0 - 0.18 * z)   # l'ombra si restringe con l'altezza
+        w = int(r * 2 * scale)
+        h = max(2, int(r * scale))
+        sh = pygame.Surface((w, h), pygame.SRCALPHA)
+        pygame.draw.ellipse(sh, (0, 0, 0, 90), sh.get_rect())
+        surface.blit(sh, (gx - w // 2, gy - h // 2))
 
     def _draw_submerged(self, surface, u, gx, gy):
         """Unità sott'acqua (SUB): mostra solo un vortice/pozza, non lo sprite."""

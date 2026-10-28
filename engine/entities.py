@@ -129,6 +129,9 @@ class Pokemon(Unit):
     atk_until: float = -1.0
     shield: float = 0.0
     shield_until: float = -1.0
+    # Sollevamento visivo (salto/lancio in aria, es. Ribaltiro/Rimbalzo): il
+    # client alza lo sprite di air_z tile e disegna un'ombra a terra. Cosmetico.
+    air_z: float = 0.0
     passive_bonus: dict = field(default_factory=dict)   # {stat: valore} permanente (mosse)
     # Oro e oggetti (Fase 6)
     gold: float = 500.0
@@ -144,6 +147,7 @@ class Pokemon(Unit):
     cc_active: bool = False            # True se sotto un qualunque CC (per ForzaBruta)
     stun_until: float = -1.0           # immobilizzato (stun / congelamento): niente movimento/azioni
     confuse_until: float = -1.0        # confuso: attacca gli alleati
+    silence_until: float = -1.0        # silenziato: solo autoattacchi, niente mosse (Ripeti)
     untargetable_until: float = -1.0   # non bersagliabile (SUB)
     rampage_until: float = -1.0        # Oltraggio attivo
     cc_immune_until: float = -1.0      # immune ai CC (durante Oltraggio)
@@ -187,6 +191,27 @@ class Pokemon(Unit):
     poison_src: int | None = None
     # Passiva Corpofunesto (cariche d'anima)
     soul_charges: int = 0
+    # Passiva Muta / forma Shedinja (linea Nincada): forma temporanea.
+    #   form: "" normale, "shedinja" guscio temporaneo (HP fissi a 1, Coleottero/Spettro).
+    form: str = ""
+    form_until: float = -1.0           # istante in cui la forma Shedinja finisce
+    rancore_form: bool = False         # True se la forma Shedinja viene dalla R Rancore
+    muta_cd_until: float = -1.0        # ricarica condivisa Muta/Rancore (150s)
+    muta_cd_max: float = 150.0
+    ninjask_stats: dict = field(default_factory=dict)   # stat base reali salvate per il ritorno
+    ninjask_types: list = field(default_factory=list)   # tipi salvati per il ritorno
+    ninjask_dex: int = 0
+    # Potenziamento difesa temporaneo (Indurimento)
+    def_buff_until: float = -1.0
+    def_buff_active: bool = False
+    def_buff_mult: float = 1.0
+    # Sfuriate (colpi consecutivi sullo stesso bersaglio)
+    fury_target: int | None = None
+    fury_stacks: int = 0
+    fury_until: float = -1.0
+    # Doppioteam (clone esca): unita' innocua che cammina e svanisce
+    is_decoy: bool = False
+    decoy_until: float = -1.0
     # Passiva Inversione (linea Snivy): ogni carica dà +1% ATT e +1% SPAT.
     inversion_stacks: int = 0
     inversion_oc_until: float = -1.0   # finestra "sovraccarico" (tetto 100 anziché 50)
@@ -231,6 +256,8 @@ class Pokemon(Unit):
         d = self.stats.defense + self._bonus("defense") + self._soul()
         if self.def_debuff_active:
             d = (d - self.def_debuff_amt) * self.def_debuff_mult
+        if self.def_buff_active:        # Indurimento: +difesa temporanea
+            d *= self.def_buff_mult
         return max(0.0, d)
 
     def eff_sp_defense(self) -> float:

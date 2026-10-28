@@ -1,0 +1,119 @@
+{
+  "_comment": "Poliwag -> Poliwhirl (liv.4) -> Poliwrath OPPURE Politoad (liv.8, RAMIFICATA). Con la Roccia di Re in inventario al liv.8 Poliwhirl evolve in Politoad, altrimenti in Poliwrath (vedi engine/evolution.py: branch 'requires'). Poliwrath = combattente di prima linea (Acqua/Lotta, Assorbacqua). Politoad = supporto curatore (Acqua, Piovischio). Statistiche = valori base reali (la derivazione le scala). La R cambia in base alla forma: base = Poliwrath (Dinamipugno/Zuffa); lo stadio Politoad sovrascrive la R (Rimbalzo/Ultimocanto).",
+  "dex": 60,
+  "name": "Poliwag",
+  "types": ["Water"],
+  "role": "combattente",
+  "color": [90, 130, 200],
+  "radius": 0.34,
+  "base_speed": 3.6,
+  "attack_range": 2.6,
+  "attack_cooldown": 0.9,
+  "sprite_dir": "assets/pokemon/0060",
+  "passive": "nuotovelox",
+  "attack_fx": "orb",
+
+  "base_stats": {"hp": 40, "attack": 50, "defense": 40, "sp_attack": 40, "sp_defense": 40, "speed": 90},
+
+  "evolutions": [
+    {"stage": 0, "level": 1, "name": "Poliwag", "dex": 60, "sprite_dir": "assets/pokemon/0060",
+     "types": ["Water"], "passive": "nuotovelox", "role": "combattente", "color": [90, 130, 200],
+     "attack_fx": "orb", "attack_range": 2.6, "ranged": true, "radius": 0.34,
+     "base_stats": {"hp": 40, "attack": 50, "defense": 40, "sp_attack": 40, "sp_defense": 40, "speed": 90}},
+
+    {"stage": 1, "level": 4, "name": "Poliwhirl", "dex": 61, "sprite_dir": "assets/pokemon/0061",
+     "types": ["Water"], "passive": "nuotovelox", "role": "combattente", "color": [80, 120, 195],
+     "attack_fx": "orb", "attack_range": 2.6, "ranged": true, "radius": 0.42,
+     "base_stats": {"hp": 65, "attack": 65, "defense": 65, "sp_attack": 50, "sp_defense": 50, "speed": 90}},
+
+    {"stage": 2, "level": 8, "name": "Poliwrath", "dex": 62, "sprite_dir": "assets/pokemon/0062",
+     "types": ["Water", "Fighting"], "passive": "assorbacqua", "role": "tank", "color": [70, 100, 180],
+     "attack_fx": "slash", "attack_range": 1.7, "ranged": false, "radius": 0.52,
+     "base_stats": {"hp": 90, "attack": 95, "defense": 95, "sp_attack": 70, "sp_defense": 90, "speed": 70}},
+
+    {"stage": 2, "level": 8, "name": "Politoad", "dex": 186, "sprite_dir": "assets/pokemon/0186",
+     "types": ["Water"], "passive": "piovischio", "role": "supporto", "color": [120, 180, 90],
+     "attack_fx": "orb", "attack_range": 3.4, "ranged": true, "radius": 0.48,
+     "requires": {"has_item": "king_rock"},
+     "base_stats": {"hp": 90, "attack": 75, "defense": 75, "sp_attack": 90, "sp_defense": 100, "speed": 70},
+     "moves": {
+       "R": {
+         "upgrades": [
+           {"id": "bounce", "name": "Rimbalzo", "type": "Flying", "category": "physical", "shape": "bounce",
+            "target": "ally", "power": [180, 250, 320], "ratio": 0.7,
+            "cooldown": [85, 75, 65], "range": 5.0, "radius": 2.6,
+            "effects": {"air_time": 1.0, "heal": [120, 180, 240],
+                        "shield": {"amount": [120, 180, 240], "duration": 3.0},
+                        "stun": {"duration": 1.2}}},
+           {"id": "perishsong", "name": "Ultimocanto", "type": "Normal", "category": "none", "shape": "perish",
+            "target": "point", "power": [0, 0, 0],
+            "cooldown": [100, 90, 80], "range": 5.5, "radius": 3.0,
+            "effects": {"countdown": 3.0, "hp_frac": 0.45}}
+         ]
+       }
+     }}
+  ],
+
+  "moves": {
+    "Q": {
+      "base": {"id": "bubble", "name": "Bolla", "type": "Water", "category": "special", "shape": "arc",
+               "fx": "arcbubble", "target": "point", "power": [40, 60, 80, 100], "ratio": 0.45,
+               "cooldown": [5, 4.5, 4, 3.5], "range": 5.5, "radius": 1.6,
+               "effects": {"delay": 0.55, "stun": {"duration": 0.5}}},
+      "upgrades": [
+        {"id": "bubblebeam", "name": "Bollaraggio", "type": "Water", "category": "special", "shape": "bubble",
+         "fx": "jet", "target": "direction", "power": [70, 100, 130, 160], "ratio": 0.55,
+         "cooldown": [4, 3.75, 3.5, 3.25], "range": 7.0, "speed": 12.0, "radius": 0.6,
+         "effects": {"slow": {"mult": 0.85, "duration": 1.2}}},
+        {"id": "mirrormove", "name": "Ripeti", "type": "Normal", "category": "special", "shape": "bolt",
+         "fx": "bolt", "target": "point", "power": [30, 45, 60, 75], "ratio": 0.3,
+         "cooldown": [9, 8.5, 8, 7.5], "range": 6.0,
+         "effects": {"silence": {"duration": 2.0}}}
+      ]
+    },
+    "W": {
+      "base": {"id": "raindance", "name": "Pioggiadanza", "type": "Water", "category": "none", "shape": "raindance",
+               "target": "self", "power": [0, 0, 0, 0],
+               "cooldown": [12, 11, 10, 9], "radius": 3.0,
+               "effects": {"duration": 3.0}},
+      "upgrades": [
+        {"id": "bellydrum", "name": "Panciamburo", "type": "Normal", "category": "none", "shape": "buff",
+         "target": "self", "power": [0, 0, 0, 0], "cooldown": [16, 15, 14, 13],
+         "passive": {"stat": "attack", "amount": [8, 16, 24, 32]},
+         "effects": {"hp_cost_frac": 0.4, "atk": {"mult": 1.6, "duration": 6.0}}},
+        {"id": "aquaring", "name": "Acquanello", "type": "Water", "category": "none", "shape": "healzone",
+         "target": "ally", "power": [0, 0, 0, 0], "cooldown": [13, 12, 11, 10], "radius": 3.0,
+         "effects": {"heal": [18, 30, 42, 54], "duration": 4.0, "interval": 1.0}}
+      ]
+    },
+    "E": {
+      "base": {"id": "mudshot", "name": "Colpo di fango", "type": "Ground", "category": "special", "shape": "projectile",
+               "fx": "shard", "target": "direction", "power": [55, 80, 105, 130], "ratio": 0.5,
+               "cooldown": [5, 4.5, 4, 3.5], "range": 7.0, "speed": 11.0, "radius": 0.5,
+               "effects": {"slow": {"mult": 0.9, "duration": 1.2}}},
+      "upgrades": [
+        {"id": "vitalthrow", "name": "Ribaltiro", "type": "Fighting", "category": "physical", "shape": "throwback",
+         "fx": "slash", "target": "direction", "power": [70, 105, 140, 175], "ratio": 0.6,
+         "cooldown": [9, 8.5, 8, 7.5], "range": 2.4, "toss": 3.0,
+         "effects": {"confuse": {"duration": 0.5}}},
+        {"id": "whirlpool", "name": "Mulinello", "type": "Water", "category": "special", "shape": "whirlpool",
+         "fx": "vortex", "target": "point", "power": [60, 90, 120, 150], "ratio": 0.5,
+         "cooldown": [8, 7.5, 7, 6.5], "range": 5.5, "radius": 2.2,
+         "effects": {"slow": {"mult": 0.4, "duration": 1.5}, "duration": 1.5, "interval": 0.3}}
+      ]
+    },
+    "R": {
+      "upgrades": [
+        {"id": "dynamicpunch", "name": "Dinamipugno", "type": "Fighting", "category": "physical", "shape": "cone",
+         "fx": "slash", "target": "direction", "power": [260, 360, 460], "ratio": 1.0,
+         "cooldown": [80, 72, 64], "range": 2.6, "angle": 45,
+         "effects": {"confuse": {"duration": 1.5}}},
+        {"id": "closecombat", "name": "Zuffa", "type": "Fighting", "category": "physical", "shape": "area",
+         "fx": "flurry", "target": "self", "power": [320, 440, 560], "ratio": 1.1,
+         "cooldown": [90, 80, 70], "radius": 2.4,
+         "effects": {"self_debuff": {"def_debuff": {"mult": 0.6, "duration": 4.0},
+                                     "spdef_debuff": {"amount": 35, "duration": 4.0}}}}
+      ]
+    }
+  }
+}

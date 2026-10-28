@@ -18,7 +18,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class App:
-    def __init__(self, initial="menu", map_path=None, pokemon_path=None):
+    def __init__(self, initial="menu", map_path=None, pokemon_path=None, start_level=1,
+                 start_items=None):
         pygame.init()
         self.windowed_size = (config.WINDOW_WIDTH, config.WINDOW_HEIGHT)
         self.fullscreen = False
@@ -36,7 +37,8 @@ class App:
 
         if initial == "match":
             from .scenes.match_scene import MatchScene
-            self.scene = MatchScene(map_path, pokemon_path)
+            self.scene = MatchScene(map_path, pokemon_path, start_level=start_level,
+                                    start_items=start_items)
         else:
             from .scenes.menu_scene import MenuScene
             self.scene = MenuScene(self)

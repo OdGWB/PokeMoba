@@ -18,12 +18,17 @@ def main() -> None:
                         help="avvia subito una partita in locale contro i bot")
     parser.add_argument("--map", default="data/maps/map_3v3.json")
     parser.add_argument("--pokemon", default="data/pokemon/charmander.json")
+    parser.add_argument("--level", type=int, default=1,
+                        help="livello di partenza del giocatore (test: es. 8 per Ninjask)")
+    parser.add_argument("--item", action="append", default=[], dest="items",
+                        help="oggetto di partenza (ripetibile; es. --item king_rock per Politoad)")
     args = parser.parse_args()
 
     from game.app import App
     if args.single:
         app = App(initial="match", map_path=str(ROOT / args.map),
-                  pokemon_path=str(ROOT / args.pokemon))
+                  pokemon_path=str(ROOT / args.pokemon), start_level=args.level,
+                  start_items=args.items)
     else:
         app = App(initial="menu")
     app.run()

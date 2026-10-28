@@ -37,7 +37,8 @@ DEATH_FADE = 1.5   # s: posa Hurt tenuta mentre l'unità si dissolve alla morte
 
 
 class MatchScene:
-    def __init__(self, map_path: str, pokemon_path: str):
+    def __init__(self, map_path: str, pokemon_path: str, start_level: int = 1,
+                 start_items=None):
         map_data = load_map(map_path)
         self.map_data = map_data
         self.world = World(map_data.grid)
@@ -47,6 +48,8 @@ class MatchScene:
         self._dying: dict = {}      # unità morte: anim Hurt + dissolvenza breve
         self._sprite_cache: dict = {}
         self._player_stage = 0
+        self._player_dex = self.pdef.dex   # per il cambio sprite anche fra rami (stesso stadio)
+        self._player_form = ""      # forma corrente del giocatore (Shedinja ecc.)
         self.anim_set = self._load_anim(self.pdef.sprite_dir)
         self._using_sprites = self.anim_set is not None
 
@@ -57,6 +60,21 @@ class MatchScene:
             self._setup_moba()
         else:
             self._setup_demo()
+
+        # Oggetti di partenza (test): es. --item king_rock per far evolvere
+        # Poliwhirl in Politoad all'arrivo al liv.8. Vanno dati PRIMA del livello,
+        # così la condizione di ramo è soddisfatta quando scatta l'evoluzione.
+        if start_items and self.match is not None and self.player is not None:
+            for iid in start_items:
+                if self.match.item_catalog.get(iid) is not None:
+                    self.player.items.append(iid)
+            self.match._apply_items(self.player)
+
+        # Livello di partenza (test): porta il giocatore al livello richiesto.
+        if start_level > 1 and self.match is not None and self.player is not None:
+            from engine.stats import CUMULATIVE_XP
+            lvl = max(1, min(start_level, len(CUMULATIVE_XP) - 1))
+            self.match._gain_xp(self.player, CUMULATIVE_XP[lvl] + 1.0)
 
         # Camera.
         map_w_px = map_data.grid.width * config.TILE_SIZE
@@ -146,8 +164,14 @@ class MatchScene:
             self._sprite_cache[sprite_dir] = load_pokemon_animations(sprite_dir)
         return self._sprite_cache[sprite_dir]
 
-    def _stage_sprite_dir(self, stage):
+    def _stage_sprite_dir(self, stage, dex=None):
         evs = self.pdef.evolutions
+        # Con le evoluzioni RAMIFICATE due forme condividono lo stesso stadio
+        # (es. Poliwrath/Politoad a stadio 2): si risolve per DEX, non per indice.
+        if dex is not None and evs:
+            for e in evs:
+                if e.get("dex") == dex and e.get("sprite_dir"):
+                    return e["sprite_dir"]
         if evs and 0 <= stage < len(evs) and evs[stage].get("sprite_dir"):
             return evs[stage]["sprite_dir"]
         return self.pdef.sprite_dir
@@ -156,7 +180,13 @@ class MatchScene:
         from engine.entities import Minion, Pokemon
         # Il giocatore usa gli sprite reali (se presenti).
         if isinstance(unit, Pokemon) and not unit.is_bot:
-            aset = self._load_anim(self._stage_sprite_dir(unit.stage))
+            aset = self._load_anim(self._stage_sprite_dir(unit.stage, unit.dex))
+            if aset is not None:
+                return SpriteAnimator(aset)
+        # Il clone esca (Doppioteam) usa lo stesso sprite del giocatore.
+        if isinstance(unit, Pokemon) and getattr(unit, "is_decoy", False) \
+                and unit.dex == self.pdef.dex:
+            aset = self._load_anim(self._stage_sprite_dir(unit.stage, unit.dex))
             if aset is not None:
                 return SpriteAnimator(aset)
         # I minion usano la skin per squadra+tipo (ridimensionata piccola).
@@ -190,6 +220,10 @@ class MatchScene:
                     self._shop_action(action)
             elif ev.type == pygame.KEYDOWN and ev.key == pygame.K_y:
                 self.camera_locked = not self.camera_locked
+            elif (ev.type == pygame.KEYDOWN and ev.key == pygame.K_h
+                  and self.match is not None):
+                # Test (solo locale): entra subito nella forma Shedinja.
+                self.match.force_shedinja(self.player)
             elif ev.type == pygame.KEYDOWN and ev.key == pygame.K_b:
                 self._menu_seq += 1
                 self.sim.queue_command(RecallCommand(seq=50_000 + self._menu_seq,
@@ -257,10 +291,21 @@ class MatchScene:
         for u in self.world.units():
             if u.id not in self.animators:
                 self.animators[u.id] = self._make_animator(u)
-        # Cambio sprite quando il giocatore si evolve.
-        if self.player.stage != self._player_stage:
+        # Cambio sprite quando il giocatore si evolve (anche di RAMO: stesso stadio,
+        # dex diverso Poliwrath/Politoad) -> si confronta il dex, non lo stadio.
+        if self.player.dex != self._player_dex or self.player.stage != self._player_stage:
             self._player_stage = self.player.stage
-            aset = self._load_anim(self._stage_sprite_dir(self.player.stage))
+            self._player_dex = self.player.dex
+            if getattr(self.player, "form", "") != "shedinja":
+                aset = self._load_anim(self._stage_sprite_dir(self.player.stage, self.player.dex))
+                if aset is not None:
+                    self.animators[self.player.id] = SpriteAnimator(aset)
+        # Cambio sprite quando il giocatore entra/esce dalla forma Shedinja.
+        if getattr(self.player, "form", "") != self._player_form:
+            self._player_form = self.player.form
+            sd = "assets/pokemon/0292" if self._player_form == "shedinja" \
+                else self._stage_sprite_dir(self.player.stage, self.player.dex)
+            aset = self._load_anim(sd)
             if aset is not None:
                 self.animators[self.player.id] = SpriteAnimator(aset)
 
@@ -404,10 +449,16 @@ class MatchScene:
             lines.append(f"Respawn - {self._respawn_status(0)}   {self._respawn_status(1)}   "
                          f"Meteo: {WEATHER_NAMES.get(self.match.jungle.weather, '?')}")
             p = self.player
+            atkm = "+" if p.atk_mult > 1.0 else ""
+            difm = "+" if p.def_buff_active else ("-" if p.def_debuff_active else "")
+            # L'Att. Speciale non e' un valore di danno ma il MOLTIPLICATORE abilita'
+            # (0,6 + 0,004 x SpA_eff); l'AP vero viene dagli oggetti. Mostro entrambi
+            # cosi' lo "speciale" non sembra zero.
             lines.append(
                 f"{p.name} Lv.{p.level}  HP {int(p.hp)}/{int(p.max_hp)}  "
-                f"Atk {int(p.eff_attack())}  Dif {int(p.eff_defense())}  "
-                f"AttSp {int(p.eff_sp_attack())}  Oro {int(p.gold)}  (P: negozio)")
+                f"Atk {int(p.eff_attack())}{atkm}  Dif {int(p.eff_defense())}{difm}  "
+                f"DifSp {int(p.eff_sp_defense())}  MoltAbil x{p.ability_mult:.2f}  "
+                f"AP {int(p.eff_sp_attack())}  Oro {int(p.gold)}  (P: negozio)")
             if self.player.recalling:
                 left = max(0.0, self.player.recall_until - self.match.time)
                 lines.append(f"RICHIAMO in corso... {left:.1f}s (muoviti o subisci danno per annullare)")
@@ -530,6 +581,28 @@ class MatchScene:
             pygame.draw.rect(surface, (110, 215, 130), pygame.Rect(bx, y0 + bh - fill, 16, fill))
             pygame.draw.rect(surface, (170, 230, 180), pygame.Rect(bx, y0, 16, bh), 1)
             surface.blit(font.render(f"Inv {iz}", True, (170, 230, 180)), (bx - 6, y0 - 18))
+        # Passiva Muta (linea Nincada): ricarica e stato della forma Shedinja.
+        if p.passive_id == "muta":
+            bx = x0 + total + 14
+            now = self.match.time if self.match is not None else 0.0
+            in_form = getattr(p, "form", "") == "shedinja"
+            cd_left = max(0.0, p.muta_cd_until - now)
+            ready = cd_left <= 0.0 and not in_form
+            frame = (230, 200, 120) if ready else (120, 110, 90)
+            pygame.draw.rect(surface, (40, 36, 24), pygame.Rect(bx, y0, 16, bh))
+            frac = 1.0 - min(1.0, cd_left / max(1.0, p.muta_cd_max))
+            fill = int(bh * (1.0 if ready else frac))
+            col = (235, 210, 110) if ready else (150, 140, 70)
+            pygame.draw.rect(surface, col, pygame.Rect(bx, y0 + bh - fill, 16, fill))
+            pygame.draw.rect(surface, frame, pygame.Rect(bx, y0, 16, bh), 1)
+            surface.blit(font.render("Muta", True, frame), (bx - 6, y0 - 18))
+            if in_form:
+                left = max(0.0, p.form_until - now)
+                tag = font.render(f"SHEDINJA {left:0.1f}s", True, (210, 180, 240))
+                surface.blit(tag, (bx - tag.get_width() // 2 + 8, y0 + bh + 2))
+            elif not ready:
+                t = font.render(f"{cd_left:0.0f}s", True, frame)
+                surface.blit(t, (bx - t.get_width() // 2 + 8, y0 + bh + 2))
 
         if self.minimap is not None:
             self.minimap.draw(surface, self.world, self.camera, self.vision,

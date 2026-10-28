@@ -276,6 +276,56 @@ class FXSystem:
         self._beam((ax, ay), (bx, by), col, width=0.45, life=0.26)
         self._splash((bx, by), 0.6, col, n=12)
 
+    def _fx_arcbubble(self, e, col):
+        """Bolla: una vera bolla che vola in ARCO (sale e ridiscende) verso il
+        punto mirato, con un cerchio-bersaglio TELEGRAFATO che si chiude mentre la
+        bolla è in volo; all'atterraggio (evento 'area' separato) fa il botto."""
+        a, b = e.get("a"), e.get("b")
+        if a is not None and b is not None:
+            r = float(e.get("radius", 1.6))
+            delay = float(e.get("delay", 0.55))
+            self._shape(kind="target", c=b, r=r, col=col, life=delay)
+            self._shape(kind="bubbleorb", a=a, b=b, col=col, life=delay,
+                        sz=0.5, arc=2.6)
+        else:   # impatto all'atterraggio
+            c = e.get("c")
+            if c is None:
+                return
+            r = float(e.get("radius", 1.6))
+            self._shape(kind="ring", c=c, r0=r * 0.2, r1=r,
+                        col=_lighten(col, 0.25), life=0.42, wd=0.2)
+            self._splash(c, r * 0.75, col, n=18)
+
+    def _fx_vortex(self, e, col):
+        """Mulinello: vortice PERSISTENTE a terra per tutta la durata (un'unica
+        forma che gira), con un tocco di spruzzi iniziali."""
+        c = e.get("c")
+        if c is None:
+            return
+        r = float(e.get("radius", 2.0))
+        dur = float(e.get("dur", 1.5))
+        self._shape(kind="vortex", c=c, r=r, col=col, life=dur)
+        self._splash(c, r * 0.6, col, n=12)
+
+    def _fx_flurry(self, e, col):
+        """Zuffa: raffica di PUGNI che volano attorno al lanciatore (sfalsati nel
+        tempo), più un'onda d'urto. Rende visibile l'attivazione della mossa."""
+        c = e.get("c") or e.get("o")
+        if c is None:
+            return
+        cx, cy = c
+        r = float(e.get("radius", 2.0))
+        lite = _lighten(col, 0.25)
+        self._shape(kind="ring", c=c, r0=0.3, r1=r, col=lite, life=0.4, wd=0.22)
+        n = max(6, int(r * 4))
+        for i in range(n):
+            ang = random.uniform(0, math.tau)
+            dist = random.uniform(r * 0.4, r)
+            bx, by = cx + math.cos(ang) * dist, cy + math.sin(ang) * dist
+            self._shape(kind="punch", a=(cx, cy), b=(bx, by), col=col,
+                        life=0.22, sz=0.42, wait=i * 0.03)
+        self._splash(c, r * 0.8, col, n=16)
+
     def _arrow_fall(self, cx, cy, radius, col, n, height=5.0):
         """Gruppo di frecce che cadono dentro un cerchio (pioggia di frecce)."""
         for _ in range(n):
@@ -319,6 +369,17 @@ class FXSystem:
         ang = math.atan2(by - ay, bx - ax)
         self._shape(kind="slash", c=b, ang=ang, col=_lighten(col, 0.25), life=0.20, rng=0.9)
         self._splash(b, 0.5, col, n=8)
+
+    def _fx_xscissor(self, e, col):
+        """Forbice X: due fendenti incrociati a forma di X, centrati sul Pokémon."""
+        c = e.get("c") or e.get("o")
+        if c is None:
+            return
+        rng = float(e.get("radius", 2.0))
+        lite = _lighten(col, 0.3)
+        for ang in (math.pi / 4.0, -math.pi / 4.0):   # le due lame della X
+            self._shape(kind="slash", c=c, ang=ang, col=lite, life=0.32, rng=rng)
+        self._splash(c, rng * 0.8, col, n=20)
 
     def _fx_slash(self, e, col):
         """Fendente stretto davanti al lanciatore (Frustata/Codacciaio): un arco
@@ -379,6 +440,10 @@ class FXSystem:
         self.particles = alive
         sh = []
         for s in self.shapes:
+            if s.get("wait", 0.0) > 0.0:   # forma in attesa (stagger, es. raffica di pugni)
+                s["wait"] -= dt
+                sh.append(s)
+                continue
             s["life"] -= dt
             if s["life"] > 0:
                 sh.append(s)
@@ -404,6 +469,8 @@ class FXSystem:
             return camera.world_to_screen(wx * ts, wy * ts)
 
         for s in self.shapes:
+            if s.get("wait", 0.0) > 0.0:   # non ancora comparsa (stagger)
+                continue
             f = max(0.0, min(1.0, s["life"] / s["maxlife"]))
             a = int(230 * f)
             col = s["col"]
@@ -535,6 +602,90 @@ class FXSystem:
                 hr = max(1, r // 2)
                 pygame.draw.circle(overlay, (*_lighten(col, 0.6), aa),
                                    (cx - r // 3, cy - r // 3), hr)
+            elif kind == "target":
+                # Cerchio-bersaglio telegrafato (Bolla): disco traslucido + anello
+                # esterno fisso + anello interno che si chiude verso l'impatto.
+                cx, cy = S(*s["c"])
+                r = max(2, int(s["r"] * ts))
+                lite = _lighten(col)
+                pygame.draw.circle(overlay, (*col, int(55 * f)), (cx, cy), r)
+                pygame.draw.circle(overlay, (*lite, a), (cx, cy), r, max(2, int(0.1 * ts)))
+                ir = max(1, int(r * (1 - f)))   # 1-f = avanzamento verso l'atterraggio
+                pygame.draw.circle(overlay, (*lite, a), (cx, cy), ir, max(2, int(0.08 * ts)))
+            elif kind == "bubbleorb":
+                # Bolla in ARCO: posizione a terra lerp A->B, altezza a parabola
+                # (sale e ridiscende). Ombra a terra + bolla traslucida con riflesso.
+                ax, ay = s["a"]
+                bx, by = s["b"]
+                t = 1 - f
+                wx = ax + (bx - ax) * t
+                wy = ay + (by - ay) * t
+                hz = s.get("arc", 2.5) * 4.0 * t * (1 - t)   # altezza in tile (0 ai capi)
+                gx, gy = S(wx, wy)                 # ombra a terra
+                bxs, bys = S(wx, wy - hz)          # bolla sollevata
+                r = max(3, int(s.get("sz", 0.5) * ts))
+                lite = _lighten(col, 0.5)
+                sh = pygame.Surface((r * 3, r * 2), pygame.SRCALPHA)
+                pygame.draw.ellipse(sh, (0, 0, 0, int(70 * f)), sh.get_rect())
+                overlay.blit(sh, (gx - r * 3 // 2, gy - r))
+                pygame.draw.circle(overlay, (*_lighten(col, 0.25), 150), (bxs, bys), r)
+                pygame.draw.circle(overlay, (*lite, 230), (bxs, bys), r, 2)
+                pygame.draw.circle(overlay, (255, 255, 255, 220),
+                                   (bxs - r // 3, bys - r // 3), max(1, r // 4))
+            elif kind == "vortex":
+                # Vortice che GIRA per tutta la durata: 3 braccia a spirale + anello
+                # esterno + centro scuro, leggermente schiacciate (imbuto a terra).
+                cx, cy = S(*s["c"])
+                r = s["r"] * ts
+                age = s["maxlife"] - s["life"]
+                phase = age * 7.0
+                vis = min(1.0, age / 0.15, s["life"] / 0.25)   # dissolvenza in/out
+                av = int(200 * max(0.0, vis))
+                lite = _lighten(col, 0.35)
+                sq = 0.75   # schiacciamento verticale
+                pygame.draw.ellipse(overlay, (*_darken(col, 0.4), int(av * 0.5)),
+                                    pygame.Rect(int(cx - r), int(cy - r * sq),
+                                                int(r * 2), int(r * 2 * sq)))
+                for k in range(3):
+                    pts = []
+                    for i in range(11):
+                        u = i / 10.0
+                        rad = r * (0.12 + 0.88 * u)
+                        ang = phase + k * (math.tau / 3) + u * 2.6
+                        pts.append((cx + math.cos(ang) * rad,
+                                    cy + math.sin(ang) * rad * sq))
+                    if len(pts) > 1:
+                        pygame.draw.lines(overlay, (*lite, av), False, pts,
+                                          max(2, int(0.12 * ts)))
+                pygame.draw.ellipse(overlay, (*lite, av),
+                                    pygame.Rect(int(cx - r), int(cy - r * sq),
+                                                int(r * 2), int(r * 2 * sq)),
+                                    max(2, int(0.08 * ts)))
+                pygame.draw.circle(overlay, (*_darken(col, 0.5), av),
+                                   (cx, cy), max(2, int(r * 0.12)))
+            elif kind == "punch":
+                # Pugno che vola: scia + nucleo chiaro, con stella d'impatto a fine corsa.
+                ax, ay = S(*s["a"])
+                bx, by = S(*s["b"])
+                t = 1 - f
+                cx = ax + (bx - ax) * t
+                cy = ay + (by - ay) * t
+                r = max(2, int(s.get("sz", 0.4) * ts))
+                ang = math.atan2(by - ay, bx - ax)
+                ca, sa = math.cos(ang), math.sin(ang)
+                lite = _lighten(col, 0.55)
+                tailx, taily = cx - ca * r * 2.2, cy - sa * r * 2.2
+                pygame.draw.line(overlay, (*col, a), (tailx, taily), (cx, cy),
+                                 max(2, int(0.12 * ts)))
+                pygame.draw.circle(overlay, (*col, a), (int(cx), int(cy)), r)
+                pygame.draw.circle(overlay, (*lite, a), (int(cx), int(cy)), max(1, r // 2))
+                if t > 0.55:   # impatto: piccola stella
+                    for sa2 in range(6):
+                        aa2 = sa2 * math.tau / 6
+                        ex = cx + math.cos(aa2) * r * 1.9
+                        ey = cy + math.sin(aa2) * r * 1.9
+                        pygame.draw.line(overlay, (*lite, a),
+                                         (int(cx), int(cy)), (int(ex), int(ey)), 2)
             elif kind == "bolt":
                 # saetta: polilinea spezzata da A a B (istantanea)
                 ax, ay = S(*s["a"])
@@ -567,6 +718,10 @@ class FXSystem:
         "shard": _fx_shard,
         "bolt": _fx_bolt,
         "jet": _fx_jet,
+        "arcbubble": _fx_arcbubble,
+        "vortex": _fx_vortex,
+        "flurry": _fx_flurry,
         "drain": _fx_drain,
         "slash": _fx_slash,
+        "xscissor": _fx_xscissor,
     }

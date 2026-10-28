@@ -6,7 +6,8 @@
     {"id": "wise_glasses","name": "Saggiocchiali", "price": 300, "stats": {"sp_attack": 18}},
     {"id": "scope_lens",  "name": "Mirino",        "price": 300, "stats": {"attack": 8, "sp_attack": 8}},
     {"id": "shell_bell",  "name": "Conchinella",   "price": 350, "stats": {"hp": 150}},
-    {"id": "berry",       "name": "Bacca",         "price": 250, "stats": {"hp": 120}}
+    {"id": "berry",       "name": "Bacca",         "price": 250, "stats": {"hp": 120}},
+    {"id": "king_rock",   "name": "Roccia di Re",  "price": 700, "stats": {"hp": 180, "sp_defense": 25, "heal_power": 0.15}, "note": "+HP e +Dif.Sp. Cure/scudi dati +15%; curando un alleato gli da' anche uno scudo (30% della cura, 3s). Se Poliwhirl ce l'ha all'arrivo al liv.8 evolve in POLITOAD (invece che Poliwrath)."}
   ],
 
   "completed": [

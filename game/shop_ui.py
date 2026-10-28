@@ -88,7 +88,33 @@ class ShopUI:
         self._draw_list(surface, font, catalog, catalog.completed_ids, owned, gold, near_base,
                         p.x + 14, y1 + 22, cols=4)
 
-        surface.blit(font.render("P = chiudi", True, (170, 170, 180)), (p.x + 14, p.bottom - 22))
+        # Nota dell'oggetto sotto il cursore (es. Roccia di Re: effetto evoluzione).
+        mx, my = pygame.mouse.get_pos()
+        note = ""
+        for rect, iid in self._buy_rects:
+            if rect.collidepoint((mx, my)):
+                it = catalog.get(iid)
+                note = it.note if (it and it.note) else ""
+                break
+        if note:
+            self._blit_wrapped(surface, font, note, p.x + 14, p.bottom - 56,
+                               p.w - 28, (215, 210, 150))
+
+        surface.blit(font.render("P = chiudi", True, (170, 170, 180)), (p.x + 14, p.bottom - 18))
+
+    @staticmethod
+    def _blit_wrapped(surface, font, text, x, y, max_w, color):
+        words = text.split(" ")
+        line, yy = "", y
+        for w in words:
+            trial = (line + " " + w).strip()
+            if font.size(trial)[0] > max_w and line:
+                surface.blit(font.render(line, True, color), (x, yy))
+                line, yy = w, yy + 15
+            else:
+                line = trial
+        if line:
+            surface.blit(font.render(line, True, color), (x, yy))
 
     def _draw_list(self, surface, font, catalog, ids, owned, gold, near_base, x, y, cols):
         bw, bh, gap = 108, 54, 8
