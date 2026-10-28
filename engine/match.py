@@ -43,7 +43,7 @@ MINION_STATS = {
     "melee":  dict(hp=170, attack_damage=12, attack_range=1.1, attack_cooldown=1.0,
                    speed=3.1, radius=0.28, gold=20, xp=60),
     "caster": dict(hp=90,  attack_damage=18, attack_range=3.4, attack_cooldown=1.3,
-                   speed=3.1, radius=0.24, gold=22, xp=30),
+                   speed=3.1, radius=0.24, gold=15, xp=30),
     "cannon": dict(hp=460, attack_damage=34, attack_range=3.0, attack_cooldown=1.6,
                    speed=2.9, radius=0.34, gold=50, xp=95),
 }
@@ -977,10 +977,20 @@ class Match:
             if p.alive:
                 p.gold += config.GOLD_PASSIVE_PER_SEC * dt
 
+    def _minion_gold(self, m: Minion) -> int:
+        """Oro del minion. Il cannone cresce di +1/min fino al tetto; gli altri
+        valgono il loro valore fisso."""
+        if m.minion_type == "cannon":
+            extra = int(self.time / 60.0) * config.CANNON_GOLD_PER_MIN
+            return min(config.CANNON_GOLD_MAX, config.CANNON_GOLD_BASE + extra)
+        return int(m.gold)
+
     def _award_gold(self, victim, killer) -> None:
         if isinstance(victim, Minion):
-            if isinstance(killer, Pokemon):          # ultimo colpo (last-hit)
-                killer.gold += victim.gold
+            # Oro solo a chi dà l'ultimo colpo (last-hit); kill da torre/altri
+            # minion danno 0 (killer non è un Pokémon).
+            if isinstance(killer, Pokemon):
+                killer.gold += self._minion_gold(victim)
         elif isinstance(victim, Pokemon):
             if isinstance(killer, Pokemon) and killer.team != victim.team:
                 killer.gold += config.GOLD_KILL_BASE + config.GOLD_KILL_PER_LEVEL * victim.level

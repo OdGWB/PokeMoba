@@ -73,6 +73,10 @@ POKEMON_RESPAWN_TIME = 8.0  # respawn fisso in Fase 2 (cresce col livello in Fas
 STARTING_GOLD = 500
 GOLD_PASSIVE_PER_SEC = 3.0   # guadagno passivo nel tempo
 GOLD_PASSIVE_START = 90.0    # s: l'oro passivo inizia a 1:30 (come in LoL)
+# Minion cannone (d'assedio): oro base + 1/min fino a un tetto.
+CANNON_GOLD_BASE = 50
+CANNON_GOLD_PER_MIN = 1
+CANNON_GOLD_MAX = 80
 GOLD_KILL_BASE = 120
 GOLD_KILL_PER_LEVEL = 15
 GOLD_ASSIST = 60
