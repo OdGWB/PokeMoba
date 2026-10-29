@@ -12,10 +12,10 @@ import math
 import random
 
 import config
-from engine.entities import Core, Pokemon, Structure, Unit
+from engine.entities import Core, Pillar, Pokemon, Structure, Unit
 from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
                          TILE_PUDDLE, TILE_RIVER, TILE_WALL)
-from .fx import type_color
+from .fx import EMBER, ROCK_HI, ROCK_MID, ROCK_OUT, ROCK_SH, type_color
 from .map_renderer import MapRenderer
 
 # Palette greybox (sostituita dai tileset in futuro).
@@ -608,10 +608,32 @@ class Renderer:
 
         # Gittata (cerchio attorno al lanciatore) quando ha senso.
         if rng > 0 and move.shape in ("projectile", "bubble", "area", "dash", "cone",
-                                      "sub", "blink", "storm", "leap", "rain"):
+                                      "sub", "blink", "storm", "leap", "rain",
+                                      "rockwave", "spikes", "avalanche"):
             pygame.draw.circle(surface, (90, 90, 90), S(ox, oy), int(rng * ts), 1)
 
         shape = move.shape
+        if shape == "rockwave":   # Rocciotomba: corsia dell'onda + pilastro in fondo
+            ex, ey = ox + nx * rng, oy + ny * rng
+            pygame.draw.line(surface, col, S(ox, oy), S(ex, ey), max(2, int(move.radius * ts)))
+            pygame.draw.rect(surface, (255, 255, 255),
+                             pygame.Rect(S(ex, ey)[0] - ts // 2, S(ex, ey)[1] - ts // 2, ts, ts), 1)
+            return
+        if shape == "rockcharge":   # Pesobomba: carica a distanza fissa
+            ex, ey = ox + nx * rng, oy + ny * rng
+            pygame.draw.line(surface, col, S(ox, oy), S(ex, ey), max(3, int(move.radius * ts)))
+            pygame.draw.circle(surface, col, S(ex, ey), int(move.radius * ts), 1)
+            return
+        if shape == "avalanche":   # Frana: punto di comparsa + percorso verso di sé
+            d = max(float(move.effects.get("min_range", 4.0)), min(dist, rng))
+            cx, cy = ox + nx * d, oy + ny * d
+            pygame.draw.line(surface, col, S(cx, cy), S(ox, oy), 2)
+            pygame.draw.circle(surface, (255, 255, 255), S(cx, cy), int(move.radius * ts), 2)
+            return
+        if shape in ("smackdown", "explosion", "spikes"):
+            shape = "area"
+        elif shape == "sandboost":
+            shape = "buff"
         if shape in ("projectile", "bubble"):
             ex, ey = ox + nx * rng, oy + ny * rng
             pygame.draw.line(surface, col, S(ox, oy), S(ex, ey), max(1, int(move.radius * ts)))
@@ -708,10 +730,17 @@ class Renderer:
                     and not vision.is_enemy_visible(player_team, u.id)):
                 continue
             drawables.append(u)
+        # Pilastri di roccia temporanei (Rocciotomba): ordinati in profondità con
+        # le unità, così chi passa dietro viene coperto e chi sta davanti no.
+        for pl in getattr(world, "pillars", ()):
+            if x0 - 2 <= pl.pos.x <= x1 + 2 and y0 - 2 <= pl.pos.y <= y1 + 2:
+                drawables.append(pl)
 
         for e in sorted(drawables, key=lambda it: it.pos.y):
             gx, gy = camera.world_to_screen(e.pos.x * ts, e.pos.y * ts)
-            if isinstance(e, Structure):
+            if isinstance(e, Pillar):
+                self._draw_pillar(surface, e, gx, gy, now)
+            elif isinstance(e, Structure):
                 self._draw_structure(surface, e, gx, gy)
             else:
                 if e.id == selected_id:
@@ -784,6 +813,84 @@ class Renderer:
         col = config.TEAM_COLORS.get(u.team, (200, 200, 200))
         pygame.draw.circle(surface, col, (gx, gy), max(2, r // 2), 1)
 
+    def _pillar_sprite(self, explosive: bool) -> pygame.Surface:
+        """Pilastro di roccia pixel-art (cache): colonna irregolare un po'
+        rastremata, faccia SINISTRA in luce e DESTRA in ombra (luce da
+        alto-sinistra), cima più chiara, strati e crepe, sassi ai piedi.
+        Pietrataglio (explosive): crepe incandescenti."""
+        ts = self.tile_size
+        key = (ts, "pillar", explosive)
+        spr = self._tile_cache.get(key)
+        if spr is not None:
+            return spr
+        W, H = int(ts * 1.0), int(ts * 1.75)
+        spr = pygame.Surface((W, H), pygame.SRCALPHA)
+        rng = random.Random(7 if explosive else 3)
+        base = H - 3
+        ridge = int(W * 0.46)
+        top = [(int(W * 0.14), 7), (int(W * 0.3), 3), (int(W * 0.52), 1),
+               (int(W * 0.72), 4), (int(W * 0.86), 8)]
+        body = [(1, base), *top, (W - 2, base)]
+        # Toni un filo più cupi delle schegge FX: il pilastro resta a lungo in
+        # scena e deve stare nella palette scura della giungla (ma staccarsi).
+        hi, mid, sh = (160, 146, 118), (114, 101, 83), (72, 63, 53)
+        # facce: sinistra chiara, destra scura (diviso dallo spigolo centrale)
+        pygame.draw.polygon(spr, mid, body)
+        pygame.draw.polygon(spr, sh, [(ridge, 2), *top[3:], (W - 2, base), (ridge + 2, base)])
+        pygame.draw.polygon(spr, hi, [(2, base - 2), *top[:2], (ridge - 1, 3),
+                                      (ridge - 3, base - 4)])
+        # cima: faccetta superiore illuminata
+        pygame.draw.polygon(spr, (192, 178, 146), [top[0], top[1], top[2], (ridge, 7),
+                                                   (int(W * 0.24), 9)])
+        # strati orizzontali + crepe (spezzate, oblique)
+        for yy in (int(H * 0.42), int(H * 0.68)):
+            pygame.draw.line(spr, ROCK_OUT, (3, yy), (ridge - 2, yy + 1), 1)
+            pygame.draw.line(spr, (64, 56, 46), (ridge + 1, yy + 1), (W - 4, yy - 1), 1)
+        crack_col = EMBER if explosive else ROCK_OUT
+        for _ in range(3 if explosive else 2):
+            x = rng.randint(4, W - 5)
+            y = rng.randint(10, base - 8)
+            pts = [(x, y)]
+            for _k in range(3):
+                x += rng.choice((-1, 0, 1))
+                y += rng.randint(2, 4)
+                pts.append((x, min(base - 2, y)))
+            pygame.draw.lines(spr, crack_col, False, pts, 1)
+        pygame.draw.polygon(spr, ROCK_OUT, body, 1)
+        # sassi ai piedi
+        for sx, sr in ((3, 3), (W - 5, 3), (W // 2 + 3, 2)):
+            pygame.draw.circle(spr, ROCK_OUT, (sx, base + 1), sr + 1)
+            pygame.draw.circle(spr, ROCK_MID, (sx, base + 1), sr)
+            pygame.draw.circle(spr, ROCK_HI, (sx - 1, base), max(1, sr - 2))
+        self._tile_cache[key] = spr
+        return spr
+
+    def _draw_pillar(self, surface, pl, gx, gy, now):
+        """Pilastro: spunta dal terreno (0.18s), resta, poi trema e si abbassa
+        sbriciolandosi negli ultimi 0.35s. Ombra di contatto a basso-destra."""
+        ts = self.tile_size
+        spr = self._pillar_sprite(pl.explode is not None)
+        W, H = spr.get_size()
+        k = min(1.0, max(0.0, (now - pl.born) / 0.18))
+        left = pl.until - now
+        shake = 0
+        if left < 0.35:
+            k = min(k, max(0.0, left / 0.35))
+            shake = random.choice((-1, 0, 1))
+        foot = gy + int(ts * 0.42)
+        sh = pygame.Surface((W + 6, 8), pygame.SRCALPHA)
+        pygame.draw.ellipse(sh, (0, 0, 0, 95), sh.get_rect())
+        surface.blit(sh, (gx - W // 2 + 2, foot - 4))
+        vis = int(H * k)
+        if vis <= 0:
+            return
+        surface.blit(spr, (gx - W // 2 + shake, foot - vis), pygame.Rect(0, 0, W, vis))
+        if pl.explode is not None and k >= 1.0:   # Pietrataglio: le crepe pulsano
+            glow = pygame.Surface((W, H), pygame.SRCALPHA)
+            a = int(40 + 40 * (0.5 + 0.5 * math.sin(now * 8.0)))
+            pygame.draw.ellipse(glow, (*EMBER, a), pygame.Rect(3, H // 4, W - 6, H // 2))
+            surface.blit(glow, (gx - W // 2 + shake, foot - H))
+
     def _draw_structure(self, surface, s, gx, gy):
         ts = self.tile_size
         col = getattr(s, "color", (180, 180, 180))
@@ -818,6 +925,10 @@ class Renderer:
             pips.append((110, 90, 160))    # maledizione (viola scuro)
         elif getattr(u, "slow_until", -1) > now:
             pips.append((120, 160, 220))   # rallentamento (azzurrino)
+        if getattr(u, "airborne_until", -1) > now:
+            pips.append((236, 214, 164))   # lanciato in aria (sabbia chiara)
+        if getattr(u, "dashlock_until", -1) > now:
+            pips.append((150, 120, 84))    # niente scatti (Abbattimento/Cucitombra: bruno)
         if not pips:
             return
         r = int(u.radius * self.tile_size)

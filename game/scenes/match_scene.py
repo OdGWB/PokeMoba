@@ -8,6 +8,8 @@ La logica di gioco sta in engine/sim; qui c'è solo l'orchestrazione lato client
 """
 from __future__ import annotations
 
+import random
+
 import pygame
 
 import config
@@ -21,7 +23,7 @@ from sim.commands import (BuyItemCommand, ChooseUpgradeCommand, MoveCommand,
 from sim.simulation import Simulation
 
 from ..camera import Camera
-from ..fx import FXSystem, type_color
+from ..fx import FXSystem, draw_avalanche, draw_sandstorm, type_color
 from ..input_controller import InputController
 from ..minimap import Minimap
 from ..particles import ParticleSystem
@@ -352,6 +354,13 @@ class MatchScene:
             self._trigger_anims(self.match.fx_events)
             self.fx.spawn_events(self.match.fx_events)
             self.match.fx_events.clear()
+        # Frana: polvere sollevata dietro la valanga che rotola.
+        if self.match is not None:
+            for av in self.match.avalanches:
+                if self.match.time >= av["start"] and random.random() < 0.6:
+                    d, r = av["dir"], av["radius"]
+                    self.fx._dust((av["pos"].x - d.x * r, av["pos"].y - d.y * r), r * 0.7,
+                                  n=2, speed=(0.3, 1.2))
         self.fx.update(dt)
         # Particelle d'atmosfera: aggiornate solo nel rettangolo visibile.
         self.particles.update(dt, self.camera, self.map_data.grid)
@@ -392,6 +401,18 @@ class MatchScene:
             self.renderer.draw_tower_ranges(surface, self.camera, self.world,
                                              self.player.team, now=self.match.time,
                                              player_pos=self.player.pos, near=6.0)
+        # Linea Roggenrola: tempesta di Sabbiafiume (aura permanente) e valanghe
+        # di Frana, disegnate dallo stato del Match (sopra mappa e unità).
+        if self.match is not None:
+            now = self.match.time
+            for p in self.world.pokemons():
+                if p.alive and p.sand_radius > 0.0 and (
+                        p.team == self.player.team or self.vision is None
+                        or self.vision.is_enemy_visible(self.player.team, p.id)):
+                    draw_sandstorm(surface, self.camera, p.pos, p.sand_radius, now)
+            for av in self.match.avalanches:
+                if now >= av["start"]:
+                    draw_avalanche(surface, self.camera, av, now)
         # Particelle d'atmosfera della giungla (ambientali, sopra mappa e unita,
         # sotto gli effetti delle mosse e la UI).
         self.particles.draw(surface, self.camera)
@@ -602,6 +623,27 @@ class MatchScene:
                 surface.blit(tag, (bx - tag.get_width() // 2 + 8, y0 + bh + 2))
             elif not ready:
                 t = font.render(f"{cd_left:0.0f}s", True, frame)
+                surface.blit(t, (bx - t.get_width() // 2 + 8, y0 + bh + 2))
+
+        # Passiva Sabbiafiume (linea Roggenrola): tempesta attiva da Gigalith,
+        # raddoppiata da Terrempesta (barra = tempo rimasto del raddoppio).
+        if p.passive_id == "sabbiafiume":
+            bx = x0 + total + 14
+            now = self.match.time if self.match is not None else 0.0
+            boost = max(0.0, p.sandstorm_boost_until - now)
+            on = p.sand_radius > 0.0
+            frame = (226, 196, 130) if on else (120, 108, 86)
+            pygame.draw.rect(surface, (44, 36, 24), pygame.Rect(bx, y0, 16, bh))
+            fill = int(bh * (min(1.0, boost / 4.0) if boost > 0 else (1.0 if on else 0.0)))
+            col = (250, 200, 110) if boost > 0 else (200, 168, 104)
+            pygame.draw.rect(surface, col, pygame.Rect(bx, y0 + bh - fill, 16, fill))
+            pygame.draw.rect(surface, frame, pygame.Rect(bx, y0, 16, bh), 1)
+            surface.blit(font.render("Sabbia", True, frame), (bx - 10, y0 - 18))
+            if boost > 0:
+                t = font.render(f"x2 {boost:0.1f}s", True, (250, 210, 130))
+                surface.blit(t, (bx - t.get_width() // 2 + 8, y0 + bh + 2))
+            elif not on:
+                t = font.render("liv.8", True, frame)
                 surface.blit(t, (bx - t.get_width() // 2 + 8, y0 + bh + 2))
 
         if self.minimap is not None:

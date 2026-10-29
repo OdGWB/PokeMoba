@@ -11,7 +11,21 @@ import pygame
 import config
 from .net_match_scene import NetMatchScene
 
-ROSTER_NAMES = ["Charmander", "Squirtle", "Gastly", "Bulbasaur"]
+def _roster_names() -> list[str]:
+    """Nomi del roster letti dai JSON (stesso ordine di config.ROSTER)."""
+    import json
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[2]
+    out = []
+    for rel in config.ROSTER:
+        try:
+            out.append(json.loads((root / rel).read_text(encoding="utf-8")).get("name", "?"))
+        except (OSError, ValueError):
+            out.append("?")
+    return out
+
+
+ROSTER_NAMES = _roster_names()
 
 
 class LobbyScene:

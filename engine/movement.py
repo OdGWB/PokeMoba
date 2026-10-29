@@ -4,13 +4,35 @@ Funzioni pure che operano su Unit + Grid. Nessuno stato globale.
 """
 from __future__ import annotations
 
+import math
+
 from .entities import Unit
-from .grid import Grid
+from .grid import TILE_PILLAR, Grid
 from .spatial import SpatialHash
 from .vec import Vec2, direction_index
 
 # Distanza entro cui un waypoint si considera raggiunto.
 _ARRIVE_EPS = 0.02
+# Aggiramento dei pilastri temporanei: angoli provati (gradi) attorno alla
+# direzione di marcia quando il passo entrerebbe in un pilastro.
+_STEER_ANGLES = (35, -35, 70, -70, 100, -100)
+
+
+def _in_pillar(grid: Grid | None, p: Vec2) -> bool:
+    return grid is not None and grid.tile_at(math.floor(p.x), math.floor(p.y)) == TILE_PILLAR
+
+
+def _steer(grid: Grid, pos: Vec2, step: Vec2) -> Vec2 | None:
+    """Passo deviato per aggirare un pilastro (che compare dopo il calcolo del
+    percorso, o sulla traiettoria diretta di minion/bot): prova direzioni
+    ruotate e prende la prima libera. None = bloccato."""
+    for deg in _STEER_ANGLES:
+        a = math.radians(deg)
+        ca, sa = math.cos(a), math.sin(a)
+        alt = pos + Vec2(step.x * ca - step.y * sa, step.x * sa + step.y * ca)
+        if not _in_pillar(grid, alt) and grid.is_walkable_point(alt.x, alt.y):
+            return alt
+    return None
 
 
 def advance_unit(unit: Unit, dt: float, grid: Grid | None = None) -> None:
@@ -35,6 +57,19 @@ def advance_unit(unit: Unit, dt: float, grid: Grid | None = None) -> None:
         target = unit.path[0]
         to = target - pos
         d = to.length()
+        # Pilastro di roccia sulla traiettoria: lo aggira deviando il passo (o si
+        # ferma se non c'è spazio). Un waypoint dentro il pilastro non si raggiunge.
+        if d > _ARRIVE_EPS and grid is not None:
+            step = to.normalized() * min(budget, d)
+            if _in_pillar(grid, pos + step) or _in_pillar(grid, target):
+                alt = _steer(grid, pos, step) if _in_pillar(grid, pos + step) else pos + step
+                if alt is None or _blocked(alt):
+                    unit.facing = direction_index(to.x, to.y)
+                    break
+                pos = alt
+                unit.facing = direction_index(to.x, to.y)
+                budget = 0.0
+                break
         if d <= _ARRIVE_EPS:
             if _blocked(target):
                 break

@@ -21,6 +21,9 @@ class World:
         self.entities: dict[int, Entity] = {}  # type: ignore[name-defined]
         self._next_id = 1
         self.spatial = SpatialHash(cell_size=2.0)
+        # Pilastri di roccia temporanei (entities.Pillar): gestiti dal Match,
+        # letti dal renderer. Lista mutata sul posto (mai riassegnata).
+        self.pillars: list = []
 
     # --- gestione entità -----------------------------------------------------
     def _alloc_id(self) -> int:

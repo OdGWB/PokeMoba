@@ -19,8 +19,9 @@ from pathlib import Path
 
 import config
 from . import evolution, skills
-from .entities import Core, Minion, Pokemon, Structure, Unit, Wild
-from .grid import TILE_BUSH, TILE_RIVER
+from .entities import Core, Minion, Pillar, Pokemon, Structure, Unit, Wild
+from .grid import TILE_BUSH, TILE_PILLAR, TILE_RIVER
+from .moves import Move
 from .items import ITEM_SLOTS, ItemCatalog
 from .jungle import JungleSystem
 from .pathfinding import find_path, smooth_path
@@ -82,6 +83,15 @@ NUOTOVELOX_SPEED = 1.2        # +20% velocità in acqua/pioggia (Poliwag/Poliwhi
 KINGROCK_SHIELD_FRAC = 0.30   # Roccia di Re: scudo pari al 30% della cura data a un alleato
 KINGROCK_SHIELD_DUR = 3.0
 
+# --- linea Roggenrola: Sabbiafiume, pilastri di roccia, lancio in aria -------
+SABBIAFIUME_RADIUS = 3.0      # raggio della tempesta di sabbia permanente attorno a Gigalith
+SABBIAFIUME_TICK = 0.5        # s tra due tick di danno della tempesta
+SABBIAFIUME_DPS_BASE = 8.0    # danno al secondo (senza tipo) = base + per_livello × livello
+SABBIAFIUME_DPS_LVL = 2.5     # (liv.8 ~28/s: poco sopra la rigenerazione passiva, resta piccolo)
+PILLAR_DURATION = 4.0         # durata dei pilastri di roccia (Rocciotomba)
+SHOCKWAVE_RADIUS = 2.2        # Pesobomba: raggio dell'onda d'urto contro muro/pilastro
+SHOCKWAVE_AIR = 1.0           # Pesobomba: durata del lancio in aria dell'onda d'urto
+
 
 def _prio(entity) -> int:
     for cls, p in _PRIO.items():
@@ -112,6 +122,13 @@ class Match:
         self.rain_zones: list[dict] = []    # zone di pioggia a tempo (Pioggiadanza): boost Acqua + Nuotovelox
         self.air_landings: list[dict] = []  # Rimbalzo: atterraggi programmati (salto in aria)
         self.tosses: list[dict] = []        # Ribaltiro: nemici scaraventati in arco (animazione)
+        self.channels: list[dict] = []      # canalizzazioni (Lanciafiamme continuo, Volo, Esplosione)
+        # Linea Roggenrola: onde di Rocciotomba, cariche di Pesobomba, valanghe di
+        # Frana (si muovono tick per tick) e zone Abbattimento (bloccano gli scatti).
+        self.rock_waves: list[dict] = []
+        self.rock_charges: list[dict] = []
+        self.avalanches: list[dict] = []
+        self.smackdown_zones: list[dict] = []
         self.vision = VisionSystem(self.world.grid)
         self._build_structures()
         self.jungle = JungleSystem(self)
@@ -153,12 +170,15 @@ class Match:
         self.vision.update(self.world, 1)
 
         self.jungle.update(dt)
+        self._update_pillars(dt)     # pilastri di roccia (ri-timbrati dopo un cambio meteo)
         self._update_recall(dt)
         self._update_waves(dt)
         self._update_ai(dt)
         self._update_submerge(dt)    # SUB: riemersione (prima dei cast)
         self._update_air_landings(dt)  # Rimbalzo: atterraggio dopo il salto (prima dei cast)
         self._update_casts(dt)       # esecuzione mosse Q/W/E/R
+        self._update_channels(dt)    # canalizzazioni (Lanciafiamme continuo, Volo, Esplosione)
+        self._update_rock_moves(dt)  # Rocciotomba / Pesobomba / Frana / Abbattimento
         self._update_projectiles(dt) # proiettili che viaggiano (bolla)
         self._update_area_effects(dt)  # aree persistenti (Pioggia di Frecce, Acquanello, Ultimocanto)
         self._update_rain_zones(dt)    # Pioggiadanza: scadenza delle zone di pioggia a tempo
@@ -168,6 +188,7 @@ class Match:
         self._update_decoys(dt)        # Doppioteam: scadenza dei cloni esca
         self._update_combat(dt)      # attacchi base
         self._update_status(dt)      # scadenza stati + velocità effettiva + ricariche
+        self._update_sandstorms(dt)  # Sabbiafiume: tempesta di sabbia attorno a Gigalith
         self.world.tick(dt)          # movimento + collisioni
         self._update_tosses(dt)      # Ribaltiro: arco del nemico lanciato (dopo le collisioni)
         self._update_regen(dt)
@@ -614,8 +635,8 @@ class Match:
         # Minion e Pokémon colpiscono il proprio target se a tiro.
         for u in self.world.alive_units():
             if isinstance(u, Pokemon):
-                if self._immobile(u) or u.submerged:
-                    u.aa_active = False   # stordito/addormentato/immerso: perde il windup
+                if self._immobile(u) or u.submerged or u.channel_until > self.time:
+                    u.aa_active = False   # stordito/immerso/canalizza: perde il windup
                     continue
                 self._pokemon_auto_attack(u)
                 continue
@@ -902,6 +923,9 @@ class Match:
         if isinstance(victim, Pokemon):
             victim.stop()
             victim.target_id = None
+            victim.airborne_until = -1.0   # niente sprite sospeso in aria da morto
+            victim.airborne_start = -1.0
+            victim.air_z = 0.0
             victim.judgment_until = -1.0   # perde il Giudizio morendo
             # Se muore in forma Shedinja, ripristina l'identità di Ninjask così il
             # respawn avviene normale (max_hp corretto, non 1).
@@ -1469,6 +1493,8 @@ class Match:
             return
         if p.silence_until > self.time:   # Ripeti: silenziato, solo autoattacchi
             return
+        if p.channel_until > self.time:   # Lanciafiamme/Volo: sta già canalizzando
+            return
         mv = ms.chosen
         rank = ms.rank
         if p.aa_active:              # lanciare annulla un auto-attacco in windup
@@ -1490,7 +1516,10 @@ class Match:
                 "curse": "Shoot", "fan": "Shoot", "dashback": "Attack",
                 "rain": "Shoot", "storm": "Shoot", "leap": "Attack",
                 "arc": "Shoot", "throwback": "Attack", "raindance": "Charge",
-                "healzone": "Charge"}.get(shape)
+                "healzone": "Charge", "flamethrower": "Shoot", "smoke": "Charge",
+                "fly": "Charge", "rockwave": "Attack", "smackdown": "Attack",
+                "sandboost": "Charge", "spikes": "Shoot", "rockcharge": "Attack",
+                "avalanche": "Shoot", "explosion": "Charge"}.get(shape)
         if anim:
             self.fx_events.append({"eid": p.id, "anim": anim})
         # Gli eventi visivi aggiunti dai _cast_* qui sotto vengono "taggati" con lo
@@ -1543,6 +1572,26 @@ class Match:
             self._cast_bounce(p, mv, rank, origin, tgt)
         elif shape == "perish":
             self._cast_perish(p, mv, rank, origin, tgt)
+        elif shape == "flamethrower":
+            self._cast_flamethrower(p, mv, rank, origin, dirv)
+        elif shape == "smoke":
+            self._cast_smoke(p, mv, rank, origin, tgt)
+        elif shape == "fly":
+            self._cast_fly(p, mv, rank, origin, tgt)
+        elif shape == "rockwave":
+            self._cast_rockwave(p, mv, rank, origin, dirv)
+        elif shape == "smackdown":
+            self._cast_smackdown(p, mv, rank, origin)
+        elif shape == "sandboost":
+            self._cast_sandboost(p, mv, rank, origin)
+        elif shape == "spikes":
+            self._cast_spikes(p, mv, rank, origin, tgt)
+        elif shape == "rockcharge":
+            self._cast_rockcharge(p, mv, rank, origin, tgt, dirv)
+        elif shape == "avalanche":
+            self._cast_avalanche(p, mv, rank, origin, tgt)
+        elif shape == "explosion":
+            self._cast_explosion(p, mv, rank, origin)
         elif shape == "buff":
             self._apply_support(p, mv, rank, origin)
             self.fx_events.append({"kind": "buff", "c": (origin.x, origin.y),
@@ -1559,6 +1608,13 @@ class Match:
             if sd:
                 self._apply_spdef_debuff(p, float(sd.get("amount", 0)),
                                          float(sd.get("duration", 4.0)))
+        # Autoblocco (Incendio): dopo il lancio Charizard resta inchiodato (non si
+        # muove né attacca) per qualche istante. Usa uno stordimento su sé stesso.
+        sr = mv.effects.get("self_root")
+        if sr:
+            dur = float(sr.get("duration", 1.0))
+            p.stop()
+            p.stun_until = max(p.stun_until, self.time + dur)
         if mv.fx:
             for ev in self.fx_events[_fx0:]:
                 if "kind" in ev:
@@ -1687,6 +1743,8 @@ class Match:
             return
         dist = min((tgt - origin).length(), mv.range)
         dest = self._clamp_to_wall(origin, origin + dirv * dist)
+        dest, grounded = self._intercept_dash(p, origin, dest)   # Abbattimento nemico attivo
+        dist = origin.dist(dest)
         hit_any = False
         for e in self._combat_hash.query_radius((origin.x + dest.x) / 2,
                                                 (origin.y + dest.y) / 2, dist + mv.radius + 1.0):
@@ -1698,7 +1756,7 @@ class Match:
         p.pos = dest
         self.fx_events.append({"kind": "dash", "a": (origin.x, origin.y),
                                "b": (dest.x, dest.y), "mtype": mv.type})
-        if hit_any:   # rimbalzo all'indietro (direzione opposta)
+        if hit_any and not grounded:   # rimbalzo all'indietro (direzione opposta)
             back = self._clamp_to_wall(dest, dest - dirv * float(mv.d.get("recoil", mv.range)))
             self.fx_events.append({"kind": "dash", "a": (dest.x, dest.y),
                                    "b": (back.x, back.y), "mtype": mv.type})
@@ -1744,6 +1802,7 @@ class Match:
         to = tgt - origin
         dist = min(to.length(), mv.range)
         dest = self._nearest_walkable(origin + dirv * dist, origin)
+        dest, _ = self._intercept_dash(p, origin, dest)   # Abbattimento nemico attivo
         p.pos = dest
         p.stop()
         for e in self._combat_hash.query_radius(dest.x, dest.y, mv.radius + 1.0):
@@ -2057,6 +2116,45 @@ class Match:
                                            "fx": ae.get("fx", "")})
                 alive.append(ae)
                 continue
+            # Muro di Fumo: nube che accieca i nemici al suo interno.
+            if ae.get("smoke"):
+                if now >= ae["end"]:
+                    continue
+                c = ae["center"]
+                caster = self.world.get(ae["caster_id"])
+                cteam = caster.team if caster is not None else ae.get("team", -1)
+                # Ogni frame: marca i NEMICI dentro (il raggio visivo cala in
+                # _update_status finché smoke_until è nel futuro).
+                for e in self._combat_hash.query_radius(c.x, c.y, ae["radius"] + 1.0):
+                    if (isinstance(e, Pokemon) and getattr(e, "alive", False)
+                            and e.team != cteam
+                            and c.dist(e.pos) <= ae["radius"] + e.radius):
+                        e.smoke_until = now + 0.3
+                if now >= ae["next"]:
+                    ae["next"] = now + ae["interval"]
+                    self.fx_events.append({"kind": "zone", "c": (c.x, c.y),
+                                           "radius": ae["radius"], "mtype": ae["mtype"],
+                                           "fx": ae.get("fx", "")})
+                alive.append(ae)
+                continue
+            # Levitoroccia: rocce aguzze a terra; ogni nemico dentro subisce danno
+            # al massimo una volta ogni `interval` secondi (timer per nemico).
+            if ae.get("spikes"):
+                if now >= ae["end"]:
+                    continue
+                caster = self.world.get(ae["caster_id"])
+                if caster is not None:
+                    nh = ae["next_hit"]
+                    for e in self._rock_targets(ae["team"], ae["center"], ae["radius"]):
+                        if now >= nh.get(e.id, -1.0):
+                            nh[e.id] = now + ae["interval"]
+                            self._hit(caster, ae["mv"], ae["rank"], e)
+                            self.fx_events.append({"kind": "rockspike",
+                                                   "c": (e.pos.x, e.pos.y), "dir": (0.0, -1.0),
+                                                   "radius": 0.6, "mtype": "Rock",
+                                                   "fx": "rockspike"})
+                alive.append(ae)
+                continue
             # Ultimocanto: conto alla rovescia, poi danno %HP max ai nemici dentro.
             if ae.get("perish") is not None:
                 caster = self.world.get(ae["caster_id"])
@@ -2186,12 +2284,608 @@ class Match:
         self.fx_events.append({"kind": "area", "c": (center.x, center.y),
                                "radius": mv.radius, "mtype": mv.type})
 
+    # --- mosse della linea Charmander ----------------------------------------
+    def _cast_flamethrower(self, p, mv, rank, origin, dirv):
+        """Lanciafiamme: un cono di fuoco CONTINUO davanti a sé per tutta la
+        durata. Non colpisce subito: registra una canalizzazione che a ogni tick
+        rifà il cono dalla posizione/direzione attuali del lanciatore (così
+        Charizard può muoversi LENTAMENTE mentre lo usa) finché non scade o viene
+        interrotto da uno stordimento/sonno/morte."""
+        dur = float(mv.effects.get("duration", 1.5))
+        interval = float(mv.effects.get("interval", 0.2))
+        move_mult = float(mv.effects.get("move_mult", 0.5))
+        p.channel_until = self.time + dur
+        self._apply_speed(p, move_mult, dur)   # si muove lentamente mentre canalizza
+        self.channels.append({
+            "type": "flame", "caster_id": p.id, "mv": mv, "rank": rank,
+            "end": self.time + dur, "next": self.time, "interval": interval})
+
+    def _cast_smoke(self, p, mv, rank, origin, tgt):
+        """Muro di Fumo: una nube persistente. Chi (nemico) ci sta dentro ha il
+        raggio visivo ridotto (vedi _update_status) per tutta la durata."""
+        to = tgt - origin
+        center = (origin + to.normalized() * min(to.length(), mv.range)
+                  if to.length() > 1e-6 and mv.range > 0 else Vec2(origin.x, origin.y))
+        dur = float(mv.effects.get("duration", 4.0))
+        self.area_effects.append({
+            "center": Vec2(center.x, center.y), "radius": mv.radius,
+            "smoke": True, "end": self.time + dur, "team": p.team,
+            "next": self.time, "interval": float(mv.effects.get("interval", 0.5)),
+            "caster_id": p.id, "mtype": mv.type, "fx": mv.fx})
+        self.fx_events.append({"kind": "zone", "c": (center.x, center.y),
+                               "radius": mv.radius, "mtype": mv.type, "fx": mv.fx})
+
+    def _cast_fly(self, p, mv, rank, origin, tgt):
+        """Volo (stile ulti di Galio): Charizard canalizza sul posto per qualche
+        istante, poi si teletrasporta al punto scelto facendo danno ad area
+        all'arrivo. Il punto è telegrafato per tutta la canalizzazione e può
+        essere interrotto da uno stordimento/sonno o dalla morte."""
+        dest = self._nearest_walkable(Vec2(tgt.x, tgt.y), origin)
+        channel = float(mv.effects.get("channel", 1.5))
+        p.stop()
+        p.channel_until = self.time + channel
+        p.root_until = max(p.root_until, self.time + channel)   # inchiodato mentre canalizza
+        self.channels.append({
+            "type": "fly", "caster_id": p.id, "mv": mv, "rank": rank,
+            "end": self.time + channel, "dest": Vec2(dest.x, dest.y),
+            "origin": Vec2(origin.x, origin.y)})
+        # Telegraph iniziale del punto d'arrivo (ripetuto in _update_channels).
+        self.fx_events.append({"kind": "zone", "c": (dest.x, dest.y),
+                               "radius": mv.radius, "mtype": mv.type, "fx": mv.fx})
+
+    def _update_channels(self, dt: float) -> None:
+        """Avanza le canalizzazioni (Lanciafiamme, Volo). Interruzione = chi
+        canalizza muore o viene stordito/addormentato (non il suo stesso root)."""
+        alive = []
+        now = self.time
+        for ch in self.channels:
+            p = self.world.get(ch["caster_id"])
+            if p is None or not getattr(p, "alive", False):
+                continue   # morto: canalizzazione annullata
+            interrupted = self._immobile(p)   # stun / sonno / lanciato in aria
+            if ch["type"] == "explode":
+                if interrupted:
+                    p.channel_until = now
+                    p.root_until = now
+                    continue   # interrotta: niente esplosione (la ricarica resta spesa)
+                if now >= ch["end"]:
+                    p.channel_until = now
+                    p.root_until = now
+                    self._explode(p, ch["mv"], ch["rank"])
+                    continue
+                # Telegraph visibile ai nemici per tutta la carica (come Volo).
+                self.fx_events.append({"kind": "zone", "c": (p.pos.x, p.pos.y),
+                                       "radius": ch["mv"].radius, "mtype": ch["mv"].type,
+                                       "fx": "explodecharge",
+                                       "t": (now - ch["start"]) / max(1e-6, ch["end"] - ch["start"])})
+                alive.append(ch)
+                continue
+            if ch["type"] == "flame":
+                if interrupted or now >= ch["end"]:
+                    if interrupted:
+                        p.channel_until = now   # interrotto: libera subito
+                    continue
+                mv, rank = ch["mv"], ch["rank"]
+                if now >= ch["next"]:
+                    ch["next"] = now + ch["interval"]
+                    dirv = DIR_VECTORS[p.facing % 8].normalized()
+                    self._cast_cone(p, mv, rank, Vec2(p.pos.x, p.pos.y), dirv)
+                alive.append(ch)
+            elif ch["type"] == "fly":
+                if interrupted:
+                    p.channel_until = now
+                    p.root_until = now
+                    continue   # interrotto prima del decollo: niente teletrasporto
+                if now >= ch["end"]:
+                    mv, rank, dest = ch["mv"], ch["rank"], ch["dest"]
+                    src = Vec2(p.pos.x, p.pos.y)
+                    p.pos = Vec2(dest.x, dest.y)
+                    p.channel_until = now
+                    p.root_until = now
+                    p.stop()
+                    for e in self._combat_hash.query_radius(dest.x, dest.y, mv.radius + 1.0):
+                        if e.team == p.team or not getattr(e, "alive", False):
+                            continue
+                        if dest.dist(e.pos) <= mv.radius + getattr(e, "radius", 0.0):
+                            self._hit(p, mv, rank, e)
+                    self.fx_events.append({"kind": "blink", "a": (src.x, src.y),
+                                           "b": (dest.x, dest.y), "mtype": mv.type})
+                    self.fx_events.append({"kind": "area", "c": (dest.x, dest.y),
+                                           "radius": mv.radius, "mtype": mv.type, "fx": mv.fx})
+                    continue
+                # Telegraph del punto d'arrivo durante la canalizzazione.
+                self.fx_events.append({"kind": "zone", "c": (ch["dest"].x, ch["dest"].y),
+                                       "radius": ch["mv"].radius, "mtype": ch["mv"].type,
+                                       "fx": ch["mv"].fx})
+                alive.append(ch)
+        self.channels = alive
+
+    # --- linea Roggenrola: pilastri, Sabbiafiume, mosse ----------------------
+    def _rock_targets(self, team, c, r):
+        """Nemici colpibili dalle mosse di roccia entro r da c (Pokémon, minion,
+        neutrali; niente strutture)."""
+        out = []
+        for e in self._combat_hash.query_radius(c.x, c.y, r + 1.0):
+            if e.team == team or not getattr(e, "alive", False):
+                continue
+            if not isinstance(e, (Pokemon, Minion, Wild)):
+                continue
+            if c.dist(e.pos) <= r + getattr(e, "radius", 0.0):
+                out.append(e)
+        return out
+
+    def _pillar_at(self, tx, ty):
+        for pl in self.world.pillars:
+            if pl.tx == tx and pl.ty == ty:
+                return pl
+        return None
+
+    def _place_pillar(self, p, pos, explode=None):
+        """Crea un pilastro di roccia sul tile di `pos` (se libero): il tile
+        diventa TILE_PILLAR (blocca come un muro) per PILLAR_DURATION secondi.
+        Chi ci stava sopra viene spinto fuori."""
+        g = self.world.grid
+        tx, ty = int(math.floor(pos.x)), int(math.floor(pos.y))
+        if not g.is_walkable(tx, ty) or self._pillar_at(tx, ty) is not None:
+            return None
+        c = Vec2(tx + 0.5, ty + 0.5)
+        for s in self.world.structures():
+            if s.alive and c.dist(s.pos) < s.radius + 0.9:
+                return None   # mai sopra torri/nucleo
+        pl = Pillar(pos=c, tx=tx, ty=ty, team=p.team, born=self.time,
+                    until=self.time + PILLAR_DURATION, prev_tile=g.tiles[ty][tx],
+                    explode=explode)
+        g.tiles[ty][tx] = TILE_PILLAR
+        self.world.pillars.append(pl)
+        self._eject_from_tile(tx, ty)
+        self.fx_events.append({"kind": "pillar", "c": (c.x, c.y), "mtype": "Rock",
+                               "fx": "pillar", "explosive": explode is not None})
+        return pl
+
+    def _eject_from_tile(self, tx, ty):
+        """Spinge fuori dal tile (appena diventato pilastro) le unità che ci stanno."""
+        g = self.world.grid
+        c = Vec2(tx + 0.5, ty + 0.5)
+        for u in self.world.alive_units():
+            if int(math.floor(u.pos.x)) != tx or int(math.floor(u.pos.y)) != ty:
+                continue
+            away = u.pos - c
+            base = math.atan2(away.y, away.x) if away.length() > 1e-6 else 0.0
+            for k in range(8):   # prima la direzione "naturale", poi a ventaglio
+                a = base + (k + 1) // 2 * (math.pi / 4) * (1 if k % 2 else -1)
+                pt = c + Vec2(math.cos(a), math.sin(a)) * (0.75 + u.radius)
+                if g.is_walkable_point(pt.x, pt.y):
+                    u.pos = pt
+                    break
+            u.stop()
+
+    def _remove_pillar(self, pl, crumble=True):
+        g = self.world.grid
+        if g.tiles[pl.ty][pl.tx] == TILE_PILLAR:
+            g.tiles[pl.ty][pl.tx] = pl.prev_tile
+        if pl in self.world.pillars:
+            self.world.pillars.remove(pl)
+        if crumble:
+            self.fx_events.append({"kind": "pillarbreak", "c": (pl.pos.x, pl.pos.y),
+                                   "mtype": "Rock", "fx": "pillarbreak"})
+
+    def _update_pillars(self, dt: float) -> None:
+        """Scadenza dei pilastri. Un cambio meteo rigenera la griglia dal terreno
+        base (cancellando i pilastri): qui si ri-timbrano, salvando il tile nuovo."""
+        g = self.world.grid
+        for pl in list(self.world.pillars):
+            if self.time >= pl.until:
+                self._remove_pillar(pl)
+                continue
+            t = g.tiles[pl.ty][pl.tx]
+            if t != TILE_PILLAR:
+                pl.prev_tile = t
+                g.tiles[pl.ty][pl.tx] = TILE_PILLAR
+
+    def _pillar_burst(self, pl) -> None:
+        """Pietrataglio: il pilastro contro cui è stato schiantato un nemico
+        esplode, danneggiando i nemici vicini, e sparisce."""
+        emv, rank, cid, r = pl.explode
+        caster = self.world.get(cid)
+        if caster is not None:
+            for e in self._rock_targets(pl.team, pl.pos, r):
+                self._hit(caster, emv, rank, e)
+        self.fx_events.append({"kind": "area", "c": (pl.pos.x, pl.pos.y), "radius": r,
+                               "mtype": "Rock", "fx": "rockburst"})
+        self._remove_pillar(pl, crumble=False)
+
+    # Sabbiafiume (passiva di Gigalith) / Terrempesta
+    def _sand_radius(self, p):
+        """(raggio, moltiplicatore) della tempesta di sabbia attorno a p; raggio 0
+        = nessuna tempesta. Terrempesta la raddoppia (e la accende anche prima
+        dell'evoluzione in Gigalith)."""
+        boost = p.sandstorm_boost_until > self.time
+        if not (boost or (p.passive_id == "sabbiafiume" and p.stage >= 2)):
+            return 0.0, 1.0
+        mult = 2.0 if boost else 1.0
+        return SABBIAFIUME_RADIUS * mult, mult
+
+    def _update_sandstorms(self, dt: float) -> None:
+        """Tempesta di sabbia PERMANENTE attorno a Gigalith (stesso schema
+        dell'aura di pioggia di Politoad, ma con danno): ogni SABBIAFIUME_TICK i
+        nemici dentro (Pokémon e minion) subiscono un piccolo danno senza tipo."""
+        now = self.time
+        for p in self.world.pokemons():
+            if not p.alive or p.is_decoy:
+                p.sand_radius = 0.0
+                continue
+            r, mult = self._sand_radius(p)
+            p.sand_radius = r
+            if r <= 0.0 or now < p.sand_next:
+                continue
+            p.sand_next = now + SABBIAFIUME_TICK
+            dmg = ((SABBIAFIUME_DPS_BASE + SABBIAFIUME_DPS_LVL * p.level)
+                   * SABBIAFIUME_TICK * mult)
+            for e in self._combat_hash.query_radius(p.pos.x, p.pos.y, r + 1.0):
+                if e.team == p.team or not getattr(e, "alive", False):
+                    continue
+                if not isinstance(e, (Pokemon, Minion)):
+                    continue
+                if p.pos.dist(e.pos) <= r + e.radius:
+                    self._deal_damage(p, e, dmg, dmg_type=None)
+
+    def _cast_sandboost(self, p, mv, rank, origin):
+        """Terrempesta: per qualche secondo la tempesta di Sabbiafiume raddoppia
+        raggio e danno."""
+        dur = float(mv.effects.get("duration", 4.0))
+        p.sandstorm_boost_until = self.time + dur
+        p.sand_next = self.time   # primo tick subito
+        self.fx_events.append({"kind": "zone", "c": (origin.x, origin.y),
+                               "radius": SABBIAFIUME_RADIUS * 2.0, "mtype": mv.type,
+                               "fx": "sandburst"})
+
+    # Q: Rocciotomba / Pietrataglio / Abbattimento
+    def _cast_rockwave(self, p, mv, rank, origin, dirv):
+        """Rocciotomba: un'onda di rocce corre in linea retta (danno + rallenta
+        ogni nemico una volta); a fine corsa spunta un pilastro di roccia.
+        Pietrataglio: il pilastro è esplosivo (vedi _pillar_burst)."""
+        explode = None
+        ex = mv.effects.get("explode")
+        if ex:
+            emv = Move(slot=mv.slot, max_rank=mv.max_rank, d={
+                "id": mv.id + "_burst", "name": mv.name, "type": mv.type,
+                "category": mv.category, "power": ex.get("power", [60]),
+                "ratio": ex.get("ratio", 0.3), "scale": mv.d.get("scale", "")})
+            explode = (emv, rank, p.id, float(ex.get("radius", 2.0)))
+        self.rock_waves.append({
+            "pos": Vec2(origin.x, origin.y), "start": Vec2(origin.x, origin.y),
+            "dir": Vec2(dirv.x, dirv.y), "left": mv.range, "speed": mv.speed,
+            "radius": mv.radius, "team": p.team, "caster_id": p.id, "mv": mv,
+            "rank": rank, "hit": set(), "fx_next": 0.0, "explode": explode})
+
+    def _cast_smackdown(self, p, mv, rank, origin):
+        """Abbattimento: colpo ad area attorno a sé (annulla Volo in corso e
+        blocca gli scatti dei colpiti). La zona resta ATTIVA per un po': uno
+        scatto nemico che la attraversa si ferma al bordo, subisce il colpo e
+        non può più scattare (vedi _intercept_dash)."""
+        hit = set()
+        for e in self._rock_targets(p.team, origin, mv.radius):
+            self._hit(p, mv, rank, e)
+            hit.add(e.id)
+        dur = float(mv.effects.get("zone", 2.0))
+        self.smackdown_zones.append({"c": Vec2(origin.x, origin.y), "radius": mv.radius,
+                                     "end": self.time + dur, "team": p.team,
+                                     "caster_id": p.id, "mv": mv, "rank": rank})
+        self.fx_events.append({"kind": "area", "c": (origin.x, origin.y),
+                               "radius": mv.radius, "mtype": mv.type, "fx": "smackdown"})
+        self.fx_events.append({"kind": "zone", "c": (origin.x, origin.y),
+                               "radius": mv.radius, "dur": dur, "mtype": mv.type,
+                               "fx": "smackzone"})
+
+    def _intercept_dash(self, p, origin, dest):
+        """Abbattimento attivo: uno scatto di `p` che entra in una zona nemica si
+        ferma al bordo e `p` subisce il colpo (niente scatti per qualche
+        secondo). Ritorna (destinazione, intercettato)."""
+        for z in self.smackdown_zones:
+            if z["team"] == p.team or self.time >= z["end"]:
+                continue
+            c, r = z["c"], z["radius"] + getattr(p, "radius", 0.0)
+            if self._point_seg_dist(c, origin, dest) > r:
+                continue
+            d = dest - origin
+            n = int(d.length() * 8) + 1
+            stop = Vec2(origin.x, origin.y)
+            for i in range(n + 1):
+                pt = origin + d * (i / n)
+                if pt.dist(c) <= r:
+                    stop = pt
+                    break
+            caster = self.world.get(z["caster_id"])
+            if caster is not None:
+                self._hit(caster, z["mv"], z["rank"], p)
+            self.fx_events.append({"kind": "area", "c": (stop.x, stop.y), "radius": 1.0,
+                                   "mtype": z["mv"].type, "fx": "smackdown"})
+            return stop, True
+        return dest, False
+
+    # W: Levitoroccia
+    def _cast_spikes(self, p, mv, rank, origin, tgt):
+        """Levitoroccia: sparge rocce aguzze in un'area per `duration`; ogni
+        nemico che ci sta dentro subisce danno, al massimo una volta ogni
+        `interval` secondi (vedi _update_area_effects, ramo "spikes")."""
+        to = tgt - origin
+        center = (origin + to.normalized() * min(to.length(), mv.range)
+                  if to.length() > 1e-6 else Vec2(origin.x, origin.y))
+        dur = float(mv.effects.get("duration", 8.0))
+        self.area_effects.append({
+            "center": Vec2(center.x, center.y), "radius": mv.radius, "spikes": True,
+            "end": self.time + dur, "interval": float(mv.effects.get("interval", 1.5)),
+            "next_hit": {}, "team": p.team, "caster_id": p.id, "mv": mv, "rank": rank,
+            "mtype": mv.type, "fx": mv.fx})
+        self.fx_events.append({"kind": "zone", "c": (center.x, center.y),
+                               "radius": mv.radius, "dur": dur, "mtype": mv.type,
+                               "fx": "spikefield"})
+
+    # E: Pesobomba (+ Bottintesta / Lucidatura)
+    def _cast_rockcharge(self, p, mv, rank, origin, tgt, dirv):
+        """Pesobomba: carica in avanti per `range` (tick per tick, vedi
+        _update_rock_moves). Trascina i nemici colpiti; se sbatte contro un muro
+        o un pilastro genera un'onda d'urto che lancia in aria i nemici vicini."""
+        if p.dashlock_until > self.time:
+            return
+        dur = mv.range / max(0.1, mv.speed)
+        p.stop()
+        p.channel_until = self.time + dur + 0.1   # niente mosse/attacchi mentre carica
+        self.rock_charges.append({"pid": p.id, "dir": Vec2(dirv.x, dirv.y),
+                                  "left": mv.range, "speed": mv.speed, "mv": mv,
+                                  "rank": rank, "hit": set(), "drag": [],
+                                  "fx_next": 0.0})
+
+    # R: Frana / Esplosione
+    def _cast_avalanche(self, p, mv, rank, origin, tgt):
+        """Frana: una grande valanga di massi compare in un punto lontano e
+        rotola verso Gigalith (rallenta + lancia in aria chi attraversa). Se
+        Gigalith la colpisce con Pesobomba la rilancia nella direzione della
+        carica, più veloce e con un lancio in aria più lungo."""
+        to = tgt - origin
+        dist = max(float(mv.effects.get("min_range", 4.0)), min(to.length(), mv.range))
+        dirv = to.normalized() if to.length() > 1e-6 else DIR_VECTORS[p.facing % 8].normalized()
+        spawn = self._nearest_walkable(origin + dirv * dist, origin)
+        back = origin - spawn
+        roll = back.normalized() if back.length() > 1e-6 else Vec2(-dirv.x, -dirv.y)
+        delay = float(mv.effects.get("delay", 0.6))
+        travel = back.length() + float(mv.effects.get("overshoot", 2.5))
+        self.avalanches.append({
+            "pos": Vec2(spawn.x, spawn.y), "dir": roll, "left": travel,
+            "speed": mv.speed, "radius": mv.radius, "start": self.time + delay,
+            "team": p.team, "caster_id": p.id, "mv": mv, "rank": rank, "hit": set(),
+            "air": float(mv.effects.get("air", 0.75)), "relaunched": False,
+            "spin": 0.0, "born": self.time})
+        self.fx_events.append({"kind": "zone", "c": (spawn.x, spawn.y),
+                               "b": (spawn.x + roll.x * travel, spawn.y + roll.y * travel),
+                               "radius": mv.radius, "delay": delay, "mtype": mv.type,
+                               "fx": "avalanchewarn"})
+
+    def _relaunch_avalanche(self, av, dirv) -> None:
+        mv = av["mv"]
+        av["dir"] = Vec2(dirv.x, dirv.y)
+        av["speed"] = mv.speed * float(mv.effects.get("relaunch_speed", 1.6))
+        av["air"] = float(mv.effects.get("relaunch_air", 1.4))
+        av["left"] = float(mv.effects.get("relaunch_range", 9.0))
+        av["hit"] = set()
+        av["relaunched"] = True
+        self.fx_events.append({"kind": "area", "c": (av["pos"].x, av["pos"].y),
+                               "radius": av["radius"] + 0.4, "mtype": mv.type,
+                               "fx": "shockwave"})
+
+    def _cast_explosion(self, p, mv, rank, origin):
+        """Esplosione: Gigalith si carica per `channel` secondi (visibile ai
+        nemici, interrompibile da stordimento/sonno/lancio in aria come il Volo),
+        poi esplode (vedi _explode)."""
+        ch = float(mv.effects.get("channel", 1.5))
+        p.stop()
+        p.channel_until = self.time + ch
+        p.root_until = max(p.root_until, self.time + ch)
+        self.channels.append({"type": "explode", "caster_id": p.id, "mv": mv, "rank": rank,
+                              "start": self.time, "end": self.time + ch})
+        self.fx_events.append({"kind": "zone", "c": (origin.x, origin.y),
+                               "radius": mv.radius, "mtype": mv.type,
+                               "fx": "explodecharge", "t": 0.0})
+
+    def _explode(self, p, mv, rank) -> None:
+        """Fine carica di Esplosione: danno ad area + lancio in aria (negli
+        effects) a tutti i nemici vicini; Gigalith perde metà degli HP attuali."""
+        c = Vec2(p.pos.x, p.pos.y)
+        for e in self._rock_targets(p.team, c, mv.radius):
+            self._hit(p, mv, rank, e)
+        cost = float(mv.effects.get("hp_cost_frac", 0.5))
+        p.hp = max(1.0, p.hp * (1.0 - cost))
+        self.fx_events.append({"kind": "area", "c": (c.x, c.y), "radius": mv.radius,
+                               "mtype": mv.type, "fx": "explosion"})
+        self.fx_events.append({"eid": p.id, "anim": "Hurt"})
+
+    def _update_rock_moves(self, dt: float) -> None:
+        now = self.time
+        self.smackdown_zones = [z for z in self.smackdown_zones if now < z["end"]]
+        self._update_rock_waves(dt)
+        self._update_rock_charges(dt)
+        self._update_avalanches(dt)
+
+    def _update_rock_waves(self, dt: float) -> None:
+        g = self.world.grid
+        alive = []
+        for w in self.rock_waves:
+            caster = self.world.get(w["caster_id"])
+            step = w["speed"] * dt
+            nxt = w["pos"] + w["dir"] * min(step, max(0.0, w["left"]))
+            blocked = not g.is_walkable_point(nxt.x, nxt.y)
+            if not blocked:
+                w["pos"] = nxt
+                w["left"] -= step
+            if caster is not None:
+                for e in self._rock_targets(w["team"], w["pos"], w["radius"]):
+                    if e.id not in w["hit"]:
+                        w["hit"].add(e.id)
+                        self._hit(caster, w["mv"], w["rank"], e)   # danno + rallentamento
+            if self.time >= w["fx_next"]:   # rocce che spuntano dietro al fronte dell'onda
+                w["fx_next"] = self.time + 0.045
+                self.fx_events.append({"kind": "rockspike", "c": (w["pos"].x, w["pos"].y),
+                                       "dir": (w["dir"].x, w["dir"].y), "radius": w["radius"],
+                                       "mtype": "Rock", "fx": "rockspike"})
+            if blocked or w["left"] <= 0.0:
+                # Fine corsa: pilastro di roccia (non a ridosso di chi l'ha lanciata).
+                if caster is not None and w["pos"].dist(w["start"]) >= 1.2:
+                    self._place_pillar(caster, w["pos"], w["explode"])
+                continue
+            alive.append(w)
+        self.rock_waves = alive
+
+    def _update_rock_charges(self, dt: float) -> None:
+        g = self.world.grid
+        alive = []
+        for ch in self.rock_charges:
+            p = self.world.get(ch["pid"])
+            if p is None or not p.alive or self._immobile(p):
+                if p is not None:
+                    p.channel_until = self.time
+                continue   # carica interrotta (morto, stordito, lanciato in aria)
+            mv, dirv = ch["mv"], ch["dir"]
+            # Abbattimento nemico attivo: la carica si ferma lì.
+            if any(z["team"] != p.team and p.pos.dist(z["c"]) <= z["radius"] + p.radius
+                   for z in self.smackdown_zones):
+                self._intercept_dash(p, p.pos, p.pos)
+                self._end_charge(p, ch)
+                continue
+            step = min(ch["speed"] * dt, max(0.0, ch["left"]))
+            newpos = p.pos + dirv * step
+            # Impatto: Gigalith sbatte contro un muro/pilastro, oppure un nemico
+            # TRASCINATO davanti a lui viene schiantato contro l'ostacolo.
+            blocked_at = newpos + dirv * (p.radius * 0.8)
+            if g.is_walkable_point(blocked_at.x, blocked_at.y):
+                blocked_at = None
+                for eid in ch["drag"]:
+                    e = self.world.get(eid)
+                    if e is None or not e.alive:
+                        continue
+                    front = newpos + dirv * (p.radius + 2.0 * e.radius + 0.05)
+                    if not g.is_walkable_point(front.x, front.y):
+                        blocked_at = front
+                        break
+            if blocked_at is not None:
+                self._charge_impact(p, ch, blocked_at)
+                continue
+            p.pos = newpos
+            p.stop()
+            ch["left"] -= step
+            # Colpisce (una volta) e TRASCINA i nemici sul percorso.
+            for e in self._rock_targets(p.team, p.pos, p.radius + 0.45):
+                if e.id in ch["hit"]:
+                    continue
+                ch["hit"].add(e.id)
+                self._hit(p, mv, ch["rank"], e)
+                if (e.alive and isinstance(e, (Pokemon, Minion))
+                        and not self._cc_immune(e)
+                        and not (isinstance(e, Pokemon) and e.untargetable_until > self.time)):
+                    ch["drag"].append(e.id)
+            for eid in ch["drag"]:
+                e = self.world.get(eid)
+                if e is None or not e.alive:
+                    continue
+                pt = p.pos + dirv * (p.radius + e.radius + 0.05)
+                if g.is_walkable_point(pt.x, pt.y):
+                    e.pos = pt
+                e.stop()
+                if isinstance(e, Pokemon):
+                    e.stun_until = max(e.stun_until, self.time + 0.12)   # spostato: non agisce
+            # Frana: Gigalith colpisce la propria valanga e la rilancia.
+            for av in self.avalanches:
+                if (av["team"] == p.team and not av["relaunched"] and self.time >= av["start"]
+                        and av["pos"].dist(p.pos) <= av["radius"] + p.radius + 0.3):
+                    self._relaunch_avalanche(av, dirv)
+                    ch["left"] = 0.0
+            if self.time >= ch["fx_next"]:
+                ch["fx_next"] = self.time + 0.05
+                self.fx_events.append({"kind": "dash", "a": (p.pos.x - dirv.x * 0.6,
+                                                             p.pos.y - dirv.y * 0.6),
+                                       "b": (p.pos.x, p.pos.y), "mtype": "Rock",
+                                       "fx": "chargedust"})
+            if ch["left"] <= 0.0:
+                self._end_charge(p, ch)
+                continue
+            alive.append(ch)
+        self.rock_charges = alive
+
+    def _end_charge(self, p, ch) -> None:
+        p.channel_until = self.time
+        p.stop()
+
+    def _charge_impact(self, p, ch, ahead) -> None:
+        """Pesobomba contro un muro o un pilastro: onda d'urto che lancia in aria
+        i nemici vicini. Pietrataglio: se un nemico viene schiantato contro un
+        pilastro esplosivo, il pilastro esplode. Lucidatura: +velocità."""
+        mv = ch["mv"]
+        c = Vec2(p.pos.x, p.pos.y)
+        for e in self._rock_targets(p.team, c, SHOCKWAVE_RADIUS):
+            if isinstance(e, Pokemon):
+                self._apply_airborne(e, SHOCKWAVE_AIR, 1.1)
+        self.fx_events.append({"kind": "area", "c": (c.x, c.y), "radius": SHOCKWAVE_RADIUS,
+                               "mtype": mv.type, "fx": "shockwave"})
+        pl = self._pillar_at(int(math.floor(ahead.x)), int(math.floor(ahead.y)))
+        if pl is None:   # il punto d'urto può cadere a cavallo del tile: il più vicino
+            near = [q for q in self.world.pillars if q.pos.dist(ahead) <= 1.0]
+            pl = min(near, key=lambda q: q.pos.dist(ahead)) if near else None
+        if pl is not None and pl.explode is not None:
+            slammed = any(self.world.get(eid) is not None and self.world.get(eid).alive
+                          for eid in ch["drag"])
+            if not slammed:   # nemico incastrato tra Gigalith e il pilastro
+                slammed = any(isinstance(e, Pokemon) and e.pos.dist(pl.pos) <= 1.3
+                              for e in self._rock_targets(p.team, pl.pos, 1.3))
+            if slammed:
+                self._pillar_burst(pl)
+        isp = mv.effects.get("impact_speed")
+        if isp:
+            self._apply_speed(p, float(isp.get("mult", 1.35)), float(isp.get("duration", 3.0)))
+            self.fx_events.append({"kind": "buff", "c": (c.x, c.y), "mtype": mv.type,
+                                   "radius": 1.0})
+        self._end_charge(p, ch)
+
+    def _update_avalanches(self, dt: float) -> None:
+        g = self.world.grid
+        alive = []
+        for av in self.avalanches:
+            if self.time < av["start"]:
+                alive.append(av)
+                continue
+            caster = self.world.get(av["caster_id"])
+            step = av["speed"] * dt
+            nxt = av["pos"] + av["dir"] * step
+            if not g.is_walkable_point(nxt.x, nxt.y):
+                self.fx_events.append({"kind": "area", "c": (av["pos"].x, av["pos"].y),
+                                       "radius": av["radius"], "mtype": "Rock",
+                                       "fx": "rockburst"})
+                continue   # si schianta contro un muro/pilastro
+            av["pos"] = nxt
+            av["left"] -= step
+            av["spin"] += step / max(0.3, av["radius"])
+            if caster is not None:
+                for e in self._rock_targets(av["team"], av["pos"], av["radius"]):
+                    if e.id in av["hit"]:
+                        continue
+                    av["hit"].add(e.id)
+                    self._hit(caster, av["mv"], av["rank"], e)   # danno + rallentamento
+                    if isinstance(e, Pokemon):
+                        self._apply_airborne(e, av["air"], 1.4 if av["relaunched"] else 1.0)
+            if av["left"] <= 0.0:
+                self.fx_events.append({"kind": "area", "c": (av["pos"].x, av["pos"].y),
+                                       "radius": av["radius"], "mtype": "Rock",
+                                       "fx": "rockburst"})
+                continue
+            alive.append(av)
+        self.avalanches = alive
+
     def _cast_bubble(self, p, mv, rank, origin, dirv):
-        """Idropulsar: una bolla d'acqua che VIAGGIA (più un getto alla bocca)."""
+        """Proiettile che VIAGGIA (Idropulsar, Fuocobomba). Con `burst` esplode in
+        un'area al contatto o a fine gittata (Fuocobomba)."""
         self.projectiles.append({
             "pos": Vec2(origin.x, origin.y), "dir": Vec2(dirv.x, dirv.y),
             "speed": mv.speed, "left": mv.range, "radius": mv.radius,
-            "team": p.team, "caster_id": p.id, "mv": mv, "rank": rank, "mtype": mv.type})
+            "team": p.team, "caster_id": p.id, "mv": mv, "rank": rank, "mtype": mv.type,
+            "burst": float(mv.d.get("burst", 0.0))})
         muzzle = origin + dirv * 1.3
         self.fx_events.append({"kind": "projectile", "a": (origin.x, origin.y),
                                "b": (muzzle.x, muzzle.y), "mtype": mv.type})
@@ -2199,10 +2893,18 @@ class Match:
     def _update_projectiles(self, dt: float) -> None:
         alive = []
         for pr in self.projectiles:
+            prev = Vec2(pr["pos"].x, pr["pos"].y)
             step = pr["speed"] * dt
             pr["pos"] = pr["pos"] + pr["dir"] * step
             pr["left"] -= step
+            burst = pr.get("burst", 0.0)
+            if burst > 0.0:   # Fuocobomba lenta: scia di fuoco visibile mentre viaggia
+                self.fx_events.append({"kind": "projectile", "a": (prev.x, prev.y),
+                                       "b": (pr["pos"].x, pr["pos"].y),
+                                       "mtype": pr["mtype"], "fx": pr["mv"].fx})
             if not self.world.grid.is_walkable_point(pr["pos"].x, pr["pos"].y):
+                if burst > 0.0:   # Fuocobomba: esplode anche contro un muro
+                    self._projectile_burst(pr)
                 continue   # colpisce un muro: svanisce
             hit = None
             for e in self._combat_hash.query_radius(pr["pos"].x, pr["pos"].y, pr["radius"] + 1.0):
@@ -2215,14 +2917,36 @@ class Match:
                     break
             if hit is not None:
                 caster = self.world.get(pr["caster_id"])
-                if caster is not None:
+                if burst > 0.0:        # Fuocobomba: esplosione ad area all'impatto
+                    self._projectile_burst(pr)
+                elif caster is not None:
                     self._hit(caster, pr["mv"], pr["rank"], hit)
-                self.fx_events.append({"kind": "area", "c": (pr["pos"].x, pr["pos"].y),
-                                       "radius": pr["radius"], "mtype": pr["mtype"]})
-                continue   # bolla consumata
+                    self.fx_events.append({"kind": "area", "c": (pr["pos"].x, pr["pos"].y),
+                                           "radius": pr["radius"], "mtype": pr["mtype"]})
+                continue   # proiettile consumato
             if pr["left"] > 0:
                 alive.append(pr)
+            elif burst > 0.0:          # Fuocobomba: esplode a fine gittata
+                self._projectile_burst(pr)
         self.projectiles = alive
+
+    def _projectile_burst(self, pr) -> None:
+        """Esplosione ad area di un proiettile (Fuocobomba): danneggia tutti i
+        nemici entro `burst` dal punto d'impatto + anello visivo."""
+        caster = self.world.get(pr["caster_id"])
+        c = pr["pos"]
+        br = pr.get("burst", pr["radius"])
+        if caster is not None:
+            for e in self._combat_hash.query_radius(c.x, c.y, br + 1.0):
+                if e.team == pr["team"] or not getattr(e, "alive", False):
+                    continue
+                if not isinstance(e, (Pokemon, Minion, Structure, Wild)):
+                    continue
+                if c.dist(e.pos) <= br + getattr(e, "radius", 0.0):
+                    self._hit(caster, pr["mv"], pr["rank"], e)
+        # Esplosione: anello generico colorato per tipo (fx di viaggio escluso).
+        self.fx_events.append({"kind": "area", "c": (c.x, c.y),
+                               "radius": br, "mtype": pr["mtype"]})
 
     def _cast_projectile(self, p, mv, rank, origin, dirv):
         best, best_proj = None, mv.range + 1.0
@@ -2285,17 +3009,21 @@ class Match:
                                "radius": mv.radius, "mtype": mv.type})
 
     def _cast_whirlpool(self, p, mv, rank, origin, tgt):
-        """Mulinello: un vortice PERSISTENTE a terra per tutta la sua durata.
-        Registra una zona che pulsa danno/rallentamento a intervalli e un unico
-        effetto visivo "vortex" che gira per lo stesso tempo (non un lampo)."""
+        """Vortice PERSISTENTE a terra per tutta la sua durata (Mulinello,
+        Turbofuoco). Registra una zona che pulsa a intervalli e un unico effetto
+        visivo "vortex" che gira per lo stesso tempo (non un lampo).
+
+        Mulinello (slow_only, default): danno UNA volta, poi la zona RI-APPLICA
+        solo il rallentamento. Turbofuoco (slow_only=false): la zona pulsa DANNO
+        (e gli effetti della mossa, p.es. radice) a ogni tick -> intrappola e
+        brucia nel tempo chi ci resta dentro."""
         to = tgt - origin
         d = to.length()
         center = (origin + to.normalized() * mv.range if d > mv.range
                   else Vec2(tgt.x, tgt.y))
         dur = float(mv.effects.get("duration", 1.5))
         interval = float(mv.effects.get("interval", 0.3))
-        # Danno UNA volta (come prima), poi la zona resta e RI-APPLICA solo il
-        # rallentamento a chi ci sta dentro: il vortice morde ma non martella.
+        slow_only = bool(mv.d.get("slow_only", True))
         for e in self._combat_hash.query_radius(center.x, center.y, mv.radius + 1.0):
             if e.team == p.team or not getattr(e, "alive", False):
                 continue
@@ -2306,7 +3034,7 @@ class Match:
             "start": self.time + interval, "end": self.time + dur,
             "next": self.time + interval, "interval": interval,
             "caster_id": p.id, "mv": mv, "rank": rank, "mtype": mv.type,
-            "fx": mv.fx, "silent": True, "slow_only": True})
+            "fx": mv.fx, "silent": True, "slow_only": slow_only})
         self.fx_events.append({"kind": "vortex", "c": (center.x, center.y),
                                "radius": mv.radius, "dur": dur, "mtype": mv.type})
 
@@ -2318,6 +3046,8 @@ class Match:
         dest = origin + dirv * dist
         if not mv.wall_pierce:
             dest = self._clamp_to_wall(origin, dest)
+        dest, _ = self._intercept_dash(p, origin, dest)   # Abbattimento nemico attivo
+        dist = origin.dist(dest)
         # Colpisce i nemici lungo il tragitto.
         hit_any = False
         for e in self._combat_hash.query_radius((origin.x + dest.x) / 2,
@@ -2338,8 +3068,23 @@ class Match:
         p.pos = dest
         p.stop()
         self._apply_support(p, mv, rank, dest)
+        # Nitrocarica: ogni scatto dà una carica di velocità (cumulabile fino a N).
+        ss = mv.effects.get("speed_stack")
+        if ss:
+            self._apply_flamecharge(p, float(ss.get("per", 0.12)),
+                                    int(ss.get("max", 3)), float(ss.get("duration", 4.0)))
         self.fx_events.append({"kind": "dash", "a": (origin.x, origin.y),
                                "b": (dest.x, dest.y), "mtype": mv.type})
+
+    def _apply_flamecharge(self, p, per, maxst, dur):
+        """Nitrocarica: accumula una carica di velocità (fino a maxst). Le cariche
+        si azzerano se scadono prima del prossimo scatto; il bonus è applicato in
+        _update_status (p.speed)."""
+        if p.fc_until <= self.time:
+            p.fc_stacks = 0
+        p.fc_stacks = min(maxst, p.fc_stacks + 1)
+        p.fc_per = per
+        p.fc_until = self.time + dur
 
     def _clamp_to_wall(self, origin, dest):
         d = dest - origin
@@ -2379,10 +3124,16 @@ class Match:
             # (×0,6..×1,5) e meteo. La mitigazione (con penetrazione e riduzione
             # fissa) ed eventuale critico sono in _mitigate_hit.
             magic = mv.category == "special"
-            raw = power + mv.ratio * (caster.eff_sp_attack() if magic
-                                      else caster.eff_attack())
-            if magic and isinstance(caster, Pokemon):
-                raw *= caster.ability_mult
+            if mv.d.get("scale") == "defense" and isinstance(caster, Pokemon):
+                # Linea Roggenrola: il danno delle MOSSE scala con la Difesa (non
+                # con l'Attacco né con l'AP); niente moltiplicatore SpA. La
+                # categoria (fisica/speciale) decide solo la difesa che la mitiga.
+                raw = power + mv.ratio * caster.eff_defense()
+            else:
+                raw = power + mv.ratio * (caster.eff_sp_attack() if magic
+                                          else caster.eff_attack())
+                if magic and isinstance(caster, Pokemon):
+                    raw *= caster.ability_mult
             eff = (self.types.moba_multiplier(mv.type, target.types)
                    if isinstance(target, Pokemon) else 1.0)
             has_plate = (isinstance(caster, Pokemon) and caster.judgment_until > self.time
@@ -2472,6 +3223,18 @@ class Match:
             if ad:
                 self._apply_atk_debuff(target, float(ad.get("amount", 20)),
                                        float(ad.get("duration", 3.0)))
+            kn = fx.get("airborne")
+            if kn:
+                self._apply_airborne(target, float(kn.get("duration", 1.0)),
+                                     float(kn.get("peak", 1.0)))
+            if fx.get("ground"):   # Abbattimento: annulla Volo in corso
+                self._cancel_fly(target)
+        # Passiva Fiammacoda: ogni colpo di una mossa Fuoco dà una carica di Calore
+        # al nemico; a 3 cariche scatta la Scottatura (danno nel tempo + -25% ATT).
+        if (isinstance(caster, Pokemon) and caster.passive_id == "fiammacoda"
+                and mv.type == "Fire" and isinstance(target, Pokemon)
+                and target.alive and target.team != caster.team):
+            self._apply_heat(target, caster)
         # Passiva Inversione: ogni spell a segno su un Pokémon nemico dà cariche
         # (non sui minion né sulle strutture).
         if (isinstance(caster, Pokemon) and isinstance(target, Pokemon)
@@ -2521,10 +3284,12 @@ class Match:
         if spd:
             for a in targets:
                 self._apply_speed(a, float(spd.get("mult", 1.2)), float(spd.get("duration", 3.0)))
-        dfb = eff.get("def")   # Indurimento: difesa temporanea
+        dfb = eff.get("def")   # Indurimento / Ferroscudo: difesa temporanea
         if dfb:
+            m = dfb.get("mult", 1.2)
+            m = self._rank_val(m, rank) if isinstance(m, list) else float(m)   # per grado
             for a in targets:
-                self._apply_def_buff(a, float(dfb.get("mult", 1.2)), float(dfb.get("duration", 4.0)))
+                self._apply_def_buff(a, m, float(dfb.get("duration", 4.0)))
         ram = eff.get("rampage")
         if ram:   # Oltraggio: inarrestabile per qualche secondo
             self._apply_rampage(caster, float(ram.get("duration", 4.0)))
@@ -2607,12 +3372,70 @@ class Match:
     def _apply_dashlock(self, p, dur):          # Cucitombra: niente scatti/tp
         p.dashlock_until = max(p.dashlock_until, self.time + dur)
 
+    def _apply_airborne(self, p, dur, peak=1.0):
+        """Lanciato in aria (knock-up): non si muove né lancia mosse/attacchi.
+        A differenza degli altri CC NON è ridotto dalla tenacia e non viene
+        accorciato né annullato da altri controlli (si tiene sempre la fine più
+        lontana). Visivamente lo sprite sale e ricade (air_z, _update_status)."""
+        if not isinstance(p, Pokemon) or not p.alive or p.is_decoy:
+            return
+        if self._cc_immune(p) or p.untargetable_until > self.time:
+            return
+        now = self.time
+        end = now + dur
+        if p.airborne_until > now and end <= p.airborne_until:
+            return   # già in aria più a lungo: il nuovo lancio non cambia nulla
+        p.airborne_start = now
+        p.airborne_until = end
+        p.airborne_peak = peak
+        p.stop()
+        p.aa_active = False
+        p.recalling = False
+        self.fx_events.append({"kind": "knockup", "c": (p.pos.x, p.pos.y),
+                               "dur": dur, "mtype": "Rock", "fx": "knockup"})
+
+    def _cancel_fly(self, p) -> bool:
+        """Abbattimento: se il bersaglio sta canalizzando Volo, lo annulla (resta
+        a terra; la ricarica della R resta spesa). True se ha annullato."""
+        if not isinstance(p, Pokemon):
+            return False
+        hit = [ch for ch in self.channels
+               if ch["caster_id"] == p.id and ch["type"] == "fly"]
+        if not hit:
+            return False
+        self.channels = [ch for ch in self.channels if ch not in hit]
+        p.channel_until = self.time
+        p.root_until = self.time
+        self.fx_events.append({"kind": "area", "c": (p.pos.x, p.pos.y),
+                               "radius": 1.2, "mtype": "Rock"})
+        return True
+
+    def _apply_heat(self, target, caster):
+        """Fiammacoda: aggiunge una carica di Calore (max 3, 4s, rinnovata). Alla
+        terza il bersaglio va in Scottatura (danno nel tempo + -25% Attacco) e le
+        cariche si azzerano."""
+        if self.time > target.heat_until:
+            target.heat_stacks = 0   # cariche scadute: riparti da zero
+        target.heat_stacks += 1
+        target.heat_until = self.time + 4.0
+        if target.heat_stacks >= 3:
+            target.heat_stacks = 0
+            target.heat_until = -1.0
+            if not self._cc_immune(target):
+                target.burn_until = self.time + 4.0
+                # Danno nel tempo: 2,5% degli HP max al secondo (10% in 4s).
+                target.burn_dps = max(target.burn_dps, 0.025 * target.max_hp)
+                target.burn_src = caster.id
+                self.fx_events.append({"kind": "area", "c": (target.pos.x, target.pos.y),
+                                       "radius": 0.9, "mtype": "Fire"})
+
     def _has_status(self, p) -> bool:
         """Vero se il Pokémon ha un qualunque stato alterato (per Sciagura)."""
         t = self.time
         return (p.slow_until > t or p.stun_until > t or p.sleep_until > t
                 or p.root_until > t or p.poison_until > t or p.confuse_until > t
-                or p.def_debuff_until > t or p.spdef_debuff_until > t)
+                or p.def_debuff_until > t or p.spdef_debuff_until > t
+                or p.burn_until > t or p.airborne_until > t)
 
     def _apply_untargetable(self, p, dur):
         p.untargetable_until = max(p.untargetable_until, self.time + dur)
@@ -2639,8 +3462,9 @@ class Match:
         p.speed_until = self.time + dur
 
     def _immobile(self, p) -> bool:
-        """Non può né muoversi né agire: stun/congelamento o sonno."""
-        return p.stun_until > self.time or p.sleep_until > self.time
+        """Non può né muoversi né agire: stun/congelamento, sonno o lanciato in aria."""
+        return (p.stun_until > self.time or p.sleep_until > self.time
+                or p.airborne_until > self.time)
 
     def _flee(self, p, dt) -> None:
         """Spavento: corre via dalla fonte (rallentato, non controllabile)."""
@@ -2689,6 +3513,15 @@ class Match:
                 src = self.world.get(p.poison_src) if p.poison_src is not None else None
                 if src is not None and src.alive:
                     self._deal_damage(src, p, p.poison_dps * dt)
+            # Scottatura (Fiammacoda): danno nel tempo + Attacco ridotto (vedi
+            # eff_attack, via burn_active).
+            p.burn_active = p.burn_until > self.time
+            if p.burn_active and p.burn_dps > 0.0:
+                src = self.world.get(p.burn_src) if p.burn_src is not None else None
+                if src is not None and src.alive:
+                    self._deal_damage(src, p, p.burn_dps * dt, dmg_type="Fire")
+            elif not p.burn_active:
+                p.burn_dps = 0.0
             # Passiva Inversione: senza colpi per 10s le cariche calano di 2 ogni 0.75s.
             if p.passive_id == "inversione":
                 if p.inversion_stacks > 0 and self.time - p.inversion_last_gain >= 10.0:
@@ -2697,6 +3530,14 @@ class Match:
                         p.inversion_decay_next = self.time + 0.75
                 else:
                     p.inversion_decay_next = self.time + 0.75   # finestra ferma finché combatte
+            # Lanciato in aria: lo sprite sale e ricade a parabola (cosmetico).
+            if p.airborne_until > self.time:
+                span = max(1e-6, p.airborne_until - p.airborne_start)
+                t = (self.time - p.airborne_start) / span
+                p.air_z = p.airborne_peak * 4.0 * t * (1.0 - t)
+            elif p.airborne_start >= 0.0:
+                p.airborne_start = -1.0
+                p.air_z = 0.0
             immobile = self._immobile(p)
             rooted = p.root_until > self.time   # paralisi: fermo ma può agire
             p.cc_active = (p.slow_until > self.time or immobile or rooted
@@ -2705,6 +3546,14 @@ class Match:
                        * self.jungle.terrain_speed_mult(p))
             if p.passive_id == "nuotovelox" and self._in_rain(p):
                 p.speed *= NUOTOVELOX_SPEED   # +20% in acqua/pioggia
+            # Nitrocarica: cariche di velocità cumulabili (scadono insieme).
+            if p.fc_until > self.time and p.fc_stacks > 0:
+                p.speed *= 1.0 + p.fc_per * p.fc_stacks
+            elif p.fc_stacks != 0:
+                p.fc_stacks = 0
+            # Muro di Fumo: raggio visivo ridotto a 3 tile finché si resta nel fumo.
+            if not p.is_decoy:
+                p.vision = 3.0 if p.smoke_until > self.time else 9.0
             if p.fear_until > self.time:
                 p.speed *= 0.5   # spavento: fuga rallentata del 50%
                 p.cc_active = True

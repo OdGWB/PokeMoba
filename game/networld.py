@@ -29,6 +29,7 @@ class NetWorld:
         self.match_time = 0.0
         self.hud = None
         self._last_seq = -1
+        self.pillars: list = []   # pilastri di roccia (non ancora trasmessi in rete)
 
     # --- aggiornamento da snapshot ------------------------------------------
     def push(self, snap, local_time):

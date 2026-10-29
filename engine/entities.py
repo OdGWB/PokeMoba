@@ -224,6 +224,33 @@ class Pokemon(Unit):
     # Spettrotuffo (R): ritorno automatico al punto di partenza
     blink_return_until: float = -1.0
     blink_return_pos: Vec2 | None = None
+    # Passiva Fiammacoda (linea Charmander): cariche di Calore e Scottatura.
+    #   A 3 cariche di Calore (ognuna dura 4s, rinnovate a ogni colpo Fuoco) il
+    #   nemico va in SCOTTATURA: danno nel tempo + Attacco ridotto del 25%.
+    heat_stacks: int = 0
+    heat_until: float = -1.0           # scadenza delle cariche di Calore
+    burn_until: float = -1.0           # scottatura attiva: danno nel tempo
+    burn_active: bool = False          # aggiornato in _update_status (per eff_attack)
+    burn_dps: float = 0.0
+    burn_src: int | None = None
+    # Muro di Fumo: raggio visivo ridotto finché si resta nel fumo nemico.
+    smoke_until: float = -1.0
+    # Canalizzazione (Lanciafiamme continuo / Volo): mentre è attiva non si
+    # possono lanciare altre mosse né fare auto-attacchi (gestita in match.py).
+    channel_until: float = -1.0
+    # Nitrocarica: cariche di velocità cumulabili (fino a 3) a ogni scatto.
+    fc_stacks: int = 0
+    fc_until: float = -1.0
+    fc_per: float = 0.0                # bonus velocità per carica (impostato al lancio)
+    # Lanciato in aria (knock-up: Pesobomba, Frana, Esplosione): non si muove né
+    # lancia mosse; non viene accorciato/annullato da altri CC (né dalla tenacia).
+    airborne_until: float = -1.0
+    airborne_start: float = -1.0
+    airborne_peak: float = 1.0         # altezza visiva del lancio (tile)
+    # Linea Roggenrola: Terrempesta (Sabbiafiume x2) e cadenza del danno della tempesta.
+    sandstorm_boost_until: float = -1.0
+    sand_next: float = 0.0
+    sand_radius: float = 0.0           # raggio attuale della tempesta (0 = spenta; per il client)
 
     def _bonus(self, stat: str) -> float:
         return self.passive_bonus.get(stat, 0.0) + self.item_bonus.get(stat, 0.0)
@@ -233,6 +260,8 @@ class Pokemon(Unit):
         if self.atk_debuff_active:
             base -= self.atk_debuff_amt
         atk = max(0.0, base) * self.atk_mult
+        if self.burn_active:
+            atk *= 0.75   # Scottatura (Fiammacoda): -25% Attacco mentre brucia
         if self.passive_id == "forzabruta" and self.cc_active:
             atk *= 1.5   # ForzaBruta: +50% attacco fisico mentre è sotto CC
         if self.passive_id == "inversione" and self.inversion_stacks:
@@ -264,6 +293,8 @@ class Pokemon(Unit):
         d = self.stats.sp_defense + self._bonus("sp_defense") + self._soul()
         if self.spdef_debuff_active:
             d -= self.spdef_debuff_amt
+        if self.passive_id == "sabbiafiume" and self.stage >= 2:
+            d *= 1.3   # Sabbiafiume (Gigalith): +30% Dif. Sp.
         return max(0.0, d)
     # Ordine corrente impartito dal giocatore (o dal controllo): guida l'IA.
     #   "idle" | "move" | "attack" | "attackmove" | "stop"
@@ -294,6 +325,26 @@ class Wild(Unit):
     reward_xp: float = 0.0
     reward_gold: int = 0
     color: tuple = (180, 180, 150)
+
+
+@dataclass
+class Pillar:
+    """Pilastro di roccia temporaneo (Rocciotomba, linea Roggenrola).
+
+    NON è un'entità del World (non combatte, non si bersaglia): occupa un tile
+    che diventa TILE_PILLAR finché esiste, quindi blocca movimento, proiettili e
+    pathfinding come un muro e vale come muro per Pesobomba. Il client lo legge
+    da world.pillars per disegnarlo (spunta dal terreno, poi si sbriciola)."""
+    pos: Vec2 = field(default_factory=lambda: Vec2(0.0, 0.0))
+    tx: int = 0
+    ty: int = 0
+    team: int = 0
+    born: float = 0.0
+    until: float = 0.0
+    prev_tile: int = 0
+    # Pietrataglio: esplode se un nemico ci viene schiantato contro.
+    explode: tuple | None = None       # (Move dell'esplosione, grado, id lanciatore, raggio)
+    radius: float = 0.5
 
 
 @dataclass

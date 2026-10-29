@@ -1,0 +1,109 @@
+{
+  "_comment": "Roggenrola -> Boldore (liv.4) -> Gigalith (liv.8). Tank di INGAGGIO stile Ornn: crea terreno (pilastri di roccia), carica, lancia in aria i nemici. Tipo Roccia. Statistiche = valori base reali (la derivazione le scala). REGOLA: il danno di TUTTE le mosse scala con la DIFESA (campo 'scale': 'defense' -> Match._hit usa eff_defense, niente AP/moltiplicatore SpA); l'Attacco vale solo per gli attacchi base. Danni delle mosse volutamente bassi rispetto a combattenti e maghi. Passiva Sabbiafiume (attiva da Gigalith, stage 2): tempesta di sabbia permanente di 3 tile attorno a lui (piccolo danno continuo senza tipo ai nemici) + 30% Dif. Sp.",
+  "dex": 524,
+  "name": "Roggenrola",
+  "types": ["Rock"],
+  "role": "tank",
+  "color": [92, 104, 150],
+  "radius": 0.36,
+  "base_speed": 3.4,
+  "attack_range": 1.6,
+  "attack_cooldown": 1.0,
+  "sprite_dir": "assets/pokemon/0524",
+  "passive": "sabbiafiume",
+  "attack_fx": "slash",
+
+  "base_stats": {"hp": 55, "attack": 75, "defense": 85, "sp_attack": 25, "sp_defense": 25, "speed": 15},
+
+  "evolutions": [
+    {"stage": 0, "level": 1, "name": "Roggenrola", "dex": 524, "sprite_dir": "assets/pokemon/0524",
+     "types": ["Rock"], "passive": "sabbiafiume", "role": "tank", "color": [92, 104, 150],
+     "attack_fx": "slash", "attack_range": 1.6, "ranged": false, "radius": 0.36,
+     "base_stats": {"hp": 55, "attack": 75, "defense": 85, "sp_attack": 25, "sp_defense": 25, "speed": 15}},
+
+    {"stage": 1, "level": 4, "name": "Boldore", "dex": 525, "sprite_dir": "assets/pokemon/0525",
+     "types": ["Rock"], "passive": "sabbiafiume", "role": "tank", "color": [80, 92, 140],
+     "attack_fx": "slash", "attack_range": 1.7, "ranged": false, "radius": 0.5,
+     "base_stats": {"hp": 70, "attack": 105, "defense": 105, "sp_attack": 50, "sp_defense": 40, "speed": 20}},
+
+    {"stage": 2, "level": 8, "name": "Gigalith", "dex": 526, "sprite_dir": "assets/pokemon/0526",
+     "types": ["Rock"], "passive": "sabbiafiume", "role": "tank", "color": [70, 80, 130],
+     "attack_fx": "slash", "attack_range": 1.8, "ranged": false, "radius": 0.62,
+     "base_stats": {"hp": 85, "attack": 135, "defense": 130, "sp_attack": 60, "sp_defense": 80, "speed": 25}}
+  ],
+
+  "moves": {
+    "Q": {
+      "base": {"id": "rocktomb", "name": "Rocciotomba", "type": "Rock", "category": "physical",
+               "shape": "rockwave", "scale": "defense", "target": "direction",
+               "power": [40, 60, 80, 100], "ratio": 0.35,
+               "cooldown": [8, 7.5, 7, 6.5], "range": 7.0, "speed": 13.0, "radius": 0.8,
+               "effects": {"slow": {"mult": 0.65, "duration": 1.5}}},
+      "upgrades": [
+        {"id": "stoneedge", "name": "Pietrataglio", "type": "Rock", "category": "physical",
+         "shape": "rockwave", "scale": "defense", "target": "direction",
+         "power": [60, 90, 120, 150], "ratio": 0.45,
+         "cooldown": [8, 7.5, 7, 6.5], "range": 7.5, "speed": 14.0, "radius": 0.85,
+         "effects": {"slow": {"mult": 0.6, "duration": 1.5},
+                     "explode": {"power": [50, 75, 100, 125], "ratio": 0.3, "radius": 2.0}}},
+        {"id": "smackdown", "name": "Abbattimento", "type": "Rock", "category": "physical",
+         "shape": "smackdown", "scale": "defense", "target": "self",
+         "power": [55, 85, 115, 145], "ratio": 0.4,
+         "cooldown": [9, 8.5, 8, 7.5], "range": 0, "radius": 2.4,
+         "effects": {"dashlock": {"stun": 0.0, "duration": 3.0}, "ground": true, "zone": 2.0}}
+      ]
+    },
+    "W": {
+      "base": {"id": "irondefense", "name": "Ferroscudo", "type": "Steel", "category": "none",
+               "shape": "buff", "fx": "ironshell", "target": "self", "power": [0, 0, 0, 0],
+               "cooldown": [14, 13, 12, 11], "radius": 1.0,
+               "effects": {"def": {"mult": [1.4, 1.5, 1.6, 1.7], "duration": 4.0}}},
+      "upgrades": [
+        {"id": "sandstorm", "name": "Terrempesta", "type": "Rock", "category": "none",
+         "shape": "sandboost", "target": "self", "power": [0, 0, 0, 0],
+         "cooldown": [16, 15, 14, 13], "radius": 6.0,
+         "effects": {"duration": 4.0}},
+        {"id": "stealthrock", "name": "Levitoroccia", "type": "Rock", "category": "physical",
+         "shape": "spikes", "scale": "defense", "target": "point",
+         "power": [30, 45, 60, 75], "ratio": 0.25,
+         "cooldown": [15, 14, 13, 12], "range": 5.5, "radius": 2.4,
+         "effects": {"duration": 8.0, "interval": 1.5}}
+      ]
+    },
+    "E": {
+      "base": {"id": "heavyslam", "name": "Pesobomba", "type": "Steel", "category": "physical",
+               "shape": "rockcharge", "scale": "defense", "target": "direction",
+               "power": [50, 75, 100, 125], "ratio": 0.4,
+               "cooldown": [11, 10, 9, 8], "range": 5.0, "speed": 15.0, "radius": 0.9},
+      "upgrades": [
+        {"id": "headbutt", "name": "Bottintesta", "type": "Normal", "category": "physical",
+         "shape": "rockcharge", "scale": "defense", "target": "direction",
+         "power": [60, 90, 120, 150], "ratio": 0.45,
+         "cooldown": [11, 10, 9, 8], "range": 5.0, "speed": 15.0, "radius": 0.9,
+         "effects": {"confuse": {"duration": 1.0}}},
+        {"id": "rockpolish", "name": "Lucidatura", "type": "Rock", "category": "physical",
+         "shape": "rockcharge", "scale": "defense", "target": "direction",
+         "power": [55, 85, 115, 145], "ratio": 0.42,
+         "cooldown": [10, 9, 8, 7], "range": 5.5, "speed": 16.0, "radius": 0.9,
+         "effects": {"impact_speed": {"mult": 1.4, "duration": 3.0}}}
+      ]
+    },
+    "R": {
+      "upgrades": [
+        {"id": "rockslide", "name": "Frana", "type": "Rock", "category": "special",
+         "shape": "avalanche", "scale": "defense", "target": "point",
+         "power": [150, 220, 290], "ratio": 0.6,
+         "cooldown": [110, 95, 80], "range": 12.0, "speed": 7.0, "radius": 1.5,
+         "effects": {"slow": {"mult": 0.6, "duration": 1.5}, "air": 0.75, "delay": 0.6,
+                     "min_range": 4.0, "overshoot": 2.5,
+                     "relaunch_speed": 1.6, "relaunch_air": 1.4, "relaunch_range": 9.0}},
+        {"id": "explosion", "name": "Esplosione", "type": "Normal", "category": "physical",
+         "shape": "explosion", "scale": "defense", "target": "self",
+         "power": [220, 320, 420], "ratio": 0.8,
+         "cooldown": [120, 105, 90], "range": 0, "radius": 3.2,
+         "effects": {"channel": 1.5, "airborne": {"duration": 1.5, "peak": 1.6},
+                     "hp_cost_frac": 0.5}}
+      ]
+    }
+  }
+}

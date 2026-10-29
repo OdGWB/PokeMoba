@@ -18,9 +18,10 @@ TILE_RIVER = 3        # fiume - calpestabile, cosmetico
 TILE_BUSH = 4         # cespuglio - calpestabile (invisibilita); sparisce col Sole
 TILE_JUNGLE_WALL = 5  # muro di giungla (bloccante); si apre col Vento forte
 TILE_PUDDLE = 6       # pozza (solo con la Pioggia) - calpestabile, rallenta i non-Acqua
+TILE_PILLAR = 7       # pilastro di roccia temporaneo (Rocciotomba): bloccante, dura pochi secondi
 
 # Insieme dei tile non calpestabili.
-BLOCKING = {TILE_WALL, TILE_JUNGLE_WALL}
+BLOCKING = {TILE_WALL, TILE_JUNGLE_WALL, TILE_PILLAR}
 
 
 @dataclass
