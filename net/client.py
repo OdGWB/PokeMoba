@@ -31,8 +31,8 @@ KEEPALIVE_DT = 0.1
 PING_DT = 1.0
 FRAME_HISTORY = 64          # snapshot tenuti come possibili basi del delta
 
-CONNECTING, LOBBY, LOADING, MATCH, ENDED, LOST = (
-    "connecting", "lobby", "loading", "match", "ended", "lost")
+CONNECTING, LOBBY, DRAFT, LOADING, MATCH, ENDED, LOST = (
+    "connecting", "lobby", "draft", "loading", "match", "ended", "lost")
 
 
 class ClientSession:
@@ -44,6 +44,8 @@ class ClientSession:
         self.slot = None
         self.max_slots = 0
         self.lobby = None
+        self.draft = None               # ultimo stato del draft (P.dec_draft)
+        self._draft_rx = 0.0            # quando è arrivato (per il conto alla rovescia)
         self.start_info = None
         self.end_info = None
         self.lost_reason = ""
@@ -140,6 +142,11 @@ class ClientSession:
                 self.phase = LOBBY
         elif t == P.R_LOBBY:
             self.lobby = P.dec_lobby(data)
+        elif t == P.R_DRAFT:
+            self.draft = P.dec_draft(data)
+            self._draft_rx = now
+            if self.phase in (LOBBY, DRAFT):
+                self.phase = DRAFT
         elif t == P.R_START:
             info = P.dec_start(data)
             for p in info["players"]:
@@ -202,6 +209,24 @@ class ClientSession:
     # --- invio: lobby -------------------------------------------------------------------------
     def send_choice(self, team, pokemon, ready) -> None:
         self.transport.send_reliable(P.enc_choice(team, pokemon, ready))
+
+    # --- draft ----------------------------------------------------------------------------------
+    def send_pick(self, pokemon, lock=False) -> None:
+        """Anteprima (lock=False, la vedono tutti) o scelta definitiva del Pokémon."""
+        self.transport.send_reliable(P.enc_pick(pokemon, lock))
+
+    def draft_my_turn(self) -> bool:
+        d = self.draft
+        return bool(d and d["turn"] is not None and d["entries"][d["turn"]]["slot"] == self.slot)
+
+    def draft_taken(self) -> set:
+        return {e["poke"] for e in (self.draft or {}).get("entries", []) if e["poke"] is not None}
+
+    def draft_time_left(self, now=None) -> float:
+        if not self.draft:
+            return 0.0
+        now = time.monotonic() if now is None else now
+        return max(0.0, self.draft["time_left"] - (now - self._draft_rx))
 
     def send_loaded(self) -> None:
         self.transport.send_reliable(P.enc_loaded())

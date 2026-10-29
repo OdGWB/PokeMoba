@@ -105,7 +105,9 @@ python run_client.py --single
 ```
 
 Multiplayer ONLINE tra amici (WebRTC, nessun server, codici scambiati su
-Discord/WhatsApp): menu **O** ospita, **U** unisciti. Guida passo-passo da
+Discord/WhatsApp): menu **O** ospita, **U** unisciti. Online i Pokémon si
+scelgono con un **draft** a turni (3v3: uno a testa; 5v5: B1, R1 R2, B2 B3,
+R3 R4, B4 B5, R5; i bot prendono a caso dopo i giocatori). Guida passo-passo da
 mandare agli amici: [GIOCARE_ONLINE.md](GIOCARE_ONLINE.md). Test su un solo PC:
 `python tools/net_local_test.py`.
 

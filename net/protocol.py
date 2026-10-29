@@ -29,7 +29,7 @@ from __future__ import annotations
 import math
 import struct
 
-PROTO_VERSION = 2       # 2: avatar (n. di Pokédex) in HELLO/LOBBY/START
+PROTO_VERSION = 3       # 2: avatar in HELLO/LOBBY/START; 3: draft (R_DRAFT/R_PICK)
 
 # --- data channel -------------------------------------------------------------
 CH_STATE = 0
@@ -57,6 +57,8 @@ R_END = 0x49            # host -> client: fine partita (vittoria o host chiuso)
 R_PING = 0x4A           # client -> host: tempo del client
 R_PONG = 0x4B           # host -> client: eco + tempo e tick dell'host
 R_BYE = 0x4C            # chiusura volontaria
+R_DRAFT = 0x4D          # host -> client: stato del draft (ordine, scelte, turno, tempo)
+R_PICK = 0x4E           # client -> host: Pokémon in anteprima o confermato nel draft
 
 # --- comandi sul canale state (dentro C_INPUT) -----------------------------------
 CMD_MOVE = 0
@@ -618,6 +620,45 @@ def enc_choice(team, pokemon, ready) -> bytes:
 def dec_choice(data) -> dict:
     r = Reader(data); r.u8()
     return {"team": r.u8(), "pokemon": r.u8(), "ready": bool(r.u8())}
+
+
+NONE8 = 0xFF            # "nessuno" in un campo u8 del draft (bot / non ancora scelto)
+
+
+def enc_draft(map_index, entries, turn, hover, time_left, done) -> bytes:
+    """entries: [{team, pos, slot (None = bot), poke (None), name, avatar}] nell'ordine
+    di scelta; turn = indice di chi sceglie (None = finito); time_left in s."""
+    def n8(v):
+        return NONE8 if v is None else v
+    w = Writer().u8(R_DRAFT).u8(map_index).u8(len(entries)).u8(n8(turn)).u8(n8(hover))
+    w.u16(min(0xFFFF, int(time_left * 1000))).u8(1 if done else 0)
+    for e in entries:
+        w.u8(e["team"]).u8(e["pos"]).u8(n8(e["slot"])).u8(n8(e["poke"]))
+        w.s(e.get("name", ""), 24).u16(e.get("avatar", 0))
+    return w.bytes()
+
+
+def dec_draft(data) -> dict:
+    def o8(v):
+        return None if v == NONE8 else v
+    r = Reader(data); r.u8()
+    map_index, n, turn, hover = r.u8(), r.u8(), o8(r.u8()), o8(r.u8())
+    time_left, done = r.u16() / 1000.0, bool(r.u8())
+    entries = []
+    for _ in range(n):
+        entries.append({"team": r.u8(), "pos": r.u8(), "slot": o8(r.u8()), "poke": o8(r.u8()),
+                        "name": r.s(), "avatar": r.u16()})
+    return {"map_index": map_index, "entries": entries, "turn": turn, "hover": hover,
+            "time_left": time_left, "done": done}
+
+
+def enc_pick(pokemon, lock) -> bytes:
+    return Writer().u8(R_PICK).u8(pokemon).u8(1 if lock else 0).bytes()
+
+
+def dec_pick(data) -> dict:
+    r = Reader(data); r.u8()
+    return {"pokemon": r.u8(), "lock": bool(r.u8())}
 
 
 def enc_start(map_path, your_entity_id, players) -> bytes:

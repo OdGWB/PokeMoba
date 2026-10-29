@@ -39,6 +39,7 @@ import config
 from . import protocol as P
 from . import validation as V
 from .client import ClientSession
+from .draft import DONE_TIME, Draft
 from .signaling import ANSWER, OFFER, ManualSignaling, SignalingError, SignalMessage, new_session_id
 from .transport import CLOSED, CONNECTED, FAILED, LoopbackTransport
 
@@ -112,7 +113,7 @@ class HostSession:
         self.map_index = map_index
         self.team_size = map_team_size(map_index)
         self.slots = [Slot(i) for i in range(MAX_SLOTS)]
-        self.phase = "lobby"          # lobby / loading / match / ended / closed
+        self.phase = "lobby"          # lobby / draft / loading / match / ended / closed
         self.message = ""
         self.view: list = []
         self.local = None
@@ -129,6 +130,8 @@ class HostSession:
         self._last_step_wall = 0.0
         self._load_deadline = 0.0
         self._ended_sent = False
+        self.draft = None             # net/draft.Draft durante la fase "draft"
+        self._draft_done_at = None
         from engine.items import ItemCatalog
         self._item_ids = set(ItemCatalog.load(str(ROOT / "data/items.json")).items)
         if host_plays:
@@ -219,6 +222,8 @@ class HostSession:
             self._close_all()
 
     def _advance(self, now):
+        if self.phase == "draft":
+            self._draft_step(now)
         if self.phase == "loading":
             if (all(s.loaded for s in self._players()) or now > self._load_deadline):
                 self.phase = "match"
@@ -298,7 +303,7 @@ class HostSession:
             elif op == "map":
                 self._set_map(cmd[1])
             elif op == "start":
-                self._start_match(now)
+                self._start_draft(now)
             elif op == "shutdown":
                 self._broadcast(P.enc_end(None, P.END_HOST_QUIT, cmd[1]))
                 time.sleep(0.3)                  # lascia partire il messaggio
@@ -401,6 +406,8 @@ class HostSession:
         s.code, s.session = "", 0           # il vecchio codice non vale più
         if self.phase == "lobby" or not s.entity_id:
             name = s.name
+            if self.phase == "draft" and self.draft.drop_slot(s.index, time.monotonic()):
+                self._broadcast_draft(time.monotonic())     # il suo posto passa a un bot
             s.reset()
             if was_joined:
                 self._broadcast_lobby()
@@ -470,6 +477,14 @@ class HostSession:
                 s.pokemon = c["pokemon"] % len(config.ROSTER)
                 s.ready = c["ready"]
                 self._broadcast_lobby()
+        elif t == P.R_PICK:
+            pk = P.dec_pick(data)
+            d = self.draft
+            if self.phase == "draft" and d is not None and d.current_slot() == s.index:
+                ok = (d.lock(s.index, pk["pokemon"], now) if pk["lock"]
+                      else d.hover_pick(s.index, pk["pokemon"]))
+                if ok:
+                    self._broadcast_draft(now)
         elif t == P.R_LOADED:
             if s.entity_id:
                 s.loaded = True
@@ -616,7 +631,8 @@ class HostSession:
             self.sim.queue_command(cmd)
 
     # --- avvio partita ---------------------------------------------------------------------------
-    def _start_match(self, now):
+    def _start_draft(self, now):
+        """INVIO dell'host in lobby: controlli, poi si passa al DRAFT (net/draft.py)."""
         if self.phase != "lobby":
             return
         players = self._players()
@@ -630,6 +646,40 @@ class HostSession:
             if sum(1 for s in players if s.team == team) > self.team_size:
                 self.message = f"Squadra {'BLU' if team == 0 else 'ROSSA'} troppo numerosa."
                 return
+        # Gli slot non usati (offerte mai accettate) si chiudono: da qui non entra più nessuno.
+        for s in self.slots:
+            if not s.joined and s.status not in (S_LOCAL,):
+                if s.transport is not None:
+                    s.transport.close()
+                s.reset()
+        humans = {t: [s.index for s in players if s.team == t] for t in (0, 1)}
+        self.draft = Draft(self.team_size, humans, len(config.ROSTER), now)
+        self._draft_done_at = None
+        self.phase = "draft"
+        self.message = ""
+        self._broadcast_draft(now)
+
+    def _draft_step(self, now):
+        d = self.draft
+        if d.tick(now):
+            self._broadcast_draft(now)
+        if d.done and self._draft_done_at is None:
+            self._draft_done_at = now
+            self._broadcast_draft(now)
+        if self._draft_done_at is not None and now - self._draft_done_at >= DONE_TIME:
+            self._start_match(now)
+
+    def _broadcast_draft(self, now):
+        d = self.draft
+        entries = []
+        for e in d.entries:
+            s = self.slots[e["slot"]] if e["slot"] is not None else None
+            entries.append({**e, "name": s.name if s else "", "avatar": s.avatar if s else 0})
+        self._broadcast(P.enc_draft(self.map_index, entries, d.turn, d.hover,
+                                    d.time_left(now), d.done))
+
+    def _start_match(self, now):
+        """Fine del draft: si costruisce la partita coi Pokémon scelti (umani e bot)."""
         from engine.content import load_map
         from engine.match import Match
         from engine.world import World
@@ -637,29 +687,23 @@ class HostSession:
         map_data = load_map(str(ROOT / config.MAPS[self.map_index][1]))
         self.world = World(map_data.grid)
         self.match = Match(self.world, map_data)
-        by_team = {0: [s for s in players if s.team == 0], 1: [s for s in players if s.team == 1]}
-        for team in (0, 1):
-            for k in range(map_data.team_size):
-                lane = LANES[k % 3]
-                if k < len(by_team[team]):
-                    s = by_team[team][k]
-                    s.entity_id = self._spawn(map_data, team, lane, s.pokemon, False).id
-                else:
-                    self._spawn(map_data, team, lane, 0, True)
+        for e in sorted(self.draft.entries, key=lambda e: (e["team"], e["pos"])):
+            lane = LANES[e["pos"] % 3]
+            s = self.slots[e["slot"]] if e["slot"] is not None else None
+            if s is not None and s.joined:
+                s.team, s.pokemon = e["team"], e["poke"]
+                s.entity_id = self._spawn(map_data, e["team"], lane, e["poke"], False).id
+            else:
+                self._spawn(map_data, e["team"], lane, e["poke"], True)
         self.match.assign_junglers()
         self.match.vision.update(self.world, 0)
         self.match.vision.update(self.world, 1)
         self.sim = Simulation(self.world, config.TICK_DT, match=self.match)
-        # Gli slot non usati (offerte mai accettate) si chiudono.
-        for s in self.slots:
-            if not s.joined and s.status not in (S_LOCAL,):
-                if s.transport is not None:
-                    s.transport.close()
-                s.reset()
         info = self._players_info()
-        for s in players:
-            s.reset_net()
-            self._send(s, P.enc_start(config.MAPS[self.map_index][1], s.entity_id, info))
+        for s in self._players():
+            if s.entity_id:
+                s.reset_net()
+                self._send(s, P.enc_start(config.MAPS[self.map_index][1], s.entity_id, info))
         self.phase = "loading"
         self._load_deadline = now + LOAD_TIMEOUT
         self.message = ""

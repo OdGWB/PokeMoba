@@ -225,6 +225,52 @@ class TestInterp(unittest.TestCase):
         self.assertEqual(b.sample(1, 0.075), (1.0, 0.0))
 
 
+class TestDraft(unittest.TestCase):
+    def test_orders(self):
+        from net.draft import pick_order
+        self.assertEqual([t for t, _ in pick_order(3)], [0, 1, 0, 1, 0, 1])
+        self.assertEqual([t for t, _ in pick_order(5)], [0, 1, 1, 0, 0, 1, 1, 0, 0, 1])
+        self.assertEqual(pick_order(5)[:3], [(0, 0), (1, 0), (1, 1)])
+
+    def test_humans_then_bots_all_together(self):
+        import random
+        from net.draft import Draft
+        # 5v5 con 2 blu (slot 0, 2) e 1 rosso (slot 1): B1 R1 B2, poi i bot.
+        d = Draft(5, {0: [0, 2], 1: [1]}, 10, now=0.0, rng=random.Random(1))
+        self.assertEqual(d.current_slot(), 0)
+        self.assertFalse(d.lock(1, 3, 0.0))            # non è il suo turno
+        self.assertTrue(d.lock(0, 3, 0.0))
+        self.assertEqual(d.current_slot(), 1)
+        self.assertFalse(d.lock(1, 3, 0.0))            # già preso
+        self.assertTrue(d.lock(1, 4, 0.0))
+        self.assertEqual(d.current_slot(), 2)
+        self.assertFalse(d.done)
+        self.assertTrue(d.lock(2, 5, 0.0))
+        self.assertTrue(d.done)
+        pokes = [e["poke"] for e in d.entries]
+        self.assertEqual(sorted(pokes), list(range(10)))   # tutti diversi
+        self.assertEqual(sum(1 for e in d.entries if e["slot"] is None), 7)
+
+    def test_timeout_and_drop(self):
+        from net.draft import PICK_TIME, Draft
+        d = Draft(3, {0: [0], 1: [1]}, 10, now=0.0)
+        d.hover_pick(0, 7)
+        self.assertTrue(d.tick(PICK_TIME + 0.1))       # scaduto: prende l'anteprima
+        self.assertEqual(d.entries[0]["poke"], 7)
+        self.assertTrue(d.drop_slot(1, 31.0))          # il rosso esce: diventa bot
+        self.assertTrue(d.done)
+        self.assertEqual(len({e["poke"] for e in d.entries}), 6)
+
+    def test_draft_packets(self):
+        e = [{"team": 0, "pos": 0, "slot": 0, "poke": 3, "name": "Ana", "avatar": 150},
+             {"team": 1, "pos": 0, "slot": None, "poke": None, "name": "", "avatar": 0}]
+        d = P.dec_draft(P.enc_draft(1, e, 1, None, 12.5, False))
+        self.assertEqual((d["map_index"], d["turn"], d["hover"], d["done"]), (1, 1, None, False))
+        self.assertAlmostEqual(d["time_left"], 12.5)
+        self.assertEqual(d["entries"], e)
+        self.assertEqual(P.dec_pick(P.enc_pick(4, True)), {"pokemon": 4, "lock": True})
+
+
 class TestHostClientLoopback(unittest.TestCase):
     """Flusso completo con la simulazione VERA, su un tubo in memoria con
     latenza e perdita: lobby, avvio, movimento, validazione, disconnessione,
@@ -235,12 +281,17 @@ class TestHostClientLoopback(unittest.TestCase):
         while time.monotonic() < end:
             for s in sessions:
                 s.poll()
+                if s.phase == "draft" and s.draft_my_turn() and not getattr(s, "_picked", 0):
+                    free = [i for i in range(10) if i not in s.draft_taken()]
+                    s.send_pick(free[0], lock=True)
+                    s._picked = True
                 if s.phase == "loading":
                     s.send_loaded()
             time.sleep(0.005)
 
     def test_full_flow(self):
         from net import ClientSession, HostSession, LoopbackTransport
+        from net.draft import DONE_TIME
         h = HostSession(map_index=0, host_name="Host")
         h.start()
         try:
@@ -255,7 +306,13 @@ class TestHostClientLoopback(unittest.TestCase):
             self._pump([me, c], 0.3)
             h.request_start()
             self._pump([me, c], 1.0)
+            self.assertEqual(h.phase, "draft")
+            self.assertEqual(me.phase, "draft")
+            self._pump([me, c], DONE_TIME + 1.5)       # draft completo + caricamento
             self.assertEqual(h.phase, "match")
+            # Ognuno ha il SUO Pokémon e nessun doppione fra umani e bot.
+            pokes = [e["poke"] for e in h.draft.entries]
+            self.assertEqual(len(set(pokes)), len(pokes))
             self.assertIsNotNone(c.latest)
             eid = c.start_info["your_entity_id"]
             x0 = P.dq_pos(c.latest.me[0])

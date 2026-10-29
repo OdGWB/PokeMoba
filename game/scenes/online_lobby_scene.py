@@ -4,7 +4,9 @@ HOST:  ogni slot ha il suo codice OFFERTA (pulsante "Copia"), il suo campo
        per incollare la RISPOSTA dell'amico e lo stato in tempo reale
        (libero / preparo il codice / in attesa / connessione / connesso / fallito).
 AMICO: incolla l'offerta, preme "Genera risposta", copia il codice e lo
-       rimanda all'host. Poi sceglie squadra e Pokémon come nella lobby LAN.
+       rimanda all'host. Poi sceglie la squadra e si dice pronto.
+Il Pokémon NON si sceglie qui: quando l'host avvia si passa al DRAFT
+(online_draft_scene.py).
 """
 from __future__ import annotations
 
@@ -20,7 +22,6 @@ from net.host import (S_CONNECTED, S_CONNECTING, S_DISCONNECTED, S_EMPTY, S_FAIL
 
 from .. import avatars as A
 from .. import clipboard
-from .lobby_scene import ROSTER_NAMES
 
 BG = (14, 20, 17)
 PANEL = (24, 34, 29)
@@ -62,8 +63,8 @@ def player_avatar(app=None) -> int:
 
 def draw_roster(surface, lobby, x, y, f, width=48):
     """Giocatori della lobby con l'IMMAGINE PROFILO accanto al nome, divisi per
-    squadra; negli slot rimasti liberi i BOT (senza immagine, col nome del loro
-    Pokémon: l'host li riempie col primo del roster). Ritorna la y finale."""
+    squadra; negli slot rimasti liberi i BOT (senza immagine: il loro Pokémon,
+    e quindi il nome, lo prendono a caso alla fine del draft). Ritorna la y finale."""
     players = (lobby or {}).get("players", [])
     per_team = max(1, (lobby or {}).get("max_slots", 2) // 2)
     side = max(f.get_height() + 6, 28)      # riga; l'avatar è 24 px (meno sgranato)
@@ -74,15 +75,14 @@ def draw_roster(surface, lobby, x, y, f, width=48):
         y += f.get_height() + 6
         mine = [p for p in players if p["team"] == team]
         for p in mine:
-            poke = ROSTER_NAMES[p["pokemon"]] if p["pokemon"] < len(ROSTER_NAMES) else "?"
             tag = "caduto" if p["conn"] == 3 else ("PRONTO" if p["ready"] else "...")
             A.draw_avatar(surface, p.get("avatar", 0), (x, y, side - 4, side - 4), col)
-            txt = f"{p['name'][:16]}  {poke[:10]}  [{tag}]"[:width]
+            txt = f"{p['name'][:16]}  [{tag}]"[:width]
             surface.blit(f.render(txt, True, col), (x + side + 4, y + ty))
             y += side
         for _ in range(max(0, per_team - len(mine))):
             A.draw_avatar(surface, 0, (x, y, side - 4, side - 4), (70, 76, 72))
-            surface.blit(f.render(f"{ROSTER_NAMES[0]}  (bot)"[:width], True, DIM),
+            surface.blit(f.render("bot  (Pokémon a caso dopo il draft)"[:width], True, DIM),
                          (x + side + 4, y + ty))
             y += side
         y += 6
@@ -276,11 +276,11 @@ class OnlineHostLobbyScene:
         self.panel = SlotPanel(self.host)
         self.chat = TextField("chat (INVIO per mandare)", limit=120)
         self.buttons = Buttons()
-        self.team, self.pokemon, self.ready = 0, 0, False
+        self.team, self.ready = 0, False
         self._sent = False
 
     def _send_choice(self):
-        self.session.send_choice(self.team, self.pokemon, self.ready)
+        self.session.send_choice(self.team, 0, self.ready)    # il Pokémon si sceglie nel draft
 
     def handle_events(self, events):
         for ev in events:
@@ -302,10 +302,6 @@ class OnlineHostLobbyScene:
                 self.next_scene = MenuScene(self.app)
             elif ev.key == pygame.K_t:
                 self.team ^= 1; self._send_choice()
-            elif ev.key == pygame.K_COMMA:
-                self.pokemon = (self.pokemon - 1) % len(config.ROSTER); self._send_choice()
-            elif ev.key == pygame.K_PERIOD:
-                self.pokemon = (self.pokemon + 1) % len(config.ROSTER); self._send_choice()
             elif ev.key == pygame.K_SPACE:
                 self.ready = not self.ready; self._send_choice()
             elif ev.key == pygame.K_m:
@@ -320,9 +316,9 @@ class OnlineHostLobbyScene:
         self.session.poll()
         if not self._sent and self.session.phase == C.LOBBY:
             self._send_choice(); self._sent = True
-        if self.session.phase == C.LOADING and self.session.start_info:
-            from .online_match_scene import OnlineMatchScene
-            self.next_scene = OnlineMatchScene(self.app, self.session, host=self.host)
+        if self.session.phase == C.DRAFT:
+            from .online_draft_scene import OnlineDraftScene
+            self.next_scene = OnlineDraftScene(self.app, self.session, host=self.host)
 
     def draw(self, surface):
         surface.fill(BG)
@@ -338,7 +334,7 @@ class OnlineHostLobbyScene:
         surface.blit(font(24, True).render("LOBBY ONLINE  (sei l'host)", True, GOLD), (24, 18))
         mapname = config.MAPS[h.map_index][0]
         surface.blit(font(15).render(f"Mappa: {mapname}  (M cambia)    giocatori max: "
-                                     f"{h.max_players}    INVIO = avvia    ESC = chiudi",
+                                     f"{h.max_players}    INVIO = draft    ESC = chiudi",
                                      True, DIM), (24, 52))
         # Colonna sinistra: giocatori e scelta personale.
         x, y = 24, 90
@@ -347,8 +343,8 @@ class OnlineHostLobbyScene:
         y += 4
         surface.blit(font(16, True).render("La tua scelta", True, TEXT), (x, y)); y += 24
         for line in (f"Squadra: {'BLU' if self.team == 0 else 'ROSSA'}  (T)",
-                     f"Pokemon: {ROSTER_NAMES[self.pokemon]}  (, .)",
-                     f"Stato:   {'PRONTO' if self.ready else 'non pronto'}  (SPAZIO)"):
+                     f"Stato:   {'PRONTO' if self.ready else 'non pronto'}  (SPAZIO)",
+                     "Il Pokémon si sceglie nel draft."):
             surface.blit(font(14).render(line, True, TEXT), (x, y)); y += 20
         if h.message:
             y += 10
@@ -380,7 +376,7 @@ class OnlineJoinScene:
         self.error = ""
         self.started_at = 0.0
         self.copied = 0.0
-        self.team, self.pokemon, self.ready = 0, 0, False
+        self.team, self.ready = 0, False
         self._sent = False
 
     def _generate(self):
@@ -445,15 +441,11 @@ class OnlineJoinScene:
             elif self.session is not None and self.session.phase == C.LOBBY:
                 if ev.key == pygame.K_t:
                     self.team ^= 1; self._choice()
-                elif ev.key == pygame.K_COMMA:
-                    self.pokemon = (self.pokemon - 1) % len(config.ROSTER); self._choice()
-                elif ev.key == pygame.K_PERIOD:
-                    self.pokemon = (self.pokemon + 1) % len(config.ROSTER); self._choice()
                 elif ev.key == pygame.K_SPACE:
                     self.ready = not self.ready; self._choice()
 
     def _choice(self):
-        self.session.send_choice(self.team, self.pokemon, self.ready)
+        self.session.send_choice(self.team, 0, self.ready)    # il Pokémon si sceglie nel draft
 
     def fixed_update(self):
         pass
@@ -478,9 +470,9 @@ class OnlineJoinScene:
             if ph == C.LOBBY and self.session.slot is not None and not self._sent:
                 self.team = 1 if self.session.slot % 2 else 0
                 self._choice(); self._sent = True
-            if ph == C.LOADING and self.session.start_info:
-                from .online_match_scene import OnlineMatchScene
-                self.next_scene = OnlineMatchScene(self.app, self.session)
+            if ph == C.DRAFT:
+                from .online_draft_scene import OnlineDraftScene
+                self.next_scene = OnlineDraftScene(self.app, self.session)
             if ph in (C.LOST, C.ENDED) and not self.error:
                 self.error = self.session.lost_reason or (self.session.end_info or {}).get(
                     "message", "Connessione chiusa.")
@@ -549,9 +541,8 @@ class OnlineJoinScene:
         y = draw_roster(surface, lob, x, y, font(15), width=60)
         y += 8
         for line in (f"Squadra: {'BLU' if self.team == 0 else 'ROSSA'}   (T)",
-                     f"Pokemon: {ROSTER_NAMES[self.pokemon]}   (, .)",
                      f"Stato: {'PRONTO' if self.ready else 'non pronto'}   (SPAZIO)",
-                     "La partita la avvia l'host quando tutti sono pronti."):
+                     "Quando tutti sono pronti l'host avvia il DRAFT: lì si sceglie il Pokémon."):
             surface.blit(font(15).render(line, True, TEXT), (x, y)); y += 22
         cy = H - 160
         for name, text in list(s.chat)[-5:]:

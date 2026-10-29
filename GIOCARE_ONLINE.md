@@ -41,8 +41,8 @@ partita gira sul suo PC), gli altri si collegano a lui scambiandosi dei
    mandalo all'host nella chat.
 5. Aspetta: appena l'host incolla la tua risposta sei dentro la lobby.
    Hai qualche minuto di tempo, non serve correre.
-6. Nella lobby: **T** cambia squadra, **,** e **.** cambiano Pokémon,
-   **SPAZIO** = pronto. La partita la avvia l'host.
+6. Nella lobby: **T** cambia squadra, **SPAZIO** = pronto. Il Pokémon non si
+   sceglie qui: quando l'host avvia si passa al **draft** (sezione 3bis).
 
 ## 3. Se sei l'HOST (ospiti la partita)
 
@@ -54,10 +54,26 @@ partita gira sul suo PC), gli altri si collegano a lui scambiandosi dei
    **dello stesso slot** e premi **Conferma**.
 4. Lo stato dello slot diventa **CONNESSO**. Gli slot liberi vengono riempiti
    dai bot.
-5. Scegli il tuo Pokémon (T , . SPAZIO come gli altri). Quando tutti sono
-   **PRONTO** premi **INVIO**.
+5. Scegli la squadra (T) e premi SPAZIO come gli altri. Quando tutti sono
+   **PRONTO** premi **INVIO**: si passa al **draft**.
 
 Durante la partita l'host può premere **F2** per vedere gli slot.
+
+## 3bis. Il draft (scelta dei Pokémon, solo online)
+
+Si sceglie **a turno**, e un Pokémon preso non lo può prendere nessun altro.
+
+- **3v3**: uno a testa, comincia il primo BLU: B1, R1, B2, R2, B3, R3.
+- **5v5**: B1, poi R1 R2, B2 B3, R3 R4, B4 B5, e per ultimo R5.
+
+Al tuo turno: frecce o mouse per guardare (gli altri vedono la tua anteprima),
+**INVIO** o doppio clic per confermare. Hai **30 secondi**: se scadono prendi
+il Pokémon che stavi guardando (o uno a caso). Se siete meno di 3 o 5 per
+squadra, i turni dei bot si saltano e, quando tutti i giocatori hanno scelto,
+**i bot prendono insieme un Pokémon a caso** fra quelli rimasti. Chi esce
+durante il draft viene sostituito da un bot.
+
+In giocatore singolo non c'è draft: il Pokémon lo scegli prima della partita.
 
 ---
 

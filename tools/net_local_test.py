@@ -52,6 +52,14 @@ def stdin_commands():
     return q
 
 
+def auto_pick(session):
+    """Nel draft, al proprio turno, prende il primo Pokémon libero (una volta sola)."""
+    if session.phase == "draft" and session.draft_my_turn() and not getattr(session, "_picked", 0):
+        free = [i for i in range(10) if i not in session.draft_taken()]
+        session.send_pick(free[0], lock=True)
+        session._picked = True
+
+
 # =====================================================================================
 # Processo HOST
 # =====================================================================================
@@ -64,6 +72,7 @@ def run_host():
     emit(ev="ready")
     while True:
         local.poll()
+        auto_pick(local)
         if local.phase == "loading":
             local.send_loaded()
         try:
@@ -128,6 +137,7 @@ def run_client(name):
     while True:
         if session is not None:
             session.poll()
+            auto_pick(session)
             if session.phase == "loading":
                 session.send_loaded()
             if session.snap_bytes.last > max_snap:
@@ -270,7 +280,7 @@ def connect(host, client, slot, R):
     host.send(op="answer", slot=slot, code=ans["code"])
     res = host.expect("answer_result")
     R.check(res["error"] is None, "l'host accetta la risposta", res["error"] or "")
-    st = wait_until(lambda: (lambda s: s if s["phase"] in ("lobby", "loading", "match") else None)(
+    st = wait_until(lambda: (lambda s: s if s["phase"] in ("lobby", "draft", "loading", "match") else None)(
         client.ask(op="state")), 25)
     R.check(bool(st), "connessione WebRTC stabilita (data channel aperti, lobby)",
             f"slot {st['slot'] if st else '?'}")
@@ -287,7 +297,7 @@ def run_auto():
     try:
         connect(host, cli, 1, R)
 
-        print("== 2. Lobby e avvio partita")
+        print("== 2. Lobby, draft e avvio partita")
         host.ask(op="choice", team=0, pokemon=0, ready=True)
         cli.ask(op="choice", team=1, pokemon=1, ready=True)
         time.sleep(0.5)
