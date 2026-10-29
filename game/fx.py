@@ -18,6 +18,8 @@ import pygame
 
 import config
 
+from . import eevee_fx
+
 # Colore per tipo (per le particelle).
 TYPE_COLORS = {
     "Normal": (200, 200, 180), "Fire": (240, 120, 50), "Water": (80, 160, 245),
@@ -1390,6 +1392,8 @@ class FXSystem:
                 lite = _lighten(col)
                 pygame.draw.lines(overlay, (*col, a // 3), False, pts, max(3, int(0.22 * ts)))
                 pygame.draw.lines(overlay, (*lite, a), False, pts, max(2, int(0.08 * ts)))
+            elif kind in eevee_fx.SHAPES:   # linea Eevee: denti di Morso, stelline
+                eevee_fx.draw_shape(overlay, s, S, ts, f, a)
         surface.blit(overlay, (0, 0))
 
     # Registro degli stili d'attacco: nome ("fx" nel JSON / "attack_fx") -> handler.
@@ -1443,4 +1447,6 @@ class FXSystem:
         "legionfear": _fx_legionfear,
         "memento": _fx_memento,
         "mementocurse": _fx_mementocurse,
+        # linea Eevee (game/eevee_fx.py)
+        **eevee_fx.STYLES,
     }

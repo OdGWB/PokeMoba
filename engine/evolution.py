@@ -23,6 +23,16 @@ def _requires_met(p, st) -> bool:
     need = req.get("has_item")
     if need is not None and need not in getattr(p, "items", []):
         return False
+    # Linea Eevee: {"choices": {"Q": 0, "W": 1, ...}} -> indici dei potenziamenti
+    # scelti. Finché uno slot non è scelto la condizione è falsa (non evolve).
+    choices = req.get("choices")
+    if choices:
+        for slot, idx in choices.items():
+            ms = p.moveset.get(slot)
+            if ms is None or ms.chosen is None or ms.chosen is ms.base:
+                return False
+            if ms.chosen not in ms.upgrades or ms.upgrades.index(ms.chosen) != idx:
+                return False
     return True
 
 
@@ -83,6 +93,16 @@ def check_evolution(p) -> bool:
     # Acqua/Lotta): aggiorna debolezze, STAB ed effetti del meteo.
     if "types" in st:
         p.types = list(st["types"])
+    # Linea Eevee: Q/W/E restano le stesse mosse ma prendono il tipo della forma
+    # (STAB compreso). Move.d è una copia per Pokémon: niente effetti sugli altri.
+    if "move_type" in st:
+        for slot in ("Q", "W", "E"):
+            ms = p.moveset.get(slot)
+            if ms is None:
+                continue
+            for mv in [ms.base, *ms.upgrades]:
+                if mv is not None:
+                    mv.d["type"] = st["move_type"]
     # Statistiche base REALI proprie della forma evoluta (se definite nel JSON):
     # il Match ricalcola tutte le stat derivate da queste. La classe di gittata
     # puo' cambiare con la forma (aggiorna la penalita' AD ranged).

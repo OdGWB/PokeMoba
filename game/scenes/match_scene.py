@@ -17,6 +17,7 @@ from engine import skills
 from engine.content import load_map, load_pokemon_def
 from engine.match import Match
 from engine.vec import Vec2
+from engine.eevee import CHOICE_SLOTS, chosen_index, eevee_candidates, eevee_forms
 from engine.world import World
 from sim.commands import (BuyItemCommand, ChooseUpgradeCommand, MoveCommand,
                           RankMoveCommand, RecallCommand, SellItemCommand)
@@ -26,7 +27,7 @@ from ..camera import Camera
 from ..fx import FXSystem, draw_avalanche, draw_sandstorm, type_color
 from ..input_controller import InputController
 from ..minimap import Minimap
-from .. import spirit_fx
+from .. import eevee_fx, spirit_fx
 from ..particles import ParticleSystem
 from ..renderer import Renderer
 from ..shop_ui import ShopUI
@@ -50,6 +51,7 @@ class MatchScene:
         self.animators: dict[int, object] = {}
         self._dying: dict = {}      # unità morte: anim Hurt + dissolvenza breve
         self._sprite_cache: dict = {}
+        self._portraits: dict = {}   # (sprite_dir, lato) -> ritratto (icona passiva Eevee)
         self._player_stage = 0
         self._player_dex = self.pdef.dex   # per il cambio sprite anche fra rami (stesso stadio)
         self._player_form = ""      # forma corrente del giocatore (Shedinja ecc.)
@@ -415,6 +417,7 @@ class MatchScene:
                 if now >= av["start"]:
                     draw_avalanche(surface, self.camera, av, now)
             self._draw_spiritomb(surface, now)
+            self._draw_eevee(surface, now)
         # Particelle d'atmosfera della giungla (ambientali, sopra mappa e unita,
         # sotto gli effetti delle mosse e la UI).
         self.particles.draw(surface, self.camera)
@@ -485,6 +488,133 @@ class MatchScene:
         for b in m.spirit_beams:
             if b["team"] == team or seen(b["pos"]):
                 spirit_fx.draw_spirit_beam(surface, self.camera, b, now)
+
+    def _draw_eevee(self, surface, now) -> None:
+        """Linea Eevee: stelle di Comete, Desiderio, nube del Tuono, Bora e
+        Divinazione (le proprie sempre, le nemiche solo se nella visione)."""
+        m = self.match
+        team = self.player.team
+
+        def seen(pos, t):
+            return (t == team or self.vision is None
+                    or self.vision.is_tile_visible(team, int(pos.x), int(pos.y)))
+
+        for th in m.thunders:
+            if seen(th["c"], th["team"]):
+                eevee_fx.draw_thunder(surface, self.camera, th, now)
+        for bz in m.blizzards:
+            if seen(bz["c"], bz["team"]):
+                eevee_fx.draw_blizzard(surface, self.camera, bz, now)
+        for fs in m.future_sights:
+            if seen(fs["c"], fs["team"]):
+                eevee_fx.draw_future_sight(surface, self.camera, fs, now)
+        for w in m.wishes:
+            tgt = self.world.get(w["target_id"])
+            if tgt is not None and seen(tgt.pos, tgt.team):
+                eevee_fx.draw_wish(surface, self.camera, w, self.world, now)
+        for st in m.swift_stars:
+            if seen(st["pos"], st["team"]):
+                eevee_fx.draw_swift_star(surface, self.camera, st, now)
+
+    def _portrait(self, sprite_dir, side):
+        """Ritratto di una forma (primo fotogramma Idle verso il basso), ritagliato
+        e scalato NEAREST a `side` px. In cache."""
+        key = (sprite_dir, side)
+        if key not in self._portraits:
+            img = None
+            aset = self._load_anim(sprite_dir)
+            idle = aset.get("Idle") if aset is not None else None
+            if idle is not None and idle.frames and idle.frames[0]:
+                fr = idle.frames[0][0]
+                fr = fr.subsurface(fr.get_bounding_rect()).copy()
+                k = side / max(fr.get_width(), fr.get_height())
+                img = pygame.transform.scale(fr, (max(1, int(fr.get_width() * k)),
+                                                  max(1, int(fr.get_height() * k))))
+            self._portraits[key] = img
+        return self._portraits[key]
+
+    def _draw_adaptability(self, surface, font, p, bx, y0, bh) -> None:
+        """Passiva Adattabilità (Eevee): icona della forma verso cui vanno le scelte
+        ("?" senza scelte; con più forme possibili scorre tra quelle) e barra con
+        gli 8 colori delle forme (accese quelle ancora raggiungibili)."""
+        forms = eevee_forms(p)
+        cands = eevee_candidates(p)
+        now = self.match.time if self.match is not None else 0.0
+        box = pygame.Rect(bx, y0, bh, bh)
+        pygame.draw.rect(surface, (24, 22, 30), box)
+        one = cands[0] if len(cands) == 1 else None
+        if len(cands) == len(forms):
+            q = font.render("?", True, (235, 225, 200))
+            q = pygame.transform.scale(q, (q.get_width() * 2, q.get_height() * 2))
+            surface.blit(q, (box.centerx - q.get_width() // 2, box.centery - q.get_height() // 2))
+            frame = (120, 112, 100)
+        else:
+            show = one or cands[int(now / 0.8) % len(cands)]
+            img = self._portrait(show["sprite_dir"], bh - 10)
+            if img is not None:
+                if one is None:
+                    img = img.copy()
+                    img.set_alpha(150)   # ancora incerto: ritratto attenuato
+                surface.blit(img, (box.centerx - img.get_width() // 2,
+                                   box.centery - img.get_height() // 2))
+            frame = tuple(show["form_color"])
+        pygame.draw.rect(surface, frame, box, 2 if one else 1)
+        # Barra degli 8 colori (verticale, accanto all'icona).
+        seg_h = bh // len(forms)
+        bar_x = box.right + 4
+        for i, st in enumerate(forms):
+            col = tuple(st["form_color"])
+            on = st in cands
+            if not on:
+                col = tuple(int(c * 0.22 + 20) for c in col)
+            r = pygame.Rect(bar_x, y0 + i * seg_h, 10, seg_h - 1)
+            pygame.draw.rect(surface, col, r)
+            if on and one is not None:
+                pygame.draw.rect(surface, (255, 255, 255), r.inflate(2, 2), 1)
+        pygame.draw.rect(surface, (90, 86, 96), pygame.Rect(bar_x - 1, y0 - 1, 12, seg_h * len(forms) + 1), 1)
+        title = one["name"] if one else ("Adattabilità" if len(cands) == len(forms)
+                                         else f"{len(cands)} forme")
+        tcol = tuple(one["form_color"]) if one else (225, 215, 190)
+        if one and sum(tcol) < 200:   # Umbreon (nero): testo leggibile
+            tcol = (200, 200, 215)
+        surface.blit(font.render(title, True, tcol), (bx - 4, y0 - 18))
+
+    def _draw_form_passive(self, surface, font, p, bx, y0, bh) -> None:
+        """Passiva della forma evoluta di Eevee: ritratto + nome + stato."""
+        st = next((e for e in p.evolutions if e.get("dex") == p.dex), None)
+        if st is None:
+            return
+        now = self.match.time if self.match is not None else 0.0
+        col = tuple(st.get("form_color", (200, 200, 200)))
+        box = pygame.Rect(bx, y0, bh, bh)
+        pygame.draw.rect(surface, (24, 22, 30), box)
+        img = self._portrait(st["sprite_dir"], bh - 10)
+        if img is not None:
+            surface.blit(img, (box.centerx - img.get_width() // 2, box.centery - img.get_height() // 2))
+        info = ""
+        lit = True
+        if p.passive_id == "assorbivolt":
+            left = p.voltabsorb_ready_at - now
+            lit = left <= 0
+            info = "pronto" if lit else f"{left:0.0f}s"
+        elif p.passive_id == "fuocardore":
+            left = p.flashfire_until - now
+            lit = left > 0
+            info = f"+30% {left:0.1f}s" if lit else ""
+        elif p.passive_id == "idratazione":
+            lit = self.match is not None and self.match._in_rain(p)
+            info = "pioggia" if lit else ""
+        elif p.passive_id == "fogliamanto":
+            lit = self.match is not None and self.match.jungle.weather == "sun"
+            info = "sole" if lit else ""
+        frame = col if lit else tuple(int(c * 0.5) for c in col)
+        if sum(frame) < 200:
+            frame = (150, 150, 170)
+        pygame.draw.rect(surface, frame, box, 2 if lit else 1)
+        name = eevee_fx.PASSIVE_NAMES.get(p.passive_id, p.passive_id)
+        if info:
+            name += f" {info}"
+        surface.blit(font.render(name, True, frame), (bx - 4, y0 - 18))
 
     def _respawn_status(self, team: int) -> str:
         name = "BLU" if team == 0 else "ROSSO"
@@ -595,6 +725,8 @@ class MatchScene:
                     surface.blit(ov, (bx, y0))
             elif ms and not ms.unlocked:
                 name = "R: lv.8"
+            elif ms is None and sl == "R" and p.passive_id == "adattabilita":
+                name = "R: evolvi"   # Eevee: l'ultimate arriva con la forma
             surface.blit(font.render(sl, True, (255, 230, 120)), (bx + 5, y0 + 3))
             ncol = (140, 140, 150) if on_cd else (230, 230, 230)
             surface.blit(font.render(name[:10], True, ncol), (bx + 5, y0 + bh - 20))
@@ -706,6 +838,12 @@ class MatchScene:
                 t = font.render(f"{p.wander_ready_at - now:0.0f}s", True, frame)
                 surface.blit(t, (bx - t.get_width() // 2 + 8, y0 + bh + 2))
 
+        # Linea Eevee: Adattabilità (prima dell'evoluzione) o passiva della forma.
+        if p.passive_id == "adattabilita":
+            self._draw_adaptability(surface, font, p, x0 + total + 14, y0, bh)
+        elif p.passive_id in eevee_fx.PASSIVE_NAMES:
+            self._draw_form_passive(surface, font, p, x0 + total + 14, y0, bh)
+
         if self.minimap is not None:
             self.minimap.draw(surface, self.world, self.camera, self.vision,
                               self.player.team, self.map_data.dens, self.player)
@@ -717,6 +855,9 @@ class MatchScene:
 
     def _draw_slot_choice(self, surface, font, sl, ms, bx, y0, bw, near_base) -> None:
         """Piccola scelta del potenziamento sopra lo slot (al posto del pop-up)."""
+        if self.player.passive_id == "adattabilita" and sl in CHOICE_SLOTS:
+            self._draw_eevee_choice(surface, font, sl, ms, bx, y0, bw, near_base)
+            return
         opts = ms.upgrades[:2]
         ph = 22 + 18 * len(opts)
         panel = pygame.Rect(bx - 44, y0 - ph - 6, bw + 88, ph)
@@ -733,3 +874,64 @@ class MatchScene:
                 pygame.draw.rect(surface, (44, 48, 60), r)
                 self._choice_rects.append((r, sl, i))
             surface.blit(font.render(f"{i + 1}. {mv.name}", True, (230, 230, 235)), (r.x + 4, oy + 1))
+
+    def _draw_eevee_choice(self, surface, font, sl, ms, bx, y0, bw, near_base) -> None:
+        """Scelta di Eevee: ogni opzione è un asse di ruolo; accanto, le forme a cui
+        porta. In cima l'anteprima "Con queste scelte diventerai: [forma]",
+        aggiornata a ogni scelta (e all'opzione sotto il mouse)."""
+        p = self.player
+        opts = ms.upgrades[:2]
+        axis = eevee_fx.CHOICE_AXES.get(sl, ("", ""))
+        lh = 18
+        pw = 330
+        ph = 60 + lh * len(opts)
+        # sopra la riga "Punti mossa" (y0 - 22), così non si sovrappongono
+        panel = pygame.Rect(bx + bw // 2 - pw // 2, y0 - ph - 26, pw, ph)
+        W = surface.get_width()
+        panel.x = max(4, min(panel.x, W - pw - 4))
+        bg = pygame.Surface((panel.w, panel.h), pygame.SRCALPHA)
+        bg.fill((20, 20, 28, 235))
+        surface.blit(bg, panel)
+        pygame.draw.rect(surface, (235, 210, 90), panel, 1)
+        title = f"Evolvi {sl} (clic):" if near_base else f"Evolvi {sl} - vai in BASE"
+        surface.blit(font.render(title, True, (235, 210, 90)), (panel.x + 6, panel.y + 3))
+        mouse = pygame.mouse.get_pos()
+        hover = None
+        rows = []
+        for i, mv in enumerate(opts):
+            oy = panel.y + 58 + i * lh
+            r = pygame.Rect(panel.x + 5, oy, panel.w - 10, lh - 1)
+            rows.append((i, mv, r, oy))
+            if r.collidepoint(mouse):
+                hover = i
+        # Anteprima: forme raggiungibili con le scelte fatte (+ l'opzione sotto il mouse).
+        cands = eevee_candidates(p, {sl: hover} if hover is not None else None)
+        x = panel.x + 6
+        y = panel.y + 21
+        lab = font.render("Con queste scelte diventerai:", True, (210, 205, 190))
+        surface.blit(lab, (x, y))
+        x = panel.x + 10
+        y += 18
+        if len(cands) == len(eevee_forms(p)):
+            surface.blit(font.render("?", True, (235, 225, 200)), (x, y))
+        else:
+            for k, st in enumerate(cands):
+                col = eevee_fx.readable(st["form_color"])
+                t = font.render(st["name"] + ("" if k == len(cands) - 1 else " /"), True, col)
+                if x + t.get_width() > panel.right - 4:
+                    break
+                surface.blit(t, (x, y))
+                x += t.get_width() + 4
+        for i, mv, r, oy in rows:
+            if near_base:
+                pygame.draw.rect(surface, (60, 64, 80) if i == hover else (44, 48, 60), r)
+                self._choice_rects.append((r, sl, i))
+            txt = f"{i + 1}. {mv.name} ({axis[i]})"
+            surface.blit(font.render(txt, True, (230, 230, 235)), (r.x + 4, oy + 1))
+            # pallini colorati delle forme a cui porta questa opzione
+            dots = eevee_candidates(p, {sl: i})
+            dx = r.right - 8
+            for st in reversed(dots):
+                pygame.draw.circle(surface, eevee_fx.readable(st["form_color"]), (dx, oy + lh // 2), 5)
+                pygame.draw.circle(surface, (15, 15, 20), (dx, oy + lh // 2), 5, 1)
+                dx -= 12

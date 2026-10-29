@@ -26,6 +26,7 @@ from .items import ITEM_SLOTS, ItemCatalog
 from .jungle import JungleSystem
 from .pathfinding import find_path, smooth_path
 from .spatial import SpatialHash
+from .eevee import EEVEE_PASSIVES, EeveeMixin
 from .spiritomb import PASSIVE_ID as SPIRITOMB_PASSIVE, SpiritombMixin
 from .stats import (CRIT_MULT, HIGH_CRIT_CHANCE, STAB_MULT, Stats,
                     ability_haste_factor, combine_tenacity as stat_combine_ten,
@@ -101,7 +102,13 @@ def _prio(entity) -> int:
     return 9
 
 
-class Match(SpiritombMixin):
+# Stati che Sincronismo (Espeon) rimanda a chi glieli applica.
+_SYNC_STATUSES = ("slow", "stun", "freeze", "confuse", "silence", "root", "sleep",
+                  "poison", "fear", "dashlock", "atk_debuff", "def_debuff",
+                  "spdef_debuff", "blind")
+
+
+class Match(SpiritombMixin, EeveeMixin):
     def __init__(self, world, map_data):
         self.world = world
         self.map = map_data
@@ -131,6 +138,7 @@ class Match(SpiritombMixin):
         self.avalanches: list[dict] = []
         self.smackdown_zones: list[dict] = []
         self._init_spiritomb()   # Spiritomb: spiriti, Stordiraggio, Malcomune, Legione
+        self._init_eevee()       # linea Eevee: Desiderio, Comete, ultimate delle forme
         self.vision = VisionSystem(self.world.grid)
         self._build_structures()
         self.jungle = JungleSystem(self)
@@ -182,6 +190,7 @@ class Match(SpiritombMixin):
         self._update_channels(dt)    # canalizzazioni (Lanciafiamme continuo, Volo, Esplosione)
         self._update_rock_moves(dt)  # Rocciotomba / Pesobomba / Frana / Abbattimento
         self._update_spiritomb(dt)   # spiriti, Stordiraggio, Malcomune, Legione, Memento
+        self._update_eevee(dt)       # Desiderio, Comete, Tuono, Bora, Divinazione, Idratazione
         self._update_projectiles(dt) # proiettili che viaggiano (bolla)
         self._update_area_effects(dt)  # aree persistenti (Pioggia di Frecce, Acquanello, Ultimocanto)
         self._update_rain_zones(dt)    # Pioggiadanza: scadenza delle zone di pioggia a tempo
@@ -268,6 +277,9 @@ class Match(SpiritombMixin):
                 continue              # il clone esca segue solo il suo percorso
             if p.fear_until > self.time and p.fear_src is not None:
                 self._flee(p, dt)     # spavento: fuga automatica dalla fonte
+                continue
+            if p.charm_until > self.time:
+                self._charmed(p, dt)  # affascinato (Incantevole): va verso Sylveon
                 continue
             if p.is_bot and p.is_jungler:
                 self._ai_jungler(p, dt)
@@ -642,7 +654,8 @@ class Match(SpiritombMixin):
         for u in self.world.alive_units():
             if isinstance(u, Pokemon):
                 if (self._immobile(u) or u.submerged or u.channel_until > self.time
-                        or u.memento_until > self.time):
+                        or u.memento_until > self.time or u.puddle_until > self.time
+                        or u.charm_until > self.time):
                     u.aa_active = False   # stordito/immerso/canalizza: perde il windup
                     continue
                 self._pokemon_auto_attack(u)
@@ -734,7 +747,11 @@ class Match(SpiritombMixin):
                     u.attack_timer = 0.0   # windup annullato: niente cooldown perso
                 return
             if self.time >= u.aa_until:    # fine windup: danno garantito + colpo
-                if self._within_attack(u, tgt):
+                if self._within_attack(u, tgt) and u.blind_until > self.time:
+                    # Turbosabbia: l'attacco base va a vuoto.
+                    self.fx_events.append({"kind": "miss", "c": (tgt.pos.x, tgt.pos.y),
+                                           "mtype": "Ground", "fx": "miss"})
+                elif self._within_attack(u, tgt):
                     dmg = self._basic_damage(u, tgt)
                     if u.aa_stealth:       # Distacco: primo colpo furtivo potenziato
                         dmg *= config.DISTACCO_BONUS_MULT
@@ -743,6 +760,7 @@ class Match(SpiritombMixin):
                     self._deal_damage(u, tgt, dmg)
                     self._vamp(u, dmg, physical=True)
                     self._spirit_wander(u, tgt)   # Spirito Vagante (Spiritomb)
+                    self._cute_charm(u, tgt)      # Incantevole (Sylveon)
                     mt = u.types[0] if u.types else "Normal"
                     self.fx_events.append({"kind": "attack", "a": (u.pos.x, u.pos.y),
                                            "b": (tgt.pos.x, tgt.pos.y), "mtype": mt,
@@ -803,6 +821,8 @@ class Match(SpiritombMixin):
                 if isinstance(attacker, Minion) and self.jungle.team_has_judgment(attacker.team):
                     power *= 2.0
         if isinstance(target, Pokemon):
+            if target.passive_id == "mantelneve":
+                power *= 0.9   # Mantelneve (Glaceon): attacchi base nemici -10%
             # Gli auto-attacchi sono fisici e senza tipo (niente STAB/efficacia);
             # possono fare critico e beneficiano di penetrazione armatura.
             return self._mitigate_hit(attacker, target, power, magic=False,
@@ -889,6 +909,9 @@ class Match(SpiritombMixin):
                 and amount > 0.0):
             target.hp = min(target.max_hp, target.hp + amount)
             return
+        # Linea Eevee: Assorbivolt (cura) e Fuocardore (si accende).
+        if self._eevee_absorb(attacker, target, amount, dmg_type):
+            return
         # Il nucleo è invulnerabile finché restano abbastanza torri della squadra.
         if isinstance(target, Core) and self._alive_towers(target.team) > config.CORE_EXPOSE_TOWERS_LEFT:
             return
@@ -899,6 +922,8 @@ class Match(SpiritombMixin):
             target.shield -= absorbed
             amount -= absorbed
         target.hp -= amount
+        if isinstance(target, Pokemon) and target.endure_until > self.time:
+            target.hp = max(1.0, target.hp)   # Resistenza: non scende sotto 1 HP
         target.last_attacker_id = attacker.id
         target.last_damaged_at = self.time
         # Il sonno si rompe al primo danno subito.
@@ -939,6 +964,8 @@ class Match(SpiritombMixin):
             victim.air_z = 0.0
             victim.judgment_until = -1.0   # perde il Giudizio morendo
             victim.memento_until = -1.0    # Memento interrotto
+            victim.puddle_until = -1.0     # Acidarmatura interrotta
+            victim.charm_until = -1.0
             victim.invisible = False
             # Se muore in forma Shedinja, ripristina l'identità di Ninjask così il
             # respawn avviene normale (max_hp corretto, non 1).
@@ -1502,6 +1529,8 @@ class Match(SpiritombMixin):
                 continue
             if p.memento_until > self.time:   # Memento: invisibile, niente mosse
                 continue
+            if p.puddle_until > self.time or p.charm_until > self.time:
+                continue                      # pozza (Acidarmatura) / affascinato
             self._cast(p, cast[0], cast[1], cast[2])
 
     def _cast(self, p: Pokemon, slot: str, tx: float, ty: float) -> None:
@@ -1517,6 +1546,8 @@ class Match(SpiritombMixin):
         # Spiritomb: senza un bersaglio valido (nessuno da legare, nessuno spirito
         # nel raggio) la mossa non parte e la ricarica non si spende.
         if not self._spirit_precheck(p, mv, Vec2(tx, ty)):
+            return
+        if not self._eevee_precheck(p, mv, Vec2(tx, ty)):   # Comete senza bersagli
             return
         if p.aa_active:              # lanciare annulla un auto-attacco in windup
             p.aa_active = False
@@ -1544,7 +1575,10 @@ class Match(SpiritombMixin):
                 "sandboost": "Charge", "spikes": "Shoot", "rockcharge": "Attack",
                 "avalanche": "Shoot", "explosion": "Charge",
                 "spiritbeam": "Shoot", "painsplit": "Charge", "legion": "Charge",
-                "memento": "Charge"}.get(shape)
+                "memento": "Charge", "wish": "Charge", "endure": "Charge",
+                "thunder": "Shoot", "blizzard": "Shoot", "futuresight": "Charge",
+                "moonlight": "Charge", "gleam": "Charge",
+                "acidarmor": "Charge"}.get(shape)
         if anim:
             self.fx_events.append({"eid": p.id, "anim": anim})
         # Gli eventi visivi aggiunti dai _cast_* qui sotto vengono "taggati" con lo
@@ -1619,6 +1653,8 @@ class Match(SpiritombMixin):
             self._cast_explosion(p, mv, rank, origin)
         elif self._spirit_cast(p, mv, rank, origin, tgt, dirv):
             pass   # Spiritomb (engine/spiritomb.py)
+        elif self._eevee_cast(p, mv, rank, origin, tgt, dirv):
+            pass   # linea Eevee (engine/eevee.py)
         elif shape == "buff":
             self._apply_support(p, mv, rank, origin)
             self.fx_events.append({"kind": "buff", "c": (origin.x, origin.y),
@@ -3138,7 +3174,8 @@ class Match(SpiritombMixin):
         proj = Vec2(a.x + ab.x * t, a.y + ab.y * t)
         return pt.dist(proj)
 
-    def _hit(self, caster, mv, rank, target) -> None:
+    def _hit(self, caster, mv, rank, target, mult: float = 1.0) -> None:
+        """`mult` scala il danno (tick di una zona, es. Bora)."""
         # Bersaglio non bersagliabile (es. SUB sott'acqua): niente danno né CC.
         if isinstance(target, Pokemon) and target.untargetable_until > self.time:
             return
@@ -3192,6 +3229,14 @@ class Match(SpiritombMixin):
                     raw *= float(bat.get("mult", 1.05))
             if mv.d.get("fury") and isinstance(target, Pokemon):  # Sfuriate: ramp fino a 5×
                 raw *= self._fury_mult(caster, target)
+            # Fuocardore (Flareon): mosse Fuoco +30% dopo averne subita una.
+            if (mv.type == "Fire" and isinstance(caster, Pokemon)
+                    and caster.flashfire_until > self.time):
+                raw *= 1.3
+            # Fendifoglia: più danno quanti meno HP ha il bersaglio.
+            if "execute" in fx and getattr(target, "max_hp", 0) > 0:
+                raw *= 1.0 + float(fx["execute"]) * (1.0 - target.hp / target.max_hp)
+            raw *= mult
             crit_bonus = HIGH_CRIT_CHANCE if mv.d.get("high_crit") else 0.0
             # Finta: ignora gli scudi e le protezioni (difesa potenziata a tempo).
             guard = bool(fx.get("pierce_guard"))
@@ -3201,63 +3246,22 @@ class Match(SpiritombMixin):
             self._vamp(caster, dmg, physical=not magic)
             if "heal_self_ratio" in fx and isinstance(caster, Pokemon):  # Mangiasogni
                 caster.hp = min(caster.max_hp, caster.hp + dmg * float(fx["heal_self_ratio"]))
+            if "recoil" in fx and isinstance(caster, Pokemon) and caster.alive:
+                # Sdoppiatore / Fuococarica: contraccolpo pari a una % del danno.
+                caster.hp = max(1.0, caster.hp - dmg * float(fx["recoil"]))
         # Effetti di controllo/debuff sui nemici colpiti.
         if isinstance(target, Pokemon) and target.alive:
-            slow = fx.get("slow")
-            if slow:
-                self._apply_slow(target, float(slow.get("mult", 0.6)),
-                                 float(slow.get("duration", 1.0)))
-            cc = fx.get("stun") or fx.get("freeze")
-            if cc:
-                self._apply_stun(target, float(cc.get("duration", 1.0)))
-            cf = fx.get("confuse")
-            if cf:
-                self._apply_confuse(target, float(cf.get("duration", 1.0)))
-            si = fx.get("silence")
-            if si:
-                self._apply_silence(target, float(si.get("duration", 2.0)))
-            dd = fx.get("def_debuff")
-            if dd:
-                self._apply_def_debuff(target, float(dd.get("amount", 0)),
-                                       float(dd.get("duration", 3.0)),
-                                       float(dd.get("mult", 1.0)))
-            sd = fx.get("spdef_debuff")
-            if sd:
-                self._apply_spdef_debuff(target, float(sd.get("amount", 20)),
-                                         float(sd.get("duration", 2.0)))
-            rt = fx.get("root")
-            if rt:
-                self._apply_root(target, float(rt.get("duration", 1.0)))
-            sl = fx.get("sleep")
-            if sl:
-                self._apply_sleep(target, float(sl.get("duration", 1.5)),
-                                  float(sl.get("delay", 0.0)))
-            po = fx.get("poison")
-            if po:
-                # Laccioerboso: il danno nel tempo può scalare sugli HP max del bersaglio.
-                dps = float(po.get("dps", 0))
-                hp_frac = float(po.get("hp_frac", 0.0))
-                if hp_frac > 0.0:
-                    dps += target.max_hp * hp_frac
-                self._apply_poison(target, caster, dps,
-                                   float(po.get("duration", 2.0)))
-            fe = fx.get("fear")
-            if fe and isinstance(caster, (Pokemon, Minion, Structure)):
-                self._apply_fear(target, caster.pos, float(fe.get("duration", 1.0)))
-            dl = fx.get("dashlock")
-            if dl:
-                self._apply_stun(target, float(dl.get("stun", 0.6)))
-                self._apply_dashlock(target, float(dl.get("duration", 2.5)))
-            ad = fx.get("atk_debuff")
-            if ad:
-                self._apply_atk_debuff(target, float(ad.get("amount", 20)),
-                                       float(ad.get("duration", 3.0)))
-            kn = fx.get("airborne")
-            if kn:
-                self._apply_airborne(target, float(kn.get("duration", 1.0)),
-                                     float(kn.get("peak", 1.0)))
-            if fx.get("ground"):   # Abbattimento: annulla Volo in corso
-                self._cancel_fly(target)
+            self._apply_hit_effects(caster, target, fx)
+            # Sincronismo (Espeon): chi gli applica uno stato lo subisce a sua volta.
+            if (target.passive_id == "sincronismo" and isinstance(caster, Pokemon)
+                    and caster.team != target.team and caster.alive):
+                sync = {k: v for k, v in fx.items() if k in _SYNC_STATUSES}
+                if sync:
+                    self._apply_hit_effects(target, caster, sync)
+                    self.fx_events.append({"kind": "sync",
+                                           "a": (target.pos.x, target.pos.y),
+                                           "b": (caster.pos.x, caster.pos.y),
+                                           "mtype": "Psychic", "fx": "sync"})
         # Passiva Fiammacoda: ogni colpo di una mossa Fuoco dà una carica di Calore
         # al nemico; a 3 cariche scatta la Scottatura (danno nel tempo + -25% ATT).
         if (isinstance(caster, Pokemon) and caster.passive_id == "fiammacoda"
@@ -3269,6 +3273,70 @@ class Match(SpiritombMixin):
         if (isinstance(caster, Pokemon) and isinstance(target, Pokemon)
                 and target.team != caster.team):
             self._add_inversion(caster)
+
+    def _apply_hit_effects(self, caster, target, fx) -> None:
+        """Controlli e debuff di una mossa sul Pokémon colpito."""
+        slow = fx.get("slow")
+        if slow:
+            self._apply_slow(target, float(slow.get("mult", 0.6)),
+                             float(slow.get("duration", 1.0)))
+        cc = fx.get("stun")
+        if cc:
+            self._apply_stun(target, float(cc.get("duration", 1.0)))
+        fz = fx.get("freeze")
+        if fz:
+            self._apply_freeze(target, float(fz.get("duration", 1.0)))
+        bl = fx.get("blind")
+        if bl:
+            self._apply_blind(target, float(bl.get("duration", 1.5)))
+        cf = fx.get("confuse")
+        if cf:
+            self._apply_confuse(target, float(cf.get("duration", 1.0)))
+        si = fx.get("silence")
+        if si:
+            self._apply_silence(target, float(si.get("duration", 2.0)))
+        dd = fx.get("def_debuff")
+        if dd:
+            self._apply_def_debuff(target, float(dd.get("amount", 0)),
+                                   float(dd.get("duration", 3.0)),
+                                   float(dd.get("mult", 1.0)))
+        sd = fx.get("spdef_debuff")
+        if sd:
+            self._apply_spdef_debuff(target, float(sd.get("amount", 20)),
+                                     float(sd.get("duration", 2.0)))
+        rt = fx.get("root")
+        if rt:
+            self._apply_root(target, float(rt.get("duration", 1.0)))
+        sl = fx.get("sleep")
+        if sl:
+            self._apply_sleep(target, float(sl.get("duration", 1.5)),
+                              float(sl.get("delay", 0.0)))
+        po = fx.get("poison")
+        if po:
+            # Laccioerboso: il danno nel tempo può scalare sugli HP max del bersaglio.
+            dps = float(po.get("dps", 0))
+            hp_frac = float(po.get("hp_frac", 0.0))
+            if hp_frac > 0.0:
+                dps += target.max_hp * hp_frac
+            self._apply_poison(target, caster, dps,
+                               float(po.get("duration", 2.0)))
+        fe = fx.get("fear")
+        if fe and isinstance(caster, (Pokemon, Minion, Structure)):
+            self._apply_fear(target, caster.pos, float(fe.get("duration", 1.0)))
+        dl = fx.get("dashlock")
+        if dl:
+            self._apply_stun(target, float(dl.get("stun", 0.6)))
+            self._apply_dashlock(target, float(dl.get("duration", 2.5)))
+        ad = fx.get("atk_debuff")
+        if ad:
+            self._apply_atk_debuff(target, float(ad.get("amount", 20)),
+                                   float(ad.get("duration", 3.0)))
+        kn = fx.get("airborne")
+        if kn:
+            self._apply_airborne(target, float(kn.get("duration", 1.0)),
+                                 float(kn.get("peak", 1.0)))
+        if fx.get("ground"):   # Abbattimento: annulla Volo in corso
+            self._cancel_fly(target)
 
     def _apply_support(self, caster, mv, rank, center) -> None:
         """Effetti su sé/alleati: cura, scudo, buff attacco/velocità."""
@@ -3336,7 +3404,7 @@ class Match(SpiritombMixin):
     def _tenacity_dur(self, p, dur):
         """Tenacia: accorcia la durata dei CC (durata × (1 − tenacia))."""
         ten = getattr(p, "tenacity", 0.0) if isinstance(p, Pokemon) else 0.0
-        return dur * (1.0 - ten)
+        return dur * (1.0 - ten) * self._eevee_cc_mult(p)   # Forza Interiore / Fogliamanto
 
     def _apply_slow(self, p, mult, dur):
         if self._cc_immune(p):
@@ -3464,7 +3532,8 @@ class Match(SpiritombMixin):
         return (p.slow_until > t or p.stun_until > t or p.sleep_until > t
                 or p.root_until > t or p.poison_until > t or p.confuse_until > t
                 or p.def_debuff_until > t or p.spdef_debuff_until > t
-                or p.burn_until > t or p.airborne_until > t)
+                or p.burn_until > t or p.airborne_until > t
+                or p.frozen_until > t or p.charm_until > t or p.blind_until > t)
 
     def _apply_untargetable(self, p, dur):
         p.untargetable_until = max(p.untargetable_until, self.time + dur)
@@ -3493,6 +3562,7 @@ class Match(SpiritombMixin):
     def _immobile(self, p) -> bool:
         """Non può né muoversi né agire: stun/congelamento, sonno o lanciato in aria."""
         return (p.stun_until > self.time or p.sleep_until > self.time
+                or p.frozen_until > self.time
                 or p.airborne_until > self.time)
 
     def _flee(self, p, dt) -> None:
@@ -3574,7 +3644,7 @@ class Match(SpiritombMixin):
             immobile = self._immobile(p)
             rooted = p.root_until > self.time   # paralisi: fermo ma può agire
             p.cc_active = (p.slow_until > self.time or immobile or rooted
-                           or p.confuse_until > self.time)
+                           or p.confuse_until > self.time or p.charm_until > self.time)
             p.speed = (p.move_speed_base * p.slow_mult * p.speed_mult
                        * self.jungle.terrain_speed_mult(p))
             if p.passive_id == "nuotovelox" and self._in_rain(p):
@@ -3610,6 +3680,12 @@ class Match(SpiritombMixin):
                     if ready:
                         p.offered_slots.add(slot)
                         p.pending_choices.append(slot)
+            # Slot con un'unica opzione (ultimate fissa delle forme di Eevee):
+            # nessuna scelta da fare, si applica subito (anche lontano dalla base).
+            for slot in list(p.pending_choices):
+                ms = p.moveset.get(slot)
+                if ms and len(ms.upgrades) == 1:
+                    evolution.apply_choice(p, slot, 0)
             if p.is_bot:
                 for slot in list(p.pending_choices):
                     ms = p.moveset.get(slot)
@@ -3632,6 +3708,8 @@ class Match(SpiritombMixin):
         if p.pending_cast is not None or p.silence_until > self.time:
             return
         if p.passive_id == SPIRITOMB_PASSIVE and self._bot_spiritomb_cast(p, target):
+            return
+        if p.passive_id in EEVEE_PASSIVES and self._bot_eevee_cast(p, target):
             return
         for slot in ("R", "Q", "W", "E"):
             ms = p.moveset.get(slot)

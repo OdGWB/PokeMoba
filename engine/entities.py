@@ -268,6 +268,17 @@ class Pokemon(Unit):
     memento_weak_until: float = -1.0
     invisible: bool = False            # aggiornato in _update_status (per la visione)
     memento_weak: bool = False         # aggiornato in _update_status (per eff_attack)
+    # Linea Eevee: stati nuovi (congelato, affascinato, accecato) e passive delle forme.
+    frozen_until: float = -1.0         # congelato: immobile e inattivo (blocco di ghiaccio)
+    charm_until: float = -1.0          # affascinato: cammina verso la fonte, niente azioni
+    charm_src: int | None = None
+    blind_until: float = -1.0          # Turbosabbia: gli attacchi base mancano
+    endure_until: float = -1.0         # Resistenza: non scende sotto 1 HP
+    puddle_until: float = -1.0         # Acidarmatura: pozza non bersagliabile, lenta
+    puddle_heal: float = 0.0           # cura al secondo mentre è una pozza
+    voltabsorb_ready_at: float = 0.0   # Assorbivolt: pronto da questo istante
+    flashfire_until: float = -1.0      # Fuocardore: mosse Fuoco potenziate fino a qui
+    hydration_next: float = 0.0        # Idratazione: prossima pulizia sotto la pioggia
 
     def _bonus(self, stat: str) -> float:
         return (self.passive_bonus.get(stat, 0.0) + self.item_bonus.get(stat, 0.0)

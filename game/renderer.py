@@ -16,6 +16,7 @@ from engine.entities import Core, Pillar, Pokemon, Structure, Unit
 from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
                          TILE_PUDDLE, TILE_RIVER, TILE_WALL)
 from . import spirit_fx
+from . import eevee_fx
 from .fx import EMBER, ROCK_HI, ROCK_MID, ROCK_OUT, ROCK_SH, type_color
 from .map_renderer import MapRenderer
 
@@ -611,7 +612,8 @@ class Renderer:
         if rng > 0 and move.shape in ("projectile", "bubble", "area", "dash", "cone",
                                       "sub", "blink", "storm", "leap", "rain",
                                       "rockwave", "spikes", "avalanche",
-                                      "spiritbeam", "painsplit", "spiritcall"):
+                                      "spiritbeam", "painsplit", "spiritcall",
+                                      "swift", "wish", "thunder", "blizzard", "futuresight"):
             pygame.draw.circle(surface, (90, 90, 90), S(ox, oy), int(rng * ts), 1)
 
         shape = move.shape
@@ -643,9 +645,17 @@ class Renderer:
             return
         if shape == "spiritcall":   # Richiamo: gli spiriti raggiungibili li evidenzia la scena
             return
-        if shape in ("smackdown", "explosion", "spikes", "legion", "memento"):
+        if shape == "wish":         # Desiderio: l'alleato vicino al mouse (o Eevee)
+            d = min(dist, rng)
+            pygame.draw.circle(surface, (255, 226, 92), S(ox + nx * d, oy + ny * d),
+                               max(4, int(0.7 * ts)), 1)
+            return
+        if shape == "swift":        # Comete: inseguono da sole il nemico più vicino
+            return
+        if shape in ("smackdown", "explosion", "spikes", "legion", "memento",
+                     "thunder", "blizzard", "futuresight", "gleam"):
             shape = "area"
-        elif shape == "sandboost":
+        elif shape in ("sandboost", "endure", "moonlight", "acidarmor"):
             shape = "buff"
         if shape in ("projectile", "bubble"):
             ex, ey = ox + nx * rng, oy + ny * rng
@@ -773,6 +783,11 @@ class Renderer:
                 if lift > 0:
                     self._draw_air_shadow(surface, e, gx, gy)
                     gy -= lift
+                # Acidarmatura (Vaporeon): al posto dello sprite, una pozza.
+                if isinstance(e, Pokemon) and e.puddle_until > now:
+                    eevee_fx.draw_puddle(surface, e, gx, gy, now, ts)
+                    self._draw_unit_hp(surface, e, gx, gy)
+                    continue
                 anim = animators.get(e.id)
                 # Memento (Spiritomb): invisibile ai nemici; la sua squadra lo
                 # vede come un'ombra traslucida.
@@ -784,6 +799,8 @@ class Renderer:
                         anim.draw(surface, gx, gy)
                 if isinstance(e, Pokemon) and getattr(e, "spirit_awaken", 0) > 0:
                     spirit_fx.draw_aura(surface, camera, e, now, 110 if ghost else 255)
+                if isinstance(e, Pokemon):   # ghiaccio, cuori, sabbia, Resistenza
+                    eevee_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)
                 if in_bush:
                     self._draw_hidden_hint(surface, e, gx, gy, now)
                 self._draw_unit_hp(surface, e, gx, gy)

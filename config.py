@@ -39,9 +39,7 @@ DEFAULT_PORT = 50007
 # Roster selezionabile in lobby (indice condiviso tra server e client).
 ROSTER = [
     "data/pokemon/charmander.json",
-    "data/pokemon/squirtle.json",
     "data/pokemon/gastly.json",
-    "data/pokemon/bulbasaur.json",
     "data/pokemon/totodile.json",
     "data/pokemon/rowlet.json",
     "data/pokemon/snivy.json",
@@ -49,6 +47,7 @@ ROSTER = [
     "data/pokemon/poliwag.json",
     "data/pokemon/roggenrola.json",
     "data/pokemon/spiritomb.json",
+    "data/pokemon/eevee.json",
 ]
 DEFAULT_MAP = "data/maps/map_3v3.json"
 # Mappe selezionabili dalla lobby (nome, percorso).
