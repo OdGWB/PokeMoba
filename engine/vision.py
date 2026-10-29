@@ -51,6 +51,10 @@ class VisionSystem:
         sources = self._sources(world, team)
         sig = frozenset((e.id, int(e.pos.x), int(e.pos.y), int(getattr(e, "vision", 0)))
                         for e in sources)
+        # Memento (Spiritomb): chi diventa/smette di essere invisibile cambia la
+        # visione nemica anche senza muoversi di tile.
+        sig |= frozenset(("inv", e.id) for e in world.entities.values()
+                         if getattr(e, "invisible", False) and getattr(e, "team", team) != team)
         if sig == self._sig.get(team):
             return False
         self._sig[team] = sig
@@ -79,6 +83,8 @@ class VisionSystem:
                 continue
             tx, ty = int(u.pos.x), int(u.pos.y)
             if (tx, ty) not in vis:
+                continue
+            if getattr(u, "invisible", False):   # Memento: invisibile ai nemici
                 continue
             if self.grid.tile_at(tx, ty) == TILE_BUSH:
                 # Visibile solo se un alleato è vicino (ci sbircia dentro).

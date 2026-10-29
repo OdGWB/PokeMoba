@@ -15,6 +15,7 @@ import config
 from engine.entities import Core, Pillar, Pokemon, Structure, Unit
 from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
                          TILE_PUDDLE, TILE_RIVER, TILE_WALL)
+from . import spirit_fx
 from .fx import EMBER, ROCK_HI, ROCK_MID, ROCK_OUT, ROCK_SH, type_color
 from .map_renderer import MapRenderer
 
@@ -609,7 +610,8 @@ class Renderer:
         # Gittata (cerchio attorno al lanciatore) quando ha senso.
         if rng > 0 and move.shape in ("projectile", "bubble", "area", "dash", "cone",
                                       "sub", "blink", "storm", "leap", "rain",
-                                      "rockwave", "spikes", "avalanche"):
+                                      "rockwave", "spikes", "avalanche",
+                                      "spiritbeam", "painsplit", "spiritcall"):
             pygame.draw.circle(surface, (90, 90, 90), S(ox, oy), int(rng * ts), 1)
 
         shape = move.shape
@@ -630,7 +632,18 @@ class Renderer:
             pygame.draw.line(surface, col, S(cx, cy), S(ox, oy), 2)
             pygame.draw.circle(surface, (255, 255, 255), S(cx, cy), int(move.radius * ts), 2)
             return
-        if shape in ("smackdown", "explosion", "spikes"):
+        if shape == "spiritbeam":   # Stordiraggio: linea + tratto oltre il bersaglio
+            ex, ey = ox + nx * rng, oy + ny * rng
+            pygame.draw.line(surface, col, S(ox, oy), S(ex, ey), max(2, int(move.radius * ts)))
+            pygame.draw.circle(surface, col, S(ex, ey), int(move.radius * ts), 1)
+            return
+        if shape == "painsplit":    # Malcomune: chi verrebbe legato e' quello vicino al mouse
+            d = min(dist, rng)
+            pygame.draw.circle(surface, col, S(ox + nx * d, oy + ny * d), max(4, int(0.6 * ts)), 1)
+            return
+        if shape == "spiritcall":   # Richiamo: gli spiriti raggiungibili li evidenzia la scena
+            return
+        if shape in ("smackdown", "explosion", "spikes", "legion", "memento"):
             shape = "area"
         elif shape == "sandboost":
             shape = "buff"
@@ -761,8 +774,16 @@ class Renderer:
                     self._draw_air_shadow(surface, e, gx, gy)
                     gy -= lift
                 anim = animators.get(e.id)
+                # Memento (Spiritomb): invisibile ai nemici; la sua squadra lo
+                # vede come un'ombra traslucida.
+                ghost = isinstance(e, Pokemon) and getattr(e, "invisible", False)
                 if anim is not None:
-                    anim.draw(surface, gx, gy)
+                    if ghost:
+                        anim.draw(surface, gx, gy, alpha=95)
+                    else:
+                        anim.draw(surface, gx, gy)
+                if isinstance(e, Pokemon) and getattr(e, "spirit_awaken", 0) > 0:
+                    spirit_fx.draw_aura(surface, camera, e, now, 110 if ghost else 255)
                 if in_bush:
                     self._draw_hidden_hint(surface, e, gx, gy, now)
                 self._draw_unit_hp(surface, e, gx, gy)

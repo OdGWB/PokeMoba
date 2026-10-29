@@ -95,6 +95,12 @@ class Minimap:
             col = config.TEAM_COLORS.get(s.team, (200, 200, 200))
             r = 4 if isinstance(s, Core) else 2
             pygame.draw.rect(surface, col, pygame.Rect(self._m(s.pos.x, s.pos.y), (r, r)))
+        # Spiriti di Spiritomb: li vede (e raccoglie) solo il proprietario.
+        for sp in getattr(world, "spirits", ()):
+            if sp.team == player_team and (player is None or sp.owner_id == player.id):
+                x, y = self._m(sp.pos.x, sp.pos.y)
+                pygame.draw.circle(surface, (40, 80, 20), (x, y), 3)
+                pygame.draw.circle(surface, (170, 245, 60), (x, y), 2)
         # Unità: alleati sempre, nemici solo se visibili.
         for u in world.alive_units():
             if u.team != player_team:

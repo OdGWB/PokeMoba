@@ -1,0 +1,91 @@
+{
+  "_comment": "Spiritomb: supporto ROAMER stile Bard. Spettro/Buio, NESSUNA evoluzione: i potenziamenti si scelgono ai livelli standard (Q@5, W@6, E@7, R@8). La crescita al posto dell'evoluzione viene dagli spiriti (passiva I 108 Spiriti, engine/spiritomb.py): ogni 20s compare uno spirito in giungla/fiume (max 6, visibili solo alla sua squadra, li raccoglie solo lui) -> XP, +30% velocita' 3s, +1 carica permanente (max 108); risvegli a 36/72/108 (+HP/Dif/DifSp). Spirito Vagante: ogni 6s l'attacco base libera gli spiriti (area + rallentamento che crescono con le cariche). Mosse di controllo e utilita', poco danno.",
+  "dex": 442,
+  "name": "Spiritomb",
+  "types": ["Ghost", "Dark"],
+  "role": "supporto",
+  "color": [96, 70, 140],
+  "radius": 0.46,
+  "base_speed": 3.4,
+  "attack_range": 4.0,
+  "attack_cooldown": 1.0,
+  "sprite_dir": "assets/pokemon/0442",
+  "passive": "108spiriti",
+  "attack_fx": "spiritshot",
+
+  "base_stats": {"hp": 50, "attack": 92, "defense": 108, "sp_attack": 92, "sp_defense": 108, "speed": 35},
+
+  "evolutions": [
+    {"stage": 0, "level": 1, "name": "Spiritomb", "dex": 442, "sprite_dir": "assets/pokemon/0442",
+     "types": ["Ghost", "Dark"], "passive": "108spiriti", "role": "supporto", "radius": 0.46,
+     "base_stats": {"hp": 50, "attack": 92, "defense": 108, "sp_attack": 92, "sp_defense": 108, "speed": 35}}
+  ],
+
+  "moves": {
+    "Q": {
+      "base": {"id": "confuseray", "name": "Stordiraggio", "type": "Ghost", "category": "special",
+               "shape": "spiritbeam", "target": "direction", "power": [0, 0, 0, 0],
+               "cooldown": [10, 9.5, 9, 8.5], "range": 8.0, "speed": 11.0, "radius": 0.45,
+               "effects": {"first": {"confuse": 1.5}, "combo": {"stun": 1.5, "reach": 3.0}}},
+      "upgrades": [
+        {"id": "darkpulse", "name": "Neropulsar", "type": "Dark", "category": "special",
+         "shape": "spiritbeam", "fx": "darkbeam", "target": "direction",
+         "power": [55, 85, 115, 145], "ratio": 0.4,
+         "cooldown": [10, 9.5, 9, 8.5], "range": 10.5, "speed": 16.0, "radius": 0.5,
+         "effects": {"first": {"stun": 1.0}, "combo": {"stun": 1.5, "reach": 3.0}}},
+        {"id": "feint", "name": "Finta", "type": "Dark", "category": "physical",
+         "shape": "spiritbeam", "fx": "feintbeam", "target": "direction",
+         "power": [45, 70, 95, 120], "ratio": 0.35,
+         "cooldown": [10, 9.5, 9, 8.5], "range": 8.0, "speed": 12.0, "radius": 0.45,
+         "effects": {"first": {"confuse": 1.5}, "combo": {"stun": 2.0, "reach": 3.0},
+                     "pierce_guard": true}}
+      ]
+    },
+    "W": {
+      "base": {"id": "painsplit", "name": "Malcomune", "type": "Normal", "category": "none",
+               "shape": "painsplit", "target": "unit", "power": [0, 0, 0, 0],
+               "cooldown": [18, 16.5, 15, 13.5], "range": 5.0, "radius": 0.6,
+               "effects": {"duration": 1.0}},
+      "upgrades": [
+        {"id": "painsplitplus", "name": "Malcomune +", "type": "Normal", "category": "none",
+         "shape": "painsplit", "target": "unit", "power": [0, 0, 0, 0],
+         "cooldown": [18, 16.5, 15, 13.5], "range": 5.5, "radius": 0.6,
+         "effects": {"duration": 1.0, "allies": 2}},
+        {"id": "spite", "name": "Dispetto", "type": "Ghost", "category": "none",
+         "shape": "painsplit", "target": "unit", "power": [0, 0, 0, 0],
+         "cooldown": [18, 16.5, 15, 13.5], "range": 5.0, "radius": 0.6,
+         "effects": {"duration": 1.0, "spite": {"mult": 1.5, "duration": 4.0}}}
+      ]
+    },
+    "E": {
+      "base": {"id": "spiritcall", "name": "Richiamo Spiriti", "type": "Ghost", "category": "none",
+               "shape": "spiritcall", "target": "point", "power": [0, 0, 0, 0],
+               "cooldown": [20, 19, 18, 17], "range": 25.0, "radius": 0.6,
+               "effects": {}},
+      "upgrades": [
+        {"id": "escort", "name": "Accompagnatore", "type": "Ghost", "category": "none",
+         "shape": "spiritcall", "target": "point", "power": [0, 0, 0, 0],
+         "cooldown": [20, 19, 18, 17], "range": 25.0, "radius": 0.6,
+         "effects": {"escort": 3.0}},
+        {"id": "pursuit", "name": "Inseguimento", "type": "Dark", "category": "none",
+         "shape": "spiritcall", "target": "point", "power": [0, 0, 0, 0],
+         "cooldown": [20, 19, 18, 17], "range": 25.0, "radius": 0.6,
+         "effects": {"chase": {"mult": 1.4, "duration": 3.0}}}
+      ]
+    },
+    "R": {
+      "upgrades": [
+        {"id": "legion108", "name": "Legione dei 108", "type": "Ghost", "category": "none",
+         "shape": "legion", "target": "self", "power": [0, 0, 0],
+         "cooldown": [100, 90, 80], "range": 0, "radius": 10.0,
+         "effects": {"duration": 3.0, "buff": 3.0, "speed": 1.3,
+                     "shield": [80, 120, 160], "shield_per_charge": 3.5,
+                     "fear": [0.6, 2.5]}},
+        {"id": "memento", "name": "Memento", "type": "Dark", "category": "none",
+         "shape": "memento", "target": "self", "power": [0, 0, 0],
+         "cooldown": [110, 95, 80], "range": 0, "radius": 4.0,
+         "effects": {"duration": 4.0}}
+      ]
+    }
+  }
+}

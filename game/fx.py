@@ -71,6 +71,12 @@ SAND = (216, 186, 124)
 SAND_DK = (168, 136, 88)
 DUST = (170, 152, 120)
 EMBER = (255, 168, 72)
+# Spiritomb: spiriti verde lime, Buio violetto.
+SPIRIT = (160, 236, 52)
+SPIRIT_HI = (214, 255, 128)
+SPIRIT_DK = (70, 140, 30)
+DARKV = (96, 58, 140)
+DARKV_DK = (40, 26, 58)
 
 _PUFF_CACHE: dict = {}
 
@@ -703,6 +709,138 @@ class FXSystem:
         self._dust(c, r * 0.6, n=24, col=EMBER, speed=(2.5, 5.0))
         self._dust(c, r * 0.9, n=34, col=(110, 100, 90), speed=(1.0, 3.5))
 
+    # --- Spiritomb: spiriti verde lime, Buio ----------------------------------
+    def _wisps(self, c, radius, n, col=SPIRIT, rise=1.4):
+        """Fiammelle-sbuffo che salgono (sbuffi traslucidi verdi che derivano in su)."""
+        cx, cy = c
+        for _ in range(n):
+            a = random.uniform(0, math.tau)
+            r = random.uniform(0, radius)
+            self._shape(kind="puff", c=(cx + math.cos(a) * r, cy + math.sin(a) * r * 0.6),
+                        v=(math.cos(a) * 0.3, -random.uniform(0.6, rise)),
+                        r0=random.uniform(0.08, 0.14), r1=random.uniform(0.2, 0.34),
+                        col=col, life=random.uniform(0.4, 0.75))
+
+    def _fx_spiritshot(self, e, col):
+        """Auto-attacco di Spiritomb: fiammella verde che vola al bersaglio."""
+        seg = self._ab(e)
+        if seg is None:
+            return
+        ax, ay, bx, by = seg
+        self._shape(kind="shot", a=(ax, ay), b=(bx, by), col=SPIRIT, life=0.24, sz=0.2,
+                    glow=0.45)
+        self._wisps((bx, by), 0.25, 2)
+
+    def _fx_spiritpick(self, e, col):
+        """Spirito raccolto: lampo verde e fiammelle che salgono."""
+        c = e.get("c")
+        if c is None:
+            return
+        self._shape(kind="flash", c=c, r=0.5, col=SPIRIT_HI, life=0.16)
+        self._shape(kind="ring", c=c, r0=0.15, r1=0.9, col=SPIRIT, life=0.35, wd=0.12)
+        self._wisps(c, 0.4, 7, rise=2.2)
+
+    def _fx_spiritawaken(self, e, col):
+        """Risveglio (36/72/108): colonna di spiriti attorno a Spiritomb."""
+        c = e.get("c")
+        if c is None:
+            return
+        lvl = int(e.get("lvl", 1))
+        self._shape(kind="flash", c=c, r=1.0 + 0.3 * lvl, col=SPIRIT_HI, life=0.25)
+        for k in range(3):
+            self._shape(kind="ring", c=c, r0=0.3, r1=1.4 + 0.5 * lvl, col=SPIRIT,
+                        life=0.5, wd=0.16, wait=k * 0.12)
+        self._wisps(c, 1.0 + 0.3 * lvl, 14 + 6 * lvl, rise=3.0)
+
+    def _fx_spiritburst(self, e, col):
+        """Spirito Vagante: gli spiriti esplodono attorno al bersaglio."""
+        c = e.get("c")
+        if c is None:
+            return
+        r = float(e.get("radius", 1.0))
+        self._shape(kind="ring", c=c, r0=0.2, r1=r, col=SPIRIT, life=0.35, wd=0.18)
+        self._shape(kind="ring", c=c, r0=0.1, r1=r * 0.6, col=SPIRIT_HI, life=0.25, wd=0.1)
+        self._wisps(c, r * 0.8, 6 + int(r * 4))
+
+    def _fx_spiritbeamhit(self, e, col):
+        """Stordiraggio/Neropulsar/Finta: colpo sul bersaglio o contro un muro."""
+        c = e.get("c")
+        if c is None:
+            return
+        tint = SPIRIT if e.get("mtype") == "Ghost" else DARKV
+        self._shape(kind="flash", c=c, r=0.45, col=_lighten(tint, 0.4), life=0.14)
+        self._shape(kind="ring", c=c, r0=0.1, r1=0.8 if e.get("wall") else 0.6, col=tint,
+                    life=0.3, wd=0.12)
+        self._wisps(c, 0.3, 4, col=tint)
+
+    def _fx_spiritbind(self, e, col):
+        """Combo di Stordiraggio: stelline di stordimento su entrambi i bersagli."""
+        for pt in e.get("pts", []):
+            self._shape(kind="ring", c=pt, r0=0.7, r1=0.2, col=(250, 230, 120), life=0.4,
+                        wd=0.14)
+            self._wisps(pt, 0.3, 4, col=(250, 230, 120))
+        if len(e.get("pts", [])) < 2:   # contro un muro: crepa di luce sul muro
+            self._shape(kind="flash", c=e["c"], r=0.6, col=SPIRIT_HI, life=0.18)
+
+    def _fx_painlink(self, e, col):
+        c = e.get("c")
+        if c is not None:
+            self._shape(kind="ring", c=c, r0=0.2, r1=1.0, col=SPIRIT, life=0.3, wd=0.1)
+
+    def _fx_painsplit(self, e, col):
+        """Fine di Malcomune: gli HP si dividono (lampo su tutti i legati)."""
+        for pt in e.get("pts", []):
+            self._shape(kind="flash", c=pt, r=0.5, col=(240, 200, 255), life=0.2)
+            self._shape(kind="ring", c=pt, r0=0.9, r1=0.2, col=(200, 120, 230), life=0.35,
+                        wd=0.12)
+            self._wisps(pt, 0.35, 5, col=(200, 140, 240))
+
+    def _fx_spiritwarp(self, e, col):
+        """Teletrasporto di Richiamo degli Spiriti / ritorno da Memento."""
+        for i, key in enumerate(("a", "b")):
+            pt = e.get(key)
+            if pt is None:
+                continue
+            self._shape(kind="ring", c=pt, r0=0.1 if i else 0.9, r1=0.9 if i else 0.1,
+                        col=SPIRIT, life=0.35, wd=0.14)
+            self._wisps(pt, 0.5, 9, rise=2.4)
+
+    def _fx_legioncast(self, e, col):
+        c = e.get("c")
+        if c is None:
+            return
+        self._shape(kind="flash", c=c, r=1.4, col=SPIRIT_HI, life=0.22)
+        self._wisps(c, 1.0, 18, rise=2.8)
+
+    def _fx_legionally(self, e, col):
+        c = e.get("c")
+        if c is not None:
+            self._shape(kind="ring", c=c, r0=0.9, r1=0.3, col=SPIRIT_HI, life=0.4, wd=0.12)
+            self._wisps(c, 0.4, 5)
+
+    def _fx_legionfear(self, e, col):
+        c = e.get("c")
+        if c is not None:
+            self._shape(kind="ring", c=c, r0=0.2, r1=0.9, col=DARKV, life=0.35, wd=0.14)
+            self._wisps(c, 0.4, 6, col=DARKV)
+
+    def _fx_memento(self, e, col):
+        """Memento: Spiritomb si dissolve in un'onda d'ombra."""
+        c = e.get("c")
+        if c is None:
+            return
+        r = float(e.get("radius", 4.0))
+        self._shape(kind="ring", c=c, r0=0.3, r1=r, col=DARKV, life=0.5, wd=0.3)
+        self._shape(kind="ring", c=c, r0=0.2, r1=r * 0.7, col=SPIRIT, life=0.4, wd=0.12)
+        self._wisps(c, 0.6, 12, col=DARKV_DK, rise=1.8)
+        self._wisps(c, r * 0.8, 14, col=DARKV)
+
+    def _fx_mementocurse(self, e, col):
+        c = e.get("c")
+        if c is not None:
+            self._wisps(c, 0.35, 6, col=DARKV_DK, rise=1.0)
+            self._shape(kind="ring", c=c, r0=0.8, r1=0.2, col=DARKV, life=0.4, wd=0.12)
+
     def _arrow_fall(self, cx, cy, radius, col, n, height=5.0):
         """Gruppo di frecce che cadono dentro un cerchio (pioggia di frecce)."""
         for _ in range(n):
@@ -1290,4 +1428,19 @@ class FXSystem:
         "avalanchewarn": _fx_avalanchewarn,
         "explodecharge": _fx_explodecharge,
         "explosion": _fx_explosion,
+        # Spiritomb
+        "spiritshot": _fx_spiritshot,
+        "spiritpick": _fx_spiritpick,
+        "spiritawaken": _fx_spiritawaken,
+        "spiritburst": _fx_spiritburst,
+        "spiritbeamhit": _fx_spiritbeamhit,
+        "spiritbind": _fx_spiritbind,
+        "painlink": _fx_painlink,
+        "painsplit": _fx_painsplit,
+        "spiritwarp": _fx_spiritwarp,
+        "legioncast": _fx_legioncast,
+        "legionally": _fx_legionally,
+        "legionfear": _fx_legionfear,
+        "memento": _fx_memento,
+        "mementocurse": _fx_mementocurse,
     }

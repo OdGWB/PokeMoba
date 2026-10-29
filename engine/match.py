@@ -26,6 +26,7 @@ from .items import ITEM_SLOTS, ItemCatalog
 from .jungle import JungleSystem
 from .pathfinding import find_path, smooth_path
 from .spatial import SpatialHash
+from .spiritomb import PASSIVE_ID as SPIRITOMB_PASSIVE, SpiritombMixin
 from .stats import (CRIT_MULT, HIGH_CRIT_CHANCE, STAB_MULT, Stats,
                     ability_haste_factor, combine_tenacity as stat_combine_ten,
                     derive, evolution_mult as stat_evo_mult,
@@ -100,7 +101,7 @@ def _prio(entity) -> int:
     return 9
 
 
-class Match:
+class Match(SpiritombMixin):
     def __init__(self, world, map_data):
         self.world = world
         self.map = map_data
@@ -129,6 +130,7 @@ class Match:
         self.rock_charges: list[dict] = []
         self.avalanches: list[dict] = []
         self.smackdown_zones: list[dict] = []
+        self._init_spiritomb()   # Spiritomb: spiriti, Stordiraggio, Malcomune, Legione
         self.vision = VisionSystem(self.world.grid)
         self._build_structures()
         self.jungle = JungleSystem(self)
@@ -179,6 +181,7 @@ class Match:
         self._update_casts(dt)       # esecuzione mosse Q/W/E/R
         self._update_channels(dt)    # canalizzazioni (Lanciafiamme continuo, Volo, Esplosione)
         self._update_rock_moves(dt)  # Rocciotomba / Pesobomba / Frana / Abbattimento
+        self._update_spiritomb(dt)   # spiriti, Stordiraggio, Malcomune, Legione, Memento
         self._update_projectiles(dt) # proiettili che viaggiano (bolla)
         self._update_area_effects(dt)  # aree persistenti (Pioggia di Frecce, Acquanello, Ultimocanto)
         self._update_rain_zones(dt)    # Pioggiadanza: scadenza delle zone di pioggia a tempo
@@ -462,6 +465,9 @@ class Match:
         if defend is not None:
             self._move_towards(p, defend.pos, dt, use_astar=True)
             return
+        # Spiritomb: gira la mappa a raccogliere gli spiriti.
+        if p.passive_id == SPIRITOMB_PASSIVE and self._bot_spirit_roam(p, dt):
+            return
         # Altrimenti spingi la lane, ma fermati fuori dalla gittata delle torri
         # nemiche se non hai minion davanti.
         self._follow_bot_lane_safe(p, dt)
@@ -635,7 +641,8 @@ class Match:
         # Minion e Pokémon colpiscono il proprio target se a tiro.
         for u in self.world.alive_units():
             if isinstance(u, Pokemon):
-                if self._immobile(u) or u.submerged or u.channel_until > self.time:
+                if (self._immobile(u) or u.submerged or u.channel_until > self.time
+                        or u.memento_until > self.time):
                     u.aa_active = False   # stordito/immerso/canalizza: perde il windup
                     continue
                 self._pokemon_auto_attack(u)
@@ -735,6 +742,7 @@ class Match:
                         u.reveal_block_until = self.time + config.DISTACCO_REVEAL_BLOCK
                     self._deal_damage(u, tgt, dmg)
                     self._vamp(u, dmg, physical=True)
+                    self._spirit_wander(u, tgt)   # Spirito Vagante (Spiritomb)
                     mt = u.types[0] if u.types else "Normal"
                     self.fx_events.append({"kind": "attack", "a": (u.pos.x, u.pos.y),
                                            "b": (tgt.pos.x, tgt.pos.y), "mtype": mt,
@@ -802,7 +810,8 @@ class Match:
         return max(1.0, power)
 
     def _mitigate_hit(self, caster, target, raw: float, *, magic: bool,
-                      crit_bonus: float = 0.0, can_crit: bool = False) -> float:
+                      crit_bonus: float = 0.0, can_crit: bool = False,
+                      pierce_guard: bool = False) -> float:
         """Critico -> penetrazione difesa -> mitigazione -> riduzione fissa.
 
         La penetrazione (percentuale poi fissa/letalita') non porta mai la difesa
@@ -815,6 +824,8 @@ class Match:
         if not isinstance(target, Pokemon):
             return max(1.0, raw)
         defense = target.eff_sp_defense() if magic else target.eff_defense()
+        if pierce_guard and not magic and target.def_buff_active and target.def_buff_mult > 0:
+            defense /= target.def_buff_mult   # Finta: la difesa potenziata non conta
         if isinstance(caster, Pokemon):
             if magic:
                 flat = caster.magic_pen_flat + (0.0 if caster.lethality_physical
@@ -849,7 +860,7 @@ class Match:
                    if e.kind == "tower" and e.team == team and e.alive)
 
     def _deal_damage(self, attacker, target, amount: float,
-                     dmg_type: str | None = None) -> None:
+                     dmg_type: str | None = None, ignore_shield: bool = False) -> None:
         """Infligge danno. `dmg_type` è il tipo del danno (per le mosse dei
         Pokémon) oppure None = "senza tipo" (auto-attacchi, torri, minion,
         neutrali, stati alterati). Il tipo serve alla Magidifesa dello Shedinja."""
@@ -883,7 +894,7 @@ class Match:
             return
         # Scudo (solo Pokémon): assorbe prima degli HP.
         if (isinstance(target, Pokemon) and target.shield > 0.0
-                and target.shield_until > self.time):
+                and target.shield_until > self.time and not ignore_shield):
             absorbed = min(target.shield, amount)
             target.shield -= absorbed
             amount -= absorbed
@@ -927,6 +938,8 @@ class Match:
             victim.airborne_start = -1.0
             victim.air_z = 0.0
             victim.judgment_until = -1.0   # perde il Giudizio morendo
+            victim.memento_until = -1.0    # Memento interrotto
+            victim.invisible = False
             # Se muore in forma Shedinja, ripristina l'identità di Ninjask così il
             # respawn avviene normale (max_hp corretto, non 1).
             if victim.form == "shedinja":
@@ -1164,8 +1177,9 @@ class Match:
                         defense=d.stats.defense * m, sp_attack=d.stats.sp_attack,
                         sp_defense=d.stats.sp_defense * m, speed=d.stats.speed)
 
-        def _b(k):   # somma dei bonus da oggetti e mosse di potenziamento
-            return p.item_bonus.get(k, 0.0) + p.passive_bonus.get(k, 0.0)
+        def _b(k):   # somma dei bonus da oggetti, mosse di potenziamento e risvegli
+            return (p.item_bonus.get(k, 0.0) + p.passive_bonus.get(k, 0.0)
+                    + p.spirit_bonus.get(k, 0.0))
 
         # Velocita' (con eventuali extra MS/AS dagli oggetti; non toccati da M).
         p.move_speed_base = d.move_speed_tiles + _b("move_speed")
@@ -1194,7 +1208,8 @@ class Match:
         p.heal_power = d.heal_power + _b("heal_power")
         p.range_cls = d.range_cls
         p.range_val = d.range_val
-        bonus_hp = p.item_bonus.get("hp", 0.0) + p.passive_bonus.get("hp", 0.0)
+        bonus_hp = (p.item_bonus.get("hp", 0.0) + p.passive_bonus.get("hp", 0.0)
+                    + p.spirit_bonus.get("hp", 0.0))
         p.max_hp = p.stats.hp + bonus_hp
         if p.form == "shedinja":
             p.max_hp = 1.0   # lo Shedinja ha SEMPRE 1 HP (non derivato)
@@ -1485,6 +1500,8 @@ class Match:
                 continue
             if p.submerged:          # sott'acqua non si lanciano altre mosse
                 continue
+            if p.memento_until > self.time:   # Memento: invisibile, niente mosse
+                continue
             self._cast(p, cast[0], cast[1], cast[2])
 
     def _cast(self, p: Pokemon, slot: str, tx: float, ty: float) -> None:
@@ -1497,6 +1514,10 @@ class Match:
             return
         mv = ms.chosen
         rank = ms.rank
+        # Spiritomb: senza un bersaglio valido (nessuno da legare, nessuno spirito
+        # nel raggio) la mossa non parte e la ricarica non si spende.
+        if not self._spirit_precheck(p, mv, Vec2(tx, ty)):
+            return
         if p.aa_active:              # lanciare annulla un auto-attacco in windup
             p.aa_active = False
             p.attack_timer = 0.0
@@ -1505,6 +1526,8 @@ class Match:
                 ms.charges_cur = float(mv.charges)
             ms.charges_cur = max(0.0, ms.charges_cur - 1.0)
         ms.cooldown_remaining = mv.cooldown_at(rank) * ability_haste_factor(p.ability_haste)
+        if p.spite_until > self.time:   # Dispetto: ricariche allungate
+            ms.cooldown_remaining *= p.spite_mult
         origin = Vec2(p.pos.x, p.pos.y)
         tgt = Vec2(tx, ty)
         to = tgt - origin
@@ -1519,7 +1542,9 @@ class Match:
                 "healzone": "Charge", "flamethrower": "Shoot", "smoke": "Charge",
                 "fly": "Charge", "rockwave": "Attack", "smackdown": "Attack",
                 "sandboost": "Charge", "spikes": "Shoot", "rockcharge": "Attack",
-                "avalanche": "Shoot", "explosion": "Charge"}.get(shape)
+                "avalanche": "Shoot", "explosion": "Charge",
+                "spiritbeam": "Shoot", "painsplit": "Charge", "legion": "Charge",
+                "memento": "Charge"}.get(shape)
         if anim:
             self.fx_events.append({"eid": p.id, "anim": anim})
         # Gli eventi visivi aggiunti dai _cast_* qui sotto vengono "taggati" con lo
@@ -1592,6 +1617,8 @@ class Match:
             self._cast_avalanche(p, mv, rank, origin, tgt)
         elif shape == "explosion":
             self._cast_explosion(p, mv, rank, origin)
+        elif self._spirit_cast(p, mv, rank, origin, tgt, dirv):
+            pass   # Spiritomb (engine/spiritomb.py)
         elif shape == "buff":
             self._apply_support(p, mv, rank, origin)
             self.fx_events.append({"kind": "buff", "c": (origin.x, origin.y),
@@ -3166,9 +3193,11 @@ class Match:
             if mv.d.get("fury") and isinstance(target, Pokemon):  # Sfuriate: ramp fino a 5×
                 raw *= self._fury_mult(caster, target)
             crit_bonus = HIGH_CRIT_CHANCE if mv.d.get("high_crit") else 0.0
+            # Finta: ignora gli scudi e le protezioni (difesa potenziata a tempo).
+            guard = bool(fx.get("pierce_guard"))
             dmg = self._mitigate_hit(caster, target, raw, magic=magic,
-                                     crit_bonus=crit_bonus)
-            self._deal_damage(caster, target, dmg, dmg_type=mv.type)
+                                     crit_bonus=crit_bonus, pierce_guard=guard)
+            self._deal_damage(caster, target, dmg, dmg_type=mv.type, ignore_shield=guard)
             self._vamp(caster, dmg, physical=not magic)
             if "heal_self_ratio" in fx and isinstance(caster, Pokemon):  # Mangiasogni
                 caster.hp = min(caster.max_hp, caster.hp + dmg * float(fx["heal_self_ratio"]))
@@ -3503,6 +3532,10 @@ class Match:
             p.spdef_debuff_active = p.spdef_debuff_until > self.time
             p.atk_debuff_active = p.atk_debuff_until > self.time
             p.def_buff_active = p.def_buff_until > self.time
+            p.memento_weak = p.memento_weak_until > self.time   # Memento: Att./Att.Sp. dimezzati
+            p.invisible = p.memento_until > self.time            # Memento: invisibile ai nemici
+            if self.time > p.spite_until:
+                p.spite_mult = 1.0
             # Sonno ritardato (Ipnosi): scatta dopo il ritardo.
             if p.sleep_arm_at >= 0.0 and self.time >= p.sleep_arm_at:
                 if not self._cc_immune(p):
@@ -3597,6 +3630,8 @@ class Match:
 
     def _bot_try_cast(self, p, target) -> None:
         if p.pending_cast is not None or p.silence_until > self.time:
+            return
+        if p.passive_id == SPIRITOMB_PASSIVE and self._bot_spiritomb_cast(p, target):
             return
         for slot in ("R", "Q", "W", "E"):
             ms = p.moveset.get(slot)

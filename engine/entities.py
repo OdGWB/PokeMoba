@@ -251,9 +251,27 @@ class Pokemon(Unit):
     sandstorm_boost_until: float = -1.0
     sand_next: float = 0.0
     sand_radius: float = 0.0           # raggio attuale della tempesta (0 = spenta; per il client)
+    # Passiva I 108 Spiriti (Spiritomb): cariche permanenti dagli spiriti raccolti,
+    # risvegli a 36/72/108 (bonus HP/Dif/DifSp in spirit_bonus), Spirito Vagante
+    # (attacco base potenziato ogni 6s) e prossima comparsa di uno spirito.
+    spirit_charges: int = 0
+    spirit_awaken: int = 0             # 0..3 risvegli raggiunti (aura visiva)
+    spirit_next: float = 0.0           # istante della prossima comparsa di uno spirito
+    wander_ready_at: float = 0.0       # Spirito Vagante pronto da questo istante
+    spirit_bonus: dict = field(default_factory=dict)   # {stat: valore} dai risvegli
+    # Dispetto: ricariche del nemico allungate (moltiplicatore sulle nuove ricariche).
+    spite_until: float = -1.0
+    spite_mult: float = 1.0
+    # Memento: Spiritomb invisibile/non bersagliabile; i nemici colpiti hanno
+    # Attacco e Att. Sp. dimezzati.
+    memento_until: float = -1.0
+    memento_weak_until: float = -1.0
+    invisible: bool = False            # aggiornato in _update_status (per la visione)
+    memento_weak: bool = False         # aggiornato in _update_status (per eff_attack)
 
     def _bonus(self, stat: str) -> float:
-        return self.passive_bonus.get(stat, 0.0) + self.item_bonus.get(stat, 0.0)
+        return (self.passive_bonus.get(stat, 0.0) + self.item_bonus.get(stat, 0.0)
+                + self.spirit_bonus.get(stat, 0.0))
 
     def eff_attack(self) -> float:
         base = self.stats.attack + self._bonus("attack")
@@ -266,6 +284,8 @@ class Pokemon(Unit):
             atk *= 1.5   # ForzaBruta: +50% attacco fisico mentre è sotto CC
         if self.passive_id == "inversione" and self.inversion_stacks:
             atk *= 1.0 + 0.01 * self.inversion_stacks
+        if self.memento_weak:
+            atk *= 0.5   # Memento: Attacco dimezzato
         return atk
 
     def eff_sp_attack(self) -> float:
@@ -275,6 +295,8 @@ class Pokemon(Unit):
         ap = self.ap * self.atk_mult
         if self.passive_id == "inversione" and self.inversion_stacks:
             ap *= 1.0 + 0.01 * self.inversion_stacks
+        if self.memento_weak:
+            ap *= 0.5    # Memento: Att. Sp. dimezzato
         return ap
 
     def _soul(self) -> int:
@@ -345,6 +367,19 @@ class Pillar:
     # Pietrataglio: esplode se un nemico ci viene schiantato contro.
     explode: tuple | None = None       # (Move dell'esplosione, grado, id lanciatore, raggio)
     radius: float = 0.5
+
+
+@dataclass
+class Spirit:
+    """Spirito della passiva I 108 Spiriti (Spiritomb): fiammella verde lime in
+    giungla o nel fiume. Lo vede solo la squadra del proprietario e lo raccoglie
+    solo il proprietario passandoci sopra (o con Richiamo degli Spiriti). Non è
+    un'entità del World: il client lo legge da world.spirits."""
+    pos: Vec2 = field(default_factory=lambda: Vec2(0.0, 0.0))
+    owner_id: int = 0
+    team: int = 0
+    born: float = 0.0
+    seed: int = 0
 
 
 @dataclass

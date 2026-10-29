@@ -24,6 +24,7 @@ class World:
         # Pilastri di roccia temporanei (entities.Pillar): gestiti dal Match,
         # letti dal renderer. Lista mutata sul posto (mai riassegnata).
         self.pillars: list = []
+        self.spirits: list = []   # spiriti della passiva di Spiritomb (entities.Spirit)
 
     # --- gestione entità -----------------------------------------------------
     def _alloc_id(self) -> int:

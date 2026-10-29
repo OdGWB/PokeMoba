@@ -26,6 +26,7 @@ from ..camera import Camera
 from ..fx import FXSystem, draw_avalanche, draw_sandstorm, type_color
 from ..input_controller import InputController
 from ..minimap import Minimap
+from .. import spirit_fx
 from ..particles import ParticleSystem
 from ..renderer import Renderer
 from ..shop_ui import ShopUI
@@ -413,6 +414,7 @@ class MatchScene:
             for av in self.match.avalanches:
                 if now >= av["start"]:
                     draw_avalanche(surface, self.camera, av, now)
+            self._draw_spiritomb(surface, now)
         # Particelle d'atmosfera della giungla (ambientali, sopra mappa e unita,
         # sotto gli effetti delle mosse e la UI).
         self.particles.draw(surface, self.camera)
@@ -444,6 +446,45 @@ class MatchScene:
                                        ms.chosen)
         # Particelle degli effetti.
         self.fx.draw(surface, self.camera)
+
+    def _draw_spiritomb(self, surface, now) -> None:
+        """Spiritomb: spiriti (solo quelli della propria squadra), ondata della
+        Legione, legami di Malcomune e proiettili di Stordiraggio."""
+        m = self.match
+        team = self.player.team
+
+        def seen(pos):
+            return (self.vision is None
+                    or self.vision.is_tile_visible(team, int(pos.x), int(pos.y)))
+
+        reach = pick = None
+        if self.input.aiming_slot and self.player.alive:
+            ms = self.player.moveset.get(self.input.aiming_slot)
+            if ms and ms.chosen and ms.ready and ms.chosen.shape == "spiritcall":
+                reach = (self.player.pos, ms.chosen.range)
+                mx, my = pygame.mouse.get_pos()
+                wx, wy = self.camera.screen_window_to_world(mx, my)
+                pick = m._spirit_call_target(self.player, ms.chosen,
+                                             Vec2(wx / config.TILE_SIZE, wy / config.TILE_SIZE))
+                if pick is not None:   # filo verso lo spirito scelto
+                    ts = config.TILE_SIZE
+                    a = self.camera.world_to_screen(self.player.pos.x * ts, self.player.pos.y * ts)
+                    b = self.camera.world_to_screen(pick.pos.x * ts, pick.pos.y * ts)
+                    pygame.draw.line(surface, spirit_fx.LIME_HI, a, b, 1)
+        # Solo i PROPRI spiriti: quelli di un altro Spiritomb alleato non si
+        # possono raccogliere, quindi non vanno mostrati.
+        mine = [s for s in self.world.spirits if s.owner_id == self.player.id]
+        spirit_fx.draw_spirits(surface, self.camera, mine, team, now,
+                               reach=reach, pick=pick)
+        for w in m.legion_waves:
+            spirit_fx.draw_legion_wave(surface, self.camera, w, now)
+        for bd in m.pain_binds:
+            c = self.world.get(bd["caster_id"])
+            if c is not None and (c.team == team or seen(c.pos)):
+                spirit_fx.draw_pain_bind(surface, self.camera, bd, self.world, now)
+        for b in m.spirit_beams:
+            if b["team"] == team or seen(b["pos"]):
+                spirit_fx.draw_spirit_beam(surface, self.camera, b, now)
 
     def _respawn_status(self, team: int) -> str:
         name = "BLU" if team == 0 else "ROSSO"
@@ -644,6 +685,25 @@ class MatchScene:
                 surface.blit(t, (bx - t.get_width() // 2 + 8, y0 + bh + 2))
             elif not on:
                 t = font.render("liv.8", True, frame)
+                surface.blit(t, (bx - t.get_width() // 2 + 8, y0 + bh + 2))
+
+        # Passiva I 108 Spiriti (Spiritomb): cariche raccolte (max 108), tacche dei
+        # risvegli a 36/72 e Spirito Vagante pronto (riquadro acceso).
+        if p.passive_id == "108spiriti":
+            bx = x0 + total + 14
+            now = self.match.time if self.match is not None else 0.0
+            ready = now >= p.wander_ready_at
+            frame = (214, 255, 128) if ready else (110, 150, 70)
+            pygame.draw.rect(surface, (22, 34, 18), pygame.Rect(bx, y0, 16, bh))
+            fill = int(bh * min(1.0, p.spirit_charges / 108.0))
+            pygame.draw.rect(surface, (150, 230, 50), pygame.Rect(bx, y0 + bh - fill, 16, fill))
+            for n in (36, 72):
+                ty = y0 + bh - int(bh * n / 108.0)
+                pygame.draw.line(surface, (240, 255, 200), (bx, ty), (bx + 15, ty))
+            pygame.draw.rect(surface, frame, pygame.Rect(bx, y0, 16, bh), 2 if ready else 1)
+            surface.blit(font.render(f"Spiriti {p.spirit_charges}", True, frame), (bx - 14, y0 - 18))
+            if not ready:
+                t = font.render(f"{p.wander_ready_at - now:0.0f}s", True, frame)
                 surface.blit(t, (bx - t.get_width() // 2 + 8, y0 + bh + 2))
 
         if self.minimap is not None:

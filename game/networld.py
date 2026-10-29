@@ -30,6 +30,7 @@ class NetWorld:
         self.hud = None
         self._last_seq = -1
         self.pillars: list = []   # pilastri di roccia (non ancora trasmessi in rete)
+        self.spirits: list = []   # spiriti di Spiritomb (non ancora trasmessi in rete)
 
     # --- aggiornamento da snapshot ------------------------------------------
     def push(self, snap, local_time):
