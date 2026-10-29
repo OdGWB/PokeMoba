@@ -9,6 +9,7 @@ La logica di gioco sta in engine/sim; qui c'è solo l'orchestrazione lato client
 from __future__ import annotations
 
 import random
+from pathlib import Path
 
 import pygame
 
@@ -34,6 +35,7 @@ from ..shop_ui import ShopUI
 from ..sprites.animator import FallbackAnimator, SpriteAnimator
 from ..sprites.spritesheet import load_pokemon_animations
 
+ROOT = Path(__file__).resolve().parents[2]
 LANE_SLOTS = ["top", "mid", "bot"]
 # Piccoli scostamenti per non far nascere i tre alleati esattamente sovrapposti.
 SLOT_OFFSET = {"top": Vec2(-1.2, 0.0), "mid": Vec2(0.0, 0.0), "bot": Vec2(0.0, 1.2)}
@@ -42,21 +44,23 @@ DEATH_FADE = 1.5   # s: posa Hurt tenuta mentre l'unità si dissolve alla morte
 
 class MatchScene:
     def __init__(self, map_path: str, pokemon_path: str, start_level: int = 1,
-                 start_items=None):
+                 start_items=None, bot_paths=None):
         map_data = load_map(map_path)
         self.map_data = map_data
         self.world = World(map_data.grid)
         self.pdef = load_pokemon_def(pokemon_path)
+        self._bot_paths = bot_paths
+        # Definizione di ogni Pokémon in campo (id -> PokemonDef) e, per gli sprite,
+        # dex -> cartella sprite di TUTTE le forme dei Pokémon in partita.
+        self._unit_defs: dict = {}
+        self._dex_sprite: dict = {}
+        self._sprite_key: dict = {}   # id -> (dex, stadio, forma) dello sprite attuale
+        self._register_def(self.pdef)
 
         self.animators: dict[int, object] = {}
         self._dying: dict = {}      # unità morte: anim Hurt + dissolvenza breve
         self._sprite_cache: dict = {}
         self._portraits: dict = {}   # (sprite_dir, lato) -> ritratto (icona passiva Eevee)
-        self._player_stage = 0
-        self._player_dex = self.pdef.dex   # per il cambio sprite anche fra rami (stesso stadio)
-        self._player_form = ""      # forma corrente del giocatore (Shedinja ecc.)
-        self.anim_set = self._load_anim(self.pdef.sprite_dir)
-        self._using_sprites = self.anim_set is not None
 
         self.camera_locked = True
         self.match: Match | None = None
@@ -105,21 +109,50 @@ class MatchScene:
         self._choice_rects = []     # (rect, slot, idx) per scegliere il potenziamento
 
     # --- allestimento --------------------------------------------------------
-    def _spawn_pokemon(self, team, lane, is_bot):
+    def _register_def(self, pdef) -> None:
+        """Annota le cartelle sprite di tutte le forme di `pdef` (per dex)."""
+        if pdef.sprite_dir:
+            self._dex_sprite.setdefault(pdef.dex, pdef.sprite_dir)
+        for e in pdef.evolutions:
+            if e.get("dex") is not None and e.get("sprite_dir"):
+                self._dex_sprite.setdefault(int(e["dex"]), e["sprite_dir"])
+
+    def _bot_defs(self, n):
+        """Definizioni dei `n` bot: quelle passate (bot_paths) oppure Pokémon CASUALI
+        dal roster, SENZA ripetizioni (né tra loro né col giocatore). Si ripete solo
+        se il roster non basta a coprire tutti gli slot."""
+        if self._bot_paths:
+            paths = list(self._bot_paths)
+        else:
+            pool = [rel for rel in config.ROSTER
+                    if load_pokemon_def(str(ROOT / rel)).dex != self.pdef.dex]
+            random.shuffle(pool)
+            paths = pool[:n]
+            while len(paths) < n and pool:
+                paths.append(random.choice(pool))
+        defs = [load_pokemon_def(str(ROOT / p)) for p in paths]
+        while len(defs) < n:
+            defs.append(self.pdef)
+        return defs[:n]
+
+    def _spawn_pokemon(self, team, lane, is_bot, pdef=None):
+        pdef = pdef or self.pdef
+        self._register_def(pdef)
         base = Vec2(*self.map_data.spawns[f"team{team}"]) + Vec2(0.5, 0.5)
         pos = base + SLOT_OFFSET[lane]
         color = config.TEAM_COLORS[team]
-        p = self.world.spawn_pokemon(pos=pos, team=team, dex=self.pdef.dex,
-                                     name=self.pdef.name, color=color,
-                                     speed=self.pdef.base_speed, is_bot=is_bot,
-                                     assigned_lane=lane, types=self.pdef.types,
-                                     base_stats=self.pdef.base_stats,
-                                     growth=self.pdef.growth, moves=self.pdef.moves,
-                                     evolutions=self.pdef.evolutions, role=self.pdef.role,
-                                     passive=self.pdef.passive,
-                                     attack_range=self.pdef.attack_range,
-                                     attack_cooldown=self.pdef.attack_cooldown)
-        p.radius = self.pdef.radius
+        p = self.world.spawn_pokemon(pos=pos, team=team, dex=pdef.dex,
+                                     name=pdef.name, color=color,
+                                     speed=pdef.base_speed, is_bot=is_bot,
+                                     assigned_lane=lane, types=pdef.types,
+                                     base_stats=pdef.base_stats,
+                                     growth=pdef.growth, moves=pdef.moves,
+                                     evolutions=pdef.evolutions, role=pdef.role,
+                                     passive=pdef.passive,
+                                     attack_range=pdef.attack_range,
+                                     attack_cooldown=pdef.attack_cooldown)
+        p.radius = pdef.radius
+        self._unit_defs[p.id] = pdef
         return p
 
     def _setup_moba(self):
@@ -128,13 +161,15 @@ class MatchScene:
         # prende il primo slot in mid; il resto della squadra 0 e tutta la 1 sono bot.
         self.player = None
         ts = self.map_data.team_size
+        bots = iter(self._bot_defs(2 * ts - 1))
         for slot in range(ts):
             lane = LANE_SLOTS[slot % 3]
             is_player = self.player is None and lane == "mid"
-            p0 = self._spawn_pokemon(0, lane, is_bot=not is_player)
+            p0 = self._spawn_pokemon(0, lane, is_bot=not is_player,
+                                     pdef=None if is_player else next(bots))
             if is_player:
                 self.player = p0
-            self._spawn_pokemon(1, lane, is_bot=True)
+            self._spawn_pokemon(1, lane, is_bot=True, pdef=next(bots))
         if self.player is None:   # fallback (team molto piccoli)
             self.player = self.world.pokemons()[0]
             self.player.is_bot = False
@@ -160,6 +195,7 @@ class MatchScene:
                                                attack_range=self.pdef.attack_range,
                                                attack_cooldown=self.pdef.attack_cooldown)
         self.player.radius = self.pdef.radius
+        self._unit_defs[self.player.id] = self.pdef
         self.sim = Simulation(self.world, config.TICK_DT)
 
     def _load_anim(self, sprite_dir):
@@ -169,29 +205,28 @@ class MatchScene:
             self._sprite_cache[sprite_dir] = load_pokemon_animations(sprite_dir)
         return self._sprite_cache[sprite_dir]
 
-    def _stage_sprite_dir(self, stage, dex=None):
-        evs = self.pdef.evolutions
-        # Con le evoluzioni RAMIFICATE due forme condividono lo stesso stadio
-        # (es. Poliwrath/Politoad a stadio 2): si risolve per DEX, non per indice.
-        if dex is not None and evs:
-            for e in evs:
-                if e.get("dex") == dex and e.get("sprite_dir"):
-                    return e["sprite_dir"]
-        if evs and 0 <= stage < len(evs) and evs[stage].get("sprite_dir"):
-            return evs[stage]["sprite_dir"]
-        return self.pdef.sprite_dir
+    def _unit_sprite_dir(self, unit):
+        """Cartella sprite della forma ATTUALE di un Pokémon. Si risolve per DEX
+        (così funzionano anche i rami, es. Poliwrath/Politoad allo stesso stadio,
+        e il clone esca che copia il dex del lanciatore); forma Shedinja a parte."""
+        if getattr(unit, "form", "") == "shedinja":
+            return "assets/pokemon/0292"
+        sd = self._dex_sprite.get(unit.dex)
+        if sd:
+            return sd
+        pdef = self._unit_defs.get(unit.id)
+        return pdef.sprite_dir if pdef is not None else None
+
+    @staticmethod
+    def _sprite_state(unit):
+        return (unit.dex, unit.stage, getattr(unit, "form", ""))
 
     def _make_animator(self, unit):
         from engine.entities import Minion, Pokemon
-        # Il giocatore usa gli sprite reali (se presenti).
-        if isinstance(unit, Pokemon) and not unit.is_bot:
-            aset = self._load_anim(self._stage_sprite_dir(unit.stage, unit.dex))
-            if aset is not None:
-                return SpriteAnimator(aset)
-        # Il clone esca (Doppioteam) usa lo stesso sprite del giocatore.
-        if isinstance(unit, Pokemon) and getattr(unit, "is_decoy", False) \
-                and unit.dex == self.pdef.dex:
-            aset = self._load_anim(self._stage_sprite_dir(unit.stage, unit.dex))
+        # Tutti i Pokémon (giocatore, bot, cloni esca) usano gli sprite reali.
+        if isinstance(unit, Pokemon):
+            self._sprite_key[unit.id] = self._sprite_state(unit)
+            aset = self._load_anim(self._unit_sprite_dir(unit))
             if aset is not None:
                 return SpriteAnimator(aset)
         # I minion usano la skin per squadra+tipo (ridimensionata piccola).
@@ -296,23 +331,15 @@ class MatchScene:
         for u in self.world.units():
             if u.id not in self.animators:
                 self.animators[u.id] = self._make_animator(u)
-        # Cambio sprite quando il giocatore si evolve (anche di RAMO: stesso stadio,
-        # dex diverso Poliwrath/Politoad) -> si confronta il dex, non lo stadio.
-        if self.player.dex != self._player_dex or self.player.stage != self._player_stage:
-            self._player_stage = self.player.stage
-            self._player_dex = self.player.dex
-            if getattr(self.player, "form", "") != "shedinja":
-                aset = self._load_anim(self._stage_sprite_dir(self.player.stage, self.player.dex))
+        # Cambio sprite quando un Pokémon (giocatore o bot) si evolve, anche di
+        # RAMO (stesso stadio, dex diverso), o entra/esce dalla forma Shedinja.
+        for p in self.world.pokemons():
+            key = self._sprite_state(p)
+            if self._sprite_key.get(p.id, key) != key:
+                self._sprite_key[p.id] = key
+                aset = self._load_anim(self._unit_sprite_dir(p))
                 if aset is not None:
-                    self.animators[self.player.id] = SpriteAnimator(aset)
-        # Cambio sprite quando il giocatore entra/esce dalla forma Shedinja.
-        if getattr(self.player, "form", "") != self._player_form:
-            self._player_form = self.player.form
-            sd = "assets/pokemon/0292" if self._player_form == "shedinja" \
-                else self._stage_sprite_dir(self.player.stage, self.player.dex)
-            aset = self._load_anim(sd)
-            if aset is not None:
-                self.animators[self.player.id] = SpriteAnimator(aset)
+                    self.animators[p.id] = SpriteAnimator(aset)
 
         keys = pygame.key.get_pressed()
         space_held = keys[pygame.K_SPACE]
