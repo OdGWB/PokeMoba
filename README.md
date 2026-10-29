@@ -97,7 +97,12 @@ Partita 3v3 contro i bot, diretta:
 python run_client.py --single
 ```
 
-Multiplayer LAN: un giocatore sceglie **Ospita** dal menu (mostra il proprio IP);
+Multiplayer ONLINE tra amici (WebRTC, nessun server, codici scambiati su
+Discord/WhatsApp): menu **O** ospita, **U** unisciti. Guida passo-passo da
+mandare agli amici: [GIOCARE_ONLINE.md](GIOCARE_ONLINE.md). Test su un solo PC:
+`python tools/net_local_test.py`.
+
+Multiplayer LAN (vecchio, resta come riferimento): un giocatore sceglie **Ospita** dal menu (mostra il proprio IP);
 gli altri scelgono **Unisciti** e digitano quell'IP. In alternativa un server
 dedicato: `python run_server.py`. Demo Fase 1: `python run_client.py --single --map data/maps/map_test.json`.
 
@@ -167,7 +172,8 @@ game/     Client pygame: app, camera, renderer, input, sprite, scene.
 data/     Contenuti data-driven: mappe e Pokémon in JSON.
 tools/    Generatori (es. gen_map_3v3.py).
 assets/   Sprite PMD SpriteCollab (non inclusi nel repo).
-net/      Multiplayer LAN: protocol (codec binario), server, client, snapshot.
+net/      Multiplayer online WebRTC (host autoritativo, delta, predizione;
+          vedi net/__init__.py). net/lan/ = vecchia modalità LAN UDP.
 tests/    Test della logica pura.
 ```
 

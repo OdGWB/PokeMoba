@@ -20,7 +20,7 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=config.DEFAULT_PORT)
     args = parser.parse_args()
 
-    from net.server import GameServer
+    from net.lan.server import GameServer
     server = GameServer(port=args.port)
     server.start()
     try:

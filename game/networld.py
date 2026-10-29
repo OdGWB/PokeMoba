@@ -10,7 +10,7 @@ from __future__ import annotations
 import config
 from engine.entities import Core, Minion, Pokemon, Structure
 from engine.vec import Vec2
-from net.protocol import K_CORE, K_MINION, K_POKEMON, K_TOWER
+from net.lan.protocol import K_CORE, K_MINION, K_POKEMON, K_TOWER
 
 _MINION_TYPES = {0: "melee", 1: "caster", 2: "cannon"}
 INTERP_DELAY = 0.06   # s: si renderizza leggermente nel passato per interpolare

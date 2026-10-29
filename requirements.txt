@@ -6,3 +6,7 @@ pygame-ce>=2.4
 # Serializzazione compatta per i messaggi di rete (Fase 5).
 # Opzionale: se assente, net/protocol.py ripiegherà su struct.
 # msgpack>=1.0
+
+# Multiplayer online WebRTC (net/rtc.py): data channel + ICE/STUN, nessun server.
+# Wheel precompilati per Windows/Python 3.13 (verificato: niente compilazione).
+aiortc>=1.9

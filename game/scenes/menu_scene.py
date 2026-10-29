@@ -1,6 +1,7 @@
 """Menu iniziale: scelta della MAPPA (3v3 / 5v5), poi selezione del personaggio.
 
-In basso restano le partite LAN: [H] ospita (host), [J] unisciti (IP).
+In basso le partite ONLINE (WebRTC, codici scambiati a mano): [O] ospita,
+[U] unisciti; e le vecchie partite LAN: [H] ospita (host), [J] unisciti (IP).
 """
 from __future__ import annotations
 
@@ -87,6 +88,12 @@ class MenuScene:
                     self._host()
                 elif ev.key == pygame.K_j:
                     self.mode = "enter_ip"
+                elif ev.key == pygame.K_o:
+                    from .online_lobby_scene import OnlineHostLobbyScene
+                    self.next_scene = OnlineHostLobbyScene(self.app, self.map_index)
+                elif ev.key == pygame.K_u:
+                    from .online_lobby_scene import OnlineJoinScene
+                    self.next_scene = OnlineJoinScene(self.app)
                 elif ev.key == pygame.K_ESCAPE:
                     self.quit_app = True
             elif self.mode == "enter_ip" and ev.type == pygame.KEYDOWN:
@@ -111,8 +118,8 @@ class MenuScene:
         self.next_scene = CharSelectScene(self.app, self.map_index)
 
     def _host(self):
-        from net.server import GameServer
-        from net.client import GameClient
+        from net.lan.server import GameServer
+        from net.lan.client import GameClient
         from .lobby_scene import LobbyScene
         server = GameServer(port=config.DEFAULT_PORT)
         server.start()
@@ -123,7 +130,7 @@ class MenuScene:
                                      init_map_index=self.map_index)
 
     def _join(self, ip):
-        from net.client import GameClient
+        from net.lan.client import GameClient
         from .lobby_scene import LobbyScene
         client = GameClient(ip, config.DEFAULT_PORT)
         client.send_hello(socket.gethostname()[:16] or "Ospite")
@@ -192,3 +199,7 @@ class MenuScene:
                            f"il tuo IP: {ip}  porta {config.DEFAULT_PORT}      [Esc] esci",
                            True, DIM)
         surface.blit(lan, (W // 2 - lan.get_width() // 2, H - lan.get_height() - H // 24))
+        onl = small.render("ONLINE (amici via Internet, codici su Discord/WhatsApp):  "
+                           "[O] ospita partita   [U] unisciti", True, GOLD)
+        surface.blit(onl, (W // 2 - onl.get_width() // 2,
+                           H - lan.get_height() - onl.get_height() - H // 24 - 8))

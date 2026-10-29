@@ -26,7 +26,7 @@ from sim.commands import (AttackCommand, AttackMoveCommand, BuyItemCommand,
 from sim.simulation import Simulation
 from . import protocol as P
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 LANES = ["top", "mid", "bot"]
 SLOT_OFFSET = {"top": Vec2(-1.2, 0.0), "mid": Vec2(0.0, 0.0), "bot": Vec2(0.0, 1.2)}
 CLIENT_TIMEOUT = 8.0
