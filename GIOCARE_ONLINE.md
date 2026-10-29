@@ -22,6 +22,9 @@ partita gira sul suo PC), gli altri si collegano a lui scambiandosi dei
 
    Aspetta che finisca (scarica pygame e aiortc, un paio di minuti).
 4. Avvia il gioco con un doppio clic su **`gioca.bat`**.
+5. La prima volta il gioco ti chiede il **nickname** (il nome che vedranno gli
+   altri) e l'**immagine profilo**, scelta fra i Pokémon leggendari. Restano
+   salvati sul tuo PC; per cambiarli premi **P** nel menu.
 
 > La prima volta Windows potrebbe chiedere se Python può usare la rete:
 > rispondi **Consenti** (anche "reti private").

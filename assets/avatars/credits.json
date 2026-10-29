@@ -1,0 +1,484 @@
+{
+ "0144": {
+  "name": "Articuno",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0145": {
+  "name": "Zapdos",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0146": {
+  "name": "Moltres",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0150": {
+  "name": "Mewtwo",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0243": {
+  "name": "Raikou",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0244": {
+  "name": "Entei",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0245": {
+  "name": "Suicune",
+  "authors": [
+   "CHUNSOFT",
+   "Emmuffin"
+  ]
+ },
+ "0249": {
+  "name": "Lugia",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0250": {
+  "name": "Ho-Oh",
+  "authors": [
+   "CHUNSOFT",
+   "CamusZekeSirius"
+  ]
+ },
+ "0377": {
+  "name": "Regirock",
+  "authors": [
+   "CHUNSOFT",
+   "CamusZekeSirius"
+  ]
+ },
+ "0378": {
+  "name": "Regice",
+  "authors": [
+   "CHUNSOFT",
+   "CamusZekeSirius"
+  ]
+ },
+ "0379": {
+  "name": "Registeel",
+  "authors": [
+   "CHUNSOFT",
+   "CamusZekeSirius"
+  ]
+ },
+ "0380": {
+  "name": "Latias",
+  "authors": [
+   "CHUNSOFT",
+   "Sharpen"
+  ]
+ },
+ "0381": {
+  "name": "Latios",
+  "authors": [
+   "CHUNSOFT",
+   "Emmuffin"
+  ]
+ },
+ "0382": {
+  "name": "Kyogre",
+  "authors": [
+   "CHUNSOFT",
+   "CamusZekeSirius"
+  ]
+ },
+ "0383": {
+  "name": "Groudon",
+  "authors": [
+   "CHUNSOFT",
+   "Mojo"
+  ]
+ },
+ "0384": {
+  "name": "Rayquaza",
+  "authors": [
+   "CHUNSOFT",
+   "CamusZekeSirius"
+  ]
+ },
+ "0480": {
+  "name": "Uxie",
+  "authors": [
+   "CHUNSOFT",
+   "baronessfaron"
+  ]
+ },
+ "0481": {
+  "name": "Mesprit",
+  "authors": [
+   "CHUNSOFT",
+   "Mojo",
+   "baronessfaron"
+  ]
+ },
+ "0482": {
+  "name": "Azelf",
+  "authors": [
+   "CHUNSOFT",
+   "baronessfaron"
+  ]
+ },
+ "0483": {
+  "name": "Dialga",
+  "authors": [
+   "CHUNSOFT",
+   "CamusZekeSirius"
+  ]
+ },
+ "0484": {
+  "name": "Palkia",
+  "authors": [
+   "CHUNSOFT",
+   "CamusZekeSirius",
+   "TaylorTrap622",
+   "baronessfaron"
+  ]
+ },
+ "0485": {
+  "name": "Heatran",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0486": {
+  "name": "Regigigas",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0487": {
+  "name": "Giratina",
+  "authors": [
+   "CHUNSOFT",
+   "CamusZekeSirius"
+  ]
+ },
+ "0488": {
+  "name": "Cresselia",
+  "authors": [
+   "CHUNSOFT",
+   "baronessfaron"
+  ]
+ },
+ "0638": {
+  "name": "Cobalion",
+  "authors": [
+   "mucrush",
+   "Noo",
+   "Deeshura"
+  ]
+ },
+ "0639": {
+  "name": "Terrakion",
+  "authors": [
+   "mucrush",
+   "Noo",
+   "G〜"
+  ]
+ },
+ "0640": {
+  "name": "Virizion",
+  "authors": [
+   "utente Discord 557599571170033664",
+   "baronessfaron"
+  ]
+ },
+ "0641": {
+  "name": "Tornadus",
+  "authors": [
+   "G〜"
+  ]
+ },
+ "0642": {
+  "name": "Thundurus",
+  "authors": [
+   "G〜"
+  ]
+ },
+ "0643": {
+  "name": "Reshiram",
+  "authors": [
+   "mucrush",
+   "CamusZekeSirius",
+   "Emmuffin"
+  ]
+ },
+ "0644": {
+  "name": "Zekrom",
+  "authors": [
+   "mucrush",
+   "CamusZekeSirius",
+   "baronessfaron"
+  ]
+ },
+ "0645": {
+  "name": "Landorus",
+  "authors": [
+   "G〜"
+  ]
+ },
+ "0646": {
+  "name": "Kyurem",
+  "authors": [
+   "Noo"
+  ]
+ },
+ "0716": {
+  "name": "Xerneas",
+  "authors": [
+   "JkKU　(Jenrikku)",
+   "Emboarger",
+   "baronessfaron",
+   "◥θ┴θ◤"
+  ]
+ },
+ "0717": {
+  "name": "Yveltal",
+  "authors": [
+   "Top_Kec"
+  ]
+ },
+ "0718": {
+  "name": "Zygarde",
+  "authors": [
+   "Emboarger",
+   "Noo"
+  ]
+ },
+ "0772": {
+  "name": "Tipo Zero",
+  "authors": [
+   "0palite",
+   "baronessfaron"
+  ]
+ },
+ "0773": {
+  "name": "Silvally",
+  "authors": [
+   "0palite",
+   "Emboarger",
+   "Caitemis",
+   "Emmuffin"
+  ]
+ },
+ "0785": {
+  "name": "Tapu Koko",
+  "authors": [
+   "XxWindpawxX",
+   "baronessfaron"
+  ]
+ },
+ "0786": {
+  "name": "Tapu Lele",
+  "authors": [
+   "XxWindpawxX",
+   "baronessfaron"
+  ]
+ },
+ "0787": {
+  "name": "Tapu Bulu",
+  "authors": [
+   "XxWindpawxX",
+   "baronessfaron"
+  ]
+ },
+ "0788": {
+  "name": "Tapu Fini",
+  "authors": [
+   "XxWindpawxX",
+   "baronessfaron"
+  ]
+ },
+ "0789": {
+  "name": "Cosmog",
+  "authors": [
+   "XxWindpawxX",
+   "Emboarger",
+   "G〜"
+  ]
+ },
+ "0790": {
+  "name": "Cosmoem",
+  "authors": [
+   "Emboarger"
+  ]
+ },
+ "0791": {
+  "name": "Solgaleo",
+  "authors": [
+   "0palite",
+   "G〜"
+  ]
+ },
+ "0792": {
+  "name": "Lunala",
+  "authors": [
+   "Deeshura"
+  ]
+ },
+ "0800": {
+  "name": "Necrozma",
+  "authors": [
+   "0palite",
+   "Emboarger",
+   "baronessfaron"
+  ]
+ },
+ "0888": {
+  "name": "Zacian",
+  "authors": [
+   "Emmuffin"
+  ]
+ },
+ "0889": {
+  "name": "Zamazenta",
+  "authors": [
+   "G〜"
+  ]
+ },
+ "0890": {
+  "name": "Eternatus",
+  "authors": [
+   "Soulja"
+  ]
+ },
+ "0891": {
+  "name": "Kubfu",
+  "authors": [
+   "JustAGunk"
+  ]
+ },
+ "0892": {
+  "name": "Urshifu",
+  "authors": [
+   "EzerArt",
+   "Emmuffin"
+  ]
+ },
+ "0894": {
+  "name": "Regieleki",
+  "authors": [
+   "EzerArt",
+   "CamusZekeSirius"
+  ]
+ },
+ "0895": {
+  "name": "Regidrago",
+  "authors": [
+   "EzerArt",
+   "CamusZekeSirius"
+  ]
+ },
+ "0896": {
+  "name": "Glastrier",
+  "authors": [
+   "baronessfaron"
+  ]
+ },
+ "0897": {
+  "name": "Spectrier",
+  "authors": [
+   "Emmuffin",
+   "baronessfaron"
+  ]
+ },
+ "0898": {
+  "name": "Calyrex",
+  "authors": [
+   "EzerArt",
+   "G〜"
+  ]
+ },
+ "0905": {
+  "name": "Enamorus",
+  "authors": [
+   "JFain",
+   "Caitemis",
+   "baronessfaron"
+  ]
+ },
+ "1001": {
+  "name": "Wo-Chien",
+  "authors": [
+   "Emmuffin"
+  ]
+ },
+ "1002": {
+  "name": "Chien-Pao",
+  "authors": [
+   "Emmuffin"
+  ]
+ },
+ "1003": {
+  "name": "Ting-Lu",
+  "authors": [
+   "Emmuffin"
+  ]
+ },
+ "1004": {
+  "name": "Chi-Yu",
+  "authors": [
+   "Emmuffin"
+  ]
+ },
+ "1007": {
+  "name": "Koraidon",
+  "authors": [
+   "Top_Kec",
+   "Emmuffin"
+  ]
+ },
+ "1008": {
+  "name": "Miraidon",
+  "authors": [
+   "Top_Kec",
+   "Emmuffin"
+  ]
+ },
+ "1014": {
+  "name": "Okidogi",
+  "authors": [
+   "Emmuffin"
+  ]
+ },
+ "1015": {
+  "name": "Munkidori",
+  "authors": [
+   "Emmuffin"
+  ]
+ },
+ "1016": {
+  "name": "Fezandipiti",
+  "authors": [
+   "Emmuffin"
+  ]
+ },
+ "1017": {
+  "name": "Ogerpon",
+  "authors": [
+   "◥θ┴θ◤",
+   "baronessfaron"
+  ]
+ },
+ "1024": {
+  "name": "Terapagos",
+  "authors": [
+   "Emmuffin"
+  ]
+ }
+}

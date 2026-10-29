@@ -82,6 +82,12 @@ def valid_item_slot(slot) -> bool:
     return isinstance(slot, int) and 0 <= slot <= 5
 
 
+def valid_avatar(dex) -> int:
+    """Immagine profilo = numero di Pokédex; fuori intervallo diventa 0 (nessuna).
+    Se il ritratto non c'è in assets/avatars il gioco mostra un riquadro vuoto."""
+    return dex if isinstance(dex, int) and 0 <= dex <= 1025 else 0
+
+
 def clean_text(text: str, limit: int = 120) -> str:
     """Testo di chat/nome senza caratteri di controllo."""
     return "".join(ch for ch in (text or "") if ch.isprintable())[:limit].strip()

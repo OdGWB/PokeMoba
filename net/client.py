@@ -36,9 +36,10 @@ CONNECTING, LOBBY, LOADING, MATCH, ENDED, LOST = (
 
 
 class ClientSession:
-    def __init__(self, transport, name="Giocatore"):
+    def __init__(self, transport, name="Giocatore", avatar=0):
         self.transport = transport
         self.name = name
+        self.avatar = avatar            # n. di Pokédex dell'immagine profilo (0 = nessuna)
         self.phase = CONNECTING
         self.slot = None
         self.max_slots = 0
@@ -82,7 +83,7 @@ class ClientSession:
         if tr.state == CONNECTED:
             self._connected_once = True
             if not self._hello_sent:
-                tr.send_reliable(P.enc_hello(self.name))
+                tr.send_reliable(P.enc_hello(self.name, self.avatar))
                 self._hello_sent = True
         for ch, data in tr.recv():
             try:

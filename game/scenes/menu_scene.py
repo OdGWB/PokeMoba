@@ -2,6 +2,7 @@
 
 In basso le partite ONLINE (WebRTC, codici scambiati a mano): [O] ospita,
 [U] unisciti; e le vecchie partite LAN: [H] ospita (host), [J] unisciti (IP).
+In alto a destra il tuo profilo ([P] per cambiarlo); [C] apre i crediti.
 """
 from __future__ import annotations
 
@@ -11,6 +12,7 @@ import pygame
 
 import config
 from engine import grid as G
+from .. import avatars as A
 from engine.content import load_map
 
 BG = (14, 20, 17)
@@ -94,6 +96,12 @@ class MenuScene:
                 elif ev.key == pygame.K_u:
                     from .online_lobby_scene import OnlineJoinScene
                     self.next_scene = OnlineJoinScene(self.app)
+                elif ev.key == pygame.K_p:
+                    from .profile_scene import ProfileScene
+                    self.next_scene = ProfileScene(self.app)
+                elif ev.key == pygame.K_c:
+                    from .credits_scene import CreditsScene
+                    self.next_scene = CreditsScene(self.app)
                 elif ev.key == pygame.K_ESCAPE:
                     self.quit_app = True
             elif self.mode == "enter_ip" and ev.type == pygame.KEYDOWN:
@@ -124,7 +132,7 @@ class MenuScene:
         server = GameServer(port=config.DEFAULT_PORT)
         server.start()
         client = GameClient("127.0.0.1", config.DEFAULT_PORT)
-        client.send_hello(socket.gethostname()[:16] or "Host")
+        client.send_hello(self._nick("Host"))
         self.app.server = server
         self.next_scene = LobbyScene(self.app, client, server=server, is_host=True,
                                      init_map_index=self.map_index)
@@ -133,8 +141,12 @@ class MenuScene:
         from net.lan.client import GameClient
         from .lobby_scene import LobbyScene
         client = GameClient(ip, config.DEFAULT_PORT)
-        client.send_hello(socket.gethostname()[:16] or "Ospite")
+        client.send_hello(self._nick("Ospite"))
         self.next_scene = LobbyScene(self.app, client, is_host=False)
+
+    def _nick(self, default):
+        prof = getattr(self.app, "profile", None)
+        return prof["name"] if prof else (socket.gethostname()[:16] or default)
 
     def draw(self, surface):
         surface.fill(BG)
@@ -156,6 +168,7 @@ class MenuScene:
         small = self._font(max(13, H // 50))
         t = title_f.render("PokrLOL", True, GOLD)
         surface.blit(t, (W // 2 - t.get_width() // 2, H // 14))
+        self._draw_profile(surface, W, H, small)
 
         if self.mode == "enter_ip":
             cx = W // 2 - 170
@@ -203,3 +216,15 @@ class MenuScene:
                            "[O] ospita partita   [U] unisciti", True, GOLD)
         surface.blit(onl, (W // 2 - onl.get_width() // 2,
                            H - lan.get_height() - onl.get_height() - H // 24 - 8))
+
+    def _draw_profile(self, surface, W, H, small):
+        """In alto a destra: immagine profilo + nickname, [P] cambia, [C] crediti."""
+        prof = getattr(self.app, "profile", None) or {}
+        side = max(40, (H // 12) // 40 * 40)
+        r = pygame.Rect(W - side - 24, 20, side, side)
+        A.draw_avatar(surface, prof.get("avatar", 0), r, GOLD)
+        nm = small.render(prof.get("name", "?"), True, TEXT)
+        surface.blit(nm, (r.x - nm.get_width() - 12, r.y + 4))
+        for i, txt in enumerate(("[P] profilo", "[C] crediti")):
+            h = small.render(txt, True, DIM)
+            surface.blit(h, (r.x - h.get_width() - 12, r.y + 8 + (i + 1) * (h.get_height() + 2)))

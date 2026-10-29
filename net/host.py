@@ -86,6 +86,7 @@ class Slot:
         self.answer_future = None
         self.connect_deadline = 0.0
         self.name = ""
+        self.avatar = 0               # immagine profilo (n. di Pokédex, 0 = nessuna)
         self.team = 0
         self.pokemon = 0
         self.ready = False
@@ -107,7 +108,7 @@ class Slot:
 
 
 class HostSession:
-    def __init__(self, map_index=0, host_name="Host", host_plays=True):
+    def __init__(self, map_index=0, host_name="Host", host_plays=True, host_avatar=0):
         self.map_index = map_index
         self.team_size = map_team_size(map_index)
         self.slots = [Slot(i) for i in range(MAX_SLOTS)]
@@ -134,7 +135,7 @@ class HostSession:
             a, b = LoopbackTransport.pair()
             s0 = self.slots[0]
             s0.transport, s0.status = a, S_LOCAL
-            self.local = ClientSession(b, V.clean_text(host_name, 24) or "Host")
+            self.local = ClientSession(b, V.clean_text(host_name, 24) or "Host", host_avatar)
         self._publish()
 
     # ==================================================================================
@@ -445,7 +446,8 @@ class HostSession:
             if s.joined or s.status == S_DISCONNECTED:
                 conn = P.SLOT_DISCONNECTED if s.status == S_DISCONNECTED else P.SLOT_CONNECTED
                 players.append({"slot": s.index, "team": s.team, "pokemon": s.pokemon,
-                                "ready": s.ready, "conn": conn, "name": s.name})
+                                "ready": s.ready, "conn": conn, "name": s.name,
+                                "avatar": s.avatar})
         self._broadcast(P.enc_lobby(self.map_index, self.max_players, players))
 
     # --- messaggi ---------------------------------------------------------------------------
@@ -496,6 +498,7 @@ class HostSession:
         if s.joined:
             return
         s.name = V.clean_text(h["name"], 24) or f"Giocatore {s.index}"
+        s.avatar = V.valid_avatar(h["avatar"])
         s.joined = True
         s.reset_net()
         self._send(s, P.enc_welcome(s.index, self.max_players))
@@ -663,7 +666,7 @@ class HostSession:
 
     def _players_info(self):
         return [{"slot": s.index, "entity_id": s.entity_id, "team": s.team,
-                 "pokemon": s.pokemon, "name": s.name}
+                 "pokemon": s.pokemon, "name": s.name, "avatar": s.avatar}
                 for s in self.slots if s.entity_id]
 
     def _get_def(self, idx):

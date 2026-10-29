@@ -30,6 +30,7 @@ class App:
         self.font = pygame.font.SysFont("consolas", 16)
         self.root = ROOT
         self.server = None
+        self.profile = None                     # {"name", "avatar"} (game/avatars.py)
         self.running = True
         self.accumulator = 0.0
         # Trasformazione corrente lowres->finestra (scale + scostamento lettera-box).
@@ -40,8 +41,14 @@ class App:
             self.scene = MatchScene(map_path, pokemon_path, start_level=start_level,
                                     start_items=start_items)
         else:
-            from .scenes.menu_scene import MenuScene
-            self.scene = MenuScene(self)
+            from .avatars import load_profile
+            self.profile = load_profile()       # nickname + immagine profilo salvati
+            if self.profile is None:            # primo avvio: si chiede subito
+                from .scenes.profile_scene import ProfileScene
+                self.scene = ProfileScene(self, first=True)
+            else:
+                from .scenes.menu_scene import MenuScene
+                self.scene = MenuScene(self)
 
     def _toggle_fullscreen(self):
         self.fullscreen = not self.fullscreen

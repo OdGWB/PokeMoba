@@ -18,6 +18,7 @@ from net import client as C
 from net.host import (S_CONNECTED, S_CONNECTING, S_DISCONNECTED, S_EMPTY, S_FAILED,
                       S_GATHERING, S_WAITING, HostSession)
 
+from .. import avatars as A
 from .. import clipboard
 from .lobby_scene import ROSTER_NAMES
 
@@ -49,8 +50,43 @@ def font(size, bold=False):
     return _fonts[(size, bold)]
 
 
-def player_name() -> str:
-    return (socket.gethostname() or "Giocatore")[:16]
+def player_name(app=None) -> str:
+    prof = getattr(app, "profile", None)
+    return prof["name"] if prof else (socket.gethostname() or "Giocatore")[:16]
+
+
+def player_avatar(app=None) -> int:
+    prof = getattr(app, "profile", None)
+    return prof["avatar"] if prof else 0
+
+
+def draw_roster(surface, lobby, x, y, f, width=48):
+    """Giocatori della lobby con l'IMMAGINE PROFILO accanto al nome, divisi per
+    squadra; negli slot rimasti liberi i BOT (senza immagine, col nome del loro
+    Pokémon: l'host li riempie col primo del roster). Ritorna la y finale."""
+    players = (lobby or {}).get("players", [])
+    per_team = max(1, (lobby or {}).get("max_slots", 2) // 2)
+    side = max(f.get_height() + 6, 28)      # riga; l'avatar è 24 px (meno sgranato)
+    ty = (side - 2 - f.get_height()) // 2
+    for team in (0, 1):
+        col = config.TEAM_COLORS[team]
+        surface.blit(f.render("Squadra BLU" if team == 0 else "Squadra ROSSA", True, col), (x, y))
+        y += f.get_height() + 6
+        mine = [p for p in players if p["team"] == team]
+        for p in mine:
+            poke = ROSTER_NAMES[p["pokemon"]] if p["pokemon"] < len(ROSTER_NAMES) else "?"
+            tag = "caduto" if p["conn"] == 3 else ("PRONTO" if p["ready"] else "...")
+            A.draw_avatar(surface, p.get("avatar", 0), (x, y, side - 4, side - 4), col)
+            txt = f"{p['name'][:16]}  {poke[:10]}  [{tag}]"[:width]
+            surface.blit(f.render(txt, True, col), (x + side + 4, y + ty))
+            y += side
+        for _ in range(max(0, per_team - len(mine))):
+            A.draw_avatar(surface, 0, (x, y, side - 4, side - 4), (70, 76, 72))
+            surface.blit(f.render(f"{ROSTER_NAMES[0]}  (bot)"[:width], True, DIM),
+                         (x + side + 4, y + ty))
+            y += side
+        y += 6
+    return y
 
 
 # --- widget minimi ----------------------------------------------------------------------
@@ -234,7 +270,7 @@ class OnlineHostLobbyScene:
     def __init__(self, app, map_index=0):
         self.app = app
         self.next_scene = None
-        self.host = HostSession(map_index, player_name())
+        self.host = HostSession(map_index, player_name(app), host_avatar=player_avatar(app))
         self.host.start()
         self.session = self.host.local
         self.panel = SlotPanel(self.host)
@@ -307,15 +343,8 @@ class OnlineHostLobbyScene:
         # Colonna sinistra: giocatori e scelta personale.
         x, y = 24, 90
         surface.blit(font(16, True).render("Giocatori", True, TEXT), (x, y)); y += 26
-        for p in (self.session.lobby or {}).get("players", []):
-            col = config.TEAM_COLORS[p["team"]]
-            poke = ROSTER_NAMES[p["pokemon"]] if p["pokemon"] < len(ROSTER_NAMES) else "?"
-            tag = "PRONTO" if p["ready"] else "..."
-            if p["conn"] == 3:
-                tag = "caduto"
-            surface.blit(font(14).render(f"{p['slot']}. {p['name'][:12]}  {poke[:10]}  [{tag}]",
-                                         True, col), (x, y)); y += 20
-        y += 14
+        y = draw_roster(surface, self.session.lobby, x, y, font(13), width=40)
+        y += 4
         surface.blit(font(16, True).render("La tua scelta", True, TEXT), (x, y)); y += 24
         for line in (f"Squadra: {'BLU' if self.team == 0 else 'ROSSA'}  (T)",
                      f"Pokemon: {ROSTER_NAMES[self.pokemon]}  (, .)",
@@ -436,7 +465,7 @@ class OnlineJoinScene:
             f, self.future = self.future, None
             try:
                 self.answer_code = self._encode(f.result())
-                self.session = ClientSession(self.peer, player_name())
+                self.session = ClientSession(self.peer, player_name(self.app), player_avatar(self.app))
             except Exception as e:
                 self.error = f"Offerta non valida: {e}"
                 self.peer.close()
@@ -517,13 +546,8 @@ class OnlineJoinScene:
                                      f"ping {s.clock.rtt * 1000:.0f} ms" if s.clock.rtt else
                                      f"Connesso come slot {s.slot}   Mappa: {mapname}",
                                      True, DIM), (x, y)); y += 32
-        for p in lob.get("players", []):
-            col = config.TEAM_COLORS[p["team"]]
-            poke = ROSTER_NAMES[p["pokemon"]] if p["pokemon"] < len(ROSTER_NAMES) else "?"
-            tag = "PRONTO" if p["ready"] else "..."
-            surface.blit(font(15).render(f"  {p['name']}  -  {poke}  [{tag}]", True, col), (x, y))
-            y += 22
-        y += 18
+        y = draw_roster(surface, lob, x, y, font(15), width=60)
+        y += 8
         for line in (f"Squadra: {'BLU' if self.team == 0 else 'ROSSA'}   (T)",
                      f"Pokemon: {ROSTER_NAMES[self.pokemon]}   (, .)",
                      f"Stato: {'PRONTO' if self.ready else 'non pronto'}   (SPAZIO)",

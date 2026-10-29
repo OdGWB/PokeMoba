@@ -29,7 +29,7 @@ from __future__ import annotations
 import math
 import struct
 
-PROTO_VERSION = 1
+PROTO_VERSION = 2       # 2: avatar (n. di Pokédex) in HELLO/LOBBY/START
 
 # --- data channel -------------------------------------------------------------
 CH_STATE = 0
@@ -44,7 +44,7 @@ S_SNAP = 0x20           # host -> client: snapshot (delta; keyframe sul canale r
 S_FX = 0x21             # host -> client: eventi visivi cosmetici (persi = pazienza)
 
 # canale reliable
-R_HELLO = 0x40          # client -> host: versione protocollo + nome
+R_HELLO = 0x40          # client -> host: versione protocollo + nome + avatar
 R_WELCOME = 0x41        # host -> client: il tuo slot
 R_LOBBY = 0x42          # host -> client: stato della lobby
 R_CHOICE = 0x43         # client -> host: squadra, Pokémon, pronto
@@ -569,13 +569,17 @@ def dec_fx(data) -> tuple:
 # ==================================================================================
 # CANALE RELIABLE
 # ==================================================================================
-def enc_hello(name) -> bytes:
-    return Writer().u8(R_HELLO).u8(PROTO_VERSION).s(name, 24).bytes()
+def enc_hello(name, avatar=0) -> bytes:
+    """avatar = numero di Pokédex del ritratto profilo (0 = nessuno)."""
+    return Writer().u8(R_HELLO).u8(PROTO_VERSION).s(name, 24).u16(avatar).bytes()
 
 
 def dec_hello(data) -> dict:
     r = Reader(data); r.u8()
-    return {"version": r.u8(), "name": r.s()}
+    version = r.u8()
+    if version != PROTO_VERSION:             # versione vecchia: il resto può non tornare
+        return {"version": version, "name": "", "avatar": 0}
+    return {"version": version, "name": r.s(), "avatar": r.u16()}
 
 
 def enc_welcome(slot, max_slots) -> bytes:
@@ -588,11 +592,11 @@ def dec_welcome(data) -> dict:
 
 
 def enc_lobby(map_index, max_slots, players) -> bytes:
-    """players: lista di dict {slot, team, pokemon, ready, conn, name}."""
+    """players: lista di dict {slot, team, pokemon, ready, conn, name, avatar}."""
     w = Writer().u8(R_LOBBY).u8(map_index).u8(max_slots).u8(len(players))
     for p in players:
         w.u8(p["slot"]).u8(p["team"]).u8(p["pokemon"]).u8(1 if p["ready"] else 0)
-        w.u8(p["conn"]).s(p["name"], 24)
+        w.u8(p["conn"]).s(p["name"], 24).u16(p.get("avatar", 0))
     return w.bytes()
 
 
@@ -602,7 +606,8 @@ def dec_lobby(data) -> dict:
     players = []
     for _ in range(n):
         players.append({"slot": r.u8(), "team": r.u8(), "pokemon": r.u8(),
-                        "ready": bool(r.u8()), "conn": r.u8(), "name": r.s()})
+                        "ready": bool(r.u8()), "conn": r.u8(), "name": r.s(),
+                        "avatar": r.u16()})
     return {"map_index": map_index, "max_slots": max_slots, "players": players}
 
 
@@ -619,6 +624,7 @@ def enc_start(map_path, your_entity_id, players) -> bytes:
     w = Writer().u8(R_START).s(map_path).u16(your_entity_id).u8(len(players))
     for p in players:
         w.u8(p["slot"]).u16(p["entity_id"]).u8(p["team"]).u8(p["pokemon"]).s(p["name"], 24)
+        w.u16(p.get("avatar", 0))
     return w.bytes()
 
 
@@ -628,7 +634,7 @@ def dec_start(data) -> dict:
     players = []
     for _ in range(n):
         players.append({"slot": r.u8(), "entity_id": r.u16(), "team": r.u8(),
-                        "pokemon": r.u8(), "name": r.s()})
+                        "pokemon": r.u8(), "name": r.s(), "avatar": r.u16()})
     return {"map": map_path, "your_entity_id": your, "players": players}
 
 

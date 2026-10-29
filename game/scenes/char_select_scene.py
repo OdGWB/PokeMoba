@@ -13,6 +13,7 @@ import pygame
 
 import config
 from engine.content import load_pokemon_def
+from .. import avatars as A
 from ..sprites.animdata import parse_anim_data
 
 COLS = 5
@@ -197,8 +198,8 @@ class CharSelectScene:
         surface.blit(title, (W // 2 - title.get_width() // 2, H // 28))
         mname = config.MAPS[self.map_index][0]
         ts = 3 if mname == "3v3" else 5
-        sub = small.render(f"Mappa {mname}  -  gli altri {2 * ts - 1} Pokémon saranno "
-                           f"assegnati a caso dal pool, senza ripetizioni", True, DIM)
+        sub = small.render(f"Mappa {mname}  -  gli altri {2 * ts - 1} sono bot: Pokémon a caso "
+                           f"dal pool, senza ripetizioni, col nome del loro Pokémon", True, DIM)
         surface.blit(sub, (W // 2 - sub.get_width() // 2, H // 28 + title.get_height() + 6))
 
         # Griglia delle carte (a sinistra) + anteprima (a destra).
@@ -240,6 +241,15 @@ class CharSelectScene:
         panel = pygame.Rect(px, top, pw, self._grid_h)
         pygame.draw.rect(surface, PANEL, panel, border_radius=8)
         pygame.draw.rect(surface, BORDER, panel, 1, border_radius=8)
+
+        # Tu: immagine profilo + nickname (i bot non ne hanno).
+        prof = getattr(self.app, "profile", None) or {}
+        side = 40 if panel.h < 520 else 80
+        A.draw_avatar(surface, prof.get("avatar", 0), (panel.x + 12, panel.y + 12, side, side), GOLD)
+        you = mid.render(prof.get("name", "Tu"), True, TEXT)
+        surface.blit(you, (panel.x + 20 + side, panel.y + 12))
+        surface.blit(small.render("sei tu", True, DIM),
+                     (panel.x + 20 + side, panel.y + 16 + you.get_height()))
 
         img = self._frame(self.idle[self.sel])
         if img is not None:
