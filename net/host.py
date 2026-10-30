@@ -608,7 +608,7 @@ class HostSession:
 
     def _on_action(self, s, a):
         from sim.commands import (BuyItemCommand, ChooseUpgradeCommand, RankMoveCommand,
-                                  SellItemCommand)
+                                  SellItemCommand, UseItemCommand)
         if not s.guard.actions.take():
             self._strike(s)
             return
@@ -625,6 +625,8 @@ class HostSession:
             cmd = BuyItemCommand(seq=seq, entity_id=eid, item_id=a["item_id"])
         elif k == P.ACT_SELL and V.valid_item_slot(a["slot"]):
             cmd = SellItemCommand(seq=seq, entity_id=eid, slot=a["slot"])
+        elif k == P.ACT_USE and V.valid_item_slot(a["slot"]):
+            cmd = UseItemCommand(seq=seq, entity_id=eid, slot=a["slot"])
         if cmd is None:
             self._strike(s)
         else:
@@ -732,7 +734,8 @@ class HostSession:
                                      role=pdef.role, passive=pdef.passive,
                                      attack_range=pdef.attack_range,
                                      attack_cooldown=pdef.attack_cooldown,
-                                     attack_fx=pdef.attack_fx)
+                                     attack_fx=pdef.attack_fx,
+                                     rec_items=pdef.recommended_items)
         p.radius = pdef.radius
         return p
 

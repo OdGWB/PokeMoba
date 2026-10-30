@@ -4,6 +4,7 @@
   "name": "Roggenrola",
   "types": ["Rock"],
   "role": "tank",
+  "recommended_items": ["rocky_helmet", "iron_ball", "bright_powder", "leftovers"],
   "color": [92, 104, 150],
   "radius": 0.36,
   "base_speed": 3.4,

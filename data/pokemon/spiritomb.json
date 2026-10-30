@@ -4,6 +4,7 @@
   "name": "Spiritomb",
   "types": ["Ghost", "Dark"],
   "role": "supporto",
+  "recommended_items": ["light_clay", "king_rock", "soothe_bell", "exp_share"],
   "color": [96, 70, 140],
   "radius": 0.46,
   "base_speed": 3.4,

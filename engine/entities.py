@@ -139,6 +139,21 @@ class Pokemon(Unit):
     death_streak: int = 0               # morti consecutive (serie di morti)
     items: list = field(default_factory=list)           # id degli oggetti (max 6)
     item_bonus: dict = field(default_factory=dict)       # {stat: valore} dagli oggetti
+    rec_items: list = field(default_factory=list)        # oggetti consigliati (JSON del Pokémon)
+    # Effetti unici degli oggetti (engine/item_effects.py)
+    item_cd: dict = field(default_factory=dict)          # {id oggetto: istante in cui torna pronto}
+    last_dealt_at: float = -1e9        # ultimo danno inflitto a un nemico (Bicicletta)
+    last_aa_at: float = -1e9           # ultimo attacco base (Rapidartigli)
+    aa_quick: bool = False             # attacco base istantaneo di Rapidartigli in corso
+    choice_key: tuple | None = None    # ultima mossa lanciata (slot, id) per gli oggetti Scelta
+    choice_at: float = -1e9
+    choice_boost: str = ""             # id della mossa potenziata da Scelta (+25%)
+    cast_seq: int = 0                  # contatore dei lanci (Assorbisfera: costo una volta a lancio)
+    orb_paid_seq: int = -1
+    metro: dict = field(default_factory=dict)            # Metronomo: {id bersaglio: (mossa, colpi, t)}
+    wp_until: float = -1.0             # Vulnerassicurazione attiva fino a qui
+    wp_active: bool = False            # aggiornato in _update_items (per eff_attack)
+    smoke_hidden: bool = False         # dentro la propria Palla Fumo (invisibile)
     # Buff Giudizio di Arceus (Fase 7)
     judgment_until: float = -1.0
     judgment_plate: str = ""
@@ -297,6 +312,8 @@ class Pokemon(Unit):
             atk *= 1.0 + 0.01 * self.inversion_stacks
         if self.memento_weak:
             atk *= 0.5   # Memento: Attacco dimezzato
+        if self.wp_active:
+            atk *= 1.25  # Vulnerassicurazione: +25% Attacco
         return atk
 
     def eff_sp_attack(self) -> float:
@@ -308,6 +325,8 @@ class Pokemon(Unit):
             ap *= 1.0 + 0.01 * self.inversion_stacks
         if self.memento_weak:
             ap *= 0.5    # Memento: Att. Sp. dimezzato
+        if self.wp_active:
+            ap *= 1.25   # Vulnerassicurazione: +25% Att. Sp.
         return ap
 
     def _soul(self) -> int:

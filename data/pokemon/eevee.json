@@ -4,6 +4,7 @@
   "name": "Eevee",
   "types": ["Normal"],
   "role": "combattente",
+  "recommended_items": ["weakness_policy", "choice_scarf", "black_sludge", "expert_belt"],
   "color": [190, 140, 90],
   "radius": 0.36,
   "base_speed": 3.6,

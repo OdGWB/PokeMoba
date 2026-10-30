@@ -462,7 +462,7 @@ class SpiritombMixin:
                     continue
                 w["touched"].add(e.id)
                 if e.team == w["team"]:
-                    self._apply_shield(e, w["shield"], w["buff"])
+                    self._give_shield(p, e, w["shield"], w["buff"])   # Creta Luce
                     self._apply_speed(e, w["speed"], w["buff"])
                     self.fx_events.append({"kind": "legionally", "c": (e.pos.x, e.pos.y),
                                            "mtype": "Ghost", "fx": "legionally"})

@@ -84,6 +84,7 @@ class PokemonDef:
     moves: dict = field(default_factory=dict)
     evolutions: list = field(default_factory=list)
     passive: str = ""
+    recommended_items: list = field(default_factory=list)   # consigliati nel negozio (e per i bot)
 
 
 def load_pokemon_def(path: str | Path) -> PokemonDef:
@@ -106,4 +107,5 @@ def load_pokemon_def(path: str | Path) -> PokemonDef:
         evolutions=list(data.get("evolutions", [])),
         passive=(data["passive"].get("id", "") if isinstance(data.get("passive"), dict)
                  else data.get("passive", "")),
+        recommended_items=list(data.get("recommended_items", [])),
     )

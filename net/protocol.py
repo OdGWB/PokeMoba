@@ -76,7 +76,8 @@ ACT_RANK = 4
 ACT_CHOOSE = 5
 ACT_BUY = 7
 ACT_SELL = 8
-ACTIONS = (ACT_RANK, ACT_CHOOSE, ACT_BUY, ACT_SELL)
+ACT_USE = 9             # attiva l'oggetto di uno slot (Mentalerba, Palla Fumo)
+ACTIONS = (ACT_RANK, ACT_CHOOSE, ACT_BUY, ACT_SELL, ACT_USE)
 
 # --- tipi di entità --------------------------------------------------------------
 K_POKEMON = 0
@@ -691,7 +692,7 @@ def enc_action(seq, kind, **f) -> bytes:
         w.u8(f["slot"]).u8(f["index"])
     elif kind == ACT_BUY:
         w.s(f["item_id"], 48)
-    elif kind == ACT_SELL:
+    elif kind in (ACT_SELL, ACT_USE):
         w.u8(f["slot"])
     else:
         raise ValueError(f"azione sconosciuta {kind}")
@@ -708,7 +709,7 @@ def dec_action(data) -> dict:
         out["slot"] = r.u8(); out["index"] = r.u8()
     elif k == ACT_BUY:
         out["item_id"] = r.s()
-    elif k == ACT_SELL:
+    elif k in (ACT_SELL, ACT_USE):
         out["slot"] = r.u8()
     else:
         raise ProtocolError(f"azione sconosciuta {k}")

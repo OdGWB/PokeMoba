@@ -497,6 +497,17 @@ Passaggi completati:
   scene; i gruppi usano GroupAnimator (animator.py): l'unita resta UNA (un solo HP/
   bersaglio), i compagni sono sprite cosmetici a offset fissi, disegnati ordinati
   per y. Screenshot: step_25_alto/basso, step_26_tangela/ragni/hoppip.
+- NEGOZIO a SCHEDE con ICONE (step_27), insieme al nuovo catalogo oggetti a 3
+  livelli (data/items.json; effetti in engine/item_effects.py). game/shop_ui.py:
+  schede Consigliati + categorie di items.json (Vitamine, Intermedi, Fisici,
+  Speciali, Ibridi, Combattenti, Tank, Supporto, Utilita') su due righe, griglia
+  a 3 colonne, dettagli (statistiche, ricetta, effetto) al passaggio del mouse,
+  ricarica degli attivabili sugli slot. ICONE da assets/items/<icon>.png
+  (tools/fetch_items.py, PokeAPI/sprites, (c) The Pokemon Company): ritagliate
+  al bordo trasparente e scalate x2 NEAREST, in cache per (id, dimensione); se
+  il file manca, segnaposto colorato con l'iniziale. Screenshot:
+  step_27_negozio/_combattenti/_tank_dettagli/_segnaposto (headless 1280x720)
+  e step_27_in_partita.
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

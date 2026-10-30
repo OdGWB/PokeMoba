@@ -75,5 +75,11 @@ class SellItemCommand(Command):
 
 
 @dataclass
+class UseItemCommand(Command):
+    """Attiva l'oggetto nello slot indicato (Mentalerba, Palla Fumo)."""
+    slot: int = 0
+
+
+@dataclass
 class RecallCommand(Command):
     """Avvia (o annulla) il richiamo verso la base."""

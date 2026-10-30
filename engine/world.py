@@ -51,7 +51,8 @@ class World:
                       base_stats: dict | None = None,
                       growth: dict | None = None, moves: dict | None = None,
                       evolutions: list | None = None, role: str = "",
-                      passive: str = "", attack_fx: str = "") -> Pokemon:
+                      passive: str = "", attack_fx: str = "",
+                      rec_items: list | None = None) -> Pokemon:
         # `growth` e `speed`/`attack_cooldown` dei parametri sono ignorati: ora
         # tutto si deriva dalle 6 stat base REALI (vedi engine/stats.derive).
         base = Stats.from_dict(base_stats or {})
@@ -72,7 +73,7 @@ class World:
                     moveset=build_moveset(moves or {}),
                     evolutions=list(evolutions or []),
                     move_speed_base=d.move_speed_tiles, role=role, passive_id=passive,
-                    attack_fx=attack_fx)
+                    attack_fx=attack_fx, rec_items=list(rec_items or []))
         self.add(p)
         return p
 

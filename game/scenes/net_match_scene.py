@@ -30,6 +30,8 @@ from ..sprites.spritesheet import load_pokemon_animations, make_wild_animator
 
 ROOT = Path(__file__).resolve().parents[2]
 ABILITY_KEYS = {pygame.K_q: 0, pygame.K_w: 1, pygame.K_e: 2, pygame.K_r: 3}
+ITEM_KEYS = {k: i for i, k in enumerate((pygame.K_1, pygame.K_2, pygame.K_3,
+                                         pygame.K_4, pygame.K_5, pygame.K_6))}
 PICK_RADIUS = 1.4
 
 
@@ -129,6 +131,8 @@ class NetMatchScene:
                     and self._pending() and self._near_base():
                 slot = self._pending()[0]
                 self.client.send_choose(slot, 0 if ev.key == pygame.K_1 else 1)
+            elif ev.type == pygame.KEYDOWN and ev.key in ITEM_KEYS:
+                self.client.send_use_item(ITEM_KEYS[ev.key])   # oggetto attivabile dello slot
             elif (self.minimap is not None and ev.type == pygame.MOUSEBUTTONDOWN
                   and self.minimap.contains(ev.pos)):
                 self._minimap_click(ev)
@@ -366,7 +370,8 @@ class NetMatchScene:
         if self.shop.open:
             near = me is not None and me.pos.dist(self.base) <= config.SHOP_RANGE
             self.shop.draw(surface, font, self.item_catalog, h.get("gold", 0),
-                           h.get("items", []), self.pdef.role, near)
+                           h.get("items", []), self.pdef.recommended_items or self.pdef.role,
+                           near)
 
     def _draw_choice_menu(self, surface, font):
         slot = ["Q", "W", "E", "R"][self._pending()[0]]

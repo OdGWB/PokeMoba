@@ -21,7 +21,7 @@ from engine.vec import Vec2
 from engine.eevee import CHOICE_SLOTS, chosen_index, eevee_candidates, eevee_forms
 from engine.world import World
 from sim.commands import (BuyItemCommand, ChooseUpgradeCommand, MoveCommand,
-                          RankMoveCommand, RecallCommand, SellItemCommand)
+                          RankMoveCommand, RecallCommand, SellItemCommand, UseItemCommand)
 from sim.simulation import Simulation
 
 from ..camera import Camera
@@ -37,6 +37,10 @@ from ..sprites.spritesheet import load_pokemon_animations, make_wild_animator
 
 ROOT = Path(__file__).resolve().parents[2]
 LANE_SLOTS = ["top", "mid", "bot"]
+# Tasti 1-6: oggetto attivabile dello slot corrispondente (1/2 scelgono il
+# potenziamento quando c'e' una scelta in sospeso in base).
+ITEM_KEYS = {k: i for i, k in enumerate((pygame.K_1, pygame.K_2, pygame.K_3,
+                                         pygame.K_4, pygame.K_5, pygame.K_6))}
 # Piccoli scostamenti per non far nascere i tre alleati esattamente sovrapposti.
 SLOT_OFFSET = {"top": Vec2(-1.2, 0.0), "mid": Vec2(0.0, 0.0), "bot": Vec2(0.0, 1.2)}
 DEATH_FADE = 1.5   # s: posa Hurt tenuta mentre l'unità si dissolve alla morte
@@ -150,7 +154,8 @@ class MatchScene:
                                      evolutions=pdef.evolutions, role=pdef.role,
                                      passive=pdef.passive,
                                      attack_range=pdef.attack_range,
-                                     attack_cooldown=pdef.attack_cooldown)
+                                     attack_cooldown=pdef.attack_cooldown,
+                                     rec_items=pdef.recommended_items)
         p.radius = pdef.radius
         self._unit_defs[p.id] = pdef
         return p
@@ -193,7 +198,8 @@ class MatchScene:
                                                evolutions=self.pdef.evolutions,
                                                role=self.pdef.role, passive=self.pdef.passive,
                                                attack_range=self.pdef.attack_range,
-                                               attack_cooldown=self.pdef.attack_cooldown)
+                                               attack_cooldown=self.pdef.attack_cooldown,
+                                               rec_items=self.pdef.recommended_items)
         self.player.radius = self.pdef.radius
         self._unit_defs[self.player.id] = self.pdef
         self.sim = Simulation(self.world, config.TICK_DT)
@@ -281,6 +287,13 @@ class MatchScene:
                 self.sim.queue_command(ChooseUpgradeCommand(
                     seq=10_000 + self._menu_seq, entity_id=self.player.id,
                     slot=slot, index=idx))
+            elif (ev.type == pygame.KEYDOWN and ev.key in ITEM_KEYS
+                  and self.match is not None):
+                # Tasti 1-6: attiva l'oggetto dello slot (Mentalerba, Palla Fumo).
+                self._menu_seq += 1
+                self.sim.queue_command(UseItemCommand(seq=60_000 + self._menu_seq,
+                                                      entity_id=self.player.id,
+                                                      slot=ITEM_KEYS[ev.key]))
             elif (ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1
                   and self._skillbar_click(ev.pos)):
                 pass   # clic consumato dalla barra abilità (grado o scelta)
@@ -881,7 +894,7 @@ class MatchScene:
         if self.shop.open and self.match is not None:
             near = p.pos.dist(p.spawn_pos) <= config.SHOP_RANGE
             self.shop.draw(surface, font, self.match.item_catalog, p.gold, p.items,
-                           self.pdef.role, near)
+                           p.rec_items or self.pdef.role, near, p.item_cd, self.match.time)
 
     def _draw_slot_choice(self, surface, font, sl, ms, bx, y0, bw, near_base) -> None:
         """Piccola scelta del potenziamento sopra lo slot (al posto del pop-up)."""

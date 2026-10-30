@@ -27,6 +27,7 @@ from .jungle import JungleSystem
 from .pathfinding import find_path, smooth_path
 from .spatial import SpatialHash
 from .eevee import EEVEE_PASSIVES, EeveeMixin
+from .item_effects import ItemEffectsMixin, cdr_to_haste
 from .spiritomb import PASSIVE_ID as SPIRITOMB_PASSIVE, SpiritombMixin
 from .stats import (CRIT_MULT, HIGH_CRIT_CHANCE, STAB_MULT, Stats,
                     ability_haste_factor, combine_tenacity as stat_combine_ten,
@@ -108,7 +109,7 @@ _SYNC_STATUSES = ("slow", "stun", "freeze", "confuse", "silence", "root", "sleep
                   "spdef_debuff", "blind")
 
 
-class Match(SpiritombMixin, EeveeMixin):
+class Match(SpiritombMixin, EeveeMixin, ItemEffectsMixin):
     def __init__(self, world, map_data):
         self.world = world
         self.map = map_data
@@ -137,6 +138,7 @@ class Match(SpiritombMixin, EeveeMixin):
         self.rock_charges: list[dict] = []
         self.avalanches: list[dict] = []
         self.smackdown_zones: list[dict] = []
+        self.item_clouds: list[dict] = []   # nubi della Palla Fumo (oggetto attivabile)
         self._init_spiritomb()   # Spiritomb: spiriti, Stordiraggio, Malcomune, Legione
         self._init_eevee()       # linea Eevee: Desiderio, Comete, ultimate delle forme
         self.vision = VisionSystem(self.world.grid)
@@ -200,6 +202,7 @@ class Match(SpiritombMixin, EeveeMixin):
         self._update_decoys(dt)        # Doppioteam: scadenza dei cloni esca
         self._update_combat(dt)      # attacchi base
         self._update_status(dt)      # scadenza stati + velocità effettiva + ricariche
+        self._update_items(dt)       # oggetti: rigen, Bicicletta, Palla Fumo (dopo la velocità)
         self._update_sandstorms(dt)  # Sabbiafiume: tempesta di sabbia attorno a Gigalith
         self.world.tick(dt)          # movimento + collisioni
         self._update_tosses(dt)      # Ribaltiro: arco del nemico lanciato (dopo le collisioni)
@@ -728,9 +731,12 @@ class Match(SpiritombMixin, EeveeMixin):
                                    "b": (target.pos.x, target.pos.y),
                                    "team": attacker.team,
                                    "big": attacker.minion_type == "cannon"})
+        if self._item_dodge(attacker, target):   # Luminpolvere
+            return
         dmg = self._basic_damage(attacker, target)
         self._deal_damage(attacker, target, dmg)
         self._vamp(attacker, dmg, physical=True)
+        self._item_after_aa(attacker, target)
 
     def _pokemon_auto_attack(self, u) -> None:
         """Auto-attacco con windup/recovery (stile LoL). Il danno è garantito solo
@@ -751,14 +757,17 @@ class Match(SpiritombMixin, EeveeMixin):
                     # Turbosabbia: l'attacco base va a vuoto.
                     self.fx_events.append({"kind": "miss", "c": (tgt.pos.x, tgt.pos.y),
                                            "mtype": "Ground", "fx": "miss"})
+                elif self._within_attack(u, tgt) and self._item_dodge(u, tgt):
+                    pass   # Luminpolvere: schivato
                 elif self._within_attack(u, tgt):
-                    dmg = self._basic_damage(u, tgt)
+                    dmg = self._basic_damage(u, tgt) * self._item_aa_mult(u, tgt)
                     if u.aa_stealth:       # Distacco: primo colpo furtivo potenziato
                         dmg *= config.DISTACCO_BONUS_MULT
                         u.stealth_shot_ready = False
                         u.reveal_block_until = self.time + config.DISTACCO_REVEAL_BLOCK
                     self._deal_damage(u, tgt, dmg)
                     self._vamp(u, dmg, physical=True)
+                    self._item_after_aa(u, tgt)   # Fangopece / Bitorzolelmo
                     self._spirit_wander(u, tgt)   # Spirito Vagante (Spiritomb)
                     self._cute_charm(u, tgt)      # Incantevole (Sylveon)
                     mt = u.types[0] if u.types else "Normal"
@@ -767,6 +776,8 @@ class Match(SpiritombMixin, EeveeMixin):
                                            "melee": u.attack_range <= 2.2,
                                            "fx": u.attack_fx})
                 u.aa_active = False
+                u.last_aa_at = self.time
+                u.aa_quick = False
             return
         # Nuovo attacco: servono bersaglio a tiro, cooldown pronto e stare fermi.
         if t is None or not getattr(t, "alive", False) or not self._within_attack(u, t):
@@ -783,7 +794,7 @@ class Match(SpiritombMixin, EeveeMixin):
             cd *= 0.5   # Oltraggio: attacca più in fretta
         u.aa_active = True
         u.aa_target_id = t.id
-        u.aa_until = self.time + cd * AA_WINDUP_FRAC
+        u.aa_until = self.time + cd * AA_WINDUP_FRAC * self._item_aa_windup(u)
         u.attack_timer = cd            # il cooldown parte dall'inizio dell'attacco
         self._face(u, t)
         self.fx_events.append({"eid": u.id, "anim": "Attack"})   # avvia l'anim
@@ -863,7 +874,7 @@ class Match(SpiritombMixin, EeveeMixin):
             return
         frac = caster.omnivamp + (caster.lifesteal if physical else 0.0)
         if frac > 0.0:
-            caster.hp = min(caster.max_hp, caster.hp + dmg * frac)
+            caster.hp = min(caster.max_hp, caster.hp + dmg * frac * self._heal_in_mult(caster))
 
     @staticmethod
     def _tower_ramp(tower, target) -> float:
@@ -924,6 +935,8 @@ class Match(SpiritombMixin, EeveeMixin):
         target.hp -= amount
         if isinstance(target, Pokemon) and target.endure_until > self.time:
             target.hp = max(1.0, target.hp)   # Resistenza: non scende sotto 1 HP
+        if amount > 0.0:
+            self._item_on_damaged(attacker, target, amount)   # Focalnastro, Cartelrossa...
         target.last_attacker_id = attacker.id
         target.last_damaged_at = self.time
         # Il sonno si rompe al primo danno subito.
@@ -1194,6 +1207,8 @@ class Match(SpiritombMixin, EeveeMixin):
         """
         old_max = p.max_hp
         old_hp = p.hp
+        # Bonus degli oggetti ricalcolati qui: l'Evolcondensa si spegne alla forma finale.
+        p.item_bonus = self._item_bonus_for(p)
         d = derive(p.base_stats, p.level, ranged=p.ranged)
         # M (moltiplicatore d'evoluzione, punto 8) si applica a HP, AD, armatura,
         # RM, mana e rigenerazione; NON a MS/AS, gittata, AP e moltiplicatore
@@ -1209,7 +1224,8 @@ class Match(SpiritombMixin, EeveeMixin):
                     + p.spirit_bonus.get(k, 0.0))
 
         # Velocita' (con eventuali extra MS/AS dagli oggetti; non toccati da M).
-        p.move_speed_base = d.move_speed_tiles + _b("move_speed")
+        p.move_speed_base = (d.move_speed_tiles * max(0.1, 1.0 + _b("move_speed_pct"))
+                             + _b("move_speed"))
         as_total = min(2.5, d.attack_speed * (1.0 + _b("attack_speed")))
         p.attack_speed = as_total
         p.attack_cooldown = 1.0 / as_total if as_total > 0 else 1.0
@@ -1225,7 +1241,7 @@ class Match(SpiritombMixin, EeveeMixin):
         p.magic_pen_flat = max(0.0, _b("magic_pen_flat"))
         p.lifesteal = max(0.0, _b("lifesteal"))
         p.omnivamp = max(0.0, _b("omnivamp"))
-        p.ability_haste = max(0.0, _b("ability_haste"))
+        p.ability_haste = max(0.0, _b("ability_haste")) + cdr_to_haste(_b("cdr"))
         # Identita' innate (non dagli oggetti), con extra sommati dagli oggetti.
         p.tenacity = stat_combine_ten(d.tenacity, _b("tenacity"))
         p.hp_regen5 = d.hp_regen5
@@ -1287,6 +1303,7 @@ class Match(SpiritombMixin, EeveeMixin):
             # minion danno 0 (killer non è un Pokémon).
             if isinstance(killer, Pokemon):
                 killer.gold += self._minion_gold(victim)
+                self._exp_share(victim, killer)   # Condividi Esp. degli alleati vicini
         elif isinstance(victim, Pokemon):
             self._award_kill(victim, killer)
         elif isinstance(victim, Structure):
@@ -1449,6 +1466,11 @@ class Match(SpiritombMixin, EeveeMixin):
         price = self.item_catalog.effective_price(item_id, unit.items)
         if unit.gold < price:
             return False
+        # Al massimo un oggetto Scelta e un paio di scarpe; un Condividi Esp. per squadra.
+        if not self.item_catalog.group_ok(item_id, unit.items):
+            return False
+        if it.group == "exp_share" and self._team_has_item(unit.team, item_id):
+            return False
         consumed = self.item_catalog.components_in(item_id, unit.items)
         if len(unit.items) - len(consumed) + 1 > ITEM_SLOTS:
             return False
@@ -1472,8 +1494,7 @@ class Match(SpiritombMixin, EeveeMixin):
         return True
 
     def _apply_items(self, unit) -> None:
-        unit.item_bonus = self.item_catalog.total_bonus(unit.items)
-        self._recompute_stats(unit, preserve_ratio=True)
+        self._recompute_stats(unit, preserve_ratio=True)   # ricalcola anche item_bonus
 
     def _update_bot_shop(self, dt: float) -> None:
         """I bot comprano oggetti quando tornano in base con abbastanza oro."""
@@ -1489,23 +1510,42 @@ class Match(SpiritombMixin, EeveeMixin):
                 self._bot_buy(p)
 
     def _bot_buy(self, p) -> None:
+        """Compra il prossimo pezzo dell'albero dei consigliati: l'oggetto se basta
+        l'oro, altrimenti il primo componente (anche annidato) che si può pagare."""
         cat = self.item_catalog
-        for target in cat.recommended_for(p.role):
-            if target in p.items or cat.get(target) is None:
+
+        def can_buy(iid):
+            it = cat.get(iid)
+            if it is None or not cat.group_ok(iid, p.items):
+                return False
+            if it.group == "exp_share" and self._team_has_item(p.team, iid):
+                return False
+            slots_after = len(p.items) - len(cat.components_in(iid, p.items)) + 1
+            return p.gold >= cat.effective_price(iid, p.items) and slots_after <= ITEM_SLOTS
+
+        def pick(iid, need=1):
+            if p.items.count(iid) >= need:
+                return None
+            if can_buy(iid):
+                return iid
+            comps = cat.get(iid).build_from
+            for comp in dict.fromkeys(comps):
+                got = pick(comp, comps.count(comp))
+                if got is not None:
+                    return got
+            return None
+
+        for target in (p.rec_items or cat.recommended_for(p.role)):
+            it = cat.get(target)
+            if it is None or target in p.items:
                 continue
-            price = cat.effective_price(target, p.items)
-            slots_after = len(p.items) - len(cat.components_in(target, p.items)) + 1
-            if p.gold >= price and slots_after <= ITEM_SLOTS:
-                self.shop_buy(p, target)
-                return
-            # Altrimenti compra un componente mancante, se può permetterselo.
-            for comp in cat.get(target).build_from:
-                if comp not in p.items and len(p.items) < ITEM_SLOTS:
-                    cd = cat.get(comp)
-                    if cd is not None and p.gold >= cd.price:
-                        self.shop_buy(p, comp)
-                        return
-            return  # non può avanzare su questo oggetto ora
+            if not cat.group_ok(target, p.items) or (
+                    it.group == "exp_share" and self._team_has_item(p.team, target)):
+                continue   # regola "al massimo uno": passa al consigliato dopo
+            got = pick(target)
+            if got is not None:
+                self.shop_buy(p, got)
+            return  # un passo alla volta sull'oggetto corrente
 
     # --- rigenerazione -------------------------------------------------------
     def _update_regen(self, dt: float) -> None:
@@ -1559,6 +1599,7 @@ class Match(SpiritombMixin, EeveeMixin):
         ms.cooldown_remaining = mv.cooldown_at(rank) * ability_haste_factor(p.ability_haste)
         if p.spite_until > self.time:   # Dispetto: ricariche allungate
             ms.cooldown_remaining *= p.spite_mult
+        mv = self._item_on_cast(p, mv, slot)   # Scelta, Assorbisfera, Grandelente (+portata)
         origin = Vec2(p.pos.x, p.pos.y)
         tgt = Vec2(tx, ty)
         to = tgt - origin
@@ -2122,12 +2163,13 @@ class Match(SpiritombMixin, EeveeMixin):
         anche uno scudo pari al 30% della cura effettiva."""
         if amount <= 0.0 or not getattr(target, "alive", False):
             return
+        amount *= self._heal_out_mult(caster) * self._heal_in_mult(target)   # Calmanella / Granradice
         before = target.hp
         target.hp = min(target.max_hp, target.hp + amount)
         healed = target.hp - before
         if (healed > 0.0 and isinstance(caster, Pokemon) and target is not caster
                 and "king_rock" in caster.items):
-            self._apply_shield(target, healed * KINGROCK_SHIELD_FRAC, KINGROCK_SHIELD_DUR)
+            self._give_shield(caster, target, healed * KINGROCK_SHIELD_FRAC, KINGROCK_SHIELD_DUR)
 
     def _apply_silence(self, p, dur):   # Ripeti: solo autoattacchi, niente mosse
         if self._cc_immune(p):
@@ -2289,6 +2331,8 @@ class Match(SpiritombMixin, EeveeMixin):
     def _auto_reach(self, u) -> float:
         """Gittata dell'auto-attacco (passiva Distacco: molto più larga se nascosti)."""
         r = u.attack_range
+        if isinstance(u, Pokemon) and "zoom_lens" in u.items:
+            r *= 1.15   # Zoomlente: +15% portata degli attacchi base
         if isinstance(u, Pokemon) and u.passive_id == "distacco" and self._is_hidden(u):
             r += config.DISTACCO_RANGE_BONUS
         return r
@@ -3237,6 +3281,7 @@ class Match(SpiritombMixin, EeveeMixin):
             if "execute" in fx and getattr(target, "max_hp", 0) > 0:
                 raw *= 1.0 + float(fx["execute"]) * (1.0 - target.hp / target.max_hp)
             raw *= mult
+            raw *= self._item_move_mult(caster, mv, target, eff)   # Scelta, Metronomo, ...
             crit_bonus = HIGH_CRIT_CHANCE if mv.d.get("high_crit") else 0.0
             # Finta: ignora gli scudi e le protezioni (difesa potenziata a tempo).
             guard = bool(fx.get("pierce_guard"))
@@ -3244,6 +3289,7 @@ class Match(SpiritombMixin, EeveeMixin):
                                      crit_bonus=crit_bonus, pierce_guard=guard)
             self._deal_damage(caster, target, dmg, dmg_type=mv.type, ignore_shield=guard)
             self._vamp(caster, dmg, physical=not magic)
+            self._item_after_move_hit(caster, mv, target, eff)   # Assorbisfera, Vulnerassicurazione
             if "heal_self_ratio" in fx and isinstance(caster, Pokemon):  # Mangiasogni
                 caster.hp = min(caster.max_hp, caster.hp + dmg * float(fx["heal_self_ratio"]))
             if "recoil" in fx and isinstance(caster, Pokemon) and caster.alive:
@@ -3366,26 +3412,31 @@ class Match(SpiritombMixin, EeveeMixin):
             for a in targets:
                 self._give_heal(caster, a, amt)   # + scudo Roccia di Re sugli alleati
         if "heal_self_ratio" in eff:
-            caster.hp = min(caster.max_hp,
-                            caster.hp + mv.power_at(rank) * float(eff["heal_self_ratio"]) * hp_power)
+            self._give_heal(caster, caster,
+                            mv.power_at(rank) * float(eff["heal_self_ratio"]) * hp_power)
         sh = eff.get("shield")
         if sh:
             amt = self._rank_val(sh.get("amount", []), rank) * hp_power
             dur = float(sh.get("duration", 3.0))
             for a in targets:
-                self._apply_shield(a, amt, dur)
+                self._give_shield(caster, a, amt, dur)   # Creta Luce
+        # Corpetto Assalto: le mosse di potenziamento statistiche (con bonus
+        # passivo) non danno il potenziamento attivo a chi lo indossa.
+        vest = (mv.passive is not None and isinstance(caster, Pokemon)
+                and "assault_vest" in caster.items)
+        boosted = [a for a in targets if not (vest and a is caster)]
         atk = eff.get("atk")
-        if atk:
+        if atk and not vest:
             self._apply_atk(caster, float(atk.get("mult", 1.3)), float(atk.get("duration", 5.0)))
         spd = eff.get("speed")
         if spd:
-            for a in targets:
+            for a in boosted:
                 self._apply_speed(a, float(spd.get("mult", 1.2)), float(spd.get("duration", 3.0)))
         dfb = eff.get("def")   # Indurimento / Ferroscudo: difesa temporanea
         if dfb:
             m = dfb.get("mult", 1.2)
             m = self._rank_val(m, rank) if isinstance(m, list) else float(m)   # per grado
-            for a in targets:
+            for a in boosted:
                 self._apply_def_buff(a, m, float(dfb.get("duration", 4.0)))
         ram = eff.get("rampage")
         if ram:   # Oltraggio: inarrestabile per qualche secondo
@@ -3478,6 +3529,8 @@ class Match(SpiritombMixin, EeveeMixin):
             return
         if self._cc_immune(p) or p.untargetable_until > self.time:
             return
+        if "iron_ball" in p.items:
+            dur *= 0.4   # Ferropalla: lanci in aria subiti -60%
         now = self.time
         end = now + dur
         if p.airborne_until > now and end <= p.airborne_until:

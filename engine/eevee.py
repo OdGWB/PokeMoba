@@ -315,7 +315,7 @@ class EeveeMixin:
     # --- R Umbreon: Lucelunare ------------------------------------------------
     def _cast_moonlight(self, p, mv, rank, origin, tgt, dirv):
         frac = self._rank_val(mv.effects.get("missing_frac", [0.4]), rank)
-        p.hp = min(p.max_hp, p.hp + (p.max_hp - p.hp) * frac * p.heal_power)
+        self._give_heal(p, p, (p.max_hp - p.hp) * frac * p.heal_power)
         self._cleanse(p)
         self.fx_events.append({"kind": "buff", "c": (p.pos.x, p.pos.y), "radius": 1.6,
                                "mtype": mv.type, "fx": "moonlight"})

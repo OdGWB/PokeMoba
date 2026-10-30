@@ -271,6 +271,7 @@ class ClientSession:
     def send_choose(self, slot, index): self._act(P.ACT_CHOOSE, slot=slot, index=index)
     def send_buy(self, item_id): self._act(P.ACT_BUY, item_id=item_id)
     def send_sell(self, slot): self._act(P.ACT_SELL, slot=slot)
+    def send_use_item(self, slot): self._act(P.ACT_USE, slot=slot)
 
     def close(self) -> None:
         try:

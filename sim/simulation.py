@@ -14,7 +14,8 @@ from engine import evolution, skills
 
 from .commands import (AttackCommand, AttackMoveCommand, BuyItemCommand,
                        ChooseUpgradeCommand, Command, CastMoveCommand, MoveCommand,
-                       RankMoveCommand, RecallCommand, SellItemCommand, StopCommand)
+                       RankMoveCommand, RecallCommand, SellItemCommand, StopCommand,
+                       UseItemCommand)
 
 
 class Simulation:
@@ -73,6 +74,9 @@ class Simulation:
         elif isinstance(cmd, SellItemCommand):
             if self.match is not None:
                 self.match.shop_sell(unit, cmd.slot)
+        elif isinstance(cmd, UseItemCommand):
+            if self.match is not None:
+                self.match.use_item(unit, cmd.slot)
         elif isinstance(cmd, RecallCommand):
             # Avvia o annulla il richiamo verso la base.
             if self.match is not None and hasattr(unit, "recalling"):

@@ -111,17 +111,24 @@ Pokémon e i relativi nomi, personaggi e tipi sono © Nintendo / Game Freak /
 The Pokémon Company. Questo è un progetto amatoriale, senza scopo di lucro e
 non ufficiale, non affiliato né approvato dai detentori dei diritti.
 
-## Icone degli oggetti — PokeAPI
+## Icone degli oggetti
 
-Le icone degli oggetti (quando presenti in `assets/items/`) provengono dagli
-sprite del progetto **PokeAPI**.
+Le icone degli oggetti del negozio sono gli **sprite originali degli strumenti
+dei giochi Pokémon**: © **The Pokémon Company** (Nintendo / Game Freak /
+Creatures). Sono raccolte e pubblicate dal progetto **PokeAPI**, da cui le
+scarichiamo.
 
-- Progetto: PokeAPI — https://pokeapi.co/
-- Sprite: https://github.com/PokeAPI/sprites (cartella `sprites/items`)
-- Licenza degli sprite: vedi il repository PokeAPI/sprites.
+- Raccolta: PokeAPI/sprites — https://github.com/PokeAPI/sprites (cartella
+  `sprites/items`). Il repository dichiara: "All image contents within are
+  Copyright The Pokémon Company" e distribuisce la raccolta sotto CC0 1.0
+  Universal (la licenza copre il lavoro di raccolta, non i diritti sulle
+  immagini, che restano di The Pokémon Company).
+- Progetto PokeAPI: https://pokeapi.co/
 
-> Nota: le icone non sono incluse nel repository; vanno scaricate e messe in
-> `assets/items/<id>.png`. In assenza, il negozio usa segnaposto colorati.
+Le icone si scaricano con `python tools/fetch_items.py` in
+`assets/items/<nome>.png` (il nome del file è nel campo `icon` di
+`data/items.json`). Quelle mancanti nel negozio diventano un segnaposto
+colorato con l'iniziale dell'oggetto.
 
 ## Software
 

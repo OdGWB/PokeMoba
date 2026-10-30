@@ -4,6 +4,7 @@
   "name": "Nincada",
   "types": ["Bug", "Ground"],
   "role": "assassino",
+  "recommended_items": ["choice_band", "quick_claw", "zoom_lens", "black_sludge"],
   "color": [150, 160, 120],
   "radius": 0.38,
   "base_speed": 3.6,

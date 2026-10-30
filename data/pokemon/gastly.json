@@ -4,6 +4,7 @@
   "name": "Gastly",
   "types": ["Ghost", "Poison"],
   "role": "mago",
+  "recommended_items": ["choice_specs", "metronome", "life_orb", "big_root"],
   "color": [150, 100, 205],
   "radius": 0.42,
   "base_speed": 3.8,

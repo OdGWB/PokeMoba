@@ -3,6 +3,7 @@
   "name": "Squirtle",
   "types": ["Water"],
   "role": "tank",
+  "recommended_items": ["assault_vest", "leftovers", "red_card", "bright_powder"],
   "color": [100, 160, 220],
   "radius": 0.44,
   "base_speed": 3.5,
