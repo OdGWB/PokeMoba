@@ -6,6 +6,8 @@ IA, combattimento, vittoria) stanno in engine/match.py, che opera sul World.
 """
 from __future__ import annotations
 
+import config
+
 from . import movement
 from .entities import Core, Entity, Minion, Pokemon, Structure, Unit, Wild
 from .grid import Grid
@@ -156,3 +158,10 @@ class World:
         for u in movers:
             movement.advance_unit(u, dt, self.grid)
         movement.resolve_collisions(movers, self.grid, spatial=self.spatial)
+        # Le torri vive sono ostacoli fisici: chi ci finisce dentro (passo,
+        # spinta, scatto) viene spinto fuori lungo il bordo.
+        towers = [(s.pos.x, s.pos.y, config.TOWER_BLOCK_RADIUS)
+                  for s in self.entities.values()
+                  if isinstance(s, Structure) and s.kind == "tower" and s.alive]
+        if towers:
+            movement.resolve_obstacles(movers, towers, self.grid)

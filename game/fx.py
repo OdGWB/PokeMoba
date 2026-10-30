@@ -19,6 +19,7 @@ import pygame
 import config
 
 from . import eevee_fx
+from . import structure_gfx
 
 # Colore per tipo (per le particelle).
 TYPE_COLORS = {
@@ -294,8 +295,10 @@ class FXSystem:
         ax, ay, bx, by = seg
         col = MINION_SHOT_COLORS.get(e.get("team", 0), (230, 230, 230))
         big = e.get("big", False)
-        self._shape(kind="shot", a=(ax, ay), b=(bx, by), col=col,
-                    life=0.26, sz=0.26 if big else 0.18, glow=0.0)
+        life = 0.26
+        self._shape(kind="energy", a=(ax, ay), b=(bx, by), col=col, life=life,
+                    sz=0.2 if big else 0.15, lift_a=0.45, lift_b=0.45, trail=4)
+        self._impact((bx, by - 0.45), col, 0.35 if big else 0.25, life)
 
     def _tower_shot(self, e) -> None:
         """Sfera d'energia della torre (stile LoL): proiettile OPACO molto piu
@@ -305,8 +308,17 @@ class FXSystem:
             return
         ax, ay, bx, by = seg
         col = TOWER_SHOT_COLORS.get(e.get("team", 0), (230, 230, 230))
-        self._shape(kind="shot", a=(ax, ay), b=(bx, by), col=col,
-                    life=0.36, sz=0.8, glow=0.7)
+        life = 0.36
+        # parte dalla GEMMA in cima alla torre e colpisce il bersaglio al busto
+        self._shape(kind="energy", a=(ax, ay), b=(bx, by), col=col, life=life,
+                    sz=0.3, lift_a=structure_gfx.gem_height_tiles(), lift_b=0.45, trail=7)
+        self._impact((bx, by - 0.45), col, 0.7, life)
+
+    def _impact(self, c, col, r, wait) -> None:
+        """Lampo + anello d'impatto, che compaiono quando il colpo arriva."""
+        self._shape(kind="flash", c=c, r=r, col=col, life=0.16, wait=wait)
+        self._shape(kind="ring", c=c, r0=r * 0.3, r1=r * 1.4, col=col, life=0.2,
+                    wd=0.07, wait=wait)
 
     # --- libreria stili d'attacco (ricolorabili) ----------------------------
     # Ogni stile è un metodo (self, evento, colore) che traduce un evento della
@@ -1119,6 +1131,63 @@ class FXSystem:
                 hr = max(1, r // 2)
                 pygame.draw.circle(overlay, (*_lighten(col, 0.6), aa),
                                    (cx - r // 3, cy - r // 3), hr)
+            elif kind == "energy":
+                # Proiettile d'ENERGIA (minion/torre): testa luminosa a 3 strati
+                # (alone, corpo, nucleo quasi bianco) che tremola, coda a cometa
+                # e una scia di bolle che si spengono. Vola da A (sollevato di
+                # lift_a tile, es. la gemma della torre) a B (lift_b, il busto).
+                t = 1 - f
+                la, lb = s.get("lift_a", 0.0), s.get("lift_b", 0.0)
+                ax, ay = s["a"]
+                bx, by = s["b"]
+
+                def at(tt):
+                    return S(ax + (bx - ax) * tt, ay - la + (by - lb - ay + la) * tt)
+
+                cx, cy = at(t)
+                r = max(2, int(s.get("sz", 0.2) * ts))
+                lite = _lighten(col, 0.5)
+                core = _lighten(col, 0.85)
+                ex, ey = bx - ax, (by - lb) - (ay - la)
+                n = math.hypot(ex, ey) or 1.0
+                ux, uy = ex / n, ey / n
+                # scia: bolle che rimpiccioliscono e sbiadiscono all'indietro
+                trail = s.get("trail", 4)
+                for i in range(trail, 0, -1):
+                    tt = t - i * 0.045
+                    if tt <= 0:
+                        continue
+                    px_, py_ = at(tt)
+                    k_ = 1 - i / (trail + 1)
+                    pygame.draw.circle(overlay, (*col, int(150 * k_)), (px_, py_),
+                                       max(1, int(r * 0.75 * k_)))
+                # alone che tremola
+                fl = 1.0 + 0.12 * math.sin(s["life"] * 90.0)
+                pygame.draw.circle(overlay, (*col, 70), (cx, cy), int(r * 2.0 * fl))
+                pygame.draw.circle(overlay, (*col, 120), (cx, cy), int(r * 1.45 * fl))
+                # coda a cometa dietro la testa
+                pxu, pyu = -uy, ux
+                tail = [(cx + pxu * r * 0.9, cy + pyu * r * 0.9),
+                        (cx - ux * r * 3.2, cy - uy * r * 3.2),
+                        (cx - pxu * r * 0.9, cy - pyu * r * 0.9)]
+                pygame.draw.polygon(overlay, (*col, 210), tail)
+                pygame.draw.circle(overlay, (*col, 255), (cx, cy), r)
+                pygame.draw.circle(overlay, (*lite, 255), (cx, cy), max(1, int(r * 0.7)))
+                pygame.draw.circle(overlay, (*core, 255),
+                                   (cx - max(0, r // 5), cy - max(0, r // 5)),
+                                   max(1, int(r * 0.38)))
+                # due scintille che girano attorno alla testa
+                for j in (0, math.pi):
+                    sa_ = s["life"] * 40.0 + j
+                    overlay.fill((*core, 230), pygame.Rect(
+                        cx + int(math.cos(sa_) * r * 1.5), cy + int(math.sin(sa_) * r * 1.5), 1, 1))
+            elif kind == "flash":
+                # lampo d'impatto: disco chiaro che si allarga e svanisce
+                cx, cy = S(*s["c"])
+                rr = max(2, int(s["r"] * ts * (1.0 + 0.6 * (1 - f))))
+                pygame.draw.circle(overlay, (*col, int(110 * f)), (cx, cy), rr)
+                pygame.draw.circle(overlay, (*_lighten(col, 0.6), int(170 * f)), (cx, cy),
+                                   max(1, rr // 2))
             elif kind == "target":
                 # Cerchio-bersaglio telegrafato (Bolla): disco traslucido + anello
                 # esterno fisso + anello interno che si chiude verso l'impatto.

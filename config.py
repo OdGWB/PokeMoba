@@ -162,6 +162,8 @@ TOWER_DAMAGE = 110
 UNITS_PER_TILE = 125
 TOWER_RANGE_UNITS = 750
 TOWER_RANGE = TOWER_RANGE_UNITS / UNITS_PER_TILE   # = 6.0 tile
+# Ingombro fisico della torre (tile): le unità non attraversano lo sprite.
+TOWER_BLOCK_RADIUS = 0.85
 CORE_HP = 9500
 # I minion grattano le strutture (pressione lenta) ma cresce col tempo.
 STRUCT_MINION_DMG_MULT = 0.5

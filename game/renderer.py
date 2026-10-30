@@ -17,6 +17,7 @@ from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
                          TILE_PUDDLE, TILE_RIVER, TILE_WALL)
 from . import spirit_fx
 from . import eevee_fx
+from . import structure_gfx
 from .fx import EMBER, ROCK_HI, ROCK_MID, ROCK_OUT, ROCK_SH, type_color
 from .map_renderer import MapRenderer
 
@@ -743,8 +744,19 @@ class Renderer:
 
         drawables = []
         for s in world.structures():
-            if s.alive and x0 - 2 <= s.pos.x <= x1 + 2 and y0 - 2 <= s.pos.y <= y1 + 2:
-                drawables.append(s)
+            if not (x0 - 4 <= s.pos.x <= x1 + 4 and y0 - 4 <= s.pos.y <= y1 + 6):
+                continue
+            if isinstance(s, Core):
+                # La base e' una piattaforma PIATTA: si disegna prima di tutto,
+                # cosi' chi ci sta sopra (respawn, negozio) resta visibile.
+                gx, gy = camera.world_to_screen(s.pos.x * ts, s.pos.y * ts)
+                structure_gfx.draw_base(surface, s, gx, gy, now, ts)
+                if s.alive and config.SHOW_HP_BARS and s.hp < s.max_hp:
+                    r = structure_gfx.base_radius_px(ts)
+                    self._hp_bar(surface, gx, gy - r - 6, s.hp / s.max_hp,
+                                 config.TEAM_COLORS.get(s.team, (200, 200, 200)), width=r)
+            else:
+                drawables.append(s)   # torri (anche distrutte: macerie)
         for u in world.alive_units():
             if not (x0 - 2 <= u.pos.x <= x1 + 2 and y0 - 2 <= u.pos.y <= y1 + 2):
                 continue
@@ -764,7 +776,7 @@ class Renderer:
             if isinstance(e, Pillar):
                 self._draw_pillar(surface, e, gx, gy, now)
             elif isinstance(e, Structure):
-                self._draw_structure(surface, e, gx, gy)
+                self._draw_structure(surface, e, gx, gy, now)
             else:
                 if e.id == selected_id:
                     r = int(e.radius * ts)
@@ -929,26 +941,14 @@ class Renderer:
             pygame.draw.ellipse(glow, (*EMBER, a), pygame.Rect(3, H // 4, W - 6, H // 2))
             surface.blit(glow, (gx - W // 2 + shake, foot - H))
 
-    def _draw_structure(self, surface, s, gx, gy):
+    def _draw_structure(self, surface, s, gx, gy, now):
+        """Torre 2.5D di pietra con la gemma di squadra (game/structure_gfx.py)."""
         ts = self.tile_size
-        col = getattr(s, "color", (180, 180, 180))
-        r = int(s.radius * ts)
-        if isinstance(s, Core):
-            pygame.draw.rect(surface, col, pygame.Rect(gx - r, gy - r, r * 2, r * 2),
-                             border_radius=4)
-            pygame.draw.rect(surface, (255, 255, 255),
-                             pygame.Rect(gx - r, gy - r, r * 2, r * 2), 1, border_radius=4)
-        else:
-            # Torre: base + fusto.
-            pygame.draw.rect(surface, (40, 40, 46),
-                             pygame.Rect(gx - r, gy - r // 2, r * 2, r))
-            pygame.draw.rect(surface, col,
-                             pygame.Rect(gx - r + 2, gy - r * 2, r * 2 - 4, int(r * 1.8)))
-            pygame.draw.rect(surface, (255, 255, 255),
-                             pygame.Rect(gx - r + 2, gy - r * 2, r * 2 - 4, int(r * 1.8)), 1)
-        if config.SHOW_HP_BARS and s.hp < s.max_hp:
-            self._hp_bar(surface, gx, gy - int(s.radius * ts) - 6,
-                         s.hp / s.max_hp, col, width=r * 2)
+        structure_gfx.draw_tower(surface, s, gx, gy, now, ts)
+        if s.alive and config.SHOW_HP_BARS and s.hp < s.max_hp:
+            col = config.TEAM_COLORS.get(s.team, (200, 200, 200))
+            self._hp_bar(surface, gx, structure_gfx.tower_top_y(ts, gy),
+                         s.hp / s.max_hp, col, width=int(1.6 * ts))
 
     def _draw_status(self, surface, u, gx, gy, now):
         """Pallini di stato sopra l'unità (sonno/veleno/paralisi/rallentamento)."""

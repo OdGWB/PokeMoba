@@ -136,6 +136,42 @@ def resolve_collisions(units: list[Unit], grid: Grid, iterations: int = 2,
                 _move_out(b, dir_ * overlap, grid)
 
 
+def resolve_obstacles(units: list[Unit], obstacles: list, grid: Grid) -> None:
+    """Spinge fuori le unità dai cerchi statici (x, y, raggio), es. le torri.
+
+    La spinta è radiale, quindi chi cammina contro l'ostacolo scivola lungo il
+    bordo con la componente tangenziale del passo. Se punta dritto al centro
+    (componente tangenziale ~0) riceve una piccola spinta laterale verso il lato
+    del waypoint, così non resta incastrato. Un waypoint DENTRO l'ostacolo si
+    considera raggiunto appena lo si tocca.
+    """
+    for u in units:
+        for ox, oy, r in obstacles:
+            dx, dy = u.pos.x - ox, u.pos.y - oy
+            min_d = r + u.radius
+            d2 = dx * dx + dy * dy
+            if d2 >= min_d * min_d:
+                continue
+            d = math.sqrt(d2)
+            nx, ny = (dx / d, dy / d) if d > 1e-6 else (0.0, 1.0)
+            new = Vec2(ox + nx * min_d, oy + ny * min_d)
+            if u.path:
+                w = u.path[0]
+                if (w.x - ox) ** 2 + (w.y - oy) ** 2 < min_d * min_d:
+                    u.path.pop(0)
+                if u.path:
+                    tx, ty = u.path[0].x - u.pos.x, u.path[0].y - u.pos.y
+                    tl = math.hypot(tx, ty)
+                    px, py = -ny, nx
+                    side = tx * px + ty * py
+                    if tl > 1e-6 and abs(side) < 0.3 * tl and tx * nx + ty * ny < 0:
+                        sgn = 1.0 if side > 0 or (abs(side) < 1e-6 and u.id % 2) else -1.0
+                        new = Vec2(new.x + px * 0.04 * sgn, new.y + py * 0.04 * sgn)
+            if grid.is_walkable_point(new.x, new.y,
+                                      block_bush=getattr(u, "bush_blocks", False)):
+                u.pos = new
+
+
 def _move_out(unit: Unit, offset: Vec2, grid: Grid) -> None:
     """Applica uno spostamento di separazione se la destinazione è calpestabile."""
     new_pos = unit.pos + offset
