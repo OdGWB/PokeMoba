@@ -2,6 +2,12 @@
 personaggio, interpolazione degli altri, effetti visivi dall'host, HUD di
 debug della rete (F3) e fine partita pulita se l'host cade.
 
+Gli EFFETTI che durano (stati sulle unità, valanghe, spiriti, Tuono/Bora,
+nube della Palla Fumo...), le morti che sfumano, gli anelli di respawn, le
+passive e le ricariche degli oggetti arrivano con lo STATO VISIVO
+(net/visual.py) e si disegnano con lo stesso codice della partita offline
+(game/world_fx.py, game/hud_passives.py).
+
 Lo stesso codice serve all'host (sessione collegata in memoria alla propria
 HostSession) e agli amici (sessione su WebRTC). L'host ha in più il pannello
 degli slot (F2) per far rientrare chi è caduto.
@@ -17,11 +23,15 @@ from net import client as C
 from net.prediction import Predictor
 
 from ..fx import FXSystem
+from ..hud_passives import PassiveCtx, draw_passive
 from ..online_world import MovementModel, OnlineWorld
 from ..sprites.animator import SpriteAnimator
+from ..world_fx import draw_projectiles, draw_world_effects, update_world_fx
+from .match_scene import DEATH_FADE
 from .net_match_scene import NetMatchScene
 
 DIM = (165, 170, 180)
+GONE_WAIT = 0.4      # s: un Pokémon sparito è morto se lo stato visivo lo dà a terra
 
 
 class OnlineMatchScene(NetMatchScene):
@@ -43,6 +53,10 @@ class OnlineMatchScene(NetMatchScene):
         self._acc = 0.0
         self._names = {p["entity_id"]: p["name"] for p in session.start_info["players"]}
         self._loaded_sent = False
+        self._seen_poke: dict = {}     # eid -> (pos, facing) all'ultimo frame
+        self._gone: dict = {}          # eid -> (pos, facing, animatore, istante)
+        self._dying: dict = {}         # come MatchScene: posa Hurt che si dissolve
+        self._portraits: dict = {}
 
     def _on_command(self, seq, kind, f):
         target = (f["x"], f["y"]) if "x" in f else None
@@ -104,9 +118,57 @@ class OnlineMatchScene(NetMatchScene):
                 self.fx.spawn_events(events)
             except Exception:       # evento cosmetico incompleto: si salta
                 pass
+        update_world_fx(self.fx, self.world.fxs, self.world.match_time)
+        self._update_deaths(dt)
         self.fx.update(dt)
         if self.slot_panel is not None:
             self.slot_panel.update()
+
+    def _update_deaths(self, dt):
+        """Morte: posa Hurt + dissolvenza come offline. Lo snapshot toglie il
+        Pokémon morto; se lo stato visivo lo dà a terra (dead) parte la dissolvenza,
+        altrimenti era solo uscito dalla visione."""
+        from engine.entities import Pokemon
+        from engine.vec import Vec2
+        now = time.monotonic()
+        alive = {}
+        for u in self.world.units():
+            if isinstance(u, Pokemon) and u.alive:
+                alive[u.id] = (Vec2(u.pos.x, u.pos.y), u.facing)
+        for eid, (pos, facing) in self._seen_poke.items():
+            if eid not in alive and eid not in self._gone:
+                self._gone[eid] = (pos, facing, self.animators.get(eid), now)
+        self._seen_poke = alive
+        for eid, (pos, facing, anim, t0) in list(self._gone.items()):
+            if eid in alive:
+                del self._gone[eid]
+            elif eid in self.world.dead:
+                del self._gone[eid]
+                if isinstance(anim, SpriteAnimator):
+                    death = SpriteAnimator(anim.anim_set, scale=anim.scale)
+                    death.facing = facing
+                    death.freeze("Hurt")
+                    self._dying[eid] = {"anim": death, "pos": pos, "t": 0.0}
+            elif now - t0 > GONE_WAIT:
+                del self._gone[eid]
+        for eid, d in list(self._dying.items()):
+            d["t"] += dt
+            if eid in alive or d["t"] >= DEATH_FADE:
+                del self._dying[eid]
+
+    def _draw_world_extras(self, surface):
+        me = self.world.get(self.your_id)
+        draw_world_effects(surface, self.camera, self.world, self.world.fxs, self.team,
+                           self.vision, self.world.match_time,
+                           me.id if me is not None else self.your_id)
+
+    def _draw_after_particles(self, surface):
+        ts = config.TILE_SIZE
+        for d in self._dying.values():
+            gx, gy = self.camera.world_to_screen(d["pos"].x * ts, d["pos"].y * ts)
+            alpha = int(255 * max(0.0, 1.0 - d["t"] / DEATH_FADE))
+            d["anim"].draw(surface, gx, gy, alpha=alpha)
+        draw_projectiles(surface, self.camera, self.world.fxs)
 
     def draw(self, surface):
         super().draw(surface)
@@ -138,11 +200,54 @@ class OnlineMatchScene(NetMatchScene):
 
     def draw_fullres(self, surface, font):
         super().draw_fullres(surface, font)
+        self._draw_passive(surface, font)
         self._draw_disconnected(surface, font)
         if self.slot_panel is not None:
             self.slot_panel.draw(surface, font)
         if self.session.phase in (C.ENDED, C.LOST):
             self._draw_end(surface)
+
+    def _portrait(self, sprite_dir, side):
+        """Ritratto di una forma (primo fotogramma Idle), come MatchScene._portrait."""
+        key = (sprite_dir, side)
+        if key not in self._portraits:
+            img = None
+            aset = self._load(sprite_dir)
+            idle = aset.get("Idle") if aset is not None else None
+            if idle is not None and idle.frames and idle.frames[0]:
+                fr = idle.frames[0][0]
+                fr = fr.subsurface(fr.get_bounding_rect()).copy()
+                k = side / max(fr.get_width(), fr.get_height())
+                img = pygame.transform.scale(fr, (max(1, int(fr.get_width() * k)),
+                                                  max(1, int(fr.get_height() * k))))
+            self._portraits[key] = img
+        return self._portraits[key]
+
+    def _draw_passive(self, surface, font):
+        """Passiva accanto alla barra delle mosse, come offline: i campi arrivano
+        dallo stato visivo e si copiano sull'entità del proprio Pokémon."""
+        me = self.world.get(self.your_id)
+        mv = self.world.me_vis
+        h = self.world.hud
+        if me is None or not mv or h is None:
+            return
+        for k, v in mv.items():
+            if k not in ("item_cd", "charges", "in_rain"):
+                setattr(me, k, v)
+        # Eevee: candidati e forma si leggono da evoluzioni e scelte fatte.
+        me.evolutions = self.pdef.evolutions
+        for sl, ms in self.disp_moveset.items():
+            ms.chosen = self._variant_move(ms, h["slots"][sl]["variant"])
+        me.moveset = self.disp_moveset
+        W, H = surface.get_size()
+        bw, bh, gap = 72, 56, 10
+        total = 4 * bw + 3 * gap
+        x0 = (W - total) // 2
+        from engine.jungle import CODE_WEATHER
+        draw_passive(surface, font, me, x0 + total + 14, H - bh - 12, bh, PassiveCtx(
+            now=self.world.match_time, portrait=self._portrait,
+            in_rain=bool(mv.get("in_rain")),
+            weather=CODE_WEATHER.get(h.get("weather", 0), "clear")))
 
     def _draw_disconnected(self, surface, font):
         """Etichetta sopra i Pokémon dei giocatori caduti."""

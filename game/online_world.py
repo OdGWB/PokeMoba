@@ -4,21 +4,30 @@ Come NetWorld (stesse classi entità del motore, così renderer, minimappa e
 animatori funzionano identici), ma:
 - le ALTRE entità sono interpolate con un buffer di ~100 ms (net/interp.py);
 - il PROPRIO Pokémon è predetto localmente e riconciliato con l'host
-  (net/prediction.py), con il movimento vero del motore (MovementModel).
+  (net/prediction.py), con il movimento vero del motore (MovementModel);
+- lo STATO VISIVO (net/visual.py) rimette sulle entità gli stati (sonno,
+  congelato, in aria...) e ricostruisce pilastri, spiriti ed effetti che
+  durano (self.fxs, con gli stessi nomi delle liste del Match), così la scena
+  online li disegna con lo stesso codice di quella offline.
 """
 from __future__ import annotations
 
+import dataclasses
+from types import SimpleNamespace
+
 import config
 from engine import movement
-from engine.entities import Core, Minion, Pokemon, Structure, Unit, Wild
+from engine.entities import Core, Minion, Pillar, Pokemon, Spirit, Structure, Unit, Wild
 from engine.pathfinding import find_path, smooth_path
 from engine.vec import Vec2
 from net import protocol as P
 from net.interp import INTERP_DELAY, InterpBuffer
+from net.visual import LISTS, UNIT_FLAGS, timer_fields
 from sim.simulation import _nearest_walkable
 
 from .networld import NetWorld
 
+MOVING = ("projectiles", "avalanches", "spirit_beams", "swift_stars")
 _WILD_COLORS = {"camp": (170, 160, 120), "meteo": (220, 180, 80), "arceus": (230, 220, 240)}
 
 
@@ -68,6 +77,16 @@ class OnlineWorld(NetWorld):
         self.interp = InterpBuffer()
         self.disconnected: set = set()
         self._last_t = None
+        # Stato visivo (vedi net/visual.py).
+        self.fxs = SimpleNamespace(**{n: [] for n in (*LISTS, "pain_binds", "wishes")})
+        self.respawning: list = []
+        self.dead: set = set()
+        self.me_vis: dict = {}
+        self._vis = None
+        self._vis_units: dict = {}
+        self._applied: dict = {}       # eid -> nomi di stato impostati l'ultima volta
+        self._applied_for: dict = {}   # eid -> entità già aggiornata con questo stato
+        self._vis_t = 0.0
 
     # --- snapshot -> entità ------------------------------------------------------------
     def push_frame(self, frame, now):
@@ -157,10 +176,61 @@ class OnlineWorld(NetWorld):
                     "gold": h[16], "items": list(h[17])})
         return out
 
+    # --- stato visivo -> entità e liste ------------------------------------------------------
+    def _apply_visual(self):
+        v = self.session.visual
+        if v is not self._vis:
+            self._vis = v
+            self.pillars = [Pillar(pos=d["pos"], tx=int(d["tx"]), ty=int(d["ty"]),
+                                   team=int(d["team"]), born=d["born"], until=d["until"],
+                                   radius=d["radius"]) for d in v.get("pillars", ())]
+            self.spirits = [Spirit(pos=d["pos"], owner_id=int(d["owner_id"]), team=int(d["team"]),
+                                   born=d["born"], seed=int(d["seed"]))
+                            for d in v.get("spirits", ())]
+            for name in vars(self.fxs):
+                setattr(self.fxs, name, v.get(name, []))
+            self.respawning = [(Vec2(r[0], r[1]), int(r[2]), r[3]) for r in v.get("respawn", ())]
+            self.dead = {int(i) for i in v.get("dead", ())}
+            self.me_vis = v.get("me", {})
+            self._vis_units = v.get("u", {})
+            self._applied_for = {}
+            self._vis_t = self.match_time
+            for name in MOVING:
+                for d in getattr(self.fxs, name):
+                    if isinstance(d.get("pos"), Vec2):
+                        d["_p0"] = d["pos"]
+        # Ciò che vola (bolle, valanghe, raggi, stelle) avanza tra un pacchetto e
+        # l'altro alla sua velocità: niente scatti a 20 Hz.
+        dt = min(0.25, max(0.0, self.match_time - self._vis_t))
+        for name in MOVING:
+            for d in getattr(self.fxs, name):
+                p0, dv = d.get("_p0"), d.get("dir")
+                if p0 is not None and isinstance(dv, Vec2) and self.match_time >= d.get("start", 0.0):
+                    k = float(d.get("speed", 0.0)) * dt
+                    d["pos"] = Vec2(p0.x + dv.x * k, p0.y + dv.y * k)
+        units = self._vis_units
+        for eid, obj in self.entities.items():
+            if not isinstance(obj, Unit) or self._applied_for.get(eid) is obj:
+                continue
+            self._applied_for[eid] = obj
+            st = units.get(eid, {})
+            defaults = _defaults(type(obj))
+            for name in self._applied.get(eid, ()):
+                if name not in st:
+                    setattr(obj, name, defaults.get(name, UNIT_FLAGS.get(name)))
+            for name, val in st.items():
+                if name in defaults or name in UNIT_FLAGS:
+                    setattr(obj, name, val)
+            self._applied[eid] = tuple(st)
+
     # --- posizioni da disegnare -----------------------------------------------------------
     def interpolate(self, local_time):
         dt = 0.0 if self._last_t is None else max(0.0, local_time - self._last_t)
         self._last_t = local_time
+        if self.session.clock.offset is not None:
+            # Orologio continuo per le animazioni (lo snapshot arriva a 20 Hz).
+            self.match_time = self.session.clock.host_time(local_time)
+        self._apply_visual()
         render_t = self.session.clock.host_time(local_time) - INTERP_DELAY
         for eid, obj in self.entities.items():
             if eid == self.your_id:
@@ -188,3 +258,17 @@ class OnlineWorld(NetWorld):
     def combatants(self):
         return [e for e in self.entities.values()
                 if isinstance(e, (Unit, Structure)) and getattr(e, "alive", True)]
+
+
+_defaults_cache: dict = {}
+
+
+def _defaults(cls) -> dict:
+    """Valori "spenti" degli stati di un'entità: timer a -1 e flag di net/visual."""
+    if cls not in _defaults_cache:
+        d = {f.name: f.default for f in dataclasses.fields(cls) if f.name in timer_fields(cls)}
+        for name, off in UNIT_FLAGS.items():
+            if any(f.name == name for f in dataclasses.fields(cls)):
+                d[name] = off
+        _defaults_cache[cls] = d
+    return _defaults_cache[cls]

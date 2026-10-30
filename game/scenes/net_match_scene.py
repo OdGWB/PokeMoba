@@ -275,14 +275,17 @@ class NetMatchScene:
         self.renderer.draw(surface, self.world, self.camera, self.animators,
                            selected_id=me.id if me else None,
                            dens=self.map_data.dens or None,
+                           respawning=getattr(self.world, "respawning", None) or None,
                            vision=self.vision, player_team=self.team,
                            now=self.world.match_time)
         # Gittata delle torri nemiche: cerchio di pericolo quando ti avvicini.
         self.renderer.draw_tower_ranges(surface, self.camera, self.world, self.team,
                                         now=self.world.match_time,
                                         player_pos=me.pos if me else None, near=6.0)
+        self._draw_world_extras(surface)
         # Particelle d'atmosfera della giungla (sopra mappa e unita, sotto la UI).
         self.particles.draw(surface, self.camera)
+        self._draw_after_particles(surface)
         if self.aiming_slot is not None and me is not None:
             s = self.world.hud["slots"][["Q", "W", "E", "R"][self.aiming_slot]]
             ms = self.disp_moveset.get(["Q", "W", "E", "R"][self.aiming_slot])
@@ -293,6 +296,16 @@ class NetMatchScene:
                 wx, wy = self.camera.screen_window_to_world(mx, my)
                 self.renderer.draw_aim(surface, self.camera, me.pos,
                                        (wx / config.TILE_SIZE, wy / config.TILE_SIZE), mv)
+
+    def _draw_world_extras(self, surface):
+        """Effetti che durano, sopra mappa e unità (la scena online li ha)."""
+
+    def _draw_after_particles(self, surface):
+        """Morti che sfumano e proiettili in volo (la scena online li ha)."""
+
+    def _me_vis(self) -> dict:
+        """Ricariche e passive del proprio Pokémon (stato visivo online; LAN: vuoto)."""
+        return getattr(self.world, "me_vis", None) or {}
 
     @staticmethod
     def _variant_move(ms, variant):
@@ -353,6 +366,16 @@ class NetMatchScene:
                 num = font.render(txt, True, (255, 255, 255))
                 surface.blit(num, (bx + bw // 2 - num.get_width() // 2,
                                    y0 + bh // 2 - num.get_height() // 2 - 2))
+            ch = self._me_vis().get("charges", {}).get(sl)
+            if mv is not None and ch is not None and s["rank"] > 0:
+                # Mossa a cariche (Erboscivolata): badge col numero di cariche pronte.
+                whole = max(0, min(mv.charges, int(ch + 1e-6)))
+                badge = (120, 220, 140) if whole > 0 else (160, 160, 170)
+                cxp, cyp = bx + bw - 12, y0 + bh - 13
+                pygame.draw.circle(surface, (16, 20, 26), (cxp, cyp), 9)
+                pygame.draw.circle(surface, badge, (cxp, cyp), 9, 1)
+                nn = font.render(str(whole), True, badge)
+                surface.blit(nn, (cxp - nn.get_width() // 2, cyp - nn.get_height() // 2))
             maxr = 3 if sl == "R" else 4
             pip_w = (bw - 12) // maxr
             for r in range(maxr):
@@ -371,7 +394,7 @@ class NetMatchScene:
             near = me is not None and me.pos.dist(self.base) <= config.SHOP_RANGE
             self.shop.draw(surface, font, self.item_catalog, h.get("gold", 0),
                            h.get("items", []), self.pdef.recommended_items or self.pdef.role,
-                           near)
+                           near, self._me_vis().get("item_cd", {}), self.world.match_time)
 
     def _draw_choice_menu(self, surface, font):
         slot = ["Q", "W", "E", "R"][self._pending()[0]]

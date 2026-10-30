@@ -261,6 +261,18 @@ class TestDraft(unittest.TestCase):
         self.assertTrue(d.done)
         self.assertEqual(len({e["poke"] for e in d.entries}), 6)
 
+    def test_visual_packet_nested(self):
+        from engine.vec import Vec2
+        st = {"u": {7: {"frozen_until": 12.5, "invisible": True}},
+              "avalanches": [{"pos": Vec2(3, 4), "dir": Vec2(1, 0), "speed": 2.0, "hit": {1, 2}}],
+              "me": {"item_cd": {"smoke_ball": 9.0}, "charges": {"Q": 1.5}}}
+        d = P.dec_vis(P.enc_vis(st))
+        self.assertEqual(d["u"][7], {"frozen_until": 12.5, "invisible": True})
+        av = d["avalanches"][0]
+        self.assertEqual((av["pos"].x, av["dir"].x, av["speed"]), (3.0, 1.0, 2.0))
+        self.assertNotIn("hit", av)                       # i set non viaggiano: solo logica
+        self.assertEqual(d["me"]["item_cd"], {"smoke_ball": 9.0})
+
     def test_draft_packets(self):
         e = [{"team": 0, "pos": 0, "slot": 0, "poke": 3, "name": "Ana", "avatar": 150},
              {"team": 1, "pos": 0, "slot": None, "poke": None, "name": "", "avatar": 0}]
@@ -324,6 +336,19 @@ class TestHostClientLoopback(unittest.TestCase):
             self.assertLess(P.dq_pos(c.latest.me[0]), x0 - 2)          # si è mosso
             self.assertEqual(len(c.unacked), 0)                         # tutto confermato
             self.assertGreaterEqual(h.view[1]["rejected"], 2)
+            # Stato visivo: stati sulle unità, nube della Palla Fumo, ricarica oggetto.
+            from engine.vec import Vec2
+            hp = h.world.get(eid)
+            t = h.match.time
+            hp.sleep_until = t + 30
+            hp.item_cd["smoke_ball"] = t + 30
+            h.match.item_clouds.append({"center": Vec2(hp.pos.x, hp.pos.y), "radius": 1.5,
+                                        "end": t + 30, "owner_id": eid, "team": hp.team})
+            self._pump([me, c], 0.5)
+            self.assertAlmostEqual(c.visual["u"][eid]["sleep_until"], t + 30, places=2)
+            self.assertIn("smoke_ball", c.visual["me"]["item_cd"])
+            self.assertEqual(len(c.visual["item_clouds"]), 1)
+            self.assertNotIn("mv", c.visual["item_clouds"][0])
             self.assertIsNotNone(c.clock.rtt)
             # Il client cade: il Pokémon resta lì, fermo e bersagliabile.
             pos = h.world.get(eid).pos

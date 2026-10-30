@@ -29,7 +29,7 @@ from __future__ import annotations
 import math
 import struct
 
-PROTO_VERSION = 3       # 2: avatar in HELLO/LOBBY/START; 3: draft (R_DRAFT/R_PICK)
+PROTO_VERSION = 4       # 2: avatar; 3: draft (R_DRAFT/R_PICK); 4: stato visivo (R_VIS)
 
 # --- data channel -------------------------------------------------------------
 CH_STATE = 0
@@ -59,6 +59,8 @@ R_PONG = 0x4B           # host -> client: eco + tempo e tick dell'host
 R_BYE = 0x4C            # chiusura volontaria
 R_DRAFT = 0x4D          # host -> client: stato del draft (ordine, scelte, turno, tempo)
 R_PICK = 0x4E           # client -> host: Pokémon in anteprima o confermato nel draft
+R_VIS = 0x4F            # host -> client: STATO VISIVO (stati sulle unità, effetti che
+                        # durano, pilastri, spiriti, ricariche): vedi net/visual.py
 
 # --- comandi sul canale state (dentro C_INPUT) -----------------------------------
 CMD_MOVE = 0
@@ -526,6 +528,85 @@ def _r_value(r):
             raise ProtocolError("tupla troppo lunga")
         return tuple(r.f32() for _ in range(n))
     raise ProtocolError(f"tipo valore sconosciuto {t}")
+
+
+# --- valori annidati (stato visivo): dict, liste e Vec2 sopra i valori semplici ----------
+_T_LIST, _T_DICT, _T_VEC = 7, 8, 9
+MAX_NEST = 6
+
+
+def _w_any(w, v, depth=0) -> bool:
+    """Come _w_value, più dict (chiavi str/int), liste e Vec2. Ciò che non si
+    sa rappresentare (oggetti del motore, set) si salta: è solo grafica."""
+    if depth > MAX_NEST:
+        return False
+    if isinstance(v, dict):
+        items = []
+        for k, x in v.items():
+            if not isinstance(k, (str, int)) or isinstance(k, bool):
+                continue
+            xw = Writer()
+            if _w_any(xw, x, depth + 1):
+                items.append((k, xw.b))
+        w.u8(_T_DICT).u16(len(items))
+        for k, xb in items:
+            if isinstance(k, str):
+                w.u8(0).s(k, 48)
+            else:
+                w.u8(1).i32(k)
+            w.b += xb
+        return True
+    if isinstance(v, (list, tuple)) and not (
+            len(v) <= 8 and all(isinstance(x, (int, float)) and not isinstance(x, bool)
+                                for x in v)):
+        parts = []
+        for x in v:
+            xw = Writer()
+            if _w_any(xw, x, depth + 1):
+                parts.append(xw.b)
+        w.u8(_T_LIST).u16(len(parts))
+        for xb in parts:
+            w.b += xb
+        return True
+    if hasattr(v, "x") and hasattr(v, "y") and not isinstance(v, (int, float, str)):
+        w.u8(_T_VEC).f32(v.x).f32(v.y)
+        return True
+    return _w_value(w, v)
+
+
+def _r_any(r, depth=0):
+    if depth > MAX_NEST:
+        raise ProtocolError("annidamento eccessivo")
+    t = r.d[r.i] if r.i < len(r.d) else None
+    if t == _T_DICT:
+        r.u8()
+        out = {}
+        for _ in range(r.u16()):
+            k = r.s() if r.u8() == 0 else r.i32()
+            out[k] = _r_any(r, depth + 1)
+        return out
+    if t == _T_LIST:
+        r.u8()
+        return [_r_any(r, depth + 1) for _ in range(r.u16())]
+    if t == _T_VEC:
+        r.u8()
+        from engine.vec import Vec2
+        return Vec2(r.f32(), r.f32())
+    return _r_value(r)
+
+
+def enc_vis(state: dict) -> bytes:
+    w = Writer().u8(R_VIS)
+    _w_any(w, state)
+    return w.bytes()
+
+
+def dec_vis(data) -> dict:
+    r = Reader(data); r.u8()
+    v = _r_any(r)
+    if not isinstance(v, dict):
+        raise ProtocolError("stato visivo non valido")
+    return v
 
 
 def enc_fx(tick, events, limit=MAX_STATE_PACKET) -> list:

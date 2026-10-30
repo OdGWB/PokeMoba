@@ -54,6 +54,7 @@ class ClientSession:
         self.frames: collections.OrderedDict = collections.OrderedDict()
         self.latest = None
         self.fx_queue: list = []
+        self.visual: dict = {}           # ultimo stato visivo (net/visual.py)
         self.on_frame = None
         self.on_command = None
         self.unacked: collections.deque = collections.deque()
@@ -156,6 +157,9 @@ class ClientSession:
             self.latest = None
             self.unacked.clear()
             self.phase = LOADING
+        elif t == P.R_VIS:
+            if self.phase == MATCH:
+                self.visual = P.dec_vis(data)
         elif t == P.R_EVENT:
             e = P.dec_event(data)
             txt = {P.EV_DISCONNECT: "si è disconnesso", P.EV_RECONNECT: "è rientrato",

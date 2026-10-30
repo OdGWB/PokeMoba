@@ -106,6 +106,7 @@ class Slot:
         self.last_cmd_seq = None
         self.last_cmd_tick = 0
         self.snap_bytes = 0
+        self.last_vis = None          # ultimo stato visivo mandato (si rimanda se cambia)
 
 
 class HostSession:
@@ -752,6 +753,7 @@ class HostSession:
 
     def _send_snapshots(self, now):
         from .snapshot import capture_global, capture_hud, capture_me, capture_team, fx_visible
+        from .visual import capture_visual
         tick = self.sim.tick_count
         glob = capture_global(self.match)
         teams = {}
@@ -778,6 +780,11 @@ class HostSession:
             # riassembla da sé; il canale state resta per i delta piccoli.
             self._send(s, data, reliable=base is None or len(data) > P.MAX_STATE_PACKET)
             s.snap_bytes = len(data)
+            # Stato visivo (stati, effetti che durano, ricariche): solo se è cambiato.
+            vis = P.enc_vis(capture_visual(self.match, s.team, p))
+            if vis != s.last_vis:
+                s.last_vis = vis
+                self._send(s, vis)
             if fx:
                 vis = [e for e in fx if fx_visible(self.match, s.team, e)]
                 for pkt in P.enc_fx(tick, vis):
