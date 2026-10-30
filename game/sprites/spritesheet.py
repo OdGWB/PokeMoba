@@ -109,3 +109,23 @@ def _cut_frames(sheet: pygame.Surface, fw: int, fh: int, frame_count: int) -> li
     while len(out) < NUM_DIRECTIONS and out:
         out.append(out[-1])
     return out
+
+
+# Leggendari neutrali della giungla: (cartella sprite, scala).
+_WILD_LEGEND_SPRITES = {
+    "rain": ("assets/pokemon/0382", 1.3),   # Kyogre
+    "sun": ("assets/pokemon/0383", 1.25),    # Groudon
+    "wind": ("assets/pokemon/0384", 1.0),  # Rayquaza (sprite molto alto)
+}
+_ARCEUS_SPRITE = ("assets/pokemon/0493", 1.3)
+
+
+def wild_legend_sprite(unit) -> tuple[str, float] | None:
+    """(cartella sprite, scala) di un leggendario neutrale (meteo o Arceus), o None
+    per i campi normali (che restano col cerchio colorato)."""
+    kind = getattr(unit, "kind", "")
+    if kind == "arceus":
+        return _ARCEUS_SPRITE
+    if kind == "meteo":
+        return _WILD_LEGEND_SPRITES.get(getattr(unit, "weather", ""))
+    return None

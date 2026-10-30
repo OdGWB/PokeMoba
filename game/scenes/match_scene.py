@@ -33,7 +33,7 @@ from ..particles import ParticleSystem
 from ..renderer import Renderer
 from ..shop_ui import ShopUI
 from ..sprites.animator import FallbackAnimator, SpriteAnimator
-from ..sprites.spritesheet import load_pokemon_animations
+from ..sprites.spritesheet import load_pokemon_animations, wild_legend_sprite
 
 ROOT = Path(__file__).resolve().parents[2]
 LANE_SLOTS = ["top", "mid", "bot"]
@@ -234,6 +234,11 @@ class MatchScene:
             aset = self._load_anim(f"assets/minions/{unit.team}_{unit.minion_type}")
             if aset is not None:
                 return SpriteAnimator(aset, scale=self._minion_scale(unit, aset))
+        leg = wild_legend_sprite(unit)
+        if leg is not None:
+            aset = self._load_anim(leg[0])
+            if aset is not None:
+                return SpriteAnimator(aset, scale=leg[1])
         radius_px = int(unit.radius * config.TILE_SIZE)
         color = getattr(unit, "color", (200, 200, 200))
         return FallbackAnimator(color, radius_px)

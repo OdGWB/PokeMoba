@@ -448,6 +448,45 @@ Passaggi completati:
   [45.4,54.6]->[43.5,56.5] e [54.6,45.4]->[56.5,43.5], entrambe su tile LANE).
   Il 5v5 non serviva (lane piu' lunga: outer gia' a ~9.8 tile dal centro).
   Screenshot: screenshots/step_22_mid.png (mid con le due gittate e il centro aperto).
+- TORRI, BASE e PROIETTILI rifatti (step_23). Nuovo game/structure_gfx.py
+  (sprite pixel-art a risoluzione nativa, in cache; a frame solo blit + piccoli
+  ritocchi animati). (1) TORRE uguale per tutti, 2.5D come i pilastri di Gigalith
+  (stessa pietra ST_*): plinto ottagonale ESTRUSO (cima chiara, facce frontali a
+  bande luce|medio|ombra), fusto rastremato a blocchi sfalsati con crepe e
+  muschio, capitello estruso con fascia d'oro e tre punte, contorno scuro da
+  dilatazione della maschera (_outline). GEMMA sfaccettata che fluttua sopra
+  (bob + alone a gradini che pulsa + scintilla in orbita): BLU squadra 0, ROSSA
+  squadra 1 (GEMS); runa dello stesso colore incastonata nel fusto. Ombra di
+  contatto + ombra lunga verso basso-destra. Torre distrutta = moncone spezzato
+  con macerie (resta disegnata). Ordinata in profondita' con le unita'.
+  (2) BASE di spawn (Core) = piattaforma PIATTA di pietra (raggio 2.2 tile):
+  bordo frontale 2.5D, due corone di lastre (per-pixel con numpy, tono per
+  lastra), smusso luce/ombra, disco interno con cornice d'oro, anello di rune e
+  gemma del nucleo ottagonale sfaccettata; 4 cristalli di squadra. Si disegna
+  PRIMA di tutte le unita' (renderer._draw_entities), quindi chi rinasce o fa
+  shopping sta SOPRA la base; le rune pulsano (strato _rune_glow con set_alpha).
+  (3) PROIETTILI di ENERGIA (fx.py, forma "energy" + "flash"): testa a 3 strati
+  (alone tremolante, corpo, nucleo quasi bianco), coda a cometa, scia di bolle e
+  due scintille; il colpo della torre parte dalla GEMMA (lift_a =
+  structure_gfx.gem_height_tiles()) e arriva al busto del bersaglio; all'arrivo
+  lampo + anello d'impatto (forme con wait = durata del volo). Minion: stessa
+  forma, piu' piccola. La scena di rete ora passa `now` al renderer (gemme e rune
+  animate anche online). (4) COLLISIONE: le torri vive sono ostacoli fisici
+  (engine/movement.resolve_obstacles, chiamata da World.tick; raggio
+  config.TOWER_BLOCK_RADIUS = 0.85 tile, distinto dal raggio di bersaglio 1.1):
+  spinta radiale -> si scivola lungo il bordo, spinta laterale se si punta dritto
+  al centro, waypoint dentro la torre = raggiunto. Il Core NON blocca.
+  Screenshot: step_23_blu/_rossa/_zoom (torri), step_23_base (base con le unita'
+  sopra), step_23_colpi/_colpi_zoom/_impatto/_impatto_zoom (proiettili),
+  step_23_macerie (torre distrutta).
+- SPRITE dei LEGGENDARI neutrali (step_24): Kyogre (0382), Groudon (0383), Rayquaza
+  (0384) e Arceus (0493), da PMD Sprite Collab, in assets/pokemon/<dex>/. Nuovo
+  game/sprites/spritesheet.py wild_legend_sprite(unit) -> (cartella, scala): kind
+  "meteo" sceglie dal `weather` (rain/sun/wind), kind "arceus" fisso; i campi
+  normali restano col cerchio colorato. match_scene._make_animator e
+  net_match_scene._net_animator usano SpriteAnimator con quella scala (1.3/1.25/
+  1.0/1.3, piu grandi dei campioni). Nessuna logica toccata. Screenshot:
+  screenshots/step_24.png.
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul
