@@ -487,6 +487,16 @@ Passaggi completati:
   net_match_scene._net_animator usano SpriteAnimator con quella scala (1.3/1.25/
   1.0/1.3, piu grandi dei campioni). Nessuna logica toccata. Screenshot:
   screenshots/step_24.png.
+- SPRITE sui CAMPI della giungla lato BLU (step_25/26), solo grafica: la tabella
+  _CAMP_SPRITES in game/sprites/spritesheet.py mappa il tile del campo -> lista di
+  membri (cartella, scala, dx, dy). Settore alto: Slowbro (0080, grosso/blue buff),
+  Carnivine (0455, piccolo a nord-ovest), 3 Tangela (0114). Settore basso: Magmortar
+  (0467, grosso/red buff), 1 Ariados (0168) + 3 Spinarak (0167, scala 0.6) a sinistra,
+  2 Hoppip (0187) sotto. Stessa disposizione su 3v3 e 5v5; i campi rossi restano
+  cerchi. make_wild_animator(unit, load) serve leggendari e campi in entrambe le
+  scene; i gruppi usano GroupAnimator (animator.py): l'unita resta UNA (un solo HP/
+  bersaglio), i compagni sono sprite cosmetici a offset fissi, disegnati ordinati
+  per y. Screenshot: step_25_alto/basso, step_26_tangela/ragni/hoppip.
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

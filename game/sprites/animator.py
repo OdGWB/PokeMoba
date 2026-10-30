@@ -134,6 +134,35 @@ class SpriteAnimator:
         surface.blit(frame, (sx - bb.centerx, sy - bb.bottom))
 
 
+class GroupAnimator(SpriteAnimator):
+    """Gruppo di sprite per UN neutrale (es. 3 Tangela su un campo): il principale
+    e' questo animator (primo membro, ancora la posizione), gli altri sono
+    compagni cosmetici a offset fissi in pixel. L'unita' resta una sola."""
+
+    def __init__(self, anim_set, scale=1.0, companions=()):
+        super().__init__(anim_set, scale)
+        self.companions = list(companions)   # [(SpriteAnimator, dx, dy)]
+
+    def play_once(self, name, speed=1.0):
+        super().play_once(name, speed)
+        for c, _, _ in self.companions:
+            c.play_once(name, speed)
+
+    def update(self, dt, moving, facing):
+        super().update(dt, moving, facing)
+        for c, _, _ in self.companions:
+            c.update(dt, moving, facing)
+
+    def draw(self, surface, sx, sy, alpha=255):
+        # Dal fondo al davanti: chi sta piu' in alto sullo schermo si disegna prima.
+        items = [(dy, c, dx) for c, dx, dy in self.companions] + [(0, self, 0)]
+        for dy, c, dx in sorted(items, key=lambda it: it[0]):
+            if c is self:
+                SpriteAnimator.draw(self, surface, sx, sy, alpha)
+            else:
+                c.draw(surface, sx + dx, sy + dy, alpha)
+
+
 class FallbackAnimator:
     """Cerchio colorato con indicatore di direzione, per quando mancano gli sprite."""
 

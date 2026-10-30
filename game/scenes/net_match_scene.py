@@ -26,7 +26,7 @@ from ..particles import ParticleSystem
 from ..renderer import Renderer
 from ..shop_ui import ShopUI
 from ..sprites.animator import FallbackAnimator, SpriteAnimator
-from ..sprites.spritesheet import load_pokemon_animations, wild_legend_sprite
+from ..sprites.spritesheet import load_pokemon_animations, make_wild_animator
 
 ROOT = Path(__file__).resolve().parents[2]
 ABILITY_KEYS = {pygame.K_q: 0, pygame.K_w: 1, pygame.K_e: 2, pygame.K_r: 3}
@@ -209,11 +209,9 @@ class NetMatchScene:
                 wf = aset.get("Walk") or aset.get("Idle")
                 fh = wf.frames[0][0].get_height() if (wf and wf.frames and wf.frames[0]) else 48
                 return SpriteAnimator(aset, scale=max(16, int(u.radius * config.TILE_SIZE * 4.5)) / max(1, fh))
-        leg = wild_legend_sprite(u)
-        if leg is not None:
-            aset = self._load(leg[0])
-            if aset is not None:
-                return SpriteAnimator(aset, scale=leg[1])
+        wild = make_wild_animator(u, self._load)
+        if wild is not None:
+            return wild
         return FallbackAnimator(getattr(u, "color", (200, 200, 200)),
                                 int(u.radius * config.TILE_SIZE))
 

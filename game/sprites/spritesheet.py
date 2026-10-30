@@ -120,12 +120,51 @@ _WILD_LEGEND_SPRITES = {
 _ARCEUS_SPRITE = ("assets/pokemon/0493", 1.3)
 
 
-def wild_legend_sprite(unit) -> tuple[str, float] | None:
-    """(cartella sprite, scala) di un leggendario neutrale (meteo o Arceus), o None
-    per i campi normali (che restano col cerchio colorato)."""
+# Campi della giungla lato BLU con sprite (tile del campo -> (cartella, scala)),
+# 3v3 e 5v5: settore alto = Slowbro (blue buff, grosso) + Carnivine (piccolo a
+# nord-ovest); settore basso = Magmortar (red buff, grosso).
+_P = "assets/pokemon/"
+_TANGELA = [(_P + "0114", 1.0, 0, 0), (_P + "0114", 1.0, -24, 6), (_P + "0114", 1.0, 24, 8)]
+_HOPPIP = [(_P + "0187", 1.0, -12, -2), (_P + "0187", 1.0, 13, 6)]
+_SPIDERS = [(_P + "0168", 1.0, 0, 0), (_P + "0167", 0.6, -22, 8),
+            (_P + "0167", 0.6, 22, 7), (_P + "0167", 0.6, 1, 16)]
+# Ogni membro: (cartella, scala, dx, dy in px dal punto del campo); il primo ancora
+# l'unita'. Stessa disposizione su 3v3 e 5v5 (piccoli: tile del campo).
+_CAMP_SPRITES = {
+    (29, 43): [(_P + "0080", 1.0, 0, 0)], (44, 64): [(_P + "0080", 1.0, 0, 0)],
+    (18, 37): [(_P + "0455", 1.0, 0, 0)], (27, 56): [(_P + "0455", 1.0, 0, 0)],
+    (57, 72): [(_P + "0467", 1.0, 0, 0)], (86, 108): [(_P + "0467", 1.0, 0, 0)],
+    (25, 53): _TANGELA, (38, 80): _TANGELA,
+    (63, 81): _HOPPIP, (94, 122): _HOPPIP,
+    (47, 61): _SPIDERS, (70, 92): _SPIDERS,
+}
+
+
+def wild_sprite_group(unit):
+    """Membri di sprite [(cartella, scala, dx, dy), ...] di un neutrale (leggendari e
+    campi con sprite), o None per gli altri (cerchio colorato)."""
     kind = getattr(unit, "kind", "")
+    if kind == "camp":
+        return _CAMP_SPRITES.get((int(unit.pos.x), int(unit.pos.y)))
     if kind == "arceus":
-        return _ARCEUS_SPRITE
-    if kind == "meteo":
-        return _WILD_LEGEND_SPRITES.get(getattr(unit, "weather", ""))
-    return None
+        d, sc = _ARCEUS_SPRITE
+    elif kind == "meteo" and getattr(unit, "weather", "") in _WILD_LEGEND_SPRITES:
+        d, sc = _WILD_LEGEND_SPRITES[unit.weather]
+    else:
+        return None
+    return [(d, sc, 0, 0)]
+
+
+def make_wild_animator(unit, load):
+    """Animator di un neutrale con sprite (`load` = cache cartella->AnimationSet),
+    o None. Con piu' membri ritorna un GroupAnimator."""
+    from .animator import GroupAnimator, SpriteAnimator
+    group = wild_sprite_group(unit)
+    if not group:
+        return None
+    sets = [load(d) for d, _, _, _ in group]
+    if sets[0] is None:
+        return None
+    comps = [(SpriteAnimator(a, scale=g[1]), g[2], g[3])
+             for a, g in zip(sets[1:], group[1:]) if a is not None]
+    return GroupAnimator(sets[0], scale=group[0][1], companions=comps)
