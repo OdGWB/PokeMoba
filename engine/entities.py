@@ -294,6 +294,11 @@ class Pokemon(Unit):
     voltabsorb_ready_at: float = 0.0   # Assorbivolt: pronto da questo istante
     flashfire_until: float = -1.0      # Fuocardore: mosse Fuoco potenziate fino a qui
     hydration_next: float = 0.0        # Idratazione: prossima pulizia sotto la pioggia
+    # Linea Rookidee: stato provocato (Provocazione), Trespolo, Specchiarmatura.
+    taunt_until: float = -1.0          # provocato: deve attaccare taunt_src con attacchi base
+    taunt_src: int | None = None
+    roost_until: float = -1.0          # Trespolo: senza il tipo Volante fino a qui
+    mirror_cd: dict = field(default_factory=dict)   # Specchiarmatura: id nemico -> pronto da
 
     def _bonus(self, stat: str) -> float:
         return (self.passive_bonus.get(stat, 0.0) + self.item_bonus.get(stat, 0.0)

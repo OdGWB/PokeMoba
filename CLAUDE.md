@@ -508,6 +508,25 @@ Passaggi completati:
   il file manca, segnaposto colorato con l'iniziale. Screenshot:
   step_27_negozio/_combattenti/_tank_dettagli/_segnaposto (headless 1280x720)
   e step_27_in_partita.
+- LINEA ROOKIDEE > CORVISQUIRE > CORVIKNIGHT (step_28), grafica nuova in
+  game/corvi_fx.py (logica in engine/corviknight.py). Sprite PMD Sprite Collab in
+  assets/pokemon/0821/0822/0823. Effetti istantanei registrati in
+  FXSystem._FX_STYLES (**corvi_fx.STYLES) e forme nuove in _draw_shapes
+  (corvi_fx.SHAPES: becco a due valve che scatta, piuma, ala d'acciaio): Beccata
+  = becco + tratti d'urto; Perforbecco = scia ventosa a "trivella" (tratti obliqui
+  alternati) + becco in punta + piume; Spennata = schiaffo d'ala + piume strappate;
+  Fulmisguardo/Provocazione = cono rosso (+ ali spalancate); Baldeali = picchiata
+  azzurra + ali + polvere. Disegni PERSISTENTI (game/world_fx.py): corrente di
+  Ventoincoda (corsia chiara con strisce di vento che scorrono, draw_tailwind) e
+  Taxi Volante (mirino d'atterraggio visibile ANCHE ai nemici, anello di carica e
+  ali sul lanciatore, poi traiettoria tratteggiata; in volo le due unita' salgono
+  con air_z, picco 1.3 tile). Sulle unita' (renderer -> corvi_fx.draw_unit_overlay):
+  "!" rosso pixel-art sopra la barra HP dei provocati, nido di rametti durante
+  Trespolo. HUD: icona occhio (Sguardofermo) / scudo a specchio (Specchiarmatura).
+  Online: tailwinds in net/visual.LISTS, taxi_flights mandati a entrambe le squadre.
+  Screenshot: step_28_rookidee/_corvisquire/_corviknight, _hud, _beccata,
+  _perforbecco, _spennata, _provocazione, _provocato, _ventoincoda, _taxi_carica/
+  _volo/_atterraggio, _baldeali, _trespolo, _draft_corviknight, _selezione.
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

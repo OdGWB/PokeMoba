@@ -26,6 +26,7 @@ from .items import ITEM_SLOTS, ItemCatalog
 from .jungle import JungleSystem
 from .pathfinding import find_path, smooth_path
 from .spatial import SpatialHash
+from .corviknight import CORVI_PASSIVES, CorviknightMixin
 from .eevee import EEVEE_PASSIVES, EeveeMixin
 from .item_effects import ItemEffectsMixin, cdr_to_haste
 from .spiritomb import PASSIVE_ID as SPIRITOMB_PASSIVE, SpiritombMixin
@@ -109,7 +110,7 @@ _SYNC_STATUSES = ("slow", "stun", "freeze", "confuse", "silence", "root", "sleep
                   "spdef_debuff", "blind")
 
 
-class Match(SpiritombMixin, EeveeMixin, ItemEffectsMixin):
+class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, ItemEffectsMixin):
     def __init__(self, world, map_data):
         self.world = world
         self.map = map_data
@@ -141,6 +142,7 @@ class Match(SpiritombMixin, EeveeMixin, ItemEffectsMixin):
         self.item_clouds: list[dict] = []   # nubi della Palla Fumo (oggetto attivabile)
         self._init_spiritomb()   # Spiritomb: spiriti, Stordiraggio, Malcomune, Legione
         self._init_eevee()       # linea Eevee: Desiderio, Comete, ultimate delle forme
+        self._init_corvi()       # linea Rookidee: Ventoincoda, Taxi Volante
         self.vision = VisionSystem(self.world.grid)
         self._build_structures()
         self.jungle = JungleSystem(self)
@@ -190,6 +192,7 @@ class Match(SpiritombMixin, EeveeMixin, ItemEffectsMixin):
         self._update_air_landings(dt)  # Rimbalzo: atterraggio dopo il salto (prima dei cast)
         self._update_casts(dt)       # esecuzione mosse Q/W/E/R
         self._update_channels(dt)    # canalizzazioni (Lanciafiamme continuo, Volo, Esplosione)
+        self._update_corvi(dt)       # Ventoincoda, Taxi Volante, Trespolo (linea Rookidee)
         self._update_rock_moves(dt)  # Rocciotomba / Pesobomba / Frana / Abbattimento
         self._update_spiritomb(dt)   # spiriti, Stordiraggio, Malcomune, Legione, Memento
         self._update_eevee(dt)       # Desiderio, Comete, Tuono, Bora, Divinazione, Idratazione
@@ -283,6 +286,9 @@ class Match(SpiritombMixin, EeveeMixin, ItemEffectsMixin):
                 continue
             if p.charm_until > self.time:
                 self._charmed(p, dt)  # affascinato (Incantevole): va verso Sylveon
+                continue
+            if p.taunt_until > self.time:
+                self._taunted(p, dt)  # provocato (Provocazione): attacca chi l'ha provocato
                 continue
             if p.is_bot and p.is_jungler:
                 self._ai_jungler(p, dt)
@@ -979,6 +985,7 @@ class Match(SpiritombMixin, EeveeMixin, ItemEffectsMixin):
             victim.memento_until = -1.0    # Memento interrotto
             victim.puddle_until = -1.0     # Acidarmatura interrotta
             victim.charm_until = -1.0
+            victim.taunt_until = -1.0
             victim.invisible = False
             # Se muore in forma Shedinja, ripristina l'identità di Ninjask così il
             # respawn avviene normale (max_hp corretto, non 1).
@@ -1571,6 +1578,8 @@ class Match(SpiritombMixin, EeveeMixin, ItemEffectsMixin):
                 continue
             if p.puddle_until > self.time or p.charm_until > self.time:
                 continue                      # pozza (Acidarmatura) / affascinato
+            if p.taunt_until > self.time:
+                continue                      # provocato: solo attacchi base
             self._cast(p, cast[0], cast[1], cast[2])
 
     def _cast(self, p: Pokemon, slot: str, tx: float, ty: float) -> None:
@@ -1619,7 +1628,8 @@ class Match(SpiritombMixin, EeveeMixin, ItemEffectsMixin):
                 "memento": "Charge", "wish": "Charge", "endure": "Charge",
                 "thunder": "Shoot", "blizzard": "Shoot", "futuresight": "Charge",
                 "moonlight": "Charge", "gleam": "Charge",
-                "acidarmor": "Charge"}.get(shape)
+                "acidarmor": "Charge", "defog": "Shoot", "tailwind": "Shoot",
+                "roost": "Charge", "taxi": "Charge"}.get(shape)
         if anim:
             self.fx_events.append({"eid": p.id, "anim": anim})
         # Gli eventi visivi aggiunti dai _cast_* qui sotto vengono "taggati" con lo
@@ -1696,6 +1706,8 @@ class Match(SpiritombMixin, EeveeMixin, ItemEffectsMixin):
             pass   # Spiritomb (engine/spiritomb.py)
         elif self._eevee_cast(p, mv, rank, origin, tgt, dirv):
             pass   # linea Eevee (engine/eevee.py)
+        elif self._corvi_cast(p, mv, rank, origin, tgt, dirv):
+            pass   # linea Rookidee (engine/corviknight.py)
         elif shape == "buff":
             self._apply_support(p, mv, rank, origin)
             self.fx_events.append({"kind": "buff", "c": (origin.x, origin.y),
@@ -3322,6 +3334,7 @@ class Match(SpiritombMixin, EeveeMixin, ItemEffectsMixin):
 
     def _apply_hit_effects(self, caster, target, fx) -> None:
         """Controlli e debuff di una mossa sul Pokémon colpito."""
+        fx = self._mirror_armor(caster, target, fx)   # Specchiarmatura (Corviknight)
         slow = fx.get("slow")
         if slow:
             self._apply_slow(target, float(slow.get("mult", 0.6)),
@@ -3383,6 +3396,11 @@ class Match(SpiritombMixin, EeveeMixin, ItemEffectsMixin):
                                  float(kn.get("peak", 1.0)))
         if fx.get("ground"):   # Abbattimento: annulla Volo in corso
             self._cancel_fly(target)
+        ta = fx.get("taunt")
+        if ta and isinstance(caster, Pokemon) and caster.team != target.team:
+            self._apply_taunt(target, caster, float(ta.get("duration", 1.5)))
+        if fx.get("steal_buff") and caster.team != target.team:   # Spennata
+            self._steal_buff(caster, target)
 
     def _apply_support(self, caster, mv, rank, center) -> None:
         """Effetti su sé/alleati: cura, scudo, buff attacco/velocità."""
@@ -3586,7 +3604,8 @@ class Match(SpiritombMixin, EeveeMixin, ItemEffectsMixin):
                 or p.root_until > t or p.poison_until > t or p.confuse_until > t
                 or p.def_debuff_until > t or p.spdef_debuff_until > t
                 or p.burn_until > t or p.airborne_until > t
-                or p.frozen_until > t or p.charm_until > t or p.blind_until > t)
+                or p.frozen_until > t or p.charm_until > t or p.blind_until > t
+                or p.taunt_until > t)
 
     def _apply_untargetable(self, p, dur):
         p.untargetable_until = max(p.untargetable_until, self.time + dur)
@@ -3697,7 +3716,8 @@ class Match(SpiritombMixin, EeveeMixin, ItemEffectsMixin):
             immobile = self._immobile(p)
             rooted = p.root_until > self.time   # paralisi: fermo ma può agire
             p.cc_active = (p.slow_until > self.time or immobile or rooted
-                           or p.confuse_until > self.time or p.charm_until > self.time)
+                           or p.confuse_until > self.time or p.charm_until > self.time
+                           or p.taunt_until > self.time)
             p.speed = (p.move_speed_base * p.slow_mult * p.speed_mult
                        * self.jungle.terrain_speed_mult(p))
             if p.passive_id == "nuotovelox" and self._in_rain(p):
@@ -3710,6 +3730,7 @@ class Match(SpiritombMixin, EeveeMixin, ItemEffectsMixin):
             # Muro di Fumo: raggio visivo ridotto a 3 tile finché si resta nel fumo.
             if not p.is_decoy:
                 p.vision = 3.0 if p.smoke_until > self.time else 9.0
+                p.vision = self._corvi_vision(p, p.vision)   # Sguardofermo: +30%
             if p.fear_until > self.time:
                 p.speed *= 0.5   # spavento: fuga rallentata del 50%
                 p.cc_active = True
@@ -3763,6 +3784,8 @@ class Match(SpiritombMixin, EeveeMixin, ItemEffectsMixin):
         if p.passive_id == SPIRITOMB_PASSIVE and self._bot_spiritomb_cast(p, target):
             return
         if p.passive_id in EEVEE_PASSIVES and self._bot_eevee_cast(p, target):
+            return
+        if p.passive_id in CORVI_PASSIVES and self._bot_corvi_cast(p, target):
             return
         for slot in ("R", "Q", "W", "E"):
             ms = p.moveset.get(slot)

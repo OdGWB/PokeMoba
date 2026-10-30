@@ -102,6 +102,25 @@ def draw_passive(surface, font, p, bx, y0, bh, ctx) -> None:
             t = font.render(f"{p.wander_ready_at - now:0.0f}s", True, frame)
             surface.blit(t, (bx - t.get_width() // 2 + 8, y0 + bh + 2))
 
+    # Linea Rookidee: Sguardofermo (occhio) / Specchiarmatura (scudo d'acciaio).
+    if p.passive_id in ("sguardofermo", "specchiarmatura"):
+        mirror = p.passive_id == "specchiarmatura"
+        frame = (196, 206, 230) if mirror else (246, 196, 72)
+        pygame.draw.rect(surface, (26, 30, 48), pygame.Rect(bx, y0, 16, bh))
+        cx, cy = bx + 8, y0 + bh // 2
+        if mirror:   # scudo a specchio con riflesso
+            pts = [(cx - 6, cy - 7), (cx + 6, cy - 7), (cx + 6, cy + 1), (cx, cy + 8), (cx - 6, cy + 1)]
+            pygame.draw.polygon(surface, (140, 150, 180), pts)
+            pygame.draw.polygon(surface, (240, 244, 255), pts, 1)
+            pygame.draw.line(surface, (255, 255, 255), (cx - 3, cy - 5), (cx - 3, cy + 1))
+        else:        # occhio vigile
+            pygame.draw.ellipse(surface, (240, 236, 220), pygame.Rect(cx - 7, cy - 4, 14, 8))
+            pygame.draw.circle(surface, (200, 60, 50), (cx, cy), 3)
+            pygame.draw.circle(surface, (20, 20, 20), (cx, cy), 1)
+        pygame.draw.rect(surface, frame, pygame.Rect(bx, y0, 16, bh), 1)
+        name = "Specchiarm." if mirror else "Sguardofermo"
+        surface.blit(font.render(name, True, frame), (bx - 18, y0 - 18))
+
     # Linea Eevee: Adattabilità (prima dell'evoluzione) o passiva della forma.
     if p.passive_id == "adattabilita":
         _draw_adaptability(surface, font, p, bx, y0, bh, ctx)

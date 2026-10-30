@@ -19,7 +19,7 @@ import pygame
 
 import config
 
-from . import eevee_fx, spirit_fx
+from . import corvi_fx, eevee_fx, spirit_fx
 from .fx import draw_avalanche, draw_sandstorm, type_color
 
 
@@ -69,6 +69,13 @@ def draw_world_effects(surface, camera, world, m, team, vision, now, player_id,
     for st in m.swift_stars:
         if seen(st["pos"], st["team"]):
             eevee_fx.draw_swift_star(surface, camera, st, now)
+    # Linea Rookidee: correnti di Ventoincoda e Taxi Volante (il punto
+    # d'atterraggio lo vedono anche i nemici).
+    for tw in getattr(m, "tailwinds", ()):
+        if seen(tw["c"], tw["team"]):
+            corvi_fx.draw_tailwind(surface, camera, tw, now)
+    for fl in getattr(m, "taxi_flights", ()):
+        corvi_fx.draw_taxi(surface, camera, fl, now)
 
 
 def draw_projectiles(surface, camera, m) -> None:

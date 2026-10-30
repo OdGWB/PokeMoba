@@ -392,7 +392,7 @@ class EeveeMixin:
                      "poison_until", "confuse_until", "silence_until", "fear_until",
                      "charm_until", "blind_until", "def_debuff_until", "spdef_debuff_until",
                      "atk_debuff_until", "burn_until", "dashlock_until",
-                     "memento_weak_until", "spite_until", "curse_until"):
+                     "memento_weak_until", "spite_until", "curse_until", "taunt_until"):
             setattr(p, attr, -1.0)
         p.sleep_arm_at = -1.0
         p.slow_mult = 1.0
@@ -405,7 +405,7 @@ class EeveeMixin:
                 or p.confuse_until > t or p.silence_until > t or p.fear_until > t
                 or p.charm_until > t or p.blind_until > t or p.burn_until > t
                 or p.def_debuff_until > t or p.spdef_debuff_until > t
-                or p.atk_debuff_until > t)
+                or p.atk_debuff_until > t or p.taunt_until > t)
 
     # --- hook del Match --------------------------------------------------------
     def _eevee_absorb(self, attacker, target, amount, dmg_type) -> bool:

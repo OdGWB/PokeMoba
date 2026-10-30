@@ -31,7 +31,7 @@ LISTS = {
     "legion_waves": ("c", "team"), "spirit_beams": ("pos", "team"),
     "thunders": ("c", "team"), "blizzards": ("c", "team"),
     "future_sights": ("c", "team"), "swift_stars": ("pos", "team"),
-    "item_clouds": ("center", "team"),
+    "item_clouds": ("center", "team"), "tailwinds": ("c", "team"),
 }
 # Campi solo di logica (oggetti del motore, insiemi di bersagli già colpiti).
 SKIP = {"mv", "hit", "touched", "since", "rank", "explode", "first"}
@@ -106,6 +106,10 @@ def capture_visual(match, team: int, player=None) -> dict:
             wishes.append(_clean(w))
     if wishes:
         out["wishes"] = wishes
+    # Taxi Volante: il punto d'atterraggio lo vede anche la squadra avversaria.
+    taxis = [_clean(fl) for fl in getattr(match, "taxi_flights", ())]
+    if taxis:
+        out["taxi_flights"] = taxis
     pillars = [{"pos": pl.pos, "tx": pl.tx, "ty": pl.ty, "team": pl.team, "born": pl.born,
                 "until": pl.until, "radius": pl.radius}
                for pl in getattr(world, "pillars", ())]

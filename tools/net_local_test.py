@@ -32,6 +32,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+import config  # noqa: E402  (dopo sys.path: serve la radice del progetto)
 TAG = "@@"
 
 
@@ -55,7 +56,7 @@ def stdin_commands():
 def auto_pick(session):
     """Nel draft, al proprio turno, prende il primo Pokémon libero (una volta sola)."""
     if session.phase == "draft" and session.draft_my_turn() and not getattr(session, "_picked", 0):
-        free = [i for i in range(10) if i not in session.draft_taken()]
+        free = [i for i in range(len(config.ROSTER)) if i not in session.draft_taken()]
         session.send_pick(free[0], lock=True)
         session._picked = True
 

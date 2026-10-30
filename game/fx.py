@@ -18,7 +18,7 @@ import pygame
 
 import config
 
-from . import eevee_fx
+from . import corvi_fx, eevee_fx
 from . import structure_gfx
 
 # Colore per tipo (per le particelle).
@@ -1463,6 +1463,8 @@ class FXSystem:
                 pygame.draw.lines(overlay, (*lite, a), False, pts, max(2, int(0.08 * ts)))
             elif kind in eevee_fx.SHAPES:   # linea Eevee: denti di Morso, stelline
                 eevee_fx.draw_shape(overlay, s, S, ts, f, a)
+            elif kind in corvi_fx.SHAPES:   # linea Rookidee: becco, piume, ali, "!"
+                corvi_fx.draw_shape(overlay, s, S, ts, f, a)
         surface.blit(overlay, (0, 0))
 
     # Registro degli stili d'attacco: nome ("fx" nel JSON / "attack_fx") -> handler.
@@ -1518,4 +1520,6 @@ class FXSystem:
         "mementocurse": _fx_mementocurse,
         # linea Eevee (game/eevee_fx.py)
         **eevee_fx.STYLES,
+        # linea Rookidee (game/corvi_fx.py)
+        **corvi_fx.STYLES,
     }

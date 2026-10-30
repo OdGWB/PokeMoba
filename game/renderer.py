@@ -16,7 +16,7 @@ from engine.entities import Core, Pillar, Pokemon, Structure, Unit
 from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
                          TILE_PUDDLE, TILE_RIVER, TILE_WALL)
 from . import spirit_fx
-from . import eevee_fx
+from . import corvi_fx, eevee_fx
 from . import structure_gfx
 from .fx import EMBER, ROCK_HI, ROCK_MID, ROCK_OUT, ROCK_SH, type_color
 from .map_renderer import MapRenderer
@@ -614,7 +614,8 @@ class Renderer:
                                       "sub", "blink", "storm", "leap", "rain",
                                       "rockwave", "spikes", "avalanche",
                                       "spiritbeam", "painsplit", "spiritcall",
-                                      "swift", "wish", "thunder", "blizzard", "futuresight"):
+                                      "swift", "wish", "thunder", "blizzard", "futuresight",
+                                      "defog", "tailwind"):
             pygame.draw.circle(surface, (90, 90, 90), S(ox, oy), int(rng * ts), 1)
 
         shape = move.shape
@@ -653,10 +654,26 @@ class Renderer:
             return
         if shape == "swift":        # Comete: inseguono da sole il nemico più vicino
             return
+        if shape == "tailwind":     # Ventoincoda: corsia del vento
+            ex, ey = ox + nx * rng, oy + ny * rng
+            r = max(2, int(move.radius * ts))
+            for s in (1, -1):
+                pygame.draw.line(surface, col, S(ox - ny * move.radius * s, oy + nx * move.radius * s),
+                                 S(ex - ny * move.radius * s, ey + nx * move.radius * s), 1)
+            pygame.draw.line(surface, (230, 245, 255), S(ox, oy), S(ex, ey), 1)
+            return
+        if shape == "taxi":         # Taxi Volante: alleato preso (3 tile) + atterraggio
+            reach = float(move.effects.get("ally_range", 3.0))
+            pygame.draw.circle(surface, (214, 240, 255), S(ox, oy), int(reach * ts), 1)
+            d = min(dist, rng)
+            cx, cy = S(ox + nx * d, oy + ny * d)
+            pygame.draw.line(surface, (120, 170, 210), S(ox, oy), (cx, cy), 1)
+            pygame.draw.circle(surface, col, (cx, cy), int(move.radius * ts), 2)
+            return
         if shape in ("smackdown", "explosion", "spikes", "legion", "memento",
-                     "thunder", "blizzard", "futuresight", "gleam"):
+                     "thunder", "blizzard", "futuresight", "gleam", "defog"):
             shape = "area"
-        elif shape in ("sandboost", "endure", "moonlight", "acidarmor"):
+        elif shape in ("sandboost", "endure", "moonlight", "acidarmor", "roost"):
             shape = "buff"
         if shape in ("projectile", "bubble"):
             ex, ey = ox + nx * rng, oy + ny * rng
@@ -813,6 +830,7 @@ class Renderer:
                     spirit_fx.draw_aura(surface, camera, e, now, 110 if ghost else 255)
                 if isinstance(e, Pokemon):   # ghiaccio, cuori, sabbia, Resistenza
                     eevee_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)
+                    corvi_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # provocato, Trespolo
                 if in_bush:
                     self._draw_hidden_hint(surface, e, gx, gy, now)
                 self._draw_unit_hp(surface, e, gx, gy)
