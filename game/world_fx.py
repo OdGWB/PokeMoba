@@ -19,7 +19,7 @@ import pygame
 
 import config
 
-from . import charcadet_fx, corvi_fx, eevee_fx, spirit_fx
+from . import charcadet_fx, corvi_fx, eevee_fx, noivern_fx, spirit_fx
 from .fx import draw_avalanche, draw_sandstorm, type_color
 
 
@@ -93,6 +93,16 @@ def draw_world_effects(surface, camera, world, m, team, vision, now, player_id,
     for fl in getattr(m, "flurries", ()):
         if seen(fl["pos"], fl["team"]):
             charcadet_fx.draw_flurry(surface, camera, fl, now)
+    # Linea Noibat: ping di Ecolocalizzazione, Tifone, Dragobolide in arrivo.
+    for pg in getattr(m, "sonar_pings", ()):
+        if seen(pg["c"], pg["team"]):
+            noivern_fx.draw_ping(surface, camera, pg, now)
+    for h in getattr(m, "hurricanes", ()):
+        if seen(h["c"], h["team"]):
+            noivern_fx.draw_hurricane(surface, camera, h, now)
+    for mt in getattr(m, "meteors", ()):
+        if seen(mt["c"], mt["team"]):
+            noivern_fx.draw_meteor_warn(surface, camera, mt, now)
 
 
 def draw_projectiles(surface, camera, m, now=0.0) -> None:

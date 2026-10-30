@@ -162,6 +162,7 @@ class MatchScene:
                                      passive=pdef.passive,
                                      attack_range=pdef.attack_range,
                                      attack_cooldown=pdef.attack_cooldown,
+                                     attack_fx=pdef.attack_fx,
                                      rec_items=pdef.recommended_items)
         p.radius = pdef.radius
         self._unit_defs[p.id] = pdef
@@ -206,6 +207,7 @@ class MatchScene:
                                                role=self.pdef.role, passive=self.pdef.passive,
                                                attack_range=self.pdef.attack_range,
                                                attack_cooldown=self.pdef.attack_cooldown,
+                                               attack_fx=self.pdef.attack_fx,
                                                rec_items=self.pdef.recommended_items)
         self.player.radius = self.pdef.radius
         self._unit_defs[self.player.id] = self.pdef

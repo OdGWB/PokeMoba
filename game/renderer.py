@@ -16,7 +16,7 @@ from engine.entities import Core, Pillar, Pokemon, Structure, Unit
 from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
                          TILE_PUDDLE, TILE_RIVER, TILE_WALL)
 from . import spirit_fx
-from . import charcadet_fx, corvi_fx, eevee_fx
+from . import charcadet_fx, corvi_fx, eevee_fx, noivern_fx
 from . import structure_gfx
 from .fx import EMBER, ROCK_HI, ROCK_MID, ROCK_OUT, ROCK_SH, type_color
 from .map_renderer import MapRenderer
@@ -1016,6 +1016,8 @@ class Renderer:
         top = gy - 2 * r - 8
         w = max(14, r * 2)
         self._hp_bar(surface, gx, top, max(0.0, u.hp / u.max_hp), col, width=w)
+        if isinstance(u, Pokemon) and noivern_fx.has_echo(u):   # cariche del ping
+            noivern_fx.draw_echo_pips(surface, u, gx, top, w)
 
     def _hp_bar(self, surface, cx, top_y, frac, team_col, width):
         h = 3

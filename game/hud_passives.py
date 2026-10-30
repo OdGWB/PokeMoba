@@ -127,6 +127,10 @@ def draw_passive(surface, font, p, bx, y0, bh, ctx) -> None:
     elif p.passive_id in ("guardia", "doppialama"):
         _draw_charcadet_form(surface, font, p, bx, y0, bh, ctx)
 
+    # Linea Noibat: Ecolocalizzazione (onde sonore + cariche del ping).
+    if p.passive_id == "ecolocalizzazione":
+        _draw_echo(surface, font, p, bx, y0, bh, ctx)
+
     # Linea Eevee: Adattabilità (prima dell'evoluzione) o passiva della forma.
     if p.passive_id == "adattabilita":
         _draw_adaptability(surface, font, p, bx, y0, bh, ctx)
@@ -290,3 +294,29 @@ def _draw_charcadet_form(surface, font, p, bx, y0, bh, ctx) -> None:
         name = "Doppia Lama" + (" +Ombra" if claws else "")
     pygame.draw.rect(surface, frame, box, 2)
     surface.blit(font.render(name, True, frame), (bx - 4, y0 - 18))
+
+
+def _draw_echo(surface, font, p, bx, y0, bh, ctx) -> None:
+    """Ecolocalizzazione (Noibat/Noivern): tre onde sonore che escono da un
+    punto, accese quante sono le cariche del ping (alla terza parte il ping);
+    sotto, l'avviso del calo d'Att. Sp. di Dragobolide."""
+    box = pygame.Rect(bx, y0, bh, bh)
+    pygame.draw.rect(surface, (22, 20, 40), box)
+    n = int(getattr(p, "echo_count", 0))
+    cx, cy = box.left + 9, box.centery
+    pygame.draw.circle(surface, (110, 236, 220), (cx, cy), 3)
+    for k in range(3):
+        r = 7 + k * (bh // 2 - 9) // 2
+        lit = k < n
+        col = (110, 236, 220) if lit else (70, 70, 100)
+        rect = pygame.Rect(cx - r, cy - r, r * 2, r * 2)
+        pygame.draw.arc(surface, (16, 60, 64) if lit else (30, 30, 46), rect.inflate(2, 2),
+                        -0.9, 0.9, 4)
+        pygame.draw.arc(surface, col, rect, -0.9, 0.9, 2)
+    frame = (110, 236, 220) if n >= 2 else (150, 130, 230)
+    pygame.draw.rect(surface, frame, box, 2)
+    surface.blit(font.render(f"Ecolocalizz. {n}/3", True, frame), (bx - 4, y0 - 18))
+    left = getattr(p, "spa_down_until", -1.0) - ctx.now
+    if left > 0:
+        t = font.render(f"Att.Sp -40% {left:0.0f}s", True, (255, 140, 80))
+        surface.blit(t, (bx - 4, y0 - 34))

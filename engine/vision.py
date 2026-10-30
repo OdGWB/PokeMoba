@@ -32,6 +32,10 @@ class VisionSystem:
         self.visible_enemies: dict[int, set] = {}
         self.version: dict[int, int] = {}   # incrementa a ogni ricalcolo (per cache UI)
         self._sig: dict[int, frozenset] = {}
+        # Zone che rivelano i nemici nascosti (ping di Ecolocalizzazione):
+        # squadra -> lista di (x, y, raggio). Le imposta chi possiede la visione
+        # (Match o scena online) prima di update().
+        self.reveals: dict[int, list] = {}
 
     def _sources(self, world, team):
         out = []
@@ -55,6 +59,14 @@ class VisionSystem:
         # visione nemica anche senza muoversi di tile.
         sig |= frozenset(("inv", e.id) for e in world.entities.values()
                          if getattr(e, "invisible", False) and getattr(e, "team", team) != team)
+        # Ping attivi: i nemici dentro si muovono senza cambiare la firma delle
+        # fonti, quindi finché ce n'è uno si ricalcola a ogni aggiornamento.
+        reveals = self.reveals.get(team) or ()
+        if reveals:
+            sig |= frozenset(("ping", round(x, 1), round(y, 1), r) for x, y, r in reveals)
+            sig |= frozenset(("pos", u.id, int(u.pos.x), int(u.pos.y))
+                             for u in world.entities.values()
+                             if isinstance(u, Unit) and u.team != team and u.alive)
         if sig == self._sig.get(team):
             return False
         self._sig[team] = sig
@@ -82,6 +94,9 @@ class VisionSystem:
             if not isinstance(u, Unit) or u.team == team or not u.alive:
                 continue
             tx, ty = int(u.pos.x), int(u.pos.y)
+            if any((u.pos.x - x) ** 2 + (u.pos.y - y) ** 2 <= r * r for x, y, r in reveals):
+                enemies.add(u.id)   # ping: visibile anche in nebbia, cespuglio o invisibile
+                continue
             if (tx, ty) not in vis:
                 continue
             if getattr(u, "invisible", False):   # Memento: invisibile ai nemici

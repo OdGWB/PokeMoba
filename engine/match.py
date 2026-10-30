@@ -27,6 +27,7 @@ from .jungle import JungleSystem
 from .pathfinding import find_path, smooth_path
 from .spatial import SpatialHash
 from .charcadet import CHARCADET_PASSIVES, CharcadetMixin
+from .noivern import ECHO_ID, NOIVERN_PASSIVES, NoivernMixin
 from .corviknight import CORVI_PASSIVES, CorviknightMixin
 from .eevee import EEVEE_PASSIVES, EeveeMixin
 from .item_effects import ItemEffectsMixin, cdr_to_haste
@@ -111,7 +112,8 @@ _SYNC_STATUSES = ("slow", "stun", "freeze", "confuse", "silence", "root", "sleep
                   "spdef_debuff", "blind")
 
 
-class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, ItemEffectsMixin):
+class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, NoivernMixin,
+            ItemEffectsMixin):
     def __init__(self, world, map_data):
         self.world = world
         self.map = map_data
@@ -145,6 +147,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, ItemEf
         self._init_eevee()       # linea Eevee: Desiderio, Comete, ultimate delle forme
         self._init_corvi()       # linea Rookidee: Ventoincoda, Taxi Volante
         self._init_charcadet()   # linea Charcadet: Ombra Notturna, Pulifumo, ultimate
+        self._init_noivern()     # linea Noibat: ping, Tifone, Dragobolide
         self.vision = VisionSystem(self.world.grid)
         self._build_structures()
         self.jungle = JungleSystem(self)
@@ -196,6 +199,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, ItemEf
         self._update_channels(dt)    # canalizzazioni (Lanciafiamme continuo, Volo, Esplosione)
         self._update_corvi(dt)       # Ventoincoda, Taxi Volante, Trespolo (linea Rookidee)
         self._update_charcadet(dt)   # Armor Cannon, Ombra Notturna, Lama dei Rancori... (linea Charcadet)
+        self._update_noivern(dt)     # ping di Ecolocalizzazione, Tifone, Dragobolide (linea Noibat)
         self._update_rock_moves(dt)  # Rocciotomba / Pesobomba / Frana / Abbattimento
         self._update_spiritomb(dt)   # spiriti, Stordiraggio, Malcomune, Legione, Memento
         self._update_eevee(dt)       # Desiderio, Comete, Tuono, Bora, Divinazione, Idratazione
@@ -780,6 +784,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, ItemEf
                     self._vamp(u, dmg, physical=True)
                     self._item_after_aa(u, tgt)   # Fangopece / Bitorzolelmo
                     self._after_aa(u, tgt)        # Doppia Lama (Ceruledge)
+                    self._echo_after_aa(u, tgt)   # Ecolocalizzazione: ping ogni 3 colpi
                     self._spirit_wander(u, tgt)   # Spirito Vagante (Spiritomb)
                     self._cute_charm(u, tgt)      # Incantevole (Sylveon)
                     mt = u.types[0] if u.types else "Normal"
@@ -830,7 +835,12 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, ItemEf
         - Torri: potenza con "ramp" crescente sullo stesso bersaglio (anti-dive).
         - Minion: potenza fissa, ridotta contro le strutture (grattano lento).
         """
-        if isinstance(attacker, Pokemon):
+        magic = False
+        if isinstance(attacker, Pokemon) and attacker.passive_id == ECHO_ID:
+            # Ecolocalizzazione (Noibat/Noivern): onda sonora, danno speciale.
+            power = self._echo_power(attacker)
+            magic = True
+        elif isinstance(attacker, Pokemon):
             power = attacker.eff_attack()
             if attacker.rampage_until > self.time:
                 power *= 1.4   # Oltraggio: attacchi base più forti
@@ -848,7 +858,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, ItemEf
                 power *= 0.9   # Mantelneve (Glaceon): attacchi base nemici -10%
             # Gli auto-attacchi sono fisici e senza tipo (niente STAB/efficacia);
             # possono fare critico e beneficiano di penetrazione armatura.
-            return self._mitigate_hit(attacker, target, power, magic=False,
+            return self._mitigate_hit(attacker, target, power, magic=magic,
                                       can_crit=True)
         return max(1.0, power)
 
@@ -1223,6 +1233,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, ItemEf
         old_hp = p.hp
         # Bonus degli oggetti ricalcolati qui: l'Evolcondensa si spegne alla forma finale.
         p.item_bonus = self._item_bonus_for(p)
+        self._echo_convert(p)   # Ecolocalizzazione: Attacco degli oggetti -> Att. Sp.
         d = derive(p.base_stats, p.level, ranged=p.ranged)
         # M (moltiplicatore d'evoluzione, punto 8) si applica a HP, AD, armatura,
         # RM, mana e rigenerazione; NON a MS/AS, gittata, AP e moltiplicatore
@@ -1641,7 +1652,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, ItemEf
                 "roost": "Charge", "taxi": "Charge",
                 "nightshade": "Shoot", "clearsmog": "Shoot", "armorcannon": "Charge",
                 "floatarmor": "Charge", "psychic": "Shoot", "grudgeblade": "Attack",
-                "shadowclaw": "Charge"}.get(shape)
+                "shadowclaw": "Charge", "dragonpulse": "Shoot", "whirlwind": "Charge",
+                "hurricane": "Shoot", "dracometeor": "Charge"}.get(shape)
         if anim:
             self.fx_events.append({"eid": p.id, "anim": anim})
         # Gli eventi visivi aggiunti dai _cast_* qui sotto vengono "taggati" con lo
@@ -1722,6 +1734,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, ItemEf
             pass   # linea Rookidee (engine/corviknight.py)
         elif self._charcadet_cast(p, mv, rank, origin, tgt, dirv):
             pass   # linea Charcadet (engine/charcadet.py)
+        elif self._noivern_cast(p, mv, rank, origin, tgt, dirv):
+            pass   # linea Noibat (engine/noivern.py)
         elif shape == "buff":
             self._apply_support(p, mv, rank, origin)
             self.fx_events.append({"kind": "buff", "c": (origin.x, origin.y),
@@ -3271,6 +3285,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, ItemEf
                                           else caster.eff_attack())
                 if magic and isinstance(caster, Pokemon):
                     raw *= caster.ability_mult * self._calm_mult(caster)   # Calmamente
+                    raw *= self._spa_down_mult(caster)   # Dragobolide: Att. Sp. ridotta
             eff = (self.types.moba_multiplier(mv.type, target.types)
                    if isinstance(target, Pokemon) else 1.0)
             has_plate = (isinstance(caster, Pokemon) and caster.judgment_until > self.time
@@ -3316,7 +3331,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, ItemEf
             guard = bool(fx.get("pierce_guard"))
             self._shield_break(target, fx)   # Bruciatutto: brucia parte dello scudo
             dmg = self._mitigate_hit(caster, target, raw, magic=magic,
-                                     crit_bonus=crit_bonus, pierce_guard=guard)
+                                     crit_bonus=crit_bonus, pierce_guard=guard,
+                                     can_crit=bool(mv.d.get("can_crit")))   # Aerasoio
             self._deal_damage(caster, target, dmg, dmg_type=mv.type, ignore_shield=guard)
             self._vamp(caster, dmg, physical=not magic)
             self._item_after_move_hit(caster, mv, target, eff)   # Assorbisfera, Vulnerassicurazione
@@ -3812,6 +3828,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, ItemEf
         if p.passive_id in CORVI_PASSIVES and self._bot_corvi_cast(p, target):
             return
         if p.passive_id in CHARCADET_PASSIVES and self._bot_charcadet_cast(p, target):
+            return
+        if p.passive_id in NOIVERN_PASSIVES and self._bot_noivern_cast(p, target):
             return
         for slot in ("R", "Q", "W", "E"):
             ms = p.moveset.get(slot)

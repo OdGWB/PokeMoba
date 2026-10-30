@@ -313,6 +313,11 @@ class Pokemon(Unit):
     floatarmor_mv: tuple | None = None
     shadowclaw_until: float = -1.0     # Ombrartigli: attacchi base potenziati fino a qui
     shadowclaw_mult: float = 1.0
+    # Linea Noibat: cariche del ping di Ecolocalizzazione, calo d'Att. Sp. di
+    # Dragobolide.
+    echo_count: int = 0                # attacchi base verso il prossimo ping (0..2)
+    spa_down_until: float = -1.0       # Dragobolide: Att. Sp. ridotta fino a qui
+    spa_down_mult: float = 1.0
 
     def _bonus(self, stat: str) -> float:
         return (self.passive_bonus.get(stat, 0.0) + self.item_bonus.get(stat, 0.0)

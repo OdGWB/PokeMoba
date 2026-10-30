@@ -34,12 +34,13 @@ LISTS = {
     "item_clouds": ("center", "team"), "tailwinds": ("c", "team"),
     "shades": ("pos", "team"), "smogs": ("c", "team"), "cannon_charges": ("pos", "team"),
     "psy_zones": ("c", "team"), "flurries": ("pos", "team"),
+    "sonar_pings": ("c", "team"), "hurricanes": ("c", "team"), "meteors": ("c", "team"),
 }
 # Campi solo di logica (oggetti del motore, insiemi di bersagli già colpiti).
-SKIP = {"mv", "hit", "touched", "since", "rank", "explode", "first"}
+SKIP = {"mv", "hit", "touched", "since", "rank", "explode", "first", "caught"}
 # Stati sulle unità che non sono timer *_until (valore "spento" a destra).
 UNIT_FLAGS = {"air_z": 0.0, "sand_radius": 0.0, "invisible": False, "submerged": False,
-              "spirit_awaken": 0, "smoke_hidden": False, "armor_blocks": 0}
+              "spirit_awaken": 0, "smoke_hidden": False, "armor_blocks": 0, "echo_count": 0}
 # Il proprio Pokémon: passive e ricariche mostrate nell'interfaccia.
 ME_FIELDS = ("passive_id", "soul_charges", "inversion_stacks", "muta_cd_until", "muta_cd_max",
              "form_until", "sandstorm_boost_until", "sand_radius", "spirit_charges",

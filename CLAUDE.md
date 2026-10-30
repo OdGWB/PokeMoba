@@ -548,6 +548,33 @@ Passaggi completati:
   cannon_charges/psy_zones/flurries in net/visual.LISTS, armor_blocks in
   UNIT_FLAGS, barre arrotondate in "me". Screenshot: step_29_* (forme, hud_*,
   ogni mossa, draft_charcadet).
+- LINEA NOIBAT > NOIVERN (step_30), grafica nuova in game/noivern_fx.py
+  (logica in engine/noivern.py). Sprite PMD Sprite Collab in
+  assets/pokemon/0714/0715. Forme nuove in _draw_shapes (noivern_fx.SHAPES):
+  arco d'onda sonora a tre strati (soundarc, anche a zig-zag per Stridio),
+  onda in volo ")))" (sonicbolt: attacco base e Supersuono), lama d'aria
+  (airblade), raggio di Dragopulsar (dragonbeam: corpo viola che pulsa,
+  nucleo chiaro, anelli che scorrono; NON il "beam" generico, che a strati
+  sembrava una banda piatta), scia di vento sottile (windline: Acrobazia e
+  respinte di Turbine, niente bande larghe), cratere di meteora (crater: al
+  posto dei "flash", che sembravano macchie sfocate), folata (gust).
+  Disegni PERSISTENTI (world_fx): ping di Ecolocalizzazione (bordo tratteggiato
+  verde acqua + increspature), Tifone (IMBUTO: silhouette piena traslucida
+  stretta in basso e larga in alto con contorno scuro e strisce che girano
+  sul lato davanti; la prima versione a anelli impilati sembrava una molla),
+  Dragobolide in arrivo (cerchio che si chiude + meteore dall'alto a destra).
+  Sulle unita': 3 tacche delle cariche del ping SOTTO la barra della vita,
+  visibili a tutti (renderer._draw_unit_hp -> noivern_fx.draw_echo_pips; online
+  si riconosce dal dex 714/715 perche' il passive_id degli altri non arriva).
+  Dentro il Tifone i nemici ripetono l'animazione Hurt (eventi "anim" ogni
+  0,2 s). HUD: Ecolocalizzazione = tre onde accese quante le cariche + avviso
+  del calo d'Att. Sp. di Dragobolide. VISIONE: VisionSystem.reveals (squadra ->
+  zone x,y,r) rende visibili i nemici dentro anche in nebbia, cespuglio o
+  invisibili; online i ping arrivano in net/visual.LISTS e la scena li rimette
+  in reveals (altrimenti il client li rinasconderebbe). Corretto anche un bug:
+  la partita offline non passava attack_fx allo spawn (le frecce di Rowlet
+  non si vedevano offline). Screenshot: step_30_* (forme, hud, ogni mossa,
+  ping, tifone/_pioggia, dragobolide/_arrivo, draft_noibat).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

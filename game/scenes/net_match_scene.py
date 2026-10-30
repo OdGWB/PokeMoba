@@ -264,6 +264,12 @@ class NetMatchScene:
             self.animators[u.id].update(dt, u.moving, u.facing)
         # Particelle d'atmosfera: aggiornate solo nel rettangolo visibile.
         self.particles.update(dt, self.camera, self.map_data.grid)
+        # Ping di Ecolocalizzazione (Noibat): l'host li manda nello stato visivo;
+        # i nemici che rivelano arrivano nello snapshot, qui non vanno rinascosti.
+        fxs = getattr(self.world, "fxs", None)
+        self.vision.reveals[self.team] = [
+            (pg["c"].x, pg["c"].y, pg["radius"]) for pg in getattr(fxs, "sonar_pings", ())
+            if pg.get("team") == self.team and pg.get("end", 0.0) > self.world.match_time]
         self.vision.update(self.world, self.team)
         v = self.vision.version.get(self.team, 0)
         if v != self._mm_version:
