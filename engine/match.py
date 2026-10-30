@@ -28,6 +28,7 @@ from .pathfinding import find_path, smooth_path
 from .spatial import SpatialHash
 from .charcadet import CHARCADET_PASSIVES, CharcadetMixin
 from .noivern import ECHO_ID, NOIVERN_PASSIVES, NoivernMixin
+from .ursaring import URSA_PASSIVES, UrsaringMixin
 from .corviknight import CORVI_PASSIVES, CorviknightMixin
 from .eevee import EEVEE_PASSIVES, EeveeMixin
 from .item_effects import ItemEffectsMixin, cdr_to_haste
@@ -113,7 +114,7 @@ _SYNC_STATUSES = ("slow", "stun", "freeze", "confuse", "silence", "root", "sleep
 
 
 class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, NoivernMixin,
-            ItemEffectsMixin):
+            UrsaringMixin, ItemEffectsMixin):
     def __init__(self, world, map_data):
         self.world = world
         self.map = map_data
@@ -148,6 +149,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self._init_corvi()       # linea Rookidee: Ventoincoda, Taxi Volante
         self._init_charcadet()   # linea Charcadet: Ombra Notturna, Pulifumo, ultimate
         self._init_noivern()     # linea Noibat: ping, Tifone, Dragobolide
+        self._init_ursa()        # linea Teddiursa: Profumino, balzi, Terremoto
         self.vision = VisionSystem(self.world.grid)
         self._build_structures()
         self.jungle = JungleSystem(self)
@@ -200,6 +202,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self._update_corvi(dt)       # Ventoincoda, Taxi Volante, Trespolo (linea Rookidee)
         self._update_charcadet(dt)   # Armor Cannon, Ombra Notturna, Lama dei Rancori... (linea Charcadet)
         self._update_noivern(dt)     # ping di Ecolocalizzazione, Tifone, Dragobolide (linea Noibat)
+        self._update_ursa(dt)        # Miele, Dentistretti, balzi, Profumino, Terremoto (linea Teddiursa)
         self._update_rock_moves(dt)  # Rocciotomba / Pesobomba / Frana / Abbattimento
         self._update_spiritomb(dt)   # spiriti, Stordiraggio, Malcomune, Legione, Memento
         self._update_eevee(dt)       # Desiderio, Comete, Tuono, Bora, Divinazione, Idratazione
@@ -785,6 +788,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
                     self._item_after_aa(u, tgt)   # Fangopece / Bitorzolelmo
                     self._after_aa(u, tgt)        # Doppia Lama (Ceruledge)
                     self._echo_after_aa(u, tgt)   # Ecolocalizzazione: ping ogni 3 colpi
+                    self._ursa_after_aa(u, tgt)   # Luna Piena: attacchi base ad area
                     self._spirit_wander(u, tgt)   # Spirito Vagante (Spiritomb)
                     self._cute_charm(u, tgt)      # Incantevole (Sylveon)
                     mt = u.types[0] if u.types else "Normal"
@@ -920,6 +924,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         # Bersaglio non bersagliabile (es. SUB sotto terra): nessun danno.
         if isinstance(target, Pokemon) and target.untargetable_until > self.time:
             return
+        amount *= self._honey_wild_mult(attacker, target)   # Miele: +30% ai neutrali
         # Clone esca (Doppioteam): qualunque danno lo dissolve, senza ricompense.
         if isinstance(target, Pokemon) and target.is_decoy:
             if amount > 0.0:
@@ -963,7 +968,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         target.last_attacker_id = attacker.id
         target.last_damaged_at = self.time
         # Il sonno si rompe al primo danno subito.
-        if isinstance(target, Pokemon) and amount > 0.0 and target.sleep_until > self.time:
+        if (isinstance(target, Pokemon) and amount > 0.0 and target.sleep_until > self.time
+                and target.rest_until <= self.time):   # Riposo: il danno non sveglia
             target.sleep_until = -1.0
         # Un Pokémon che danneggia un Pokémon/struttura diventa bersaglio valido per le torri.
         if isinstance(attacker, Pokemon) and isinstance(target, (Pokemon, Structure)):
@@ -988,6 +994,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         victim.hp = 0.0
         victim.alive = False
         if isinstance(victim, Wild):
+            self._honey_on_wild_death(victim, killer)   # Miele: vasetto per campo ripulito
             self.jungle.on_wild_death(victim, killer)
             return
         self._award_xp(victim, killer)
@@ -1278,7 +1285,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         p.range_val = d.range_val
         bonus_hp = (p.item_bonus.get("hp", 0.0) + p.passive_bonus.get("hp", 0.0)
                     + p.spirit_bonus.get("hp", 0.0))
-        p.max_hp = p.stats.hp + bonus_hp
+        p.max_hp = (p.stats.hp + bonus_hp) * self._ursa_hp_mult(p)   # Luna Piena: +25%
         if p.form == "shedinja":
             p.max_hp = 1.0   # lo Shedinja ha SEMPRE 1 HP (non derivato)
         p.attack_damage = p.stats.attack
@@ -1653,7 +1660,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
                 "nightshade": "Shoot", "clearsmog": "Shoot", "armorcannon": "Charge",
                 "floatarmor": "Charge", "psychic": "Shoot", "grudgeblade": "Attack",
                 "shadowclaw": "Charge", "dragonpulse": "Shoot", "whirlwind": "Charge",
-                "hurricane": "Shoot", "dracometeor": "Charge"}.get(shape)
+                "hurricane": "Shoot", "dracometeor": "Charge",
+                "honeyscent": "Shoot", "rest": "Sleep", "earthquake": "Rumble"}.get(shape)
         if anim:
             self.fx_events.append({"eid": p.id, "anim": anim})
         # Gli eventi visivi aggiunti dai _cast_* qui sotto vengono "taggati" con lo
@@ -1736,6 +1744,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             pass   # linea Charcadet (engine/charcadet.py)
         elif self._noivern_cast(p, mv, rank, origin, tgt, dirv):
             pass   # linea Noibat (engine/noivern.py)
+        elif self._ursa_cast(p, mv, rank, origin, tgt, dirv):
+            pass   # linea Teddiursa (engine/ursaring.py)
         elif shape == "buff":
             self._apply_support(p, mv, rank, origin)
             self.fx_events.append({"kind": "buff", "c": (origin.x, origin.y),
@@ -1754,6 +1764,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
                                          float(sd.get("duration", 4.0)))
         # Autoblocco (Incendio): dopo il lancio Charizard resta inchiodato (non si
         # muove né attacca) per qualche istante. Usa uno stordimento su sé stesso.
+        self._self_slow(p, mv)   # Martelpugno: chi lo usa rallenta
         sr = mv.effects.get("self_root")
         if sr:
             dur = float(sr.get("duration", 1.0))
@@ -3327,6 +3338,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             raw *= mult
             raw *= self._item_move_mult(caster, mv, target, eff)   # Scelta, Metronomo, ...
             crit_bonus = HIGH_CRIT_CHANCE if mv.d.get("high_crit") else 0.0
+            crit_bonus += float(mv.d.get("crit_bonus", 0.0))   # Lacerazione: +20%
             # Finta: ignora gli scudi e le protezioni (difesa potenziata a tempo).
             guard = bool(fx.get("pierce_guard"))
             self._shield_break(target, fx)   # Bruciatutto: brucia parte dello scudo
@@ -3515,7 +3527,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         return dur * (1.0 - ten) * self._eevee_cc_mult(p)   # Forza Interiore / Fogliamanto
 
     def _apply_slow(self, p, mult, dur):
-        if self._cc_immune(p):
+        if self._cc_immune(p) or self._ursa_slow_immune(p):   # Luna Piena
             return
         dur = self._tenacity_dur(p, dur)
         p.slow_mult = min(p.slow_mult, mult) if self.time <= p.slow_until else mult
@@ -3830,6 +3842,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         if p.passive_id in CHARCADET_PASSIVES and self._bot_charcadet_cast(p, target):
             return
         if p.passive_id in NOIVERN_PASSIVES and self._bot_noivern_cast(p, target):
+            return
+        if p.passive_id in URSA_PASSIVES and self._bot_ursa_cast(p, target):
             return
         for slot in ("R", "Q", "W", "E"):
             ms = p.moveset.get(slot)

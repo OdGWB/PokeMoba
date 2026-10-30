@@ -16,10 +16,11 @@ from engine.entities import Core, Pillar, Pokemon, Structure, Unit
 from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
                          TILE_PUDDLE, TILE_RIVER, TILE_WALL)
 from . import spirit_fx
-from . import charcadet_fx, corvi_fx, eevee_fx, noivern_fx
+from . import charcadet_fx, corvi_fx, eevee_fx, noivern_fx, ursa_fx
 from . import structure_gfx
 from .fx import EMBER, ROCK_HI, ROCK_MID, ROCK_OUT, ROCK_SH, type_color
 from .map_renderer import MapRenderer
+from .sprites.animator import SpriteAnimator
 
 # Palette greybox (sostituita dai tileset in futuro).
 COL_BG = (18, 20, 24)
@@ -833,8 +834,13 @@ class Renderer:
                 # Memento (Spiritomb): invisibile ai nemici; la sua squadra lo
                 # vede come un'ombra traslucida.
                 ghost = isinstance(e, Pokemon) and getattr(e, "invisible", False)
+                grow = ursa_fx.grow(e, now) if isinstance(e, Pokemon) else 1.0
+                if isinstance(e, Pokemon):   # alone di Luna Piena / Dentistretti
+                    ursa_fx.draw_unit_under(surface, e, gx, gy, now, ts)
                 if anim is not None:
-                    if ghost:
+                    if grow != 1.0 and isinstance(anim, SpriteAnimator):
+                        anim.draw(surface, gx, gy, alpha=95 if ghost else 255, grow=grow)
+                    elif ghost:
                         anim.draw(surface, gx, gy, alpha=95)
                     else:
                         anim.draw(surface, gx, gy)
@@ -844,9 +850,10 @@ class Renderer:
                     eevee_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)
                     corvi_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # provocato, Trespolo
                     charcadet_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # spallacci, artigli
+                    ursa_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # Riposo, Dentistretti
                 if in_bush:
                     self._draw_hidden_hint(surface, e, gx, gy, now)
-                self._draw_unit_hp(surface, e, gx, gy)
+                self._draw_unit_hp(surface, e, gx, gy, grow)
                 if isinstance(e, Pokemon):
                     self._draw_status(surface, e, gx, gy, now)
 
@@ -1006,18 +1013,20 @@ class Renderer:
             pygame.draw.circle(surface, col, (gx - len(pips) * 3 + i * 6, top), 3)
             pygame.draw.circle(surface, (15, 15, 15), (gx - len(pips) * 3 + i * 6, top), 3, 1)
 
-    def _draw_unit_hp(self, surface, u, gx, gy):
+    def _draw_unit_hp(self, surface, u, gx, gy, grow=1.0):
         if not config.SHOW_HP_BARS:
             return
         if u.hp >= u.max_hp and not isinstance(u, Pokemon):
             return
         col = config.TEAM_COLORS.get(u.team, (200, 200, 200))
-        r = int(u.radius * self.tile_size)
+        r = int(u.radius * self.tile_size * grow)   # Luna Piena: barra più in alto
         top = gy - 2 * r - 8
         w = max(14, r * 2)
         self._hp_bar(surface, gx, top, max(0.0, u.hp / u.max_hp), col, width=w)
         if isinstance(u, Pokemon) and noivern_fx.has_echo(u):   # cariche del ping
             noivern_fx.draw_echo_pips(surface, u, gx, top, w)
+        elif isinstance(u, Pokemon) and ursa_fx.has_honey(u):   # vasetti di miele
+            ursa_fx.draw_honey_pips(surface, u, gx, top, w)
 
     def _hp_bar(self, surface, cx, top_y, frac, team_col, width):
         h = 3

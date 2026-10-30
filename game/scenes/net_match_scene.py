@@ -261,7 +261,10 @@ class NetMatchScene:
                 self.animators[u.id] = self._net_animator(u)
                 if isinstance(u, Pokemon):
                     self._unit_dex[u.id] = u.dex
-            self.animators[u.id].update(dt, u.moving, u.facing)
+            anim = self.animators[u.id]
+            anim.pose = ("Sleep" if getattr(u, "sleep_until", -1.0) > self.world.match_time
+                         else None)   # addormentato (sonno, Riposo)
+            anim.update(dt, u.moving, u.facing)
         # Particelle d'atmosfera: aggiornate solo nel rettangolo visibile.
         self.particles.update(dt, self.camera, self.map_data.grid)
         # Ping di Ecolocalizzazione (Noibat): l'host li manda nello stato visivo;
@@ -270,6 +273,10 @@ class NetMatchScene:
         self.vision.reveals[self.team] = [
             (pg["c"].x, pg["c"].y, pg["radius"]) for pg in getattr(fxs, "sonar_pings", ())
             if pg.get("team") == self.team and pg.get("end", 0.0) > self.world.match_time]
+        # Profumino (Teddiursa): i nemici nella nuvola restano visibili.
+        self.vision.reveals[self.team] += [
+            (z["c"].x, z["c"].y, z["radius"]) for z in getattr(fxs, "honey_zones", ())
+            if z.get("team") == self.team and z.get("end", 0.0) > self.world.match_time]
         self.vision.update(self.world, self.team)
         v = self.vision.version.get(self.team, 0)
         if v != self._mm_version:

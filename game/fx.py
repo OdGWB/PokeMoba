@@ -18,7 +18,7 @@ import pygame
 
 import config
 
-from . import charcadet_fx, corvi_fx, eevee_fx, noivern_fx
+from . import charcadet_fx, corvi_fx, eevee_fx, noivern_fx, ursa_fx
 from . import structure_gfx
 
 # Colore per tipo (per le particelle).
@@ -1469,6 +1469,8 @@ class FXSystem:
                 charcadet_fx.draw_shape(overlay, s, S, ts, f, a)
             elif kind in noivern_fx.SHAPES:   # linea Noibat: onde sonore, lame d'aria, meteore
                 noivern_fx.draw_shape(overlay, s, S, ts, f, a)
+            elif kind in ursa_fx.SHAPES:   # linea Teddiursa: artigli, pugno, crepe, sassi, luna
+                ursa_fx.draw_shape(overlay, s, S, ts, f, a)
         surface.blit(overlay, (0, 0))
 
     # Registro degli stili d'attacco: nome ("fx" nel JSON / "attack_fx") -> handler.
@@ -1530,4 +1532,6 @@ class FXSystem:
         **charcadet_fx.STYLES,
         # linea Noibat (game/noivern_fx.py)
         **noivern_fx.STYLES,
+        # linea Teddiursa (game/ursa_fx.py)
+        **ursa_fx.STYLES,
     }

@@ -318,6 +318,15 @@ class Pokemon(Unit):
     echo_count: int = 0                # attacchi base verso il prossimo ping (0..2)
     spa_down_until: float = -1.0       # Dragobolide: Att. Sp. ridotta fino a qui
     spa_down_mult: float = 1.0
+    # Linea Teddiursa: vasetti di Miele, Dentistretti, Riposo, Luna Piena.
+    honey: int = 0                     # vasetti di miele (0..3, visibili a tutti)
+    honey_ready_at: float = 0.0        # prossimo vasetto consumabile da qui
+    guts_until: float = -1.0           # Dentistretti attivo dopo il risveglio da Riposo
+    guts_active: bool = False          # aggiornato dal Match (per eff_attack)
+    rest_until: float = -1.0           # Riposo: sonno che il danno non rompe
+    moon_until: float = -1.0           # Luna Piena: forma ingrandita fino a qui
+    moon_hp_mult: float = 1.0
+    moon_cleave: float = 0.0           # raggio degli attacchi base ad area
 
     def _bonus(self, stat: str) -> float:
         return (self.passive_bonus.get(stat, 0.0) + self.item_bonus.get(stat, 0.0)
@@ -328,8 +337,10 @@ class Pokemon(Unit):
         if self.atk_debuff_active:
             base -= self.atk_debuff_amt
         atk = max(0.0, base) * self.atk_mult
-        if self.burn_active:
+        if self.burn_active and self.passive_id != "dentistretti":
             atk *= 0.75   # Scottatura (Fiammacoda): -25% Attacco mentre brucia
+        if self.guts_active:
+            atk *= 1.5    # Dentistretti (Ursaring/Ursaluna): +50% con uno stato alterato
         if self.passive_id == "forzabruta" and self.cc_active:
             atk *= 1.5   # ForzaBruta: +50% attacco fisico mentre è sotto CC
         if self.passive_id == "inversione" and self.inversion_stacks:

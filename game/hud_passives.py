@@ -15,7 +15,7 @@ import pygame
 
 from engine.eevee import eevee_candidates, eevee_forms
 
-from . import eevee_fx
+from . import eevee_fx, ursa_fx
 
 
 @dataclass
@@ -130,6 +130,10 @@ def draw_passive(surface, font, p, bx, y0, bh, ctx) -> None:
     # Linea Noibat: Ecolocalizzazione (onde sonore + cariche del ping).
     if p.passive_id == "ecolocalizzazione":
         _draw_echo(surface, font, p, bx, y0, bh, ctx)
+
+    # Linea Teddiursa: Miele (vasetti) e, da Ursaring, Dentistretti.
+    if p.passive_id in ("miele", "dentistretti"):
+        _draw_honey(surface, font, p, bx, y0, bh, ctx)
 
     # Linea Eevee: Adattabilità (prima dell'evoluzione) o passiva della forma.
     if p.passive_id == "adattabilita":
@@ -320,3 +324,26 @@ def _draw_echo(surface, font, p, bx, y0, bh, ctx) -> None:
     if left > 0:
         t = font.render(f"Att.Sp -40% {left:0.0f}s", True, (255, 140, 80))
         surface.blit(t, (bx - 4, y0 - 34))
+
+
+def _draw_honey(surface, font, p, bx, y0, bh, ctx) -> None:
+    """Miele: tre vasetti (pieni quanti ne ha) e la ricarica di 10 s; sopra,
+    da Ursaring, Dentistretti che si accende di rosso quando è attivo."""
+    box = pygame.Rect(bx, y0, bh + 8, bh)
+    pygame.draw.rect(surface, (40, 28, 18), box)
+    n = int(getattr(p, "honey", 0))
+    s = max(6, bh // 4)
+    for k in range(3):
+        ursa_fx.draw_jar(surface, box.left + 5 + k * (s + 4), box.centery - s // 2, s, k < n)
+    left = getattr(p, "honey_ready_at", 0.0) - ctx.now
+    frame = (244, 178, 48) if n else (150, 120, 80)
+    pygame.draw.rect(surface, frame, box, 2)
+    surface.blit(font.render(f"Miele {n}/3", True, frame), (bx - 4, y0 - 18))
+    if left > 0:
+        t = font.render(f"{left:0.0f}s", True, frame)
+        surface.blit(t, (box.centerx - t.get_width() // 2, y0 + bh + 2))
+    if p.passive_id == "dentistretti":
+        on = bool(getattr(p, "guts_active", False))
+        col = (255, 84, 54) if on else (130, 110, 100)
+        txt = "Dentistretti +50% Att" if on else "Dentistretti"
+        surface.blit(font.render(txt, True, col), (bx - 4, y0 - 34))

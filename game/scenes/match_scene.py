@@ -377,6 +377,8 @@ class MatchScene:
         for u in self.world.alive_units():
             anim = self.animators.get(u.id)
             if anim is not None:
+                # Addormentato (sonno, Riposo): posa Sleep finché dura.
+                anim.pose = "Sleep" if getattr(u, "sleep_until", -1.0) > self.match.time else None
                 anim.update(dt, u.moving, u.facing)
 
         # Morte: avvia l'animazione Hurt + dissolvenza (così si capisce che sei morto).

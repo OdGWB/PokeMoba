@@ -35,12 +35,14 @@ LISTS = {
     "shades": ("pos", "team"), "smogs": ("c", "team"), "cannon_charges": ("pos", "team"),
     "psy_zones": ("c", "team"), "flurries": ("pos", "team"),
     "sonar_pings": ("c", "team"), "hurricanes": ("c", "team"), "meteors": ("c", "team"),
+    "honey_zones": ("c", "team"), "quakes": ("c", "team"),
 }
 # Campi solo di logica (oggetti del motore, insiemi di bersagli già colpiti).
 SKIP = {"mv", "hit", "touched", "since", "rank", "explode", "first", "caught"}
 # Stati sulle unità che non sono timer *_until (valore "spento" a destra).
 UNIT_FLAGS = {"air_z": 0.0, "sand_radius": 0.0, "invisible": False, "submerged": False,
-              "spirit_awaken": 0, "smoke_hidden": False, "armor_blocks": 0, "echo_count": 0}
+              "spirit_awaken": 0, "smoke_hidden": False, "armor_blocks": 0, "echo_count": 0,
+              "honey": 0, "guts_active": False}
 # Il proprio Pokémon: passive e ricariche mostrate nell'interfaccia.
 ME_FIELDS = ("passive_id", "soul_charges", "inversion_stacks", "muta_cd_until", "muta_cd_max",
              "form_until", "sandstorm_boost_until", "sand_radius", "spirit_charges",
@@ -113,6 +115,11 @@ def capture_visual(match, team: int, player=None) -> dict:
     taxis = [_clean(fl) for fl in getattr(match, "taxi_flights", ())]
     if taxis:
         out["taxi_flights"] = taxis
+    # Balzi della linea Teddiursa: l'atterraggio di Luna Piena lo vedono tutti.
+    leaps = [_clean(lp) for lp in getattr(match, "bear_leaps", ())
+             if lp.get("fx") == "fullmoon" or seen(lp["c"], lp["team"])]
+    if leaps:
+        out["bear_leaps"] = leaps
     pillars = [{"pos": pl.pos, "tx": pl.tx, "ty": pl.ty, "team": pl.team, "born": pl.born,
                 "until": pl.until, "radius": pl.radius}
                for pl in getattr(world, "pillars", ())]

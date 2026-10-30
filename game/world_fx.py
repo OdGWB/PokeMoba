@@ -19,7 +19,7 @@ import pygame
 
 import config
 
-from . import charcadet_fx, corvi_fx, eevee_fx, noivern_fx, spirit_fx
+from . import charcadet_fx, corvi_fx, eevee_fx, noivern_fx, spirit_fx, ursa_fx
 from .fx import draw_avalanche, draw_sandstorm, type_color
 
 
@@ -103,6 +103,16 @@ def draw_world_effects(surface, camera, world, m, team, vision, now, player_id,
     for mt in getattr(m, "meteors", ()):
         if seen(mt["c"], mt["team"]):
             noivern_fx.draw_meteor_warn(surface, camera, mt, now)
+    # Linea Teddiursa: nuvola di Profumino, balzi (Luna Piena in arrivo), Terremoto.
+    for z in getattr(m, "honey_zones", ()):
+        if seen(z["c"], z["team"]):
+            ursa_fx.draw_honey_zone(surface, camera, z, now)
+    for q in getattr(m, "quakes", ()):
+        if seen(q["c"], q["team"]):
+            ursa_fx.draw_quake(surface, camera, q, now)
+    for lp in getattr(m, "bear_leaps", ()):
+        if seen(lp["c"], lp["team"]) or lp.get("fx") == "fullmoon":   # l'atterraggio lo vedono tutti
+            ursa_fx.draw_leap(surface, camera, lp, now)
 
 
 def draw_projectiles(surface, camera, m, now=0.0) -> None:

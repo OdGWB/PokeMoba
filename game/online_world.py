@@ -78,7 +78,8 @@ class OnlineWorld(NetWorld):
         self.disconnected: set = set()
         self._last_t = None
         # Stato visivo (vedi net/visual.py).
-        self.fxs = SimpleNamespace(**{n: [] for n in (*LISTS, "pain_binds", "wishes", "taxi_flights")})
+        self.fxs = SimpleNamespace(**{n: [] for n in (*LISTS, "pain_binds", "wishes", "taxi_flights",
+                                                       "bear_leaps")})
         self.respawning: list = []
         self.dead: set = set()
         self.me_vis: dict = {}

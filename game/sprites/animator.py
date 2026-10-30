@@ -35,6 +35,7 @@ class SpriteAnimator:
         self.oneshot: str | None = None   # animazione "una tantum" (Attack/Shoot/Hurt)
         self.oneshot_speed = 1.0          # moltiplicatore di velocità (es. Hop veloce)
         self.frozen = False               # True = resta fermo sul frame corrente (morte)
+        self.pose: str | None = None      # posa continua al posto di Idle/Walk (es. Sleep)
 
     def play_once(self, name: str, speed: float = 1.0) -> None:
         """Riproduce un'animazione una sola volta (a `speed`x), poi torna a Idle/Walk."""
@@ -68,6 +69,8 @@ class SpriteAnimator:
         return s
 
     def _resolve_state(self, moving: bool) -> str:
+        if self.pose and self.anim_set.has(self.pose):
+            return self.pose   # addormentato: resta nella posa finché dura
         want = "Walk" if moving else "Idle"
         if self.anim_set.has(want):
             return want
@@ -109,7 +112,8 @@ class SpriteAnimator:
                 self.frame = 0                # animazione normale: in loop
         self.frame %= anim.frame_count
 
-    def draw(self, surface: pygame.Surface, sx: int, sy: int, alpha: int = 255) -> None:
+    def draw(self, surface: pygame.Surface, sx: int, sy: int, alpha: int = 255,
+             grow: float = 1.0) -> None:
         anim = self.anim_set.get(self.state)
         if anim is None or anim.frame_count == 0:
             return
@@ -119,6 +123,23 @@ class SpriteAnimator:
             return
         idx = self.frame % len(frames)
         frame = self._frame_surface(self.state, direction, idx, frames[idx])
+        if grow != 1.0:   # ingrandito a tempo (Luna Piena): scala NEAREST, in cache
+            g = round(grow, 2)
+            gkey = (self.state, direction, idx, g)
+            big = self._scaled.get(gkey)
+            if big is None:
+                big = pygame.transform.scale(frame, (max(1, int(frame.get_width() * g)),
+                                                     max(1, int(frame.get_height() * g))))
+                self._scaled[gkey] = big
+                self._bboxes[gkey] = big.get_bounding_rect()
+            bb = self._bboxes[gkey]
+            if bb.width == 0:
+                return
+            if alpha < 255:
+                big = big.copy()
+                big.fill((255, 255, 255, max(0, alpha)), None, pygame.BLEND_RGBA_MULT)
+            surface.blit(big, (sx - bb.centerx, sy - bb.bottom))
+            return
         # Ancora il BORDO INFERIORE del contenuto reale (non del riquadro, che ha
         # margini trasparenti) al punto a terra, centrato orizzontalmente su di esso.
         key = (self.state, direction, idx)

@@ -575,6 +575,31 @@ Passaggi completati:
   la partita offline non passava attack_fx allo spawn (le frecce di Rowlet
   non si vedevano offline). Screenshot: step_30_* (forme, hud, ogni mossa,
   ping, tifone/_pioggia, dragobolide/_arrivo, draft_noibat).
+- LINEA TEDDIURSA > URSARING > URSALUNA (step_31), grafica nuova in
+  game/ursa_fx.py (logica in engine/ursaring.py). Sprite PMD Sprite Collab in
+  assets/pokemon/0216/0217/0901. Forme nuove in _draw_shapes (ursa_fx.SHAPES):
+  tre artigliate AFFUSOLATE (claw3: spesse al centro, a punta ai capi; le
+  prime a tratto pieno sembravano bande), pugno arancione che cala dall'alto e
+  si schiaccia (fist), crepe a terra irregolari (groundcrack: lunghezze e
+  angoli casuali, altrimenti sembrano i raggi di una ruota; "crack" esisteva
+  gia' in fx.py), onda d'urto schiacciata in prospettiva (groundring), sassi
+  che saltano (pebble), vasetto di miele (honeypot), luna (moonglow, alta
+  sopra la barra della vita). Disegni PERSISTENTI (world_fx): nuvola di
+  Profumino (macchie oro/rosa tenui + bordo tratteggiato + cuoricini che
+  salgono; con il fondo pieno sembrava un disco piatto), Terremoto (area a
+  trattini, crepe CORTE attorno ai piedi che tremano), balzi (cerchio
+  d'atterraggio di Luna Piena visibile a tutti, online compreso). Sulle unita':
+  vasetti di miele sotto la barra della vita (visibili a tutti; online dal dex
+  216/217/901), Luna Piena = sprite x1,3 (SpriteAnimator.draw grow=, NEAREST in
+  cache) con alone lunare e barra della vita piu' in alto, Z di Riposo a
+  destra della barra, vena rossa + anello quando Dentistretti e' attivo. Chi
+  dorme (sonno o Riposo) usa l'animazione Sleep (SpriteAnimator.pose, in
+  entrambe le scene). HUD: Miele = tre vasetti + ricarica, sopra
+  "Dentistretti" che si accende di rosso. Online: honey_zones/quakes in
+  net/visual.LISTS, bear_leaps a parte (Luna Piena a entrambe le squadre),
+  honey/guts_active in UNIT_FLAGS; la scena di rete rimette le nuvole di
+  Profumino in vision.reveals. Screenshot: step_31_* (linea, hud_*, ogni
+  mossa, lunapiena_balzo/_grande, draft_teddiursa).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul
