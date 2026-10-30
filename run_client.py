@@ -22,13 +22,15 @@ def main() -> None:
                         help="livello di partenza del giocatore (test: es. 8 per Ninjask)")
     parser.add_argument("--item", action="append", default=[], dest="items",
                         help="oggetto di partenza (ripetibile; es. --item king_rock per Politoad)")
+    parser.add_argument("--armature", choices=("fausta", "infausta"), default=None,
+                        help="Charcadet: barra di Armature in vantaggio (test: forma al liv.8)")
     args = parser.parse_args()
 
     from game.app import App
     if args.single:
         app = App(initial="match", map_path=str(ROOT / args.map),
                   pokemon_path=str(ROOT / args.pokemon), start_level=args.level,
-                  start_items=args.items)
+                  start_items=args.items, start_armature=args.armature)
     else:
         app = App(initial="menu")
     app.run()

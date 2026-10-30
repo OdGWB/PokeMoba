@@ -121,6 +121,12 @@ def draw_passive(surface, font, p, bx, y0, bh, ctx) -> None:
         name = "Specchiarm." if mirror else "Sguardofermo"
         surface.blit(font.render(name, True, frame), (bx - 18, y0 - 18))
 
+    # Linea Charcadet: Armature (barre e forma verso cui va), Guardia, Doppia Lama.
+    if p.passive_id == "armature":
+        _draw_armature(surface, font, p, bx, y0, bh, ctx)
+    elif p.passive_id in ("guardia", "doppialama"):
+        _draw_charcadet_form(surface, font, p, bx, y0, bh, ctx)
+
     # Linea Eevee: Adattabilità (prima dell'evoluzione) o passiva della forma.
     if p.passive_id == "adattabilita":
         _draw_adaptability(surface, font, p, bx, y0, bh, ctx)
@@ -210,4 +216,77 @@ def _draw_form_passive(surface, font, p, bx, y0, bh, ctx) -> None:
     name = eevee_fx.PASSIVE_NAMES.get(p.passive_id, p.passive_id)
     if info:
         name += f" {info}"
+    surface.blit(font.render(name, True, frame), (bx - 4, y0 - 18))
+
+
+ARM_FAUSTA = (236, 74, 70)      # Armatura Fausta -> Armarouge (rosso)
+ARM_INFAUSTA = (110, 132, 250)  # Armatura Infausta -> Ceruledge (blu)
+
+
+def _draw_armature(surface, font, p, bx, y0, bh, ctx) -> None:
+    """Passiva Armature (Charcadet): ritratto della forma verso cui sta andando
+    (Armarouge se Fausta > Infausta, altrimenti Ceruledge) e le due barre."""
+    fa, inf = float(getattr(p, "fausta", 0.0)), float(getattr(p, "infausta", 0.0))
+    to_arma = fa > inf
+    name = "Armarouge" if to_arma else "Ceruledge"
+    st = next((e for e in p.evolutions if e.get("name") == name), None)
+    col = ARM_FAUSTA if to_arma else ARM_INFAUSTA
+    box = pygame.Rect(bx, y0, bh, bh)
+    pygame.draw.rect(surface, (30, 20, 22), box)
+    if st is not None:
+        img = ctx.portrait(st["sprite_dir"], bh - 10)
+        if img is not None:
+            if fa == inf == 0.0:
+                img = img.copy()
+                img.set_alpha(120)   # ancora nessun danno: forma incerta
+            surface.blit(img, (box.centerx - img.get_width() // 2,
+                               box.centery - img.get_height() // 2))
+    pygame.draw.rect(surface, col, box, 2)
+    top = max(1.0, fa, inf)
+    for i, (v, c, lab) in enumerate(((fa, ARM_FAUSTA, "F"), (inf, ARM_INFAUSTA, "I"))):
+        # barra + lettera sotto, tutto dentro l'altezza del riquadro
+        r = pygame.Rect(box.right + 4 + i * 13, y0, 10, bh - 16)
+        pygame.draw.rect(surface, (24, 20, 26), r)
+        fill = int((r.h - 2) * min(1.0, v / top))
+        pygame.draw.rect(surface, c, pygame.Rect(r.x + 1, r.bottom - 1 - fill, r.w - 2, fill))
+        lead = (i == 0) == to_arma
+        pygame.draw.rect(surface, (255, 255, 255) if lead else (90, 84, 96), r, 1)
+        t = font.render(lab, True, c)
+        surface.blit(t, (r.centerx - t.get_width() // 2, r.bottom))
+    surface.blit(font.render(f"Armature -> {name}", True, col), (bx - 4, y0 - 18))
+
+
+def _draw_charcadet_form(surface, font, p, bx, y0, bh, ctx) -> None:
+    """Guardia (Armarouge: scudo dorato, ricarica) o Doppia Lama (Ceruledge:
+    due spade incrociate)."""
+    guard = p.passive_id == "guardia"
+    box = pygame.Rect(bx, y0, bh, bh)
+    pygame.draw.rect(surface, (30, 20, 22) if guard else (20, 20, 36), box)
+    cx, cy = box.center
+    s = bh // 2 - 10
+    if guard:
+        left = getattr(p, "guard_ready_at", 0.0) - ctx.now
+        lit = left <= 0
+        gold = (246, 200, 84) if lit else (130, 110, 70)
+        pts = [(cx - s, cy - s), (cx + s, cy - s), (cx + s, cy), (cx, cy + s), (cx - s, cy)]
+        pygame.draw.polygon(surface, (206, 40, 52) if lit else (96, 40, 44), pts)
+        pygame.draw.polygon(surface, gold, pts, 2)
+        pygame.draw.line(surface, gold, (cx, cy - s + 3), (cx, cy + s - 4), 2)
+        frame = gold
+        name = "Guardia" if lit else f"Guardia {left:0.0f}s"
+    else:
+        for side in (-1, 1):   # due lame incrociate: elsa in basso, punta in alto
+            a = (cx - side * s, cy + s)          # pomo
+            g = (cx - side * (s - 5), cy + s - 5)   # guardia
+            b = (cx + side * s, cy - s)          # punta
+            pygame.draw.line(surface, (30, 34, 110), g, b, 6)
+            pygame.draw.line(surface, (110, 140, 255), g, b, 4)
+            pygame.draw.line(surface, (220, 230, 255), g, b, 1)
+            pygame.draw.line(surface, (120, 70, 30), a, g, 3)
+            pygame.draw.line(surface, (246, 200, 84), (g[0] - 4, g[1] - side * 4),
+                             (g[0] + 4, g[1] + side * 4), 3)
+        claws = getattr(p, "shadowclaw_until", -1.0) > ctx.now
+        frame = (176, 120, 236) if claws else (110, 132, 250)
+        name = "Doppia Lama" + (" +Ombra" if claws else "")
+    pygame.draw.rect(surface, frame, box, 2)
     surface.blit(font.render(name, True, frame), (bx - 4, y0 - 18))

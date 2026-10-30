@@ -1,0 +1,132 @@
+{
+  "_comment": "Charcadet -> Armarouge OPPURE Ceruledge (liv.8), evoluzione ramificata dallo STILE DI GIOCO. Passiva Armature (engine/charcadet.py): Armatura Fausta si riempie col danno SUBITO dai Pokémon nemici, Armatura Infausta col danno INFLITTO ai Pokémon nemici (minion, neutrali e torri non contano). Al liv.8: Fausta piu' alta -> Armarouge (mago corazzato, danno speciale), altrimenti (parita' compresa) Ceruledge (duellante, danno fisico, si cura). All'evoluzione la Q diventa la mossa esclusiva della forma (il grado si conserva), W ed E restano; la forma porta la sua passiva e due ultimate a scelta. Q si potenzia senza scelta al liv.5 (Bruciatutto+), W al liv.6 e E al liv.7 come al solito.",
+  "dex": 935,
+  "name": "Charcadet",
+  "types": ["Fire"],
+  "role": "combattente",
+  "recommended_items": ["shell_bell", "wise_glasses", "muscle_band", "leftovers"],
+  "color": [214, 96, 60],
+  "radius": 0.36,
+  "base_speed": 3.5,
+  "attack_range": 1.7,
+  "attack_cooldown": 0.9,
+  "sprite_dir": "assets/pokemon/0935",
+  "passive": "armature",
+  "attack_fx": "slash",
+
+  "base_stats": {"hp": 40, "attack": 50, "defense": 40, "sp_attack": 50, "sp_defense": 40, "speed": 35},
+
+  "evolutions": [
+    {"stage": 0, "level": 1, "name": "Charcadet", "dex": 935, "sprite_dir": "assets/pokemon/0935",
+     "types": ["Fire"], "passive": "armature", "role": "combattente", "color": [214, 96, 60],
+     "attack_fx": "slash", "attack_range": 1.7, "ranged": false, "radius": 0.36,
+     "base_stats": {"hp": 40, "attack": 50, "defense": 40, "sp_attack": 50, "sp_defense": 40, "speed": 35}},
+
+    {"stage": 1, "level": 8, "name": "Armarouge", "dex": 936, "sprite_dir": "assets/pokemon/0936",
+     "types": ["Fire", "Psychic"], "passive": "guardia", "role": "mago", "color": [206, 52, 62],
+     "form_color": [232, 74, 70],
+     "attack_fx": "orb", "attack_range": 3.6, "ranged": true, "radius": 0.5,
+     "requires": {"armature": "fausta"},
+     "base_stats": {"hp": 85, "attack": 60, "defense": 100, "sp_attack": 125, "sp_defense": 80, "speed": 75},
+     "moves": {
+       "Q": {"base": {"id": "armorcannon", "name": "Armor Cannon", "type": "Fire", "category": "special",
+                      "shape": "armorcannon", "fx": "armorcannon", "target": "direction",
+                      "power": [140, 210, 280, 350], "ratio": 0.9,
+                      "cooldown": [10, 9.5, 9, 8.5], "range": 9.5, "radius": 0.55, "speed": 15,
+                      "effects": {"charge": 0.5, "self_down": {"mult": 0.8, "duration": 4.0}}}},
+       "R": {"upgrades": [
+         {"id": "floatarmor", "name": "Armatura Fluttuante", "type": "Fire", "category": "special",
+          "shape": "floatarmor", "fx": "floatarmor", "target": "self",
+          "power": [160, 240, 320], "ratio": 0.6,
+          "cooldown": [90, 80, 70], "range": 0, "radius": 2.6,
+          "effects": {"duration": 5.0, "blocks": 3, "guard_radius": 1.7}},
+         {"id": "psychic", "name": "Psichico", "type": "Psychic", "category": "special",
+          "shape": "psychic", "fx": "psychic", "target": "point",
+          "power": [170, 250, 330], "ratio": 0.7,
+          "cooldown": [80, 70, 60], "range": 6.5, "radius": 2.3,
+          "effects": {"delay": 0.5, "airborne": {"duration": 1.5, "peak": 1.1}}}
+       ]}
+     }},
+
+    {"stage": 1, "level": 8, "name": "Ceruledge", "dex": 937, "sprite_dir": "assets/pokemon/0937",
+     "types": ["Fire", "Ghost"], "passive": "doppialama", "role": "combattente", "color": [72, 62, 150],
+     "form_color": [96, 120, 240],
+     "attack_fx": "slash", "attack_range": 1.8, "ranged": false, "radius": 0.5,
+     "base_stats": {"hp": 75, "attack": 125, "defense": 80, "sp_attack": 60, "sp_defense": 100, "speed": 85},
+     "moves": {
+       "Q": {"base": {"id": "bitterblade", "name": "Bitter Blade", "type": "Ghost", "category": "physical",
+                      "shape": "cone", "fx": "bitterblade", "target": "direction",
+                      "power": [80, 120, 160, 200], "ratio": 0.9,
+                      "cooldown": [7, 6.5, 6, 5.5], "range": 2.6, "angle": 65,
+                      "effects": {"heal_self_ratio": 0.5}}},
+       "R": {"upgrades": [
+         {"id": "grudgeblade", "name": "Lama dei Rancori", "type": "Ghost", "category": "physical",
+          "shape": "grudgeblade", "fx": "grudgeblade", "target": "point",
+          "power": [240, 340, 440], "ratio": 1.0,
+          "cooldown": [90, 80, 70], "range": 6.0, "radius": 1.2,
+          "effects": {"duration": 1.5, "hits": 6, "heal_ratio": 0.2}},
+         {"id": "shadowclaw", "name": "Ombrartigli", "type": "Dark", "category": "physical",
+          "shape": "shadowclaw", "fx": "shadowclaw", "target": "self",
+          "power": [0, 0, 0],
+          "cooldown": [60, 55, 50], "range": 0, "radius": 1.0,
+          "effects": {"duration": 6.0, "range_mult": 1.5}}
+       ]}
+     }}
+  ],
+
+  "moves": {
+    "Q": {
+      "base": {"id": "incinerate", "name": "Bruciatutto", "type": "Fire", "category": "special",
+               "shape": "cone", "fx": "incinerate", "target": "direction",
+               "power": [60, 90, 120, 150], "ratio": 0.5,
+               "cooldown": [6, 5.5, 5, 4.5], "range": 2.5, "angle": 45,
+               "effects": {"shield_break": 0.2}},
+      "upgrades": [
+        {"id": "incinerateplus", "name": "Bruciatutto +", "type": "Fire", "category": "special",
+         "shape": "cone", "fx": "incinerate", "target": "direction",
+         "power": [80, 120, 160, 200], "ratio": 0.6,
+         "cooldown": [6, 5.5, 5, 4.5], "range": 2.7, "angle": 48,
+         "effects": {"shield_break": 0.4}}
+      ]
+    },
+    "W": {
+      "base": {"id": "lavaplume", "name": "Lavasbuffo", "type": "Fire", "category": "special",
+               "shape": "area", "fx": "lavaplume", "target": "self",
+               "power": [55, 85, 115, 145], "ratio": 0.45,
+               "cooldown": [9, 8.5, 8, 7.5], "range": 0, "radius": 2.2,
+               "effects": {"burn": {"chance": 0.3, "duration": 3.0}}},
+      "upgrades": [
+        {"id": "nightshade", "name": "Ombra Notturna", "type": "Dark", "category": "special",
+         "shape": "nightshade", "fx": "nightshade", "target": "point",
+         "power": [20, 30, 40, 50],
+         "cooldown": [9, 8.5, 8, 7.5], "range": 6.5, "radius": 0.5, "speed": 9,
+         "effects": {"per_level": [9, 11, 13, 15]}},
+        {"id": "clearsmog", "name": "Pulifumo", "type": "Poison", "category": "none",
+         "shape": "clearsmog", "fx": "clearsmog", "target": "point",
+         "power": [0, 0, 0, 0],
+         "cooldown": [13, 12, 11, 10], "range": 6.5, "radius": 2.0,
+         "effects": {"duration": 3.0}}
+      ]
+    },
+    "E": {
+      "base": {"id": "flamecharge", "name": "Nitrocarica", "type": "Fire", "category": "physical",
+               "shape": "dash", "fx": "flamecharge", "target": "direction",
+               "power": [45, 70, 95, 120], "ratio": 0.5,
+               "cooldown": [0.8, 0.8, 0.8, 0.8], "range": 4.5, "radius": 0.9,
+               "charges": 2, "charge_time": 7, "refund_on_hit": false,
+               "effects": {"speed_stack": {"per": 0.12, "max": 3, "duration": 4.0}}},
+      "upgrades": [
+        {"id": "calmmind", "name": "Calmamente", "type": "Psychic", "category": "none",
+         "shape": "buff", "fx": "calmmind", "target": "self",
+         "cooldown": [14, 13, 12, 11],
+         "passive": {"stat": "sp_defense", "amount": [4, 8, 12, 16]},
+         "effects": {"calm": {"mult": 1.15, "duration": 5.0}}},
+        {"id": "swordsdance", "name": "Danzaspada", "type": "Normal", "category": "none",
+         "shape": "buff", "fx": "swordsdance", "target": "self",
+         "cooldown": [14, 13, 12, 11],
+         "passive": {"stat": "attack", "amount": [6, 12, 18, 24]},
+         "effects": {"atk": {"mult": 1.25, "duration": 5.0}}}
+      ]
+    }
+  }
+}

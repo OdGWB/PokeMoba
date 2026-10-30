@@ -25,6 +25,14 @@ def _requires_met(p, st) -> bool:
         return False
     # Linea Eevee: {"choices": {"Q": 0, "W": 1, ...}} -> indici dei potenziamenti
     # scelti. Finché uno slot non è scelto la condizione è falsa (non evolve).
+    # Linea Charcadet: {"armature": "fausta"} -> vera se l'Armatura Fausta (danno
+    # subito) supera l'Infausta (danno inflitto); "infausta" -> il contrario,
+    # parità compresa.
+    arm = req.get("armature")
+    if arm == "fausta" and not p.fausta > p.infausta:
+        return False
+    if arm == "infausta" and p.fausta > p.infausta:
+        return False
     choices = req.get("choices")
     if choices:
         for slot, idx in choices.items():

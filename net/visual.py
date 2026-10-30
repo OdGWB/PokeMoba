@@ -32,17 +32,19 @@ LISTS = {
     "thunders": ("c", "team"), "blizzards": ("c", "team"),
     "future_sights": ("c", "team"), "swift_stars": ("pos", "team"),
     "item_clouds": ("center", "team"), "tailwinds": ("c", "team"),
+    "shades": ("pos", "team"), "smogs": ("c", "team"), "cannon_charges": ("pos", "team"),
+    "psy_zones": ("c", "team"), "flurries": ("pos", "team"),
 }
 # Campi solo di logica (oggetti del motore, insiemi di bersagli già colpiti).
 SKIP = {"mv", "hit", "touched", "since", "rank", "explode", "first"}
 # Stati sulle unità che non sono timer *_until (valore "spento" a destra).
 UNIT_FLAGS = {"air_z": 0.0, "sand_radius": 0.0, "invisible": False, "submerged": False,
-              "spirit_awaken": 0, "smoke_hidden": False}
+              "spirit_awaken": 0, "smoke_hidden": False, "armor_blocks": 0}
 # Il proprio Pokémon: passive e ricariche mostrate nell'interfaccia.
 ME_FIELDS = ("passive_id", "soul_charges", "inversion_stacks", "muta_cd_until", "muta_cd_max",
              "form_until", "sandstorm_boost_until", "sand_radius", "spirit_charges",
              "wander_ready_at", "voltabsorb_ready_at", "flashfire_until", "recalling",
-             "recall_until", "respawn_timer")
+             "recall_until", "respawn_timer", "guard_ready_at")
 
 _timer_fields: dict = {}
 
@@ -135,6 +137,8 @@ def capture_visual(match, team: int, player=None) -> dict:
 def capture_me_visual(match, p) -> dict:
     me = {name: getattr(p, name) for name in ME_FIELDS if hasattr(p, name)}
     me["respawn_timer"] = round(max(0.0, p.respawn_timer))
+    if p.passive_id == "armature":   # Charcadet: barre di Armature (arrotondate)
+        me["fausta"], me["infausta"] = round(p.fausta), round(p.infausta)
     me["item_cd"] = {k: float(v) for k, v in p.item_cd.items() if v > match.time}
     charges = {}
     for s in SLOTS:

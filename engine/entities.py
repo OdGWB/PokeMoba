@@ -173,6 +173,7 @@ class Pokemon(Unit):
     spdef_debuff_until: float = -1.0
     spdef_debuff_active: bool = False
     spdef_debuff_amt: float = 0.0
+    spdef_debuff_mult: float = 1.0     # Armor Cannon: Dif. Sp. ridotta in percentuale
     atk_debuff_until: float = -1.0     # Danzadipiume: riduce l'Attacco
     atk_debuff_active: bool = False
     atk_debuff_amt: float = 0.0
@@ -299,6 +300,19 @@ class Pokemon(Unit):
     taunt_src: int | None = None
     roost_until: float = -1.0          # Trespolo: senza il tipo Volante fino a qui
     mirror_cd: dict = field(default_factory=dict)   # Specchiarmatura: id nemico -> pronto da
+    # Linea Charcadet: barre di Armature, Calmamente, Guardia, Armatura
+    # Fluttuante, Ombrartigli.
+    fausta: float = 0.0                # Armatura Fausta: danno subito da Pokémon nemici
+    infausta: float = 0.0              # Armatura Infausta: danno inflitto a Pokémon nemici
+    calm_until: float = -1.0           # Calmamente: +Att. Sp. e +Dif. Sp. temporanei
+    calm_mult: float = 1.0
+    calm_active: bool = False          # aggiornato dal Match (per eff_sp_defense)
+    guard_ready_at: float = 0.0        # Guardia: pronta da questo istante
+    floatarmor_until: float = -1.0     # Armatura Fluttuante: spallacci in orbita fino a qui
+    armor_blocks: int = 0              # proiettili che può ancora intercettare
+    floatarmor_mv: tuple | None = None
+    shadowclaw_until: float = -1.0     # Ombrartigli: attacchi base potenziati fino a qui
+    shadowclaw_mult: float = 1.0
 
     def _bonus(self, stat: str) -> float:
         return (self.passive_bonus.get(stat, 0.0) + self.item_bonus.get(stat, 0.0)
@@ -332,6 +346,8 @@ class Pokemon(Unit):
             ap *= 0.5    # Memento: Att. Sp. dimezzato
         if self.wp_active:
             ap *= 1.25   # Vulnerassicurazione: +25% Att. Sp.
+        if self.calm_active:
+            ap *= self.calm_mult   # Calmamente: +Att. Sp. temporaneo
         return ap
 
     def _soul(self) -> int:
@@ -349,7 +365,9 @@ class Pokemon(Unit):
     def eff_sp_defense(self) -> float:
         d = self.stats.sp_defense + self._bonus("sp_defense") + self._soul()
         if self.spdef_debuff_active:
-            d -= self.spdef_debuff_amt
+            d = (d - self.spdef_debuff_amt) * self.spdef_debuff_mult
+        if self.calm_active:            # Calmamente: +Dif. Sp. temporanea
+            d *= self.calm_mult
         if self.passive_id == "sabbiafiume" and self.stage >= 2:
             d *= 1.3   # Sabbiafiume (Gigalith): +30% Dif. Sp.
         return max(0.0, d)

@@ -168,7 +168,7 @@ class OnlineMatchScene(NetMatchScene):
             gx, gy = self.camera.world_to_screen(d["pos"].x * ts, d["pos"].y * ts)
             alpha = int(255 * max(0.0, 1.0 - d["t"] / DEATH_FADE))
             d["anim"].draw(surface, gx, gy, alpha=alpha)
-        draw_projectiles(surface, self.camera, self.world.fxs)
+        draw_projectiles(surface, self.camera, self.world.fxs, self.world.match_time)
 
     def draw(self, surface):
         super().draw(surface)

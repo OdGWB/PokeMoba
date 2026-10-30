@@ -527,6 +527,27 @@ Passaggi completati:
   Screenshot: step_28_rookidee/_corvisquire/_corviknight, _hud, _beccata,
   _perforbecco, _spennata, _provocazione, _provocato, _ventoincoda, _taxi_carica/
   _volo/_atterraggio, _baldeali, _trespolo, _draft_corviknight, _selezione.
+- LINEA CHARCADET > ARMAROUGE / CERULEDGE (step_29), grafica nuova in
+  game/charcadet_fx.py (logica in engine/charcadet.py). Sprite PMD Sprite Collab
+  in assets/pokemon/0935/0936/0937. Forme nuove in _draw_shapes
+  (charcadet_fx.SHAPES): lingua di fuoco a tre strati (flametongue), goccia di
+  lava a parabola con ombra a terra (lavablob), tre graffi d'ombra (claw),
+  mezzaluna di fendente (crescent), spadina orbitante (sword). Lavasbuffo =
+  cratere + gocce di lava + colonna di fumo; Bruciatutto = ventaglio di fiamme
+  piccole e varie (+ schegge se rompe uno scudo); Nitrocarica = fiamme sfalsate
+  lungo lo scatto; Calmamente/cure = puntini che risalgono (NON _rise: bolle
+  grosse che coprivano lo sprite). Disegni PERSISTENTI (world_fx): ombra di Ombra
+  Notturna che scivola a terra con la scia, nube di Pulifumo, carica di Armor
+  Cannon (braci risucchiate + mira tratteggiata), area di Psichico che si chiude,
+  raffica di mezzalune della Lama dei Rancori; la palla di Armor Cannon in volo
+  e' in draw_projectiles (proiettile con "fx"). Sulle unita'
+  (charcadet_fx.draw_unit_overlay): 3 spallacci in orbita (incrinati quelli gia'
+  usati), artigli viola sulle mani con Ombrartigli, aura di Calmamente. HUD:
+  Armature = ritratto della forma verso cui va + barre F/I; Guardia = scudo
+  (ricarica); Doppia Lama = spade incrociate. Online: shades/smogs/
+  cannon_charges/psy_zones/flurries in net/visual.LISTS, armor_blocks in
+  UNIT_FLAGS, barre arrotondate in "me". Screenshot: step_29_* (forme, hud_*,
+  ogni mossa, draft_charcadet).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

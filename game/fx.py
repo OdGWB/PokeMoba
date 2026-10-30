@@ -18,7 +18,7 @@ import pygame
 
 import config
 
-from . import corvi_fx, eevee_fx
+from . import charcadet_fx, corvi_fx, eevee_fx
 from . import structure_gfx
 
 # Colore per tipo (per le particelle).
@@ -1465,6 +1465,8 @@ class FXSystem:
                 eevee_fx.draw_shape(overlay, s, S, ts, f, a)
             elif kind in corvi_fx.SHAPES:   # linea Rookidee: becco, piume, ali, "!"
                 corvi_fx.draw_shape(overlay, s, S, ts, f, a)
+            elif kind in charcadet_fx.SHAPES:   # linea Charcadet: fuoco, lava, artigli, lame
+                charcadet_fx.draw_shape(overlay, s, S, ts, f, a)
         surface.blit(overlay, (0, 0))
 
     # Registro degli stili d'attacco: nome ("fx" nel JSON / "attack_fx") -> handler.
@@ -1522,4 +1524,6 @@ class FXSystem:
         **eevee_fx.STYLES,
         # linea Rookidee (game/corvi_fx.py)
         **corvi_fx.STYLES,
+        # linea Charcadet (game/charcadet_fx.py)
+        **charcadet_fx.STYLES,
     }

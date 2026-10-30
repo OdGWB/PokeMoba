@@ -16,7 +16,7 @@ from engine.entities import Core, Pillar, Pokemon, Structure, Unit
 from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
                          TILE_PUDDLE, TILE_RIVER, TILE_WALL)
 from . import spirit_fx
-from . import corvi_fx, eevee_fx
+from . import charcadet_fx, corvi_fx, eevee_fx
 from . import structure_gfx
 from .fx import EMBER, ROCK_HI, ROCK_MID, ROCK_OUT, ROCK_SH, type_color
 from .map_renderer import MapRenderer
@@ -615,7 +615,8 @@ class Renderer:
                                       "rockwave", "spikes", "avalanche",
                                       "spiritbeam", "painsplit", "spiritcall",
                                       "swift", "wish", "thunder", "blizzard", "futuresight",
-                                      "defog", "tailwind"):
+                                      "defog", "tailwind", "nightshade", "clearsmog",
+                                      "armorcannon", "psychic", "grudgeblade"):
             pygame.draw.circle(surface, (90, 90, 90), S(ox, oy), int(rng * ts), 1)
 
         shape = move.shape
@@ -670,11 +671,22 @@ class Renderer:
             pygame.draw.line(surface, (120, 170, 210), S(ox, oy), (cx, cy), 1)
             pygame.draw.circle(surface, col, (cx, cy), int(move.radius * ts), 2)
             return
+        if shape in ("nightshade", "grudgeblade"):   # bersaglio: il nemico vicino al mirino
+            d = min(dist, rng)
+            cx, cy = S(ox + nx * d, oy + ny * d)
+            pygame.draw.line(surface, col, S(ox, oy), (cx, cy), 1)
+            pygame.draw.circle(surface, col, (cx, cy), int(2.0 * ts), 1)
+            pygame.draw.circle(surface, (255, 255, 255), (cx, cy), max(3, int(0.3 * ts)), 1)
+            return
         if shape in ("smackdown", "explosion", "spikes", "legion", "memento",
-                     "thunder", "blizzard", "futuresight", "gleam", "defog"):
+                     "thunder", "blizzard", "futuresight", "gleam", "defog",
+                     "clearsmog", "psychic"):
             shape = "area"
-        elif shape in ("sandboost", "endure", "moonlight", "acidarmor", "roost"):
+        elif shape in ("sandboost", "endure", "moonlight", "acidarmor", "roost",
+                       "floatarmor", "shadowclaw"):
             shape = "buff"
+        elif shape == "armorcannon":
+            shape = "projectile"
         if shape in ("projectile", "bubble"):
             ex, ey = ox + nx * rng, oy + ny * rng
             pygame.draw.line(surface, col, S(ox, oy), S(ex, ey), max(1, int(move.radius * ts)))
@@ -831,6 +843,7 @@ class Renderer:
                 if isinstance(e, Pokemon):   # ghiaccio, cuori, sabbia, Resistenza
                     eevee_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)
                     corvi_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # provocato, Trespolo
+                    charcadet_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # spallacci, artigli
                 if in_bush:
                     self._draw_hidden_hint(surface, e, gx, gy, now)
                 self._draw_unit_hp(surface, e, gx, gy)

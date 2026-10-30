@@ -26,6 +26,7 @@ from .items import ITEM_SLOTS, ItemCatalog
 from .jungle import JungleSystem
 from .pathfinding import find_path, smooth_path
 from .spatial import SpatialHash
+from .charcadet import CHARCADET_PASSIVES, CharcadetMixin
 from .corviknight import CORVI_PASSIVES, CorviknightMixin
 from .eevee import EEVEE_PASSIVES, EeveeMixin
 from .item_effects import ItemEffectsMixin, cdr_to_haste
@@ -110,7 +111,7 @@ _SYNC_STATUSES = ("slow", "stun", "freeze", "confuse", "silence", "root", "sleep
                   "spdef_debuff", "blind")
 
 
-class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, ItemEffectsMixin):
+class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, ItemEffectsMixin):
     def __init__(self, world, map_data):
         self.world = world
         self.map = map_data
@@ -143,6 +144,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, ItemEffectsMixin):
         self._init_spiritomb()   # Spiritomb: spiriti, Stordiraggio, Malcomune, Legione
         self._init_eevee()       # linea Eevee: Desiderio, Comete, ultimate delle forme
         self._init_corvi()       # linea Rookidee: Ventoincoda, Taxi Volante
+        self._init_charcadet()   # linea Charcadet: Ombra Notturna, Pulifumo, ultimate
         self.vision = VisionSystem(self.world.grid)
         self._build_structures()
         self.jungle = JungleSystem(self)
@@ -193,6 +195,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, ItemEffectsMixin):
         self._update_casts(dt)       # esecuzione mosse Q/W/E/R
         self._update_channels(dt)    # canalizzazioni (Lanciafiamme continuo, Volo, Esplosione)
         self._update_corvi(dt)       # Ventoincoda, Taxi Volante, Trespolo (linea Rookidee)
+        self._update_charcadet(dt)   # Armor Cannon, Ombra Notturna, Lama dei Rancori... (linea Charcadet)
         self._update_rock_moves(dt)  # Rocciotomba / Pesobomba / Frana / Abbattimento
         self._update_spiritomb(dt)   # spiriti, Stordiraggio, Malcomune, Legione, Memento
         self._update_eevee(dt)       # Desiderio, Comete, Tuono, Bora, Divinazione, Idratazione
@@ -766,21 +769,24 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, ItemEffectsMixin):
                 elif self._within_attack(u, tgt) and self._item_dodge(u, tgt):
                     pass   # Luminpolvere: schivato
                 elif self._within_attack(u, tgt):
-                    dmg = self._basic_damage(u, tgt) * self._item_aa_mult(u, tgt)
+                    claws = self._claws_on(u)   # Ombrartigli: Spettro, sempre brutto colpo
+                    dmg = ((self._aa_ghost_damage(u, tgt) if claws
+                            else self._basic_damage(u, tgt)) * self._item_aa_mult(u, tgt))
                     if u.aa_stealth:       # Distacco: primo colpo furtivo potenziato
                         dmg *= config.DISTACCO_BONUS_MULT
                         u.stealth_shot_ready = False
                         u.reveal_block_until = self.time + config.DISTACCO_REVEAL_BLOCK
-                    self._deal_damage(u, tgt, dmg)
+                    self._deal_damage(u, tgt, dmg, dmg_type="Ghost" if claws else None)
                     self._vamp(u, dmg, physical=True)
                     self._item_after_aa(u, tgt)   # Fangopece / Bitorzolelmo
+                    self._after_aa(u, tgt)        # Doppia Lama (Ceruledge)
                     self._spirit_wander(u, tgt)   # Spirito Vagante (Spiritomb)
                     self._cute_charm(u, tgt)      # Incantevole (Sylveon)
                     mt = u.types[0] if u.types else "Normal"
                     self.fx_events.append({"kind": "attack", "a": (u.pos.x, u.pos.y),
                                            "b": (tgt.pos.x, tgt.pos.y), "mtype": mt,
                                            "melee": u.attack_range <= 2.2,
-                                           "fx": u.attack_fx})
+                                           "fx": "shadowclawhit" if claws else u.attack_fx})
                 u.aa_active = False
                 u.last_aa_at = self.time
                 u.aa_quick = False
@@ -932,6 +938,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, ItemEffectsMixin):
         # Il nucleo è invulnerabile finché restano abbastanza torri della squadra.
         if isinstance(target, Core) and self._alive_towers(target.team) > config.CORE_EXPOSE_TOWERS_LEFT:
             return
+        self._armature_track(attacker, target, amount)   # Armature (Charcadet)
         # Scudo (solo Pokémon): assorbe prima degli HP.
         if (isinstance(target, Pokemon) and target.shield > 0.0
                 and target.shield_until > self.time and not ignore_shield):
@@ -1598,6 +1605,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, ItemEffectsMixin):
             return
         if not self._eevee_precheck(p, mv, Vec2(tx, ty)):   # Comete senza bersagli
             return
+        if not self._charcadet_precheck(p, mv, Vec2(tx, ty)):   # Ombra Notturna, Rancori
+            return
         if p.aa_active:              # lanciare annulla un auto-attacco in windup
             p.aa_active = False
             p.attack_timer = 0.0
@@ -1629,7 +1638,10 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, ItemEffectsMixin):
                 "thunder": "Shoot", "blizzard": "Shoot", "futuresight": "Charge",
                 "moonlight": "Charge", "gleam": "Charge",
                 "acidarmor": "Charge", "defog": "Shoot", "tailwind": "Shoot",
-                "roost": "Charge", "taxi": "Charge"}.get(shape)
+                "roost": "Charge", "taxi": "Charge",
+                "nightshade": "Shoot", "clearsmog": "Shoot", "armorcannon": "Charge",
+                "floatarmor": "Charge", "psychic": "Shoot", "grudgeblade": "Attack",
+                "shadowclaw": "Charge"}.get(shape)
         if anim:
             self.fx_events.append({"eid": p.id, "anim": anim})
         # Gli eventi visivi aggiunti dai _cast_* qui sotto vengono "taggati" con lo
@@ -1708,6 +1720,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, ItemEffectsMixin):
             pass   # linea Eevee (engine/eevee.py)
         elif self._corvi_cast(p, mv, rank, origin, tgt, dirv):
             pass   # linea Rookidee (engine/corviknight.py)
+        elif self._charcadet_cast(p, mv, rank, origin, tgt, dirv):
+            pass   # linea Charcadet (engine/charcadet.py)
         elif shape == "buff":
             self._apply_support(p, mv, rank, origin)
             self.fx_events.append({"kind": "buff", "c": (origin.x, origin.y),
@@ -2347,7 +2361,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, ItemEffectsMixin):
             r *= 1.15   # Zoomlente: +15% portata degli attacchi base
         if isinstance(u, Pokemon) and u.passive_id == "distacco" and self._is_hidden(u):
             r += config.DISTACCO_RANGE_BONUS
-        return r
+        return self._claw_reach(u, r)   # Ombrartigli: +50% portata
 
     def _nearest_walkable(self, dest, fallback):
         if self.world.grid.is_walkable_point(dest.x, dest.y):
@@ -3040,8 +3054,11 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, ItemEffectsMixin):
                     self._projectile_burst(pr)
                 elif caster is not None:
                     self._hit(caster, pr["mv"], pr["rank"], hit)
-                    self.fx_events.append({"kind": "area", "c": (pr["pos"].x, pr["pos"].y),
-                                           "radius": pr["radius"], "mtype": pr["mtype"]})
+                    ev = {"kind": "area", "c": (pr["pos"].x, pr["pos"].y),
+                          "radius": pr["radius"], "mtype": pr["mtype"]}
+                    if pr.get("fx"):   # Armor Cannon: esplosione dedicata
+                        ev["fx"] = pr["fx"] + "hit"
+                    self.fx_events.append(ev)
                 continue   # proiettile consumato
             if pr["left"] > 0:
                 alive.append(pr)
@@ -3253,7 +3270,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, ItemEffectsMixin):
                 raw = power + mv.ratio * (caster.eff_sp_attack() if magic
                                           else caster.eff_attack())
                 if magic and isinstance(caster, Pokemon):
-                    raw *= caster.ability_mult
+                    raw *= caster.ability_mult * self._calm_mult(caster)   # Calmamente
             eff = (self.types.moba_multiplier(mv.type, target.types)
                    if isinstance(target, Pokemon) else 1.0)
             has_plate = (isinstance(caster, Pokemon) and caster.judgment_until > self.time
@@ -3297,6 +3314,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, ItemEffectsMixin):
             crit_bonus = HIGH_CRIT_CHANCE if mv.d.get("high_crit") else 0.0
             # Finta: ignora gli scudi e le protezioni (difesa potenziata a tempo).
             guard = bool(fx.get("pierce_guard"))
+            self._shield_break(target, fx)   # Bruciatutto: brucia parte dello scudo
             dmg = self._mitigate_hit(caster, target, raw, magic=magic,
                                      crit_bonus=crit_bonus, pierce_guard=guard)
             self._deal_damage(caster, target, dmg, dmg_type=mv.type, ignore_shield=guard)
@@ -3362,7 +3380,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, ItemEffectsMixin):
         sd = fx.get("spdef_debuff")
         if sd:
             self._apply_spdef_debuff(target, float(sd.get("amount", 20)),
-                                     float(sd.get("duration", 2.0)))
+                                     float(sd.get("duration", 2.0)),
+                                     float(sd.get("mult", 1.0)))
         rt = fx.get("root")
         if rt:
             self._apply_root(target, float(rt.get("duration", 1.0)))
@@ -3401,6 +3420,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, ItemEffectsMixin):
             self._apply_taunt(target, caster, float(ta.get("duration", 1.5)))
         if fx.get("steal_buff") and caster.team != target.team:   # Spennata
             self._steal_buff(caster, target)
+        self._charcadet_hit_effects(caster, target, fx)   # Lavasbuffo: scottatura
 
     def _apply_support(self, caster, mv, rank, center) -> None:
         """Effetti su sé/alleati: cura, scudo, buff attacco/velocità."""
@@ -3456,6 +3476,9 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, ItemEffectsMixin):
             m = self._rank_val(m, rank) if isinstance(m, list) else float(m)   # per grado
             for a in boosted:
                 self._apply_def_buff(a, m, float(dfb.get("duration", 4.0)))
+        cm = eff.get("calm")
+        if cm and not vest:   # Calmamente: +Att. Sp. e +Dif. Sp. temporanei
+            self._apply_calm(caster, float(cm.get("mult", 1.15)), float(cm.get("duration", 5.0)))
         ram = eff.get("rampage")
         if ram:   # Oltraggio: inarrestabile per qualche secondo
             self._apply_rampage(caster, float(ram.get("duration", 4.0)))
@@ -3499,8 +3522,9 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, ItemEffectsMixin):
         p.def_debuff_mult = mult
         p.def_debuff_until = max(p.def_debuff_until, self.time + dur)
 
-    def _apply_spdef_debuff(self, p, amt, dur):
+    def _apply_spdef_debuff(self, p, amt, dur, mult=1.0):
         p.spdef_debuff_amt = amt
+        p.spdef_debuff_mult = mult
         p.spdef_debuff_until = max(p.spdef_debuff_until, self.time + dur)
 
     def _apply_atk_debuff(self, p, amt, dur):   # Danzadipiume: -Attacco
@@ -3786,6 +3810,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, ItemEffectsMixin):
         if p.passive_id in EEVEE_PASSIVES and self._bot_eevee_cast(p, target):
             return
         if p.passive_id in CORVI_PASSIVES and self._bot_corvi_cast(p, target):
+            return
+        if p.passive_id in CHARCADET_PASSIVES and self._bot_charcadet_cast(p, target):
             return
         for slot in ("R", "Q", "W", "E"):
             ms = p.moveset.get(slot)

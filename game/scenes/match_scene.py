@@ -50,7 +50,7 @@ DEATH_FADE = 1.5   # s: posa Hurt tenuta mentre l'unità si dissolve alla morte
 
 class MatchScene:
     def __init__(self, map_path: str, pokemon_path: str, start_level: int = 1,
-                 start_items=None, bot_paths=None):
+                 start_items=None, bot_paths=None, start_armature=None):
         map_data = load_map(map_path)
         self.map_data = map_data
         self.world = World(map_data.grid)
@@ -84,6 +84,11 @@ class MatchScene:
                 if self.match.item_catalog.get(iid) is not None:
                     self.player.items.append(iid)
             self.match._apply_items(self.player)
+
+        # Charcadet (test): barra di Armature in vantaggio prima del livello, cosi'
+        # al liv.8 evolve nella forma scelta (fausta -> Armarouge).
+        if start_armature and self.player is not None:
+            setattr(self.player, start_armature, 1.0)
 
         # Livello di partenza (test): porta il giocatore al livello richiesto.
         if start_level > 1 and self.match is not None and self.player is not None:
@@ -462,7 +467,7 @@ class MatchScene:
             d["anim"].draw(surface, gx, gy, alpha=alpha)
         # Proiettili che viaggiano (bolla Idropulsar).
         if self.match is not None:
-            draw_projectiles(surface, self.camera, self.match)
+            draw_projectiles(surface, self.camera, self.match, self.match.time)
         # Indicatore di mira (solo se la mossa è pronta: niente mirino in cooldown).
         if self.input.aiming_slot and self.player.alive:
             ms = self.player.moveset.get(self.input.aiming_slot)

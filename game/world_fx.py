@@ -19,7 +19,7 @@ import pygame
 
 import config
 
-from . import corvi_fx, eevee_fx, spirit_fx
+from . import charcadet_fx, corvi_fx, eevee_fx, spirit_fx
 from .fx import draw_avalanche, draw_sandstorm, type_color
 
 
@@ -76,12 +76,32 @@ def draw_world_effects(surface, camera, world, m, team, vision, now, player_id,
             corvi_fx.draw_tailwind(surface, camera, tw, now)
     for fl in getattr(m, "taxi_flights", ()):
         corvi_fx.draw_taxi(surface, camera, fl, now)
+    # Linea Charcadet: Pulifumo, Psichico, Ombra Notturna, carica di Armor
+    # Cannon, raffica della Lama dei Rancori.
+    for s in getattr(m, "smogs", ()):
+        if seen(s["c"], s["team"]):
+            charcadet_fx.draw_smog(surface, camera, s, now)
+    for z in getattr(m, "psy_zones", ()):
+        if seen(z["c"], z["team"]):
+            charcadet_fx.draw_psy_zone(surface, camera, z, now)
+    for sh in getattr(m, "shades", ()):
+        if seen(sh["pos"], sh["team"]):
+            charcadet_fx.draw_shade(surface, camera, sh, now)
+    for cc in getattr(m, "cannon_charges", ()):
+        if seen(cc["pos"], cc["team"]):
+            charcadet_fx.draw_cannon_charge(surface, camera, cc, now)
+    for fl in getattr(m, "flurries", ()):
+        if seen(fl["pos"], fl["team"]):
+            charcadet_fx.draw_flurry(surface, camera, fl, now)
 
 
-def draw_projectiles(surface, camera, m) -> None:
-    """Proiettili che viaggiano (bolla Idropulsar)."""
+def draw_projectiles(surface, camera, m, now=0.0) -> None:
+    """Proiettili che viaggiano (bolla Idropulsar, palla di Armor Cannon)."""
     ts = config.TILE_SIZE
     for pr in m.projectiles:
+        if pr.get("fx") == "armorcannon":
+            charcadet_fx.draw_cannonball(surface, camera, pr, now)
+            continue
         gx, gy = camera.world_to_screen(pr["pos"].x * ts, pr["pos"].y * ts)
         col = type_color(pr["mtype"])
         r = max(3, int(pr["radius"] * ts))
