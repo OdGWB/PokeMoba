@@ -28,6 +28,69 @@ def tier_path() -> Path:
     return Path(base) / "PokeMoba" / "tierlist.json"
 
 
+class TierChoiceScene:
+    """Scelta della tier list: Developer (per ora vuota) o Personale (la tua)."""
+
+    def __init__(self, app):
+        self.app = app
+        self.next_scene = None
+        self.buttons = Buttons()
+        self._fonts = {}
+
+    def _font(self, size, bold=False):
+        key = (size, bold)
+        if key not in self._fonts:
+            self._fonts[key] = pygame.font.SysFont("consolas", size, bold=bold)
+        return self._fonts[key]
+
+    def _personal(self):
+        self.next_scene = TierListScene(self.app)
+
+    def _developer(self):
+        pass        # da implementare
+
+    def _back(self):
+        from .menu_scene import MenuScene
+        self.next_scene = MenuScene(self.app)
+
+    def handle_events(self, events):
+        for ev in events:
+            if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
+                self._back()
+            elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+                self.buttons.click(ev.pos)
+
+    def fixed_update(self):
+        pass
+
+    def update(self, dt):
+        pass
+
+    def draw(self, surface):
+        surface.fill(BG)
+
+    def hud_lines(self):
+        return []
+
+    def draw_fullres(self, surface, font):
+        W, H = surface.get_size()
+        surface.fill(BG)
+        self.buttons.clear()
+        title_f = self._font(max(30, H // 16), bold=True)
+        big = self._font(max(22, H // 26), bold=True)
+        small = self._font(max(13, H // 50))
+        t = title_f.render("Tier list", True, GOLD)
+        surface.blit(t, (W // 2 - t.get_width() // 2, H // 8))
+        bw, bh = min(int(W * 0.34), 460), max(52, H // 11)
+        y = int(H * 0.38)
+        self.buttons.draw(surface, (W // 2 - bw // 2, y, bw, bh), "Developer",
+                          self._developer, big)
+        self.buttons.draw(surface, (W // 2 - bw // 2, y + bh + 16, bw, bh), "Personale",
+                          self._personal, big)
+        self.buttons.draw(surface, (W // 2 - bw // 2, y + 2 * (bh + 16) + 10, bw, bh),
+                          "Indietro  (Esc)", self._back, small)
+
+
 class TierListScene:
     def __init__(self, app):
         self.app = app
@@ -81,8 +144,7 @@ class TierListScene:
         self._save()
 
     def _back(self):
-        from .menu_scene import MenuScene
-        self.next_scene = MenuScene(self.app)
+        self.next_scene = TierChoiceScene(self.app)
 
     # --- input -------------------------------------------------------------------------
     def handle_events(self, events):

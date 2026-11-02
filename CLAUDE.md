@@ -712,6 +712,11 @@ Passaggi completati:
   trascina-e-rilascia dei Pokémon del roster, salvata in
   %APPDATA%\PokeMoba	ierlist.json (prima non esisteva nessuna tier list).
   Screenshot: step_36_menu/_gioca/_tier/_personalizzazione/_crediti.
+- Tier list a DUE OPZIONI (step_37): il clic su "Tier list" apre
+  tier_scene.TierChoiceScene con "Developer" (solo pulsante, per ora non fa
+  nulla) e "Personale" (la TierListScene trascina-e-rilascia salvata). Esc/
+  Indietro dalla tier personale torna alla scelta, poi al menu.
+  Screenshot: step_37_tier_scelta.png.
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

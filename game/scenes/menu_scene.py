@@ -99,8 +99,8 @@ class MenuScene:
             from .credits_scene import CreditsScene
             self.next_scene = CreditsScene(self.app)
         elif key == "tier":
-            from .tier_scene import TierListScene
-            self.next_scene = TierListScene(self.app)
+            from .tier_scene import TierChoiceScene
+            self.next_scene = TierChoiceScene(self.app)
         elif key == "quit":
             self.quit_app = True
 
