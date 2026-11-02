@@ -16,7 +16,7 @@ import pygame
 
 from engine.eevee import eevee_candidates, eevee_forms
 
-from . import eevee_fx, mien_fx, sneasel_fx, ursa_fx
+from . import arch_fx, eevee_fx, mien_fx, sneasel_fx, ursa_fx
 
 
 @dataclass
@@ -141,6 +141,10 @@ def draw_passive(surface, font, p, bx, y0, bh, ctx) -> None:
     # Linea Mienfoo: Maniche a Frusta + Rigenergia, Bruciapelo pronto, Danza.
     if p.passive_id == "manichefrusta":
         _draw_mien(surface, font, p, bx, y0, bh, ctx)
+
+    # Linea Duraludon: Conduzione (pioggia), fulmini di Tuono, carica di Elettroraggio.
+    if p.passive_id == "conduzione":
+        _draw_conduct(surface, font, p, bx, y0, bh, ctx)
 
     # Linea Teddiursa: Miele (vasetti) e, da Ursaring, Dentistretti.
     if p.passive_id in ("miele", "dentistretti"):
@@ -469,5 +473,45 @@ def _draw_mien(surface, font, p, bx, y0, bh, ctx) -> None:
         name = f"Danza {left:0.1f}s"
     elif ready:
         name = "Bruciapelo pronto"
+    pygame.draw.rect(surface, frame, box, 2)
+    surface.blit(font.render(name, True, frame), (bx - 4, y0 - 18))
+
+
+def _draw_conduct(surface, font, p, bx, y0, bh, ctx) -> None:
+    """Conduzione (Duraludon/Archaludon): nuvola con la saetta, accesa e con la
+    pioggia che cade quando la passiva è attiva (cariche e ritardi dimezzati,
+    mosse Elettro che rallentano). In basso le saette di Tuono ancora da
+    lanciare e il tempo per farlo; cornice gialla durante il +Att. Sp. di
+    Elettroraggio."""
+    now = ctx.now
+    box = pygame.Rect(bx, y0, bh, bh)
+    cx, cy = box.center
+    rain = bool(getattr(p, "arch_rain", False))
+    pygame.draw.rect(surface, (22, 28, 44) if rain else (30, 32, 38), box)
+    old_clip = surface.get_clip()
+    surface.set_clip(box.inflate(-4, -4))
+    if rain:   # gocce che cadono
+        for k in range(7):
+            x = box.left + 5 + (k * 9) % (bh - 8)
+            y = box.top + int((now * 40 + k * 13) % (bh - 4))
+            pygame.draw.line(surface, arch_fx.RAIN, (x, y), (x - 1, y + 3))
+    cloud = (150, 160, 180) if rain else (90, 94, 104)
+    for dx, dy, r in ((-6, -8, 7), (2, -11, 8), (9, -7, 6), (0, -5, 7)):
+        pygame.draw.circle(surface, cloud, (cx + dx, cy + dy), r)
+    col = arch_fx.ELEC if rain else (120, 116, 90)
+    arch_fx.draw_bolt_icon(surface, cx + 1, cy + 7, 9, col, (40, 30, 10))
+    surface.set_clip(old_clip)
+    frame = arch_fx.ELEC if rain else (140, 150, 170)
+    name = "Conduzione: pioggia!" if rain else "Conduzione"
+    left = getattr(p, "thunder_left", 0)
+    t_left = getattr(p, "thunder_until", -1.0) - now
+    if left > 0 and t_left > 0:
+        for k in range(left):
+            arch_fx.draw_bolt_icon(surface, box.left + 8 + k * 10, box.bottom - 9, 5)
+        name = f"Tuono x{left}  {t_left:0.1f}s"
+    if getattr(p, "arch_spa_until", -1.0) > now:
+        frame = arch_fx.ELEC_HI
+        if not (left > 0 and t_left > 0):
+            name = "Att. Sp. +30%"
     pygame.draw.rect(surface, frame, box, 2)
     surface.blit(font.render(name, True, frame), (bx - 4, y0 - 18))

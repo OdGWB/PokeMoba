@@ -654,6 +654,42 @@ Passaggi completati:
   fascia del punto dolce si ricava dal dex (619/620). Screenshot: step_33_*
   (linea, hud_*, ogni mossa, calcinvolo_volo/_vuoto, parata, rigenergia,
   danza/_finale, draft_mienfoo).
+- LINEA DURALUDON > ARCHALUDON (step_34), grafica nuova in game/arch_fx.py
+  (logica in engine/archaludon.py). Sprite PMD Sprite Collab in
+  assets/pokemon/0884/1018. Forme nuove in _draw_shapes (arch_fx.SHAPES):
+  palla d'acciaio in volo con scia argentata (steelball: attacco base e
+  Cannonflash, piu' grossa e con scintille se Tiro Lungo e' carico), fulmine
+  dal cielo a zig-zag rifatto a ogni frame con un ramo (zigbolt: Fulmine,
+  Tuono, paralisi), anello elettrico che crepita (sparkring: bordo a zig-zag
+  FITTO, con pochi punti sembrava un poligono), raggio di Elettroraggio
+  (railbeam: tre strati + archi sui bordi + anelli che scorrono). Riusa
+  crescent (Charcadet, Codadrago: sweep ridotto, se no finiva sotto il
+  bersaglio), soundarc (Noibat, Ferrosuono con jag), hexshell (Ferroscudo),
+  windline, impactstar. Niente groundcrack sul fulmine: disegnato sopra lo
+  sprite sembrava un mucchio di rametti. Disegni PERSISTENTI (world_fx):
+  Tuononda in arrivo (area che si riempie + scariche), bersagli di Tuono
+  (ombra della nube, cerchio che si chiude, gocce se allargato dalla
+  pioggia), carica di Elettroraggio (corsia tratteggiata di 25 tile + globo
+  d'energia che risucchia scintille) VISIBILE ANCHE AI NEMICI. SCHERMO CHE
+  TREMA (Elettroraggio, per tutti): evento fx "shake" senza posizione (passa
+  fx_visible per entrambe le squadre) -> FXSystem.shake_until_ms ->
+  arch_fx.draw_shake fa surface.scroll di 1-2 px sul fotogramma a bassa
+  risoluzione (MatchScene.draw e OnlineMatchScene.draw), la UI resta ferma.
+  Sulle unita' (visibili a tutti): scintille di Conduzione sotto la pioggia,
+  alone giallo del +Att. Sp., saette dei fulmini di Tuono rimasti a destra
+  della barra della vita. Mirino: Tiro Lungo = corsia che si allunga con la
+  pressione + barra di carica (gialla a carica piena, dimezzata sotto la
+  pioggia); Tuononda/Tuono col raggio vero (+50% Tuono in pioggia). HUD:
+  nuvola con saetta, accesa con la pioggia che cade quando Conduzione e'
+  attiva; saette e secondi di Tuono; cornice chiara col +Att. Sp.
+  PRESSIONE DEL TASTO (Tiro Lungo): InputController/NetMatchScene misurano
+  la mira (aim_start) e la mettono in CastMoveCommand.hold; online viaggia nei
+  6 bit alti del byte dello slot di CMD_CAST (protocol.pack_cast_slot, passi
+  di 0,05 s): il formato dei pacchetti non cambia. Online: wave_zones/
+  thunder_marks in net/visual.LISTS, beam_charges a entrambe le squadre (come
+  taxi_flights), arch_rain/thunder_left in UNIT_FLAGS. Screenshot: step_34_*
+  (linea, hud_*, ogni mossa, tirolungo_mira, tuononda_arrivo,
+  elettroraggio_carica, tuono_arrivo, conduzione, draft_duraludon).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

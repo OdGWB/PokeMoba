@@ -29,6 +29,7 @@ class InputController:
         self.controlled_id = controlled_id
         self._seq = 0
         self.aiming_slot: str | None = None   # slot in fase di mira (per l'indicatore)
+        self.aim_start = 0                    # ms: inizio della mira (pressione tenuta)
 
     def _next_seq(self) -> int:
         self._seq += 1
@@ -45,6 +46,7 @@ class InputController:
                                                     entity_id=self.controlled_id, slot=slot))
                 elif self._can_aim(me, slot):
                     self.aiming_slot = slot
+                    self.aim_start = pygame.time.get_ticks()
             elif ev.type == pygame.KEYUP and ev.key in ABILITY_KEYS:
                 slot = ABILITY_KEYS[ev.key]
                 if self.aiming_slot == slot:
@@ -76,8 +78,9 @@ class InputController:
 
     def _cast_at_mouse(self, slot, camera, pos):
         tx, ty = self._world_tile(camera, pos)
+        hold = (pygame.time.get_ticks() - self.aim_start) / 1000.0
         return CastMoveCommand(seq=self._next_seq(), entity_id=self.controlled_id,
-                               slot=slot, x=tx, y=ty)
+                               slot=slot, x=tx, y=ty, hold=min(1.5, max(0.0, hold)))
 
     def _left_click(self, pos, camera, world, me):
         tx, ty = self._world_tile(camera, pos)

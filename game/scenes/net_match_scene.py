@@ -69,6 +69,7 @@ class NetMatchScene:
         self._unit_dex = {}   # dex per unità (per ricreare lo sprite al cambio forma)
         self.camera_locked = True
         self.aiming_slot = None
+        self.aim_start = 0             # ms: inizio della mira (pressione tenuta)
         self._sprite_cache = {}
         self.item_catalog = ItemCatalog.load(str(ROOT / "data/items.json"))
         self.shop = ShopUI()
@@ -142,6 +143,7 @@ class NetMatchScene:
                     self.client.send_rank(slot)
                 elif self._slot_castable(slot):
                     self.aiming_slot = slot
+                    self.aim_start = pygame.time.get_ticks()
             elif ev.type == pygame.KEYUP and ev.key in ABILITY_KEYS:
                 if self.aiming_slot == ABILITY_KEYS[ev.key]:
                     self._cast(self.aiming_slot, pygame.mouse.get_pos())
@@ -166,7 +168,8 @@ class NetMatchScene:
 
     def _cast(self, slot, pos):
         tx, ty = self._tile(pos)
-        self.client.send_cast(slot, tx, ty)
+        hold = (pygame.time.get_ticks() - self.aim_start) / 1000.0
+        self.client.send_cast(slot, tx, ty, hold=min(1.5, max(0.0, hold)))
 
     def _left_click(self, pos):
         tx, ty = self._tile(pos)
@@ -307,8 +310,10 @@ class NetMatchScene:
             if mv is not None and ready:   # niente mirino se in cooldown o non pronta
                 mx, my = pygame.mouse.get_pos()
                 wx, wy = self.camera.screen_window_to_world(mx, my)
+                hold = (pygame.time.get_ticks() - self.aim_start) / 1000.0
                 self.renderer.draw_aim(surface, self.camera, me.pos,
-                                       (wx / config.TILE_SIZE, wy / config.TILE_SIZE), mv)
+                                       (wx / config.TILE_SIZE, wy / config.TILE_SIZE), mv,
+                                       hold=hold, rain=getattr(me, "arch_rain", False))
 
     def _draw_world_extras(self, surface):
         """Effetti che durano, sopra mappa e unità (la scena online li ha)."""

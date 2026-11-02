@@ -19,8 +19,8 @@ import pygame
 
 import config
 
-from . import (charcadet_fx, corvi_fx, eevee_fx, mien_fx, noivern_fx, sneasel_fx, spirit_fx,
-               ursa_fx)
+from . import (arch_fx, charcadet_fx, corvi_fx, eevee_fx, mien_fx, noivern_fx, sneasel_fx,
+               spirit_fx, ursa_fx)
 from .fx import draw_avalanche, draw_sandstorm, type_color
 
 
@@ -125,6 +125,16 @@ def draw_world_effects(surface, camera, world, m, team, vision, now, player_id,
     for lp in getattr(m, "mien_leaps", ()):
         if seen(lp["c"], lp["team"]):
             mien_fx.draw_jump(surface, camera, lp, now)
+    # Linea Duraludon: Tuononda in arrivo, fulmini di Tuono, carica di Elettroraggio
+    # (la carica la vedono tutti, anche la squadra avversaria).
+    for z in getattr(m, "wave_zones", ()):
+        if seen(z["c"], z["team"]):
+            arch_fx.draw_wave_zone(surface, camera, z, now)
+    for tm in getattr(m, "thunder_marks", ()):
+        if seen(tm["c"], tm["team"]):
+            arch_fx.draw_thunder_mark(surface, camera, tm, now)
+    for ch in getattr(m, "beam_charges", ()):
+        arch_fx.draw_beam_charge(surface, camera, ch, now)
 
 
 def draw_projectiles(surface, camera, m, now=0.0) -> None:

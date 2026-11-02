@@ -1,0 +1,109 @@
+{
+  "_comment": "Duraludon -> Archaludon (liv.8, unica evoluzione). Supporto che bersaglia da lontano, sinergia con la pioggia. Acciaio/Drago. Passiva Conduzione (engine/archaludon.py, entrambe le forme): sotto la pioggia (meteo Pioggia, aura di Politoad, Pioggiadanza) i tempi di carica e i ritardi delle sue mosse sono dimezzati e le sue mosse Elettro rallentano del 25% per 1,5 s i nemici colpiti. Q Cannonflash = proiettile lungo che riduce la Dif. Sp. del primo colpito; W Tuononda = area a distanza che paralizza dopo 0,75 s; E Codadrago = colpo di coda che respinge di 4 tile. Q5/W6/E7 potenziamenti, R al liv.8 a scelta (Elettroraggio o Tuono).",
+  "dex": 884,
+  "name": "Duraludon",
+  "types": ["Steel", "Dragon"],
+  "role": "supporto",
+  "recommended_items": ["light_clay", "soothe_bell", "wide_lens", "choice_specs"],
+  "color": [176, 184, 196],
+  "radius": 0.44,
+  "base_speed": 3.4,
+  "attack_range": 5.0,
+  "attack_cooldown": 1.0,
+  "ranged": true,
+  "sprite_dir": "assets/pokemon/0884",
+  "passive": "conduzione",
+  "attack_fx": "steelshot",
+
+  "base_stats": {"hp": 70, "attack": 95, "defense": 115, "sp_attack": 120, "sp_defense": 50, "speed": 85},
+
+  "evolutions": [
+    {"stage": 0, "level": 1, "name": "Duraludon", "dex": 884, "sprite_dir": "assets/pokemon/0884",
+     "types": ["Steel", "Dragon"], "passive": "conduzione", "role": "supporto", "color": [176, 184, 196],
+     "attack_fx": "steelshot", "attack_range": 5.0, "ranged": true, "radius": 0.44,
+     "base_stats": {"hp": 70, "attack": 95, "defense": 115, "sp_attack": 120, "sp_defense": 50, "speed": 85}},
+
+    {"stage": 1, "level": 8, "name": "Archaludon", "dex": 1018, "sprite_dir": "assets/pokemon/1018",
+     "types": ["Steel", "Dragon"], "passive": "conduzione", "role": "supporto", "color": [88, 120, 200],
+     "attack_fx": "steelshot", "attack_range": 5.5, "ranged": true, "radius": 0.52,
+     "base_stats": {"hp": 90, "attack": 105, "defense": 130, "sp_attack": 125, "sp_defense": 65, "speed": 85}}
+  ],
+
+  "moves": {
+    "Q": {
+      "base": {"id": "flashcannon", "name": "Cannonflash", "type": "Steel", "category": "special",
+               "shape": "flashcannon", "fx": "flashcannon", "target": "direction",
+               "power": [55, 85, 115, 145], "ratio": 0.45,
+               "cooldown": [7, 6.5, 6, 5.5], "range": 10.0, "radius": 0.5,
+               "effects": {"spdef_debuff": {"amount": 0, "mult": 0.85, "duration": 3.0}}},
+      "upgrades": [
+        {"id": "flashcannonlong", "name": "Tiro Lungo", "type": "Steel", "category": "special",
+         "shape": "flashcannon", "fx": "flashcannon", "target": "direction",
+         "power": [55, 85, 115, 145], "ratio": 0.45,
+         "cooldown": [7, 6.5, 6, 5.5], "range": 10.0, "radius": 0.5,
+         "effects": {"spdef_debuff": {"amount": 0, "mult": 0.85, "duration": 3.0},
+                     "hold": {"time": 1.0, "range": 0.4, "power": 0.5}}},
+        {"id": "flashcannonburst", "name": "Raffica", "type": "Steel", "category": "special",
+         "shape": "flashcannon", "fx": "flashcannon", "target": "direction",
+         "power": [38, 60, 80, 102], "ratio": 0.32,
+         "cooldown": [0.6, 0.6, 0.6, 0.6], "charges": 2, "charge_time": 6.5,
+         "range": 10.0, "radius": 0.5,
+         "effects": {"spdef_debuff": {"amount": 0, "mult": 0.85, "duration": 3.0}}}
+      ]
+    },
+    "W": {
+      "base": {"id": "thunderwave", "name": "Tuononda", "type": "Electric", "category": "special",
+               "shape": "thunderwave", "fx": "thunderwave", "target": "point",
+               "power": [0, 0, 0, 0], "ratio": 0.0,
+               "cooldown": [13, 12.5, 12, 11.5], "range": 8.0, "radius": 1.6,
+               "effects": {"delay": 0.75, "root": {"duration": 1.5}}},
+      "upgrades": [
+        {"id": "thunderwavebolt", "name": "Fulmine", "type": "Electric", "category": "special",
+         "shape": "thunderwave", "fx": "thunderwave", "target": "point",
+         "power": [80, 120, 160, 200], "ratio": 0.5,
+         "cooldown": [9, 8.5, 8, 7.5], "range": 8.0, "radius": 1.6,
+         "effects": {"delay": 0.75}},
+        {"id": "thunderwaveplus", "name": "Tuononda +", "type": "Electric", "category": "special",
+         "shape": "thunderwave", "fx": "thunderwave", "target": "point",
+         "power": [0, 0, 0, 0], "ratio": 0.0,
+         "cooldown": [13, 12.5, 12, 11.5], "range": 8.0, "radius": 2.4,
+         "effects": {"delay": 0.75, "root": {"duration": 1.5}}}
+      ]
+    },
+    "E": {
+      "base": {"id": "dragontail", "name": "Codadrago", "type": "Dragon", "category": "physical",
+               "shape": "dragontail", "fx": "dragontail", "target": "direction",
+               "power": [60, 90, 120, 150], "ratio": 0.5,
+               "cooldown": [11, 10.5, 10, 9.5], "range": 2.6, "radius": 0.6,
+               "effects": {"push": 4.0}},
+      "upgrades": [
+        {"id": "metalsound", "name": "Ferrosuono", "type": "Steel", "category": "special",
+         "shape": "metalsound", "fx": "metalsound", "target": "self",
+         "power": [0, 0, 0, 0], "ratio": 0.0,
+         "cooldown": [12, 11.5, 11, 10.5], "range": 0, "radius": 3.2,
+         "effects": {"spdef_debuff": {"amount": 0, "mult": 0.7, "duration": 4.0}}},
+        {"id": "irondefense", "name": "Ferroscudo", "type": "Steel", "category": "none",
+         "shape": "irondefense", "fx": "irondefense", "target": "ally",
+         "power": [0, 0, 0, 0], "ratio": 0.0,
+         "cooldown": [12, 11.5, 11, 10.5], "range": 6.0, "radius": 1.5,
+         "effects": {"shield": [70, 110, 150, 190], "shield_ratio": 0.35,
+                     "def_mult": 1.3, "duration": 3.0}}
+      ]
+    },
+    "R": {
+      "upgrades": [
+        {"id": "electroshot", "name": "Elettroraggio", "type": "Electric", "category": "special",
+         "shape": "electroshot", "fx": "electroshot", "target": "direction",
+         "power": [240, 360, 480], "ratio": 0.85,
+         "cooldown": [100, 90, 80], "range": 25.0, "radius": 0.8,
+         "effects": {"charge": 1.5, "spa_mult": 1.3, "spa_dur": 4.0}},
+        {"id": "thunderstorm", "name": "Tuono", "type": "Electric", "category": "special",
+         "shape": "thunderstorm", "fx": "thunderstorm", "target": "point",
+         "power": [130, 195, 260], "ratio": 0.5,
+         "cooldown": [90, 80, 70], "range": 14.0, "radius": 1.5,
+         "effects": {"bolts": 3, "window": 5.0, "delay": 0.75,
+                     "paralyze": {"duration": 1.0, "chance": 0.5}, "rain_mult": 1.5}}
+      ]
+    }
+  }
+}

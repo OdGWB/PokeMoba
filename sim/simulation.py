@@ -60,6 +60,7 @@ class Simulation:
             # Il lancio vero lo esegue il Match al prossimo tick (autoritativo).
             if hasattr(unit, "pending_cast"):
                 unit.pending_cast = (cmd.slot, cmd.x, cmd.y)
+                unit.cast_hold = max(0.0, min(2.0, float(getattr(cmd, "hold", 0.0))))
         elif isinstance(cmd, RankMoveCommand):
             if hasattr(unit, "moveset"):
                 skills.rank_up(unit, cmd.slot)

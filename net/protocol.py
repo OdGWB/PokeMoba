@@ -72,6 +72,14 @@ CMD_RECALL = 9
 STATE_CMDS = (CMD_MOVE, CMD_ATTACK, CMD_ATTACKMOVE, CMD_CAST, CMD_STOP, CMD_RECALL)
 MAX_CMDS_PER_INPUT = 16      # comandi ridondanti al massimo per pacchetto
 SLOTS_QWER = ["Q", "W", "E", "R"]   # indice di slot mossa 0..3 nei comandi
+# Nel byte dello slot di CMD_CAST i 6 bit alti portano la pressione del tasto
+# (mosse a carica, Tiro Lungo) a passi di CAST_HOLD_STEP s: il formato non cambia.
+CAST_HOLD_STEP = 0.05
+
+
+def pack_cast_slot(slot: int, hold: float = 0.0) -> int:
+    q = max(0, min(63, int(round(float(hold or 0.0) / CAST_HOLD_STEP))))
+    return (int(slot) & 3) | (q << 2)
 
 # --- azioni sul canale reliable (dentro R_ACTION) --------------------------------
 ACT_RANK = 4
@@ -273,7 +281,7 @@ def enc_input(ack_snap, cmds) -> bytes:
         elif k == CMD_ATTACK:
             w.u16(c["target_id"])
         elif k == CMD_CAST:
-            w.u8(c["slot"]).pos(c["x"]).pos(c["y"])
+            w.u8(pack_cast_slot(c["slot"], c.get("hold", 0.0))).pos(c["x"]).pos(c["y"])
         elif k in (CMD_STOP, CMD_RECALL):
             pass
         else:
@@ -297,7 +305,10 @@ def dec_input(data) -> dict:
         elif k == CMD_ATTACK:
             c["target_id"] = r.u16()
         elif k == CMD_CAST:
-            c["slot"] = r.u8(); c["x"] = r.pos(); c["y"] = r.pos()
+            b = r.u8()
+            c["slot"] = b & 3; c["x"] = r.pos(); c["y"] = r.pos()
+            if b >> 2:
+                c["hold"] = (b >> 2) * CAST_HOLD_STEP
         elif k in (CMD_STOP, CMD_RECALL):
             pass
         else:

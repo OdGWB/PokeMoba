@@ -22,6 +22,7 @@ import config
 from net import client as C
 from net.prediction import Predictor
 
+from .. import arch_fx
 from ..fx import FXSystem
 from ..hud_passives import PassiveCtx, draw_passive
 from ..online_world import MovementModel, OnlineWorld
@@ -173,6 +174,7 @@ class OnlineMatchScene(NetMatchScene):
     def draw(self, surface):
         super().draw(surface)
         self.fx.draw(surface, self.camera)
+        arch_fx.draw_shake(surface, self.fx)   # Elettroraggio: lo schermo trema
         if not self._loaded_sent:
             self._loaded_sent = True
             self.session.send_loaded()

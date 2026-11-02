@@ -359,6 +359,15 @@ class Pokemon(Unit):
     dance_seq: str = ""                # mosse già usate nella danza ("QE"...)
     dance_mv: tuple | None = None
     itemlock_until: float = -1.0       # oggetti disattivati (Privazione)
+    # Linea Duraludon: Conduzione, Tiro Lungo, Elettroraggio, Tuono.
+    cast_hold: float = 0.0             # secondi di pressione del tasto (Tiro Lungo)
+    arch_rain: bool = False            # Conduzione attiva: sotto la pioggia (interfaccia)
+    arch_spa_until: float = -1.0       # Elettroraggio: +Att. Sp. fino a qui
+    arch_spa_mult: float = 1.0
+    beam_charge_until: float = -1.0    # Elettroraggio: in carica fino a qui
+    thunder_left: int = 0              # Tuono: fulmini ancora da lanciare
+    thunder_until: float = -1.0        # Tuono: finestra dei rilanci
+    thunder_cd: float = 0.0
 
     def _bonus(self, stat: str) -> float:
         return (self.passive_bonus.get(stat, 0.0) + self.item_bonus.get(stat, 0.0)

@@ -28,7 +28,7 @@ from ..camera import Camera
 from ..fx import FXSystem
 from ..input_controller import InputController
 from ..minimap import Minimap
-from .. import eevee_fx, spirit_fx
+from .. import arch_fx, eevee_fx, spirit_fx
 from ..particles import ParticleSystem
 from ..renderer import Renderer
 from ..shop_ui import ShopUI
@@ -478,11 +478,14 @@ class MatchScene:
             if ms and ms.chosen and ms.ready:
                 mx, my = pygame.mouse.get_pos()
                 wx, wy = self.camera.screen_window_to_world(mx, my)
+                hold = (pygame.time.get_ticks() - self.input.aim_start) / 1000.0
                 self.renderer.draw_aim(surface, self.camera, self.player.pos,
                                        (wx / config.TILE_SIZE, wy / config.TILE_SIZE),
-                                       ms.chosen)
+                                       ms.chosen, hold=hold,
+                                       rain=getattr(self.player, "arch_rain", False))
         # Particelle degli effetti.
         self.fx.draw(surface, self.camera)
+        arch_fx.draw_shake(surface, self.fx)   # Elettroraggio: lo schermo trema
 
     def _spirit_aim(self, surface):
         """Mira di Richiamo degli Spiriti (Spiritomb): raggio e spirito che verrebbe

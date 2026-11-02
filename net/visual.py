@@ -37,7 +37,7 @@ LISTS = {
     "sonar_pings": ("c", "team"), "hurricanes": ("c", "team"), "meteors": ("c", "team"),
     "honey_zones": ("c", "team"), "quakes": ("c", "team"),
     "claw_leaps": ("c", "team"), "beatups": ("pos", "team"), "sludge_lobs": ("c", "team"),
-    "mien_leaps": ("c", "team"),
+    "mien_leaps": ("c", "team"), "wave_zones": ("c", "team"), "thunder_marks": ("c", "team"),
 }
 # Campi solo di logica (oggetti del motore, insiemi di bersagli già colpiti).
 SKIP = {"mv", "hit", "touched", "since", "rank", "explode", "first", "caught"}
@@ -45,7 +45,8 @@ SKIP = {"mv", "hit", "touched", "since", "rank", "explode", "first", "caught"}
 UNIT_FLAGS = {"air_z": 0.0, "sand_radius": 0.0, "invisible": False, "submerged": False,
               "spirit_awaken": 0, "smoke_hidden": False, "armor_blocks": 0, "echo_count": 0,
               "honey": 0, "guts_active": False,
-              "snatch_down": 0, "snatch_up": 0, "mien_regen": False}
+              "snatch_down": 0, "snatch_up": 0, "mien_regen": False,
+              "arch_rain": False, "thunder_left": 0}
 # Il proprio Pokémon: passive e ricariche mostrate nell'interfaccia.
 ME_FIELDS = ("passive_id", "soul_charges", "inversion_stacks", "muta_cd_until", "muta_cd_max",
              "form_until", "sandstorm_boost_until", "sand_radius", "spirit_charges",
@@ -119,6 +120,10 @@ def capture_visual(match, team: int, player=None) -> dict:
     taxis = [_clean(fl) for fl in getattr(match, "taxi_flights", ())]
     if taxis:
         out["taxi_flights"] = taxis
+    # Carica di Elettroraggio: la vedono anche i nemici (anche fuori visione).
+    charges = [_clean(ch) for ch in getattr(match, "beam_charges", ())]
+    if charges:
+        out["beam_charges"] = charges
     # Balzi della linea Teddiursa: l'atterraggio di Luna Piena lo vedono tutti.
     leaps = [_clean(lp) for lp in getattr(match, "bear_leaps", ())
              if lp.get("fx") == "fullmoon" or seen(lp["c"], lp["team"])]

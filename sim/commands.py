@@ -47,6 +47,7 @@ class CastMoveCommand(Command):
     slot: str = "Q"
     x: float = 0.0
     y: float = 0.0
+    hold: float = 0.0   # secondi di pressione del tasto (mosse a carica: Tiro Lungo)
 
 
 @dataclass

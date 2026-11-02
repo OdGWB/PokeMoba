@@ -18,7 +18,8 @@ import pygame
 
 import config
 
-from . import charcadet_fx, corvi_fx, eevee_fx, mien_fx, noivern_fx, sneasel_fx, ursa_fx
+from . import (arch_fx, charcadet_fx, corvi_fx, eevee_fx, mien_fx, noivern_fx, sneasel_fx,
+               ursa_fx)
 from . import structure_gfx
 
 # Colore per tipo (per le particelle).
@@ -1475,6 +1476,8 @@ class FXSystem:
                 sneasel_fx.draw_shape(overlay, s, S, ts, f, a)
             elif kind in mien_fx.SHAPES:   # linea Mienfoo: manica, palmo, occhio, nastri
                 mien_fx.draw_shape(overlay, s, S, ts, f, a)
+            elif kind in arch_fx.SHAPES:   # linea Duraludon: palla d'acciaio, fulmini, raggio
+                arch_fx.draw_shape(overlay, s, S, ts, f, a)
         surface.blit(overlay, (0, 0))
 
     # Registro degli stili d'attacco: nome ("fx" nel JSON / "attack_fx") -> handler.
@@ -1542,4 +1545,6 @@ class FXSystem:
         **sneasel_fx.STYLES,
         # linea Mienfoo (game/mien_fx.py)
         **mien_fx.STYLES,
+        # linea Duraludon (game/arch_fx.py)
+        **arch_fx.STYLES,
     }

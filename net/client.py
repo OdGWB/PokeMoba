@@ -262,7 +262,11 @@ class ClientSession:
     def send_move(self, x, y): self._cmd(P.CMD_MOVE, x=x, y=y)
     def send_attack(self, target_id): self._cmd(P.CMD_ATTACK, target_id=target_id)
     def send_attackmove(self, x, y): self._cmd(P.CMD_ATTACKMOVE, x=x, y=y)
-    def send_cast(self, slot, x, y): self._cmd(P.CMD_CAST, slot=slot, x=x, y=y)
+    def send_cast(self, slot, x, y, hold=0.0):
+        if hold > 0.0:   # pressione del tasto (Tiro Lungo)
+            self._cmd(P.CMD_CAST, slot=slot, x=x, y=y, hold=hold)
+        else:
+            self._cmd(P.CMD_CAST, slot=slot, x=x, y=y)
     def send_stop(self): self._cmd(P.CMD_STOP)
     def send_recall(self): self._cmd(P.CMD_RECALL)
 

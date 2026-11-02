@@ -16,7 +16,8 @@ from engine.entities import Core, Pillar, Pokemon, Structure, Unit
 from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
                          TILE_PUDDLE, TILE_RIVER, TILE_WALL)
 from . import spirit_fx
-from . import charcadet_fx, corvi_fx, eevee_fx, mien_fx, noivern_fx, sneasel_fx, ursa_fx
+from . import (arch_fx, charcadet_fx, corvi_fx, eevee_fx, mien_fx, noivern_fx, sneasel_fx,
+               ursa_fx)
 from . import structure_gfx
 from .fx import EMBER, ROCK_HI, ROCK_MID, ROCK_OUT, ROCK_SH, type_color
 from .map_renderer import MapRenderer
@@ -593,10 +594,11 @@ class Renderer:
             surface.blit(overlay, (0, 0))
 
     # --- percorso di debug ---------------------------------------------------
-    def draw_aim(self, surface, camera, origin, mouse_tile, move):
+    def draw_aim(self, surface, camera, origin, mouse_tile, move, hold=0.0, rain=False):
         """Indicatore di mira mentre si tiene premuto il tasto mossa.
 
         Mostra la gittata e l'area reale di colpo (linea/cono/cerchio/scatto).
+        `hold` = secondi di pressione (Tiro Lungo), `rain` = sotto la pioggia.
         """
         ts = self.tile_size
         col = type_color(move.type)
@@ -623,6 +625,8 @@ class Renderer:
             pygame.draw.circle(surface, (90, 90, 90), S(ox, oy), int(rng * ts), 1)
 
         shape = move.shape
+        if arch_fx.draw_aim(surface, S, ts, ox, oy, nx, ny, dist, move, hold, rain):
+            return   # linea Duraludon
         if shape == "rockwave":   # Rocciotomba: corsia dell'onda + pilastro in fondo
             ex, ey = ox + nx * rng, oy + ny * rng
             pygame.draw.line(surface, col, S(ox, oy), S(ex, ey), max(2, int(move.radius * ts)))
@@ -873,6 +877,7 @@ class Renderer:
                     ursa_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # Riposo, Dentistretti
                     sneasel_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # cure ridotte, Arraffalesto
                     mien_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # oggetti spenti, Rigenergia
+                    arch_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # Conduzione, Tuono
                 if in_bush:
                     self._draw_hidden_hint(surface, e, gx, gy, now)
                 self._draw_unit_hp(surface, e, gx, gy, grow)

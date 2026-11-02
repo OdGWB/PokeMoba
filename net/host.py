@@ -590,7 +590,7 @@ class HostSession:
             if not V.valid_move_slot(c["slot"]):
                 return None
             return CastMoveCommand(seq=seq, entity_id=eid, slot=P.SLOTS_QWER[c["slot"]],
-                                   x=pt[0], y=pt[1])
+                                   x=pt[0], y=pt[1], hold=float(c.get("hold", 0.0)))
         if k == P.CMD_ATTACK:
             from engine.entities import Structure
             tgt = self.world.get(c["target_id"])

@@ -31,6 +31,7 @@ from .noivern import ECHO_ID, NOIVERN_PASSIVES, NoivernMixin
 from .ursaring import URSA_PASSIVES, UrsaringMixin
 from .sneasel import SNEASEL_PASSIVES, SneaselMixin
 from .mienshao import MIEN_PASSIVES, PROJ_SHAPES, MienshaoMixin
+from .archaludon import ARCH_PASSIVES, ArchaludonMixin
 from .corviknight import CORVI_PASSIVES, CorviknightMixin
 from .eevee import EEVEE_PASSIVES, EeveeMixin
 from .item_effects import ItemEffectsMixin, cdr_to_haste
@@ -116,7 +117,8 @@ _SYNC_STATUSES = ("slow", "stun", "freeze", "confuse", "silence", "root", "sleep
 
 
 class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, NoivernMixin,
-            UrsaringMixin, SneaselMixin, MienshaoMixin, ItemEffectsMixin):
+            UrsaringMixin, SneaselMixin, MienshaoMixin, ArchaludonMixin,
+            ItemEffectsMixin):
     def __init__(self, world, map_data):
         self.world = world
         self.map = map_data
@@ -154,6 +156,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self._init_ursa()        # linea Teddiursa: Profumino, balzi, Terremoto
         self._init_sneasel()     # linea Sneasel: scavalcamenti, Picchiaduro, Sporcolancio
         self._init_mien()        # linea Mienfoo: balzi di Calcinvolo, Guardia Rapida
+        self._init_arch()        # linea Duraludon: Tuononda, Elettroraggio, Tuono
         self.vision = VisionSystem(self.world.grid)
         self._build_structures()
         self.jungle = JungleSystem(self)
@@ -209,6 +212,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self._update_ursa(dt)        # Miele, Dentistretti, balzi, Profumino, Terremoto (linea Teddiursa)
         self._update_sneasel(dt)     # Arraffalesto, Notte Fonda, Scalaroccia... (linea Sneasel)
         self._update_mien(dt)        # Calcinvolo, Rigenergia, Individua, Danza (linea Mienfoo)
+        self._update_arch(dt)        # Tuononda, Elettroraggio, Tuono (linea Duraludon)
         self._update_rock_moves(dt)  # Rocciotomba / Pesobomba / Frana / Abbattimento
         self._update_spiritomb(dt)   # spiriti, Stordiraggio, Malcomune, Legione, Memento
         self._update_eevee(dt)       # Desiderio, Comete, Tuono, Bora, Divinazione, Idratazione
@@ -1686,7 +1690,10 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
                 "honeyscent": "Shoot", "rest": "Sleep", "earthquake": "Rumble",
                 "nightslash": "Attack", "nightfall": "Charge", "beatup": "Attack",
                 "sludgelob": "Shoot", "detect": "Charge", "fakeout": "Strike",
-                "sleevedance": "Twirl", "reversal": "Attack"}.get(shape)
+                "sleevedance": "Twirl", "reversal": "Attack",
+                "flashcannon": "Shoot", "thunderwave": "Shoot", "dragontail": "Swing",
+                "metalsound": "Charge", "irondefense": "Charge", "electroshot": "Charge",
+                "thunderstorm": "Shoot"}.get(shape)
         if anim:
             self.fx_events.append({"eid": p.id, "anim": anim})
         # Gli eventi visivi aggiunti dai _cast_* qui sotto vengono "taggati" con lo
@@ -1775,6 +1782,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             pass   # linea Sneasel (engine/sneasel.py)
         elif self._mien_cast(p, mv, rank, origin, tgt, dirv):
             pass   # linea Mienfoo (engine/mienshao.py)
+        elif self._arch_cast(p, mv, rank, origin, tgt, dirv):
+            pass   # linea Duraludon (engine/archaludon.py)
         elif shape == "buff":
             self._apply_support(p, mv, rank, origin)
             self.fx_events.append({"kind": "buff", "c": (origin.x, origin.y),
@@ -3883,6 +3892,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         if p.passive_id in SNEASEL_PASSIVES and self._bot_sneasel_cast(p, target):
             return
         if p.passive_id in MIEN_PASSIVES and self._bot_mien_cast(p, target):
+            return
+        if p.passive_id in ARCH_PASSIVES and self._bot_arch_cast(p, target):
             return
         for slot in ("R", "Q", "W", "E"):
             ms = p.moveset.get(slot)
