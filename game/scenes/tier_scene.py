@@ -29,7 +29,7 @@ def tier_path() -> Path:
 
 
 class TierChoiceScene:
-    """Scelta della tier list: Developer (per ora vuota) o Personale (la tua)."""
+    """Scelta della tier list: Developer (dai bot) o Personale (la tua)."""
 
     def __init__(self, app):
         self.app = app
@@ -47,7 +47,7 @@ class TierChoiceScene:
         self.next_scene = TierListScene(self.app)
 
     def _developer(self):
-        pass        # da implementare
+        self.next_scene = DeveloperTierScene(self.app)
 
     def _back(self):
         from .menu_scene import MenuScene
@@ -89,6 +89,289 @@ class TierChoiceScene:
                           self._personal, big)
         self.buttons.draw(surface, (W // 2 - bw // 2, y + 2 * (bh + 16) + 10, bw, bh),
                           "Indietro  (Esc)", self._back, small)
+
+
+DEV_PATH = Path(__file__).resolve().parents[2] / "data" / "tier_developer.json"
+
+
+def _wrap(font, text, width):
+    lines, cur = [], ""
+    for w in text.split():
+        t = (cur + " " + w).strip()
+        if cur and font.size(t)[0] > width:
+            lines.append(cur)
+            cur = w
+        else:
+            cur = t
+    if cur:
+        lines.append(cur)
+    return lines
+
+
+class _DevBase:
+    """Font e metodi comuni alle schermate Developer (sola lettura)."""
+
+    def _font(self, size, bold=False):
+        key = (size, bold)
+        if key not in self._fonts:
+            self._fonts[key] = pygame.font.SysFont("consolas", size, bold=bold)
+        return self._fonts[key]
+
+    def fixed_update(self):
+        pass
+
+    def update(self, dt):
+        pass
+
+    def draw(self, surface):
+        surface.fill(BG)
+
+    def hud_lines(self):
+        return []
+
+
+def _load_dev():
+    try:
+        return json.loads(DEV_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+class DeveloperTierScene(_DevBase):
+    """Tier list ricavata dalle partite dei bot (tools/tier_sim.py + tier_build.py).
+
+    Dentro ogni riga, piu' a sinistra = piu' forte; il numero e' la posizione
+    assoluta (1 = il migliore). Non si sposta nulla: il clic apre la pagina del
+    Pokemon con il perche' di quella posizione."""
+
+    def __init__(self, app):
+        self.app = app
+        self.next_scene = None
+        self.data = _load_dev()
+        defs = [load_pokemon_def(str(app.root / rel)) for rel in config.ROSTER]
+        self._frames = {}
+        self.colors = {d.name: tuple(d.color) for d in defs}
+        for d in defs:
+            fr = load_idle(d.sprite_dir)
+            self._frames[d.name] = fr[0][0] if fr else None
+        self.buttons = Buttons()
+        self._fonts = {}
+        self._icons = {}
+        self._cells = []
+        self.hover = None
+
+    def _back(self):
+        self.next_scene = TierChoiceScene(self.app)
+
+    def _open(self, name):
+        self.next_scene = DeveloperDetailScene(self.app, name, self.data)
+
+    def handle_events(self, events):
+        for ev in events:
+            if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
+                self._back()
+            elif ev.type == pygame.MOUSEMOTION:
+                self.hover = next((n for r, n in self._cells if r.collidepoint(ev.pos)), None)
+            elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+                if self.buttons.click(ev.pos):
+                    continue
+                n = next((n for r, n in self._cells if r.collidepoint(ev.pos)), None)
+                if n:
+                    self._open(n)
+
+    def _icon(self, name, side):
+        key = (name, side)
+        if key not in self._icons:
+            fr = self._frames.get(name)
+            self._icons[key] = scale_nearest(fr, side - 8) if fr is not None else None
+        return self._icons[key]
+
+    def draw_fullres(self, surface, font):
+        W, H = surface.get_size()
+        surface.fill(BG)
+        self.buttons.clear()
+        self._cells = []
+        title_f = self._font(max(28, H // 18), bold=True)
+        mid = self._font(max(14, H // 46))
+        small = self._font(max(12, H // 58))
+        t = title_f.render("Tier list Developer", True, GOLD)
+        surface.blit(t, (W // 2 - t.get_width() // 2, int(H * 0.025)))
+        bh = mid.get_height() + 14
+        x0 = int(W * 0.06)
+        if not self.data:
+            m = mid.render("Nessun dato: lancia tools/tier_sim.py e tools/tier_build.py.", True, DIM)
+            surface.blit(m, (W // 2 - m.get_width() // 2, H // 2))
+            self.buttons.draw(surface, (x0, H - bh - 10, 200, bh), "Indietro  (Esc)",
+                              self._back, mid)
+            return
+        sub = small.render(f"Dalle partite dei bot ({self.data['matches']} partite 3v3).  "
+                           "Più a sinistra = più forte.  Clic su un Pokémon per il perché.",
+                           True, DIM)
+        surface.blit(sub, (W // 2 - sub.get_width() // 2, int(H * 0.025) + t.get_height() + 2))
+
+        top = int(H * 0.025) + t.get_height() + sub.get_height() + 16
+        rows = {}
+        for e in self.data["list"]:
+            rows.setdefault(e["tier"], []).append(e)
+        avail = H - top - bh - 30
+        row_h = max(52, min(avail // len(TIERS), int(H * 0.15)))
+        cell = row_h - 10
+        lab_w = max(48, int(row_h * 0.9))
+        w = W - 2 * x0
+        for i, (tier, col) in enumerate(TIERS):
+            y = top + i * row_h
+            r = pygame.Rect(x0, y, w, row_h - 4)
+            pygame.draw.rect(surface, PANEL, r, border_radius=6)
+            pygame.draw.rect(surface, BORDER, r, 1, border_radius=6)
+            lab = pygame.Rect(r.x, r.y, lab_w, r.h)
+            pygame.draw.rect(surface, col, lab, border_radius=6)
+            lt = title_f.render(tier, True, (20, 24, 22))
+            surface.blit(lt, (lab.centerx - lt.get_width() // 2, lab.centery - lt.get_height() // 2))
+            cx = r.x + lab_w + 8
+            for e in sorted(rows.get(tier, []), key=lambda e: e["pos"]):
+                c = pygame.Rect(cx, r.y + 3, cell, cell)
+                cx += cell + 6
+                self._cells.append((c, e["name"]))
+                on = e["name"] == self.hover
+                pygame.draw.rect(surface, PANEL_HI if on else BG, c, border_radius=6)
+                pygame.draw.rect(surface, GOLD if on else self.colors.get(e["name"], BORDER),
+                                 c, 2, border_radius=6)
+                img = self._icon(e["name"], c.w)
+                if img is not None:
+                    surface.blit(img, (c.centerx - img.get_width() // 2,
+                                       c.centery - img.get_height() // 2))
+                nb = small.render(str(e["pos"]), True, GOLD)
+                surface.blit(nb, (c.x + 4, c.y + 2))
+        if self.hover:
+            e = next(e for e in self.data["list"] if e["name"] == self.hover)
+            txt = mid.render(f"{e['pos']}º  {e['name']}  -  vittorie {e['winrate'] * 100:.0f}%",
+                             True, TEXT)
+            surface.blit(txt, (W // 2 - txt.get_width() // 2,
+                               H - bh - 10 + (bh - txt.get_height()) // 2))
+        self.buttons.draw(surface, (x0, H - bh - 10, 200, bh), "Indietro  (Esc)", self._back, mid)
+
+
+class DeveloperDetailScene(_DevBase):
+    """Pagina di un Pokemon: posizione, tier, statistiche e il perche'."""
+
+    def __init__(self, app, name, data):
+        self.app = app
+        self.next_scene = None
+        self.name = name
+        self.data = data
+        self.entry = next(e for e in data["list"] if e["name"] == name)
+        d = next(x for x in (load_pokemon_def(str(app.root / rel)) for rel in config.ROSTER)
+                 if x.name == name)
+        fr = load_idle(d.sprite_dir)
+        self.frame = fr[0][0] if fr else None
+        self.color = tuple(d.color)
+        self.buttons = Buttons()
+        self._fonts = {}
+
+    def _back(self):
+        self.next_scene = DeveloperTierScene(self.app)
+
+    def handle_events(self, events):
+        for ev in events:
+            if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
+                self._back()
+            elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+                self.buttons.click(ev.pos)
+
+    def draw_fullres(self, surface, font):
+        W, H = surface.get_size()
+        surface.fill(BG)
+        self.buttons.clear()
+        e = self.entry
+        col = dict(TIERS)[e["tier"]]
+        title_f = self._font(max(28, H // 16), bold=True)
+        big = self._font(max(18, H // 32), bold=True)
+        mid = self._font(max(14, H // 46))
+        small = self._font(max(12, H // 56))
+        pad = int(W * 0.05)
+
+        # Colonna sinistra: ritratto, tier e dati base.
+        side = int(min(W * 0.26, H * 0.38))
+        box = pygame.Rect(pad, int(H * 0.06), side, side)
+        pygame.draw.rect(surface, PANEL, box, border_radius=10)
+        pygame.draw.rect(surface, self.color, box, 3, border_radius=10)
+        if self.frame is not None:
+            img = scale_nearest(self.frame, side - 16)
+            surface.blit(img, (box.centerx - img.get_width() // 2,
+                               box.centery - img.get_height() // 2))
+        y = box.bottom + 14
+        tb = pygame.Rect(pad, y, side, max(56, H // 10))
+        pygame.draw.rect(surface, col, tb, border_radius=8)
+        tt = title_f.render(f"Tier {e['tier']}", True, (20, 24, 22))
+        surface.blit(tt, (tb.centerx - tt.get_width() // 2, tb.centery - tt.get_height() // 2))
+        y = tb.bottom + 10
+        for line in (f"Posizione {e['pos']} su 17", f"Ruolo: {e['role']}",
+                     "Tipo: " + "/".join(e["types"]), f"{e['games']} partite giocate"):
+            surface.blit(mid.render(line, True, TEXT), (pad, y))
+            y += mid.get_height() + 4
+
+        # Colonna destra: titolo, riepilogo, statistiche, motivi, scontri.
+        x = pad + side + int(W * 0.04)
+        cw = W - x - pad
+        surface.blit(title_f.render(e["name"], True, GOLD), (x, int(H * 0.05)))
+        y = int(H * 0.05) + title_f.get_height() + 6
+        for ln in _wrap(mid, e["summary"], cw):
+            surface.blit(mid.render(ln, True, TEXT), (x, y))
+            y += mid.get_height() + 2
+        y += 10
+
+        av = self.data["averages"]
+        stats = [("Vittorie", f"{e['winrate'] * 100:.0f}%", f"{self.data['avg_winrate'] * 100:.0f}%"),
+                 ("Uccisioni", f"{e['kills']:.1f}", f"{av['kills']:.1f}"),
+                 ("Morti", f"{e['deaths']:.1f}", f"{av['deaths']:.1f}"),
+                 ("K/D", f"{e['kda']:.2f}", f"{av['kda']:.2f}"),
+                 ("Danno", f"{e['dmg']}", f"{av['dmg']:.0f}"),
+                 ("Livello", f"{e['level']:.1f}", f"{av['level']:.1f}")]
+        sw = cw // len(stats)
+        sh = int(H * 0.11)
+        for i, (lab, val, ref) in enumerate(stats):
+            r = pygame.Rect(x + i * sw, y, sw - 6, sh)
+            pygame.draw.rect(surface, PANEL, r, border_radius=6)
+            pygame.draw.rect(surface, BORDER, r, 1, border_radius=6)
+            surface.blit(small.render(lab, True, DIM), (r.x + 6, r.y + 4))
+            surface.blit(big.render(val, True, TEXT), (r.x + 6, r.y + 4 + small.get_height()))
+            surface.blit(small.render(f"media {ref}", True, DIM),
+                         (r.x + 6, r.bottom - small.get_height() - 4))
+        y += sh + 14
+
+        def block(title, items, color):
+            nonlocal y
+            surface.blit(big.render(title, True, color), (x, y))
+            y += big.get_height() + 2
+            for it in items:
+                surface.blit(mid.render("•", True, color), (x + 4, y))
+                for ln in _wrap(mid, it, cw - 22):
+                    surface.blit(mid.render(ln, True, TEXT), (x + 20, y))
+                    y += mid.get_height() + 1
+            y += 8
+
+        def duel(title, items, color):
+            nonlocal y
+            if not items:
+                return
+            txt = ", ".join(f"{d['name']} ({d['winrate'] * 100:.0f}%)" for d in items)
+            surface.blit(mid.render(title, True, color), (x, y))
+            y += mid.get_height() + 1
+            for ln in _wrap(mid, txt, cw - 20):
+                surface.blit(mid.render(ln, True, TEXT), (x + 20, y))
+                y += mid.get_height() + 1
+            y += 4
+
+        block("Perché sta qui: punti di forza", e["pros"], (130, 200, 100))
+        block("Punti deboli", e["cons"], (230, 120, 90))
+        duel("Va meglio quando affronta:", e["best"], (130, 200, 100))
+        duel("Soffre quando affronta:", e["worst"], (230, 120, 90))
+
+        note = small.render("Posizione calcolata dalle partite dei bot: vittorie 50%, K/D 25%, "
+                            "danno 15%, livello 10%.", True, DIM)
+        surface.blit(note, (x, H - note.get_height() - 18))
+        bh = mid.get_height() + 14
+        self.buttons.draw(surface, (pad, H - bh - 12, 200, bh), "Indietro  (Esc)", self._back, mid)
 
 
 class TierListScene:
