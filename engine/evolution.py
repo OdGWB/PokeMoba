@@ -33,6 +33,13 @@ def _requires_met(p, st) -> bool:
         return False
     if arm == "infausta" and p.fausta > p.infausta:
         return False
+    # Linea Sneasel: {"oro": "neutrali"} -> vera se l'oro dai neutrali supera
+    # quello dai minion; "minion" -> il contrario, parità compresa.
+    gold = req.get("oro")
+    if gold == "neutrali" and not p.gold_wild > p.gold_minion:
+        return False
+    if gold == "minion" and p.gold_wild > p.gold_minion:
+        return False
     choices = req.get("choices")
     if choices:
         for slot, idx in choices.items():

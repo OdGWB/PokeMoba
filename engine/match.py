@@ -29,6 +29,7 @@ from .spatial import SpatialHash
 from .charcadet import CHARCADET_PASSIVES, CharcadetMixin
 from .noivern import ECHO_ID, NOIVERN_PASSIVES, NoivernMixin
 from .ursaring import URSA_PASSIVES, UrsaringMixin
+from .sneasel import SNEASEL_PASSIVES, SneaselMixin
 from .corviknight import CORVI_PASSIVES, CorviknightMixin
 from .eevee import EEVEE_PASSIVES, EeveeMixin
 from .item_effects import ItemEffectsMixin, cdr_to_haste
@@ -114,7 +115,7 @@ _SYNC_STATUSES = ("slow", "stun", "freeze", "confuse", "silence", "root", "sleep
 
 
 class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, NoivernMixin,
-            UrsaringMixin, ItemEffectsMixin):
+            UrsaringMixin, SneaselMixin, ItemEffectsMixin):
     def __init__(self, world, map_data):
         self.world = world
         self.map = map_data
@@ -150,6 +151,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self._init_charcadet()   # linea Charcadet: Ombra Notturna, Pulifumo, ultimate
         self._init_noivern()     # linea Noibat: ping, Tifone, Dragobolide
         self._init_ursa()        # linea Teddiursa: Profumino, balzi, Terremoto
+        self._init_sneasel()     # linea Sneasel: scavalcamenti, Picchiaduro, Sporcolancio
         self.vision = VisionSystem(self.world.grid)
         self._build_structures()
         self.jungle = JungleSystem(self)
@@ -203,6 +205,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self._update_charcadet(dt)   # Armor Cannon, Ombra Notturna, Lama dei Rancori... (linea Charcadet)
         self._update_noivern(dt)     # ping di Ecolocalizzazione, Tifone, Dragobolide (linea Noibat)
         self._update_ursa(dt)        # Miele, Dentistretti, balzi, Profumino, Terremoto (linea Teddiursa)
+        self._update_sneasel(dt)     # Arraffalesto, Notte Fonda, Scalaroccia... (linea Sneasel)
         self._update_rock_moves(dt)  # Rocciotomba / Pesobomba / Frana / Abbattimento
         self._update_spiritomb(dt)   # spiriti, Stordiraggio, Malcomune, Legione, Memento
         self._update_eevee(dt)       # Desiderio, Comete, Tuono, Bora, Divinazione, Idratazione
@@ -789,6 +792,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
                     self._after_aa(u, tgt)        # Doppia Lama (Ceruledge)
                     self._echo_after_aa(u, tgt)   # Ecolocalizzazione: ping ogni 3 colpi
                     self._ursa_after_aa(u, tgt)   # Luna Piena: attacchi base ad area
+                    self._sneasel_after_aa(u, tgt)   # Arraffalesto, colpo d'agguato
                     self._spirit_wander(u, tgt)   # Spirito Vagante (Spiritomb)
                     self._cute_charm(u, tgt)      # Incantevole (Sylveon)
                     mt = u.types[0] if u.types else "Normal"
@@ -876,6 +880,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         """
         if isinstance(caster, Pokemon):
             chance = (caster.crit if can_crit else 0.0) + crit_bonus
+            chance += self._sneasel_crit_bonus(caster)   # Nottesferza, Notte Fonda
             if chance > 0.0 and random.random() < chance:
                 raw *= CRIT_MULT
         if not isinstance(target, Pokemon):
@@ -925,6 +930,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         if isinstance(target, Pokemon) and target.untargetable_until > self.time:
             return
         amount *= self._honey_wild_mult(attacker, target)   # Miele: +30% ai neutrali
+        amount *= self._sneasel_wild_mult(attacker, target)   # Scalaroccia: +30% ai neutrali
         # Clone esca (Doppioteam): qualunque danno lo dissolve, senza ricompense.
         if isinstance(target, Pokemon) and target.is_decoy:
             if amount > 0.0:
@@ -1011,6 +1017,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             victim.charm_until = -1.0
             victim.taunt_until = -1.0
             victim.invisible = False
+            victim.nightfall_until = victim.ambush_until = -1.0   # Notte Fonda interrotta
             # Se muore in forma Shedinja, ripristina l'identità di Ninjask così il
             # respawn avviene normale (max_hp corretto, non 1).
             if victim.form == "shedinja":
@@ -1335,6 +1342,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             # minion danno 0 (killer non è un Pokémon).
             if isinstance(killer, Pokemon):
                 killer.gold += self._minion_gold(victim)
+                self._track_gold(killer, self._minion_gold(victim), "minion")   # Sole e Luna
                 self._exp_share(victim, killer)   # Condividi Esp. degli alleati vicini
         elif isinstance(victim, Pokemon):
             self._award_kill(victim, killer)
@@ -1588,7 +1596,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             if p.pos.dist(p.spawn_pos) <= 5.0:
                 p.hp = min(p.max_hp, p.hp + p.max_hp * 0.25 * dt)   # ~25%/s
             else:
-                p.hp = min(p.max_hp, p.hp + (p.max_hp * 0.015 + 2.0) * dt)
+                p.hp = min(p.max_hp, p.hp + (p.max_hp * 0.015 + 2.0) * dt
+                           * self._healcut_mult(p))   # cure ridotte (Sporcolancio)
 
     # --- mosse: esecuzione ---------------------------------------------------
     def _update_casts(self, dt: float) -> None:
@@ -1625,6 +1634,9 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             return
         if not self._charcadet_precheck(p, mv, Vec2(tx, ty)):   # Ombra Notturna, Rancori
             return
+        if not self._sneasel_precheck(p, mv, Vec2(tx, ty)):   # Picchiaduro, Agguato
+            return
+        self._sneasel_on_cast(p, mv)   # Notte Fonda: lanciare una mossa toglie l'invisibilità
         if p.aa_active:              # lanciare annulla un auto-attacco in windup
             p.aa_active = False
             p.attack_timer = 0.0
@@ -1661,7 +1673,9 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
                 "floatarmor": "Charge", "psychic": "Shoot", "grudgeblade": "Attack",
                 "shadowclaw": "Charge", "dragonpulse": "Shoot", "whirlwind": "Charge",
                 "hurricane": "Shoot", "dracometeor": "Charge",
-                "honeyscent": "Shoot", "rest": "Sleep", "earthquake": "Rumble"}.get(shape)
+                "honeyscent": "Shoot", "rest": "Sleep", "earthquake": "Rumble",
+                "nightslash": "Attack", "nightfall": "Charge", "beatup": "Attack",
+                "sludgelob": "Shoot"}.get(shape)
         if anim:
             self.fx_events.append({"eid": p.id, "anim": anim})
         # Gli eventi visivi aggiunti dai _cast_* qui sotto vengono "taggati" con lo
@@ -1746,6 +1760,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             pass   # linea Noibat (engine/noivern.py)
         elif self._ursa_cast(p, mv, rank, origin, tgt, dirv):
             pass   # linea Teddiursa (engine/ursaring.py)
+        elif self._sneasel_cast(p, mv, rank, origin, tgt, dirv):
+            pass   # linea Sneasel (engine/sneasel.py)
         elif shape == "buff":
             self._apply_support(p, mv, rank, origin)
             self.fx_events.append({"kind": "buff", "c": (origin.x, origin.y),
@@ -3349,7 +3365,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             self._vamp(caster, dmg, physical=not magic)
             self._item_after_move_hit(caster, mv, target, eff)   # Assorbisfera, Vulnerassicurazione
             if "heal_self_ratio" in fx and isinstance(caster, Pokemon):  # Mangiasogni
-                caster.hp = min(caster.max_hp, caster.hp + dmg * float(fx["heal_self_ratio"]))
+                caster.hp = min(caster.max_hp, caster.hp + dmg * float(fx["heal_self_ratio"])
+                                * self._heal_in_mult(caster))
             if "recoil" in fx and isinstance(caster, Pokemon) and caster.alive:
                 # Sdoppiatore / Fuococarica: contraccolpo pari a una % del danno.
                 caster.hp = max(1.0, caster.hp - dmg * float(fx["recoil"]))
@@ -3377,6 +3394,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         if (isinstance(caster, Pokemon) and isinstance(target, Pokemon)
                 and target.team != caster.team):
             self._add_inversion(caster)
+        self._sneasel_on_hit(caster, target)   # Arraffalesto, colpo d'agguato di Notte Fonda
 
     def _apply_hit_effects(self, caster, target, fx) -> None:
         """Controlli e debuff di una mossa sul Pokémon colpito."""
@@ -3449,6 +3467,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         if fx.get("steal_buff") and caster.team != target.team:   # Spennata
             self._steal_buff(caster, target)
         self._charcadet_hit_effects(caster, target, fx)   # Lavasbuffo: scottatura
+        self._sneasel_hit_effects(caster, target, fx)   # Furto, Dire Claw, cure ridotte
 
     def _apply_support(self, caster, mv, rank, center) -> None:
         """Effetti su sé/alleati: cura, scudo, buff attacco/velocità."""
@@ -3657,7 +3676,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
                 or p.def_debuff_until > t or p.spdef_debuff_until > t
                 or p.burn_until > t or p.airborne_until > t
                 or p.frozen_until > t or p.charm_until > t or p.blind_until > t
-                or p.taunt_until > t)
+                or p.taunt_until > t or p.healcut_until > t)
 
     def _apply_untargetable(self, p, dur):
         p.untargetable_until = max(p.untargetable_until, self.time + dur)
@@ -3727,7 +3746,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             p.atk_debuff_active = p.atk_debuff_until > self.time
             p.def_buff_active = p.def_buff_until > self.time
             p.memento_weak = p.memento_weak_until > self.time   # Memento: Att./Att.Sp. dimezzati
-            p.invisible = p.memento_until > self.time            # Memento: invisibile ai nemici
+            # Memento / Notte Fonda: invisibile ai nemici
+            p.invisible = p.memento_until > self.time or p.nightfall_until > self.time
             if self.time > p.spite_until:
                 p.spite_mult = 1.0
             # Sonno ritardato (Ipnosi): scatta dopo il ritardo.
@@ -3844,6 +3864,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         if p.passive_id in NOIVERN_PASSIVES and self._bot_noivern_cast(p, target):
             return
         if p.passive_id in URSA_PASSIVES and self._bot_ursa_cast(p, target):
+            return
+        if p.passive_id in SNEASEL_PASSIVES and self._bot_sneasel_cast(p, target):
             return
         for slot in ("R", "Q", "W", "E"):
             ms = p.moveset.get(slot)

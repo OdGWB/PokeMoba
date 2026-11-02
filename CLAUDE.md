@@ -600,6 +600,32 @@ Passaggi completati:
   honey/guts_active in UNIT_FLAGS; la scena di rete rimette le nuvole di
   Profumino in vision.reveals. Screenshot: step_31_* (linea, hud_*, ogni
   mossa, lunapiena_balzo/_grande, draft_teddiursa).
+- LINEA SNEASEL > WEAVILE / SNEASLER (step_32), grafica nuova in
+  game/sneasel_fx.py (logica in engine/sneasel.py). Sprite PMD Sprite Collab in
+  assets/pokemon/0215/0461/0903. Forme nuove in _draw_shapes (sneasel_fx.SHAPES):
+  scheggia di ghiaccio in volo con scia di brina (iceshard), fendente buio
+  SOTTILE e un filo curvo (darkslash: le prime versioni larghe sembravano una
+  banda piatta), moneta/sfera che vola ad arco (coin: Furto, Arraffalesto),
+  cristallo di brina (flake), punta velenosa che scatta (stab), stella
+  d'impatto (impactstar: Picchiaduro, Agguato). Riusa le forme di Charcadet
+  (claw, sword), Teddiursa (claw3, groundcrack, groundring, pebble, zzz) e
+  Noibat (windline, soundarc). Disegni PERSISTENTI (world_fx): palla di fango di
+  Sporcolancio in volo ad arco con mirino che si chiude, poi pozza tossica che
+  ribolle; balzi di Sneasler (mirino di roccia sul bersaglio dell'Agguato,
+  ombra d'arrivo dello scavalcamento; il salto e' air_z). Sulle unita':
+  cuoricino verde spezzato (bitmap 7x6) a sinistra della barra per le CURE
+  RIDOTTE (nuovo stato generico healcut_until/_mult, applicato in
+  _heal_in_mult) + pallino rosso tra gli stati; triangolini cremisi sotto la
+  barra per Arraffalesto (in giu' sul derubato, in su su Weavile); ombra che
+  fuma sotto Weavile in Notte Fonda (gli alleati lo vedono traslucido). HUD:
+  Sole e Luna = LUNA (verso Weavile, parita' compresa) o SOLE (verso
+  Sneasler) + contatori "Minion"/"Neutr."; Arraffalesto = artigli + 5 tacche;
+  Scalaroccia = roccia con l'arco del salto + ricarica. Online: claw_leaps/
+  beatups/sludge_lobs in net/visual.LISTS, snatch_down/up in UNIT_FLAGS, oro
+  dei contatori e climb_ready_at in "me". Launcher gioca_weavile/_sneasler
+  usano --oro (stesso meccanismo di --armature). Screenshot: step_32_* (linea,
+  hud_*, ogni mossa, scalaroccia/_dopo, agguato_balzo, sporcolancio_volo/
+  _pozza, draft_sneasel).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

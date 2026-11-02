@@ -108,7 +108,8 @@ class ItemEffectsMixin:
         return self.item_catalog.total_bonus(p.items, skip)
 
     def _heal_in_mult(self, p) -> float:
-        return BIGROOT_MULT if isinstance(p, Pokemon) and "big_root" in p.items else 1.0
+        m = BIGROOT_MULT if isinstance(p, Pokemon) and "big_root" in p.items else 1.0
+        return m * self._healcut_mult(p)   # cure ridotte (Sporcolancio)
 
     def _heal_out_mult(self, caster) -> float:
         return SOOTHE_MULT if isinstance(caster, Pokemon) and "soothe_bell" in caster.items else 1.0

@@ -1,0 +1,129 @@
+{
+  "_comment": "Sneasel -> Weavile OPPURE Sneasler (liv.8), evoluzione ramificata da DOVE guadagna l'oro. Passiva Sole e Luna (engine/sneasel.py): due contatori, oro dai minion (last-hit) e oro dai Pokémon neutrali (campi + oro di squadra del leggendario meteo e di Arceus). Al liv.8: oro dai neutrali piu' alto -> Sneasler (jungler assassino), altrimenti (parita' compresa) Weavile (assassino di lane). All'evoluzione la Q diventa la mossa propria della forma (il grado si conserva), W ed E restano; la forma porta la sua passiva (Arraffalesto / Scalaroccia) e due ultimate a scelta. Q si potenzia senza scelta al liv.5 (Geloscheggia +), W al liv.6 e E al liv.7 come al solito.",
+  "dex": 215,
+  "name": "Sneasel",
+  "types": ["Dark", "Ice"],
+  "role": "assassino",
+  "recommended_items": ["muscle_band", "scope_lens", "quick_claw", "life_orb"],
+  "color": [52, 58, 96],
+  "radius": 0.36,
+  "base_speed": 3.7,
+  "attack_range": 1.6,
+  "attack_cooldown": 0.8,
+  "sprite_dir": "assets/pokemon/0215",
+  "passive": "soleluna",
+  "attack_fx": "slash",
+
+  "base_stats": {"hp": 55, "attack": 95, "defense": 55, "sp_attack": 35, "sp_defense": 75, "speed": 115},
+
+  "evolutions": [
+    {"stage": 0, "level": 1, "name": "Sneasel", "dex": 215, "sprite_dir": "assets/pokemon/0215",
+     "types": ["Dark", "Ice"], "passive": "soleluna", "role": "assassino", "color": [52, 58, 96],
+     "attack_fx": "slash", "attack_range": 1.6, "ranged": false, "radius": 0.36,
+     "base_stats": {"hp": 55, "attack": 95, "defense": 55, "sp_attack": 35, "sp_defense": 75, "speed": 115}},
+
+    {"stage": 1, "level": 8, "name": "Weavile", "dex": 461, "sprite_dir": "assets/pokemon/0461",
+     "types": ["Dark", "Ice"], "passive": "arraffalesto", "role": "assassino", "color": [64, 52, 96],
+     "form_color": [214, 56, 78],
+     "attack_fx": "slash", "attack_range": 1.7, "ranged": false, "radius": 0.42,
+     "base_stats": {"hp": 70, "attack": 120, "defense": 65, "sp_attack": 45, "sp_defense": 85, "speed": 125},
+     "moves": {
+       "Q": {"base": {"id": "nightslash", "name": "Nottesferza", "type": "Dark", "category": "special",
+                      "shape": "nightslash", "fx": "nightslash", "target": "direction",
+                      "power": [100, 150, 200, 250], "ratio": 0.8,
+                      "cooldown": [6, 5.5, 5, 4.5], "range": 3.4, "radius": 0.6,
+                      "effects": {"isolated_range": 5.0}}},
+       "R": {"upgrades": [
+         {"id": "nightfall", "name": "Notte Fonda", "type": "Dark", "category": "physical",
+          "shape": "nightfall", "fx": "nightfall", "target": "self",
+          "power": [100, 150, 200], "ratio": 0.6,
+          "cooldown": [80, 70, 60], "range": 0, "radius": 1.0,
+          "effects": {"duration": 4.0, "speed": 1.3, "slow": {"mult": 0.5, "duration": 2.0}}},
+         {"id": "beatup", "name": "Picchiaduro", "type": "Fighting", "category": "physical",
+          "shape": "beatup", "fx": "beatup", "target": "point",
+          "power": [45, 65, 85], "ratio": 0.35,
+          "cooldown": [80, 70, 60], "range": 5.0, "radius": 0.6,
+          "effects": {"hits": 3, "ally_range": 8.0, "interval": 0.16}}
+       ]}
+     }},
+
+    {"stage": 1, "level": 8, "name": "Sneasler", "dex": 903, "sprite_dir": "assets/pokemon/0903",
+     "types": ["Fighting", "Poison"], "passive": "scalaroccia", "role": "assassino", "color": [120, 96, 150],
+     "form_color": [240, 196, 74],
+     "attack_fx": "slash", "attack_range": 1.7, "ranged": false, "radius": 0.48,
+     "requires": {"oro": "neutrali"},
+     "base_stats": {"hp": 80, "attack": 130, "defense": 60, "sp_attack": 40, "sp_defense": 80, "speed": 120},
+     "moves": {
+       "Q": {"base": {"id": "direclaw", "name": "Dire Claw", "type": "Poison", "category": "physical",
+                      "shape": "cone", "fx": "direclaw", "target": "direction",
+                      "power": [90, 135, 180, 225], "ratio": 1.0,
+                      "cooldown": [6, 5.5, 5, 4.5], "range": 2.3, "angle": 55,
+                      "effects": {"direclaw": {"chance": 0.5, "duration": 2.0}}}},
+       "R": {"upgrades": [
+         {"id": "cliffambush", "name": "Agguato dalla Rupe", "type": "Rock", "category": "physical",
+          "shape": "cliffambush", "fx": "cliffambush", "target": "point",
+          "power": [200, 300, 400], "ratio": 1.1,
+          "cooldown": [80, 70, 60], "range": 10.0, "radius": 1.0,
+          "effects": {"stun": {"duration": 1.0}, "wall_range": 2.0, "leap_time": 0.6}},
+         {"id": "sludgelob", "name": "Sporcolancio", "type": "Poison", "category": "special",
+          "shape": "sludgelob", "fx": "sludgelob", "target": "point",
+          "power": [160, 240, 320], "ratio": 0.8,
+          "cooldown": [80, 70, 60], "range": 7.0, "radius": 2.8,
+          "effects": {"flight": 0.6, "poison": {"dps": 30, "hp_frac": 0.01, "duration": 4.0},
+                      "healcut": {"mult": 0.5, "duration": 6.0}}}
+       ]}
+     }}
+  ],
+
+  "moves": {
+    "Q": {
+      "base": {"id": "iceshard", "name": "Geloscheggia", "type": "Ice", "category": "special",
+               "shape": "projectile", "fx": "iceshard", "target": "direction",
+               "power": [55, 85, 115, 145], "ratio": 0.6,
+               "cooldown": [4, 3.5, 3, 2.5], "range": 4.5, "radius": 0.35},
+      "upgrades": [
+        {"id": "iceshardplus", "name": "Geloscheggia +", "type": "Ice", "category": "special",
+         "shape": "projectile", "fx": "iceshard", "target": "direction",
+         "power": [80, 120, 160, 200], "ratio": 0.7,
+         "cooldown": [4, 3.5, 3, 2.5], "range": 4.8, "radius": 0.38}
+      ]
+    },
+    "W": {
+      "base": {"id": "thief", "name": "Furto", "type": "Dark", "category": "physical",
+               "shape": "cone", "fx": "thief", "target": "direction",
+               "power": [45, 70, 95, 120], "ratio": 0.8,
+               "cooldown": [7, 6.5, 6, 5.5], "range": 2.0, "angle": 50,
+               "effects": {"steal_gold": {"amount": 10, "cd": 10.0}}},
+      "upgrades": [
+        {"id": "shadowclawslash", "name": "Ombrartigli", "type": "Ghost", "category": "physical",
+         "shape": "cone", "fx": "sneaclaw", "target": "direction",
+         "power": [75, 115, 155, 195], "ratio": 1.0,
+         "can_crit": true, "crit_bonus": 0.3,
+         "cooldown": [6, 5.5, 5, 4.5], "range": 2.4, "angle": 60},
+        {"id": "poisonjab", "name": "Velenpuntura", "type": "Poison", "category": "physical",
+         "shape": "cone", "fx": "poisonjab", "target": "direction",
+         "power": [70, 105, 140, 175], "ratio": 0.9,
+         "cooldown": [7, 6.5, 6, 5.5], "range": 2.2, "angle": 40,
+         "effects": {"poison": {"dps": 25, "hp_frac": 0.01, "duration": 3.0}}}
+      ]
+    },
+    "E": {
+      "base": {"id": "quickattack", "name": "Rapidattacco", "type": "Normal", "category": "physical",
+               "shape": "dash", "fx": "quickattack", "target": "direction",
+               "power": [40, 65, 90, 115], "ratio": 0.6,
+               "cooldown": [9, 8.5, 8, 7.5], "range": 4.0, "radius": 0.7},
+      "upgrades": [
+        {"id": "quickattack2", "name": "Doppio scatto", "type": "Normal", "category": "physical",
+         "shape": "dash", "fx": "quickattack", "target": "direction",
+         "power": [40, 65, 90, 115], "ratio": 0.6,
+         "cooldown": [0.6, 0.6, 0.6, 0.6], "range": 4.0, "radius": 0.7,
+         "charges": 2, "charge_time": 8.5, "refund_on_hit": false},
+        {"id": "quickdance", "name": "Danzaspada", "type": "Normal", "category": "physical",
+         "shape": "dash", "fx": "quickdance", "target": "direction",
+         "power": [40, 65, 90, 115], "ratio": 0.6,
+         "cooldown": [9, 8.5, 8, 7.5], "range": 4.0, "radius": 0.7,
+         "effects": {"atk": {"mult": 1.25, "duration": 2.5}}}
+      ]
+    }
+  }
+}

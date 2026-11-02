@@ -8,6 +8,7 @@ ricostruita a cui OnlineMatchScene ha copiato i campi dello stato visivo.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Callable
 
@@ -15,7 +16,7 @@ import pygame
 
 from engine.eevee import eevee_candidates, eevee_forms
 
-from . import eevee_fx, ursa_fx
+from . import eevee_fx, sneasel_fx, ursa_fx
 
 
 @dataclass
@@ -130,6 +131,12 @@ def draw_passive(surface, font, p, bx, y0, bh, ctx) -> None:
     # Linea Noibat: Ecolocalizzazione (onde sonore + cariche del ping).
     if p.passive_id == "ecolocalizzazione":
         _draw_echo(surface, font, p, bx, y0, bh, ctx)
+
+    # Linea Sneasel: Sole e Luna (luna/sole + oro), Arraffalesto, Scalaroccia.
+    if p.passive_id == "soleluna":
+        _draw_sunmoon(surface, font, p, bx, y0, bh, ctx)
+    elif p.passive_id in ("arraffalesto", "scalaroccia"):
+        _draw_sneasel_form(surface, font, p, bx, y0, bh, ctx)
 
     # Linea Teddiursa: Miele (vasetti) e, da Ursaring, Dentistretti.
     if p.passive_id in ("miele", "dentistretti"):
@@ -347,3 +354,65 @@ def _draw_honey(surface, font, p, bx, y0, bh, ctx) -> None:
         col = (255, 84, 54) if on else (130, 110, 100)
         txt = "Dentistretti +50% Att" if on else "Dentistretti"
         surface.blit(font.render(txt, True, col), (bx - 4, y0 - 34))
+
+
+def _draw_sunmoon(surface, font, p, bx, y0, bh, ctx) -> None:
+    """Sole e Luna (Sneasel): luna se l'oro dai minion è in vantaggio (verso
+    Weavile, parità compresa), sole se lo è quello dai neutrali (verso
+    Sneasler); sotto i due contatori."""
+    gm, gw = float(getattr(p, "gold_minion", 0.0)), float(getattr(p, "gold_wild", 0.0))
+    sun = gw > gm
+    box = pygame.Rect(bx, y0, bh, bh)
+    pygame.draw.rect(surface, (44, 30, 18) if sun else (18, 22, 44), box)
+    if sun:
+        sneasel_fx.draw_sun_icon(surface, box.centerx, box.centery, bh // 5, ctx.now)
+        frame, name = sneasel_fx.SUN, "Sneasler"
+    else:
+        sneasel_fx.draw_moon_icon(surface, box.centerx, box.centery, bh // 3)
+        frame, name = sneasel_fx.MOON, "Weavile"
+    pygame.draw.rect(surface, frame, box, 2)
+    surface.blit(font.render(f"Sole e Luna -> {name}", True, frame), (bx - 4, y0 - 18))
+    rows = ((f"Minion {gm:0.0f}", sneasel_fx.MOON, not sun),
+            (f"Neutr. {gw:0.0f}", sneasel_fx.SUN, sun))
+    for i, (txt, col, lead) in enumerate(rows):
+        t = font.render(txt, True, col if lead else (120, 116, 128))
+        surface.blit(t, (box.right + 5, y0 + 2 + i * (t.get_height() + 2)))
+
+
+def _draw_sneasel_form(surface, font, p, bx, y0, bh, ctx) -> None:
+    """Arraffalesto (Weavile: cariche rubate, +x% Att/Att.Sp) o Scalaroccia
+    (Sneasler: ricarica dello scavalcamento)."""
+    box = pygame.Rect(bx, y0, bh, bh)
+    cx, cy = box.center
+    s = bh // 2 - 8
+    if p.passive_id == "arraffalesto":
+        n = int(getattr(p, "snatch_up", 0))
+        pygame.draw.rect(surface, (30, 16, 30), box)
+        for k in range(3):   # tre artigli cremisi
+            x = cx + (k - 1) * s * 0.6
+            pygame.draw.line(surface, sneasel_fx.CRIMSON_DK, (x - s * 0.3, cy - s), (x + s * 0.3, cy + s), 5)
+            pygame.draw.line(surface, sneasel_fx.CRIMSON, (x - s * 0.3, cy - s), (x + s * 0.3, cy + s), 3)
+            pygame.draw.line(surface, sneasel_fx.CRIMSON_HI, (x - s * 0.3, cy - s), (x - s * 0.05, cy - s * 0.2), 1)
+        frame = sneasel_fx.CRIMSON if n else (130, 96, 110)
+        name = f"Arraffalesto +{n * 5}%" if n else "Arraffalesto"
+        for k in range(5):   # cariche (5 = 25%)
+            r = pygame.Rect(box.left + 4 + k * ((bh - 8) // 5), box.bottom - 7, (bh - 8) // 5 - 2, 4)
+            pygame.draw.rect(surface, sneasel_fx.CRIMSON if k < n else (60, 40, 50), r)
+    else:
+        left = getattr(p, "climb_ready_at", 0.0) - ctx.now
+        lit = left <= 0
+        pygame.draw.rect(surface, (34, 28, 22), box)
+        rock = sneasel_fx.ROCK if lit else (100, 90, 76)
+        hi = sneasel_fx.ROCK_HI if lit else (130, 120, 100)
+        pts = [(cx - s, cy + s), (cx - s * 0.3, cy - s), (cx + s * 0.2, cy - s * 0.2),
+               (cx + s * 0.5, cy - s * 0.6), (cx + s, cy + s)]
+        pygame.draw.polygon(surface, sneasel_fx.ROCK_DK, pts)
+        pygame.draw.polygon(surface, rock, [(x, y + 2) for x, y in pts[:-1]] + [(cx + s - 2, cy + s)])
+        pygame.draw.line(surface, hi, pts[0], pts[1], 2)
+        # freccia ad arco sopra la roccia: lo scavalcamento
+        arc = [(cx - s + i * s / 4, cy - s * 0.2 - math.sin(math.pi * i / 8) * s * 0.9) for i in range(9)]
+        pygame.draw.lines(surface, sneasel_fx.SUN if lit else (120, 100, 60), False, arc, 2)
+        frame = sneasel_fx.SUN if lit else (130, 110, 80)
+        name = "Scalaroccia" if lit else f"Scalaroccia {left:0.0f}s"
+    pygame.draw.rect(surface, frame, box, 2)
+    surface.blit(font.render(name, True, frame), (bx - 4, y0 - 18))

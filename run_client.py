@@ -24,7 +24,11 @@ def main() -> None:
                         help="oggetto di partenza (ripetibile; es. --item king_rock per Politoad)")
     parser.add_argument("--armature", choices=("fausta", "infausta"), default=None,
                         help="Charcadet: barra di Armature in vantaggio (test: forma al liv.8)")
+    parser.add_argument("--oro", choices=("minion", "neutrali"), default=None,
+                        help="Sneasel: oro in vantaggio (test: forma al liv.8)")
     args = parser.parse_args()
+    if args.oro:   # stesso meccanismo di --armature: un contatore in vantaggio
+        args.armature = "gold_wild" if args.oro == "neutrali" else "gold_minion"
 
     from game.app import App
     if args.single:

@@ -232,6 +232,7 @@ class JungleSystem:
                 gold *= 1.0 + config.CAMP_GOLD_PER_LEVEL * self.m._avg_player_level()
                 gold *= self.m._comeback_mult(killer.team)
                 killer.gold += gold
+                self.m._track_gold(killer, gold, "wild")   # Sole e Luna (Sneasel)
             # I campi danno +3% XP per ogni livello medio dei giocatori; chi e' 2+
             # livelli sotto la media prende il bonus recupero (+15%).
             lvl_mult = (1.0 + 0.03 * self.m._avg_player_level()
@@ -254,6 +255,7 @@ class JungleSystem:
                 for p in self.world.pokemons():
                     if p.team == killer.team:
                         p.gold += config.LEGENDARY_TEAM_GOLD * mult   # oro di squadra
+                        self.m._track_gold(p, config.LEGENDARY_TEAM_GOLD * mult, "wild")
         elif victim.kind == "arceus":
             self._arceus = None
             self._next_arceus = self.m.time + config.ARCEUS_RESPAWN
@@ -262,6 +264,7 @@ class JungleSystem:
                 for p in self.world.pokemons():
                     if p.team == killer.team:
                         p.gold += config.LEGENDARY_TEAM_GOLD * mult   # oro di squadra
+                        self.m._track_gold(p, config.LEGENDARY_TEAM_GOLD * mult, "wild")
                         if p.alive:
                             p.judgment_until = self.m.time + config.JUDGMENT_DURATION
                             p.judgment_plate = victim.plate

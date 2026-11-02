@@ -16,7 +16,7 @@ from engine.entities import Core, Pillar, Pokemon, Structure, Unit
 from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
                          TILE_PUDDLE, TILE_RIVER, TILE_WALL)
 from . import spirit_fx
-from . import charcadet_fx, corvi_fx, eevee_fx, noivern_fx, ursa_fx
+from . import charcadet_fx, corvi_fx, eevee_fx, noivern_fx, sneasel_fx, ursa_fx
 from . import structure_gfx
 from .fx import EMBER, ROCK_HI, ROCK_MID, ROCK_OUT, ROCK_SH, type_color
 from .map_renderer import MapRenderer
@@ -617,7 +617,8 @@ class Renderer:
                                       "spiritbeam", "painsplit", "spiritcall",
                                       "swift", "wish", "thunder", "blizzard", "futuresight",
                                       "defog", "tailwind", "nightshade", "clearsmog",
-                                      "armorcannon", "psychic", "grudgeblade"):
+                                      "armorcannon", "psychic", "grudgeblade",
+                                      "nightslash", "beatup", "cliffambush", "sludgelob"):
             pygame.draw.circle(surface, (90, 90, 90), S(ox, oy), int(rng * ts), 1)
 
         shape = move.shape
@@ -672,21 +673,22 @@ class Renderer:
             pygame.draw.line(surface, (120, 170, 210), S(ox, oy), (cx, cy), 1)
             pygame.draw.circle(surface, col, (cx, cy), int(move.radius * ts), 2)
             return
-        if shape in ("nightshade", "grudgeblade"):   # bersaglio: il nemico vicino al mirino
+        if shape in ("nightshade", "grudgeblade", "beatup", "cliffambush"):   # il nemico vicino al mirino
             d = min(dist, rng)
             cx, cy = S(ox + nx * d, oy + ny * d)
             pygame.draw.line(surface, col, S(ox, oy), (cx, cy), 1)
-            pygame.draw.circle(surface, col, (cx, cy), int(2.0 * ts), 1)
+            pick = 2.5 if shape in ("beatup", "cliffambush") else 2.0
+            pygame.draw.circle(surface, col, (cx, cy), int(pick * ts), 1)
             pygame.draw.circle(surface, (255, 255, 255), (cx, cy), max(3, int(0.3 * ts)), 1)
             return
         if shape in ("smackdown", "explosion", "spikes", "legion", "memento",
                      "thunder", "blizzard", "futuresight", "gleam", "defog",
-                     "clearsmog", "psychic"):
+                     "clearsmog", "psychic", "sludgelob"):
             shape = "area"
         elif shape in ("sandboost", "endure", "moonlight", "acidarmor", "roost",
-                       "floatarmor", "shadowclaw"):
+                       "floatarmor", "shadowclaw", "nightfall"):
             shape = "buff"
-        elif shape == "armorcannon":
+        elif shape in ("armorcannon", "nightslash"):
             shape = "projectile"
         if shape in ("projectile", "bubble"):
             ex, ey = ox + nx * rng, oy + ny * rng
@@ -837,6 +839,7 @@ class Renderer:
                 grow = ursa_fx.grow(e, now) if isinstance(e, Pokemon) else 1.0
                 if isinstance(e, Pokemon):   # alone di Luna Piena / Dentistretti
                     ursa_fx.draw_unit_under(surface, e, gx, gy, now, ts)
+                    sneasel_fx.draw_unit_under(surface, e, gx, gy, now, ts)   # Notte Fonda
                 if anim is not None:
                     if grow != 1.0 and isinstance(anim, SpriteAnimator):
                         anim.draw(surface, gx, gy, alpha=95 if ghost else 255, grow=grow)
@@ -851,6 +854,7 @@ class Renderer:
                     corvi_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # provocato, Trespolo
                     charcadet_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # spallacci, artigli
                     ursa_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # Riposo, Dentistretti
+                    sneasel_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # cure ridotte, Arraffalesto
                 if in_bush:
                     self._draw_hidden_hint(surface, e, gx, gy, now)
                 self._draw_unit_hp(surface, e, gx, gy, grow)
@@ -1005,6 +1009,8 @@ class Renderer:
             pips.append((236, 214, 164))   # lanciato in aria (sabbia chiara)
         if getattr(u, "dashlock_until", -1) > now:
             pips.append((150, 120, 84))    # niente scatti (Abbattimento/Cucitombra: bruno)
+        if getattr(u, "healcut_until", -1) > now:
+            pips.append((214, 64, 80))     # cure ridotte (rosso)
         if not pips:
             return
         r = int(u.radius * self.tile_size)

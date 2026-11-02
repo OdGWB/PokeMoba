@@ -36,18 +36,20 @@ LISTS = {
     "psy_zones": ("c", "team"), "flurries": ("pos", "team"),
     "sonar_pings": ("c", "team"), "hurricanes": ("c", "team"), "meteors": ("c", "team"),
     "honey_zones": ("c", "team"), "quakes": ("c", "team"),
+    "claw_leaps": ("c", "team"), "beatups": ("pos", "team"), "sludge_lobs": ("c", "team"),
 }
 # Campi solo di logica (oggetti del motore, insiemi di bersagli già colpiti).
 SKIP = {"mv", "hit", "touched", "since", "rank", "explode", "first", "caught"}
 # Stati sulle unità che non sono timer *_until (valore "spento" a destra).
 UNIT_FLAGS = {"air_z": 0.0, "sand_radius": 0.0, "invisible": False, "submerged": False,
               "spirit_awaken": 0, "smoke_hidden": False, "armor_blocks": 0, "echo_count": 0,
-              "honey": 0, "guts_active": False}
+              "honey": 0, "guts_active": False,
+              "snatch_down": 0, "snatch_up": 0}
 # Il proprio Pokémon: passive e ricariche mostrate nell'interfaccia.
 ME_FIELDS = ("passive_id", "soul_charges", "inversion_stacks", "muta_cd_until", "muta_cd_max",
              "form_until", "sandstorm_boost_until", "sand_radius", "spirit_charges",
              "wander_ready_at", "voltabsorb_ready_at", "flashfire_until", "recalling",
-             "recall_until", "respawn_timer", "guard_ready_at")
+             "recall_until", "respawn_timer", "guard_ready_at", "climb_ready_at")
 
 _timer_fields: dict = {}
 
@@ -147,6 +149,8 @@ def capture_me_visual(match, p) -> dict:
     me["respawn_timer"] = round(max(0.0, p.respawn_timer))
     if p.passive_id == "armature":   # Charcadet: barre di Armature (arrotondate)
         me["fausta"], me["infausta"] = round(p.fausta), round(p.infausta)
+    if p.passive_id == "soleluna":   # Sneasel: oro dai minion e dai neutrali
+        me["gold_minion"], me["gold_wild"] = round(p.gold_minion), round(p.gold_wild)
     me["item_cd"] = {k: float(v) for k, v in p.item_cd.items() if v > match.time}
     charges = {}
     for s in SLOTS:

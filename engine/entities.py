@@ -327,6 +327,21 @@ class Pokemon(Unit):
     moon_until: float = -1.0           # Luna Piena: forma ingrandita fino a qui
     moon_hp_mult: float = 1.0
     moon_cleave: float = 0.0           # raggio degli attacchi base ad area
+    # Linea Sneasel: Sole e Luna, Furto, Arraffalesto, Notte Fonda, Scalaroccia,
+    # cure ridotte (stato generico).
+    gold_minion: float = 0.0           # Sole e Luna: oro dai minion (-> Weavile)
+    gold_wild: float = 0.0             # Sole e Luna: oro dai neutrali (-> Sneasler)
+    thief_cd: dict = field(default_factory=dict)   # Furto: id vittima -> pronto da
+    snatch_down: int = 0               # Arraffalesto: cariche rubate a questo Pokémon (5% l'una)
+    snatch_down_until: float = -1.0
+    snatch_up: int = 0                 # Arraffalesto: cariche guadagnate da Weavile
+    snatch_up_until: float = -1.0
+    nightfall_until: float = -1.0      # Notte Fonda: invisibile fino a qui
+    ambush_until: float = -1.0         # Notte Fonda: colpo d'agguato pronto fino a qui
+    ambush_mv: tuple | None = None
+    climb_ready_at: float = 0.0        # Scalaroccia: prossimo scavalcamento da qui
+    healcut_until: float = -1.0        # cure ridotte (Sporcolancio)
+    healcut_mult: float = 1.0
 
     def _bonus(self, stat: str) -> float:
         return (self.passive_bonus.get(stat, 0.0) + self.item_bonus.get(stat, 0.0)
@@ -349,6 +364,8 @@ class Pokemon(Unit):
             atk *= 0.5   # Memento: Attacco dimezzato
         if self.wp_active:
             atk *= 1.25  # Vulnerassicurazione: +25% Attacco
+        if self.snatch_down or self.snatch_up:
+            atk *= self.snatch_mult()   # Arraffalesto (Weavile): Attacco rubato
         return atk
 
     def eff_sp_attack(self) -> float:
@@ -364,7 +381,13 @@ class Pokemon(Unit):
             ap *= 1.25   # Vulnerassicurazione: +25% Att. Sp.
         if self.calm_active:
             ap *= self.calm_mult   # Calmamente: +Att. Sp. temporaneo
+        if self.snatch_down or self.snatch_up:
+            ap *= self.snatch_mult()   # Arraffalesto (Weavile): Att. Sp. rubato
         return ap
+
+    def snatch_mult(self) -> float:
+        """Arraffalesto: -5% per carica rubata, +5% per carica guadagnata."""
+        return (1.0 - 0.05 * self.snatch_down) * (1.0 + 0.05 * self.snatch_up)
 
     def _soul(self) -> int:
         # Corpofunesto: ogni carica dà +1 Difesa e +1 Dif.Sp.
