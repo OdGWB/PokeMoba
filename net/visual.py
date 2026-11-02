@@ -37,6 +37,7 @@ LISTS = {
     "sonar_pings": ("c", "team"), "hurricanes": ("c", "team"), "meteors": ("c", "team"),
     "honey_zones": ("c", "team"), "quakes": ("c", "team"),
     "claw_leaps": ("c", "team"), "beatups": ("pos", "team"), "sludge_lobs": ("c", "team"),
+    "mien_leaps": ("c", "team"),
 }
 # Campi solo di logica (oggetti del motore, insiemi di bersagli già colpiti).
 SKIP = {"mv", "hit", "touched", "since", "rank", "explode", "first", "caught"}
@@ -44,12 +45,13 @@ SKIP = {"mv", "hit", "touched", "since", "rank", "explode", "first", "caught"}
 UNIT_FLAGS = {"air_z": 0.0, "sand_radius": 0.0, "invisible": False, "submerged": False,
               "spirit_awaken": 0, "smoke_hidden": False, "armor_blocks": 0, "echo_count": 0,
               "honey": 0, "guts_active": False,
-              "snatch_down": 0, "snatch_up": 0}
+              "snatch_down": 0, "snatch_up": 0, "mien_regen": False}
 # Il proprio Pokémon: passive e ricariche mostrate nell'interfaccia.
 ME_FIELDS = ("passive_id", "soul_charges", "inversion_stacks", "muta_cd_until", "muta_cd_max",
              "form_until", "sandstorm_boost_until", "sand_radius", "spirit_charges",
              "wander_ready_at", "voltabsorb_ready_at", "flashfire_until", "recalling",
-             "recall_until", "respawn_timer", "guard_ready_at", "climb_ready_at")
+             "recall_until", "respawn_timer", "guard_ready_at", "climb_ready_at",
+             "fakeout_ready", "dance_seq", "mien_calm_at")
 
 _timer_fields: dict = {}
 

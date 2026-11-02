@@ -16,7 +16,7 @@ import pygame
 
 from engine.eevee import eevee_candidates, eevee_forms
 
-from . import eevee_fx, sneasel_fx, ursa_fx
+from . import eevee_fx, mien_fx, sneasel_fx, ursa_fx
 
 
 @dataclass
@@ -137,6 +137,10 @@ def draw_passive(surface, font, p, bx, y0, bh, ctx) -> None:
         _draw_sunmoon(surface, font, p, bx, y0, bh, ctx)
     elif p.passive_id in ("arraffalesto", "scalaroccia"):
         _draw_sneasel_form(surface, font, p, bx, y0, bh, ctx)
+
+    # Linea Mienfoo: Maniche a Frusta + Rigenergia, Bruciapelo pronto, Danza.
+    if p.passive_id == "manichefrusta":
+        _draw_mien(surface, font, p, bx, y0, bh, ctx)
 
     # Linea Teddiursa: Miele (vasetti) e, da Ursaring, Dentistretti.
     if p.passive_id in ("miele", "dentistretti"):
@@ -414,5 +418,56 @@ def _draw_sneasel_form(surface, font, p, bx, y0, bh, ctx) -> None:
         pygame.draw.lines(surface, sneasel_fx.SUN if lit else (120, 100, 60), False, arc, 2)
         frame = sneasel_fx.SUN if lit else (130, 110, 80)
         name = "Scalaroccia" if lit else f"Scalaroccia {left:0.0f}s"
+    pygame.draw.rect(surface, frame, box, 2)
+    surface.blit(font.render(name, True, frame), (bx - 4, y0 - 18))
+
+
+def _draw_mien(surface, font, p, bx, y0, bh, ctx) -> None:
+    """Maniche a Frusta (Mienfoo/Mienshao): maniche lavanda; sotto, la barra
+    della calma (si riempie in 4 s, verde quando Rigenergia cura); in alto a
+    destra il palmo giallo quando Bruciapelo stordisce; durante la Danza delle
+    Maniche le tre mosse Q W E (accese quelle già usate) e il tempo rimasto."""
+    now = ctx.now
+    box = pygame.Rect(bx, y0, bh, bh)
+    cx, cy = box.center
+    s = bh // 2 - 6
+    pygame.draw.rect(surface, (30, 22, 40), box)
+    old_clip = surface.get_clip()
+    surface.set_clip(box.inflate(-4, -4))
+    for k in (-1, 1):   # due maniche che si incrociano
+        pts = [(cx + k * (s - i * s / 4), cy - s * 0.6 + i * s / 6
+                + math.sin(i * 1.1 + now * 4) * 2) for i in range(9)]
+        pygame.draw.lines(surface, mien_fx.SLEEVE_DK, False, pts, 6)
+        pygame.draw.lines(surface, mien_fx.SLEEVE, False, pts, 4)
+        pygame.draw.lines(surface, mien_fx.SLEEVE_HI, False, pts[:4], 1)
+        pygame.draw.line(surface, mien_fx.PINK, pts[0], pts[1], 4)   # polsino
+    surface.set_clip(old_clip)
+    calm = now - getattr(p, "mien_calm_at", -1e9)
+    regen = bool(getattr(p, "mien_regen", False))
+    bar = pygame.Rect(box.left + 4, box.bottom - 8, bh - 8, 4)
+    pygame.draw.rect(surface, (40, 40, 44), bar)
+    fill = int(bar.width * max(0.0, min(1.0, calm / 4.0)))
+    pygame.draw.rect(surface, mien_fx.HEAL if regen else (150, 150, 160),
+                     pygame.Rect(bar.left, bar.top, fill, bar.height))
+    ready = bool(getattr(p, "fakeout_ready", False))
+    if ready:
+        mien_fx.draw_hand_icon(surface, box.right - 9, box.top + 12, 8, mien_fx.GOLD,
+                               mien_fx.GOLD_DK)
+    frame = mien_fx.GOLD if ready else (mien_fx.HEAL if regen else (150, 120, 170))
+    name = "Rigenergia" if regen else "Maniche a Frusta"
+    left = getattr(p, "dance_until", -1.0) - now
+    if left > 0:   # sequenza della danza
+        seq = getattr(p, "dance_seq", "")
+        for i, sl in enumerate("QWE"):
+            r = pygame.Rect(box.left + 3 + i * (bh - 6) // 3, box.top + 3, (bh - 6) // 3 - 2, 14)
+            on = sl in seq
+            pygame.draw.rect(surface, mien_fx.SLEEVE if on else (50, 40, 60), r)
+            pygame.draw.rect(surface, mien_fx.SLEEVE_HI if on else (110, 96, 130), r, 1)
+            t = font.render(sl, True, (30, 20, 40) if on else (170, 160, 190))
+            surface.blit(t, (r.centerx - t.get_width() // 2, r.centery - t.get_height() // 2))
+        frame = mien_fx.PINK
+        name = f"Danza {left:0.1f}s"
+    elif ready:
+        name = "Bruciapelo pronto"
     pygame.draw.rect(surface, frame, box, 2)
     surface.blit(font.render(name, True, frame), (bx - 4, y0 - 18))

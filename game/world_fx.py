@@ -19,7 +19,8 @@ import pygame
 
 import config
 
-from . import charcadet_fx, corvi_fx, eevee_fx, noivern_fx, sneasel_fx, spirit_fx, ursa_fx
+from . import (charcadet_fx, corvi_fx, eevee_fx, mien_fx, noivern_fx, sneasel_fx, spirit_fx,
+               ursa_fx)
 from .fx import draw_avalanche, draw_sandstorm, type_color
 
 
@@ -120,6 +121,10 @@ def draw_world_effects(surface, camera, world, m, team, vision, now, player_id,
     for lp in getattr(m, "claw_leaps", ()):
         if seen(lp["c"], lp["team"]):
             sneasel_fx.draw_claw_leap(surface, camera, lp, now)
+    # Linea Mienfoo: mirino d'atterraggio di Calcinvolo.
+    for lp in getattr(m, "mien_leaps", ()):
+        if seen(lp["c"], lp["team"]):
+            mien_fx.draw_jump(surface, camera, lp, now)
 
 
 def draw_projectiles(surface, camera, m, now=0.0) -> None:

@@ -1,0 +1,104 @@
+{
+  "_comment": "Mienfoo -> Mienshao (liv.8): assassino da combo ad alta difficoltà (distanza, rischio, tempismo). Passiva Maniche a Frusta + Rigenergia (engine/mienshao.py): il 30% più esterno della portata degli attacchi base e di Bruciapelo è un PUNTO DOLCE (+40% danno, -1 s alla ricarica di Calcinvolo); dopo 4 s senza subire né infliggere danni rigenera il 3% degli HP max al secondo. Mienfoo ha portata corta, Mienshao +40%. Q Calcinvolo = balzo a distanza FISSA (5 tile): a vuoto costa HP e stordisce chi lo lancia. W Individua = parata breve (finestra dimezzata se ripetuta entro 6 s). E Bruciapelo stordisce solo come prima azione dopo 4 s di calma. Q5/W6/E7 potenziamenti, R al liv.8 a scelta.",
+  "dex": 619,
+  "name": "Mienfoo",
+  "types": ["Fighting"],
+  "role": "assassino",
+  "recommended_items": ["muscle_band", "scope_lens", "focus_sash", "life_orb"],
+  "color": [214, 176, 72],
+  "radius": 0.38,
+  "base_speed": 3.7,
+  "attack_range": 1.5,
+  "attack_cooldown": 0.8,
+  "sprite_dir": "assets/pokemon/0619",
+  "passive": "manichefrusta",
+  "attack_fx": "sleevewhip",
+
+  "base_stats": {"hp": 45, "attack": 85, "defense": 50, "sp_attack": 55, "sp_defense": 50, "speed": 65},
+
+  "evolutions": [
+    {"stage": 0, "level": 1, "name": "Mienfoo", "dex": 619, "sprite_dir": "assets/pokemon/0619",
+     "types": ["Fighting"], "passive": "manichefrusta", "role": "assassino", "color": [214, 176, 72],
+     "attack_fx": "sleevewhip", "attack_range": 1.5, "ranged": false, "radius": 0.38,
+     "base_stats": {"hp": 45, "attack": 85, "defense": 50, "sp_attack": 55, "sp_defense": 50, "speed": 65}},
+
+    {"stage": 1, "level": 8, "name": "Mienshao", "dex": 620, "sprite_dir": "assets/pokemon/0620",
+     "types": ["Fighting"], "passive": "manichefrusta", "role": "assassino", "color": [150, 96, 170],
+     "attack_fx": "sleevewhip", "attack_range": 2.1, "ranged": false, "radius": 0.46,
+     "base_stats": {"hp": 65, "attack": 125, "defense": 60, "sp_attack": 95, "sp_defense": 60, "speed": 105}}
+  ],
+
+  "moves": {
+    "Q": {
+      "base": {"id": "highjumpkick", "name": "Calcinvolo", "type": "Fighting", "category": "physical",
+               "shape": "jumpkick", "fx": "jumpkick", "target": "direction",
+               "power": [120, 180, 240, 300], "ratio": 1.2,
+               "cooldown": [9, 8.5, 8, 7.5], "range": 5.0, "radius": 1.0,
+               "effects": {"leap_time": 0.45, "crash": 0.15, "crash_stun": 0.5}},
+      "upgrades": [
+        {"id": "jumpkickreckless", "name": "Temerarietà", "type": "Fighting", "category": "physical",
+         "shape": "jumpkick", "fx": "jumpkick", "target": "direction",
+         "power": [156, 234, 312, 390], "ratio": 1.56,
+         "cooldown": [9, 8.5, 8, 7.5], "range": 5.0, "radius": 1.0,
+         "effects": {"leap_time": 0.45, "crash": 0.30, "crash_stun": 0.5}},
+        {"id": "jumpkicksafe", "name": "Calcio Controllato", "type": "Fighting", "category": "physical",
+         "shape": "jumpkick", "fx": "jumpkick", "target": "direction",
+         "power": [120, 180, 240, 300], "ratio": 1.2,
+         "cooldown": [9, 8.5, 8, 7.5], "range": 5.0, "radius": 1.0,
+         "effects": {"leap_time": 0.45, "crash": 0.0, "crash_stun": 0.0, "miss_cd_mult": 2.0}}
+      ]
+    },
+    "W": {
+      "base": {"id": "detect", "name": "Individua", "type": "Fighting", "category": "physical",
+               "shape": "detect", "fx": "detect", "target": "self",
+               "power": [0, 0, 0, 0], "ratio": 0.0,
+               "cooldown": [4, 4, 4, 4], "range": 0, "radius": 0.8,
+               "effects": {"window": 0.5, "min_window": 0.15, "chain": 6.0}},
+      "upgrades": [
+        {"id": "detectcounter", "name": "Contrattacco", "type": "Fighting", "category": "physical",
+         "shape": "detect", "fx": "detect", "target": "self",
+         "power": [0, 0, 0, 0], "ratio": 0.0,
+         "cooldown": [4, 4, 4, 4], "range": 0, "radius": 0.8,
+         "effects": {"window": 0.5, "min_window": 0.15, "chain": 6.0, "counter": 3.0}},
+        {"id": "detectguard", "name": "Guardia Rapida", "type": "Fighting", "category": "physical",
+         "shape": "detect", "fx": "detect", "target": "self",
+         "power": [0, 0, 0, 0], "ratio": 0.0,
+         "cooldown": [4, 4, 4, 4], "range": 0, "radius": 3.0,
+         "effects": {"window": 0.5, "min_window": 0.15, "chain": 6.0, "guard_allies": 3.0}}
+      ]
+    },
+    "E": {
+      "base": {"id": "fakeout", "name": "Bruciapelo", "type": "Normal", "category": "physical",
+               "shape": "fakeout", "fx": "fakeout", "target": "direction",
+               "power": [70, 105, 140, 175], "ratio": 0.9,
+               "cooldown": [8, 7.5, 7, 6.5], "range": 2.2, "radius": 0.5,
+               "effects": {"stun": {"duration": 1.0}, "calm": 4.0, "weak": 0.4}},
+      "upgrades": [
+        {"id": "fakeoutdark", "name": "Privazione", "type": "Dark", "category": "physical",
+         "shape": "fakeout", "fx": "fakeoutdark", "target": "direction",
+         "power": [70, 105, 140, 175], "ratio": 0.9,
+         "cooldown": [8, 7.5, 7, 6.5], "range": 2.2, "radius": 0.5,
+         "effects": {"itemlock": 3.0}},
+        {"id": "fakeoutdouble", "name": "Doppio Bruciapelo", "type": "Normal", "category": "physical",
+         "shape": "fakeout", "fx": "fakeout", "target": "direction",
+         "power": [70, 105, 140, 175], "ratio": 0.9,
+         "cooldown": [8, 7.5, 7, 6.5], "range": 2.2, "radius": 0.5,
+         "effects": {"stun": {"duration": 1.0}, "calm": 4.0, "weak": 0.4, "double": 3.0}}
+      ]
+    },
+    "R": {
+      "upgrades": [
+        {"id": "sleevedance", "name": "Danza delle Maniche", "type": "Fighting", "category": "physical",
+         "shape": "sleevedance", "fx": "sleevedance", "target": "self",
+         "power": [260, 390, 520], "ratio": 1.4,
+         "cooldown": [90, 80, 70], "range": 0, "radius": 2.6,
+         "effects": {"duration": 6.0}},
+        {"id": "reversal", "name": "Contropiede", "type": "Fighting", "category": "physical",
+         "shape": "reversal", "fx": "reversal", "target": "direction",
+         "power": [120, 180, 240], "ratio": 1.0,
+         "cooldown": [60, 50, 40], "range": 2.2, "radius": 0.6,
+         "effects": {"max_mult": 3.0, "low_hp": 0.15}}
+      ]
+    }
+  }
+}

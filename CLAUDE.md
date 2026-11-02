@@ -626,6 +626,34 @@ Passaggi completati:
   usano --oro (stesso meccanismo di --armature). Screenshot: step_32_* (linea,
   hud_*, ogni mossa, scalaroccia/_dopo, agguato_balzo, sporcolancio_volo/
   _pozza, draft_sneasel).
+- LINEA MIENFOO > MIENSHAO (step_33), grafica nuova in game/mien_fx.py
+  (logica in engine/mienshao.py). Sprite PMD Sprite Collab in
+  assets/pokemon/0619/0620. Forme nuove in _draw_shapes (mien_fx.SHAPES):
+  manica a frusta (sleeve: nastro affusolato che ONDEGGIA con il polsino rosa
+  in punta; la prima versione quasi dritta sembrava un bastone), palmo aperto
+  di Bruciapelo (palm, disegnato DOPO lo scoppio dello stordimento, altrimenti
+  sparisce sotto), occhio di Individua che si apre e si chiude (eye),
+  stellina a 4 punte del punto dolce (twinkle, sopra il bersaglio), nastri
+  che girano in prospettiva (ribbons: Danza delle Maniche), lucchetto
+  (padlock). Riusa impactstar (Sneasel), groundring/groundcrack/pebble
+  (Teddiursa), windline (Noibat), hexshell (Guardia Rapida). Contrattacco
+  sposta l'attaccante SENZA _item_push (quello emette un evento "dash"
+  generico = banda grigia larga). Disegni PERSISTENTI (world_fx): mirino
+  d'atterraggio di Calcinvolo (area d'impatto che si chiude). Sulle unità
+  (visibili a tutti): guardia di Individua (anello chiaro con raggi), nastri
+  della Danza, lucchetto a destra della barra della vita (OGGETTI
+  DISATTIVATI, nuovo stato generico itemlock_until: gli effetti unici
+  passano da _fx_items, le statistiche restano) + pallino viola tra gli
+  stati, crocette verdi di Rigenergia ai lati, scintilla del brutto colpo
+  pronto. Solo sul proprio Pokémon: FASCIA del punto dolce (dal 70% al 100%
+  della portata, CERCHI come la gittata, non ellissi: la distanza in logica e'
+  circolare). HUD: maniche incrociate, barra della calma (verde con
+  Rigenergia), palmo giallo = Bruciapelo stordisce, durante la Danza le
+  caselle Q W E accese e il tempo. Online: mien_leaps in net/visual.LISTS,
+  mien_regen in UNIT_FLAGS, fakeout_ready/dance_seq/mien_calm_at in "me"; la
+  fascia del punto dolce si ricava dal dex (619/620). Screenshot: step_33_*
+  (linea, hud_*, ogni mossa, calcinvolo_volo/_vuoto, parata, rigenergia,
+  danza/_finale, draft_mienfoo).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

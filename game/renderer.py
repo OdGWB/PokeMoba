@@ -16,7 +16,7 @@ from engine.entities import Core, Pillar, Pokemon, Structure, Unit
 from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
                          TILE_PUDDLE, TILE_RIVER, TILE_WALL)
 from . import spirit_fx
-from . import charcadet_fx, corvi_fx, eevee_fx, noivern_fx, sneasel_fx, ursa_fx
+from . import charcadet_fx, corvi_fx, eevee_fx, mien_fx, noivern_fx, sneasel_fx, ursa_fx
 from . import structure_gfx
 from .fx import EMBER, ROCK_HI, ROCK_MID, ROCK_OUT, ROCK_SH, type_color
 from .map_renderer import MapRenderer
@@ -618,7 +618,8 @@ class Renderer:
                                       "swift", "wish", "thunder", "blizzard", "futuresight",
                                       "defog", "tailwind", "nightshade", "clearsmog",
                                       "armorcannon", "psychic", "grudgeblade",
-                                      "nightslash", "beatup", "cliffambush", "sludgelob"):
+                                      "nightslash", "beatup", "cliffambush", "sludgelob",
+                                      "jumpkick", "fakeout", "reversal"):
             pygame.draw.circle(surface, (90, 90, 90), S(ox, oy), int(rng * ts), 1)
 
         shape = move.shape
@@ -627,6 +628,19 @@ class Renderer:
             pygame.draw.line(surface, col, S(ox, oy), S(ex, ey), max(2, int(move.radius * ts)))
             pygame.draw.rect(surface, (255, 255, 255),
                              pygame.Rect(S(ex, ey)[0] - ts // 2, S(ex, ey)[1] - ts // 2, ts, ts), 1)
+            return
+        if shape == "jumpkick":     # Calcinvolo: balzo a distanza FISSA + area d'impatto
+            ex, ey = ox + nx * rng, oy + ny * rng
+            pygame.draw.line(surface, col, S(ox, oy), S(ex, ey), 1)
+            pygame.draw.circle(surface, col, S(ex, ey), int(move.radius * ts), 2)
+            pygame.draw.circle(surface, (255, 255, 255), S(ex, ey), max(3, int(0.25 * ts)), 1)
+            return
+        if shape == "fakeout":      # Bruciapelo: linea con il punto dolce in fondo
+            ex, ey = ox + nx * rng, oy + ny * rng
+            sx, sy = ox + nx * rng * 0.7, oy + ny * rng * 0.7
+            pygame.draw.line(surface, col, S(ox, oy), S(sx, sy), max(1, int(move.radius * ts)))
+            pygame.draw.line(surface, (255, 212, 84), S(sx, sy), S(ex, ey),
+                             max(2, int(move.radius * ts)))
             return
         if shape == "rockcharge":   # Pesobomba: carica a distanza fissa
             ex, ey = ox + nx * rng, oy + ny * rng
@@ -686,9 +700,9 @@ class Renderer:
                      "clearsmog", "psychic", "sludgelob"):
             shape = "area"
         elif shape in ("sandboost", "endure", "moonlight", "acidarmor", "roost",
-                       "floatarmor", "shadowclaw", "nightfall"):
+                       "floatarmor", "shadowclaw", "nightfall", "detect", "sleevedance"):
             shape = "buff"
-        elif shape in ("armorcannon", "nightslash"):
+        elif shape in ("armorcannon", "nightslash", "reversal"):
             shape = "projectile"
         if shape in ("projectile", "bubble"):
             ex, ey = ox + nx * rng, oy + ny * rng
@@ -814,6 +828,8 @@ class Renderer:
                     r = int(e.radius * ts)
                     pygame.draw.ellipse(surface, COL_SELECT,
                                         pygame.Rect(gx - r, gy - r // 2, r * 2, r), 1)
+                    if isinstance(e, Pokemon):   # Maniche a Frusta: fascia del punto dolce
+                        mien_fx.draw_sweet_ring(surface, e, gx, gy, ts)
                 if isinstance(e, Pokemon) and getattr(e, "submerged", False):
                     self._draw_submerged(surface, e, gx, gy)
                     continue
@@ -840,6 +856,7 @@ class Renderer:
                 if isinstance(e, Pokemon):   # alone di Luna Piena / Dentistretti
                     ursa_fx.draw_unit_under(surface, e, gx, gy, now, ts)
                     sneasel_fx.draw_unit_under(surface, e, gx, gy, now, ts)   # Notte Fonda
+                    mien_fx.draw_unit_under(surface, e, gx, gy, now, ts)   # Individua, Danza
                 if anim is not None:
                     if grow != 1.0 and isinstance(anim, SpriteAnimator):
                         anim.draw(surface, gx, gy, alpha=95 if ghost else 255, grow=grow)
@@ -855,6 +872,7 @@ class Renderer:
                     charcadet_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # spallacci, artigli
                     ursa_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # Riposo, Dentistretti
                     sneasel_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # cure ridotte, Arraffalesto
+                    mien_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # oggetti spenti, Rigenergia
                 if in_bush:
                     self._draw_hidden_hint(surface, e, gx, gy, now)
                 self._draw_unit_hp(surface, e, gx, gy, grow)
@@ -1011,6 +1029,8 @@ class Renderer:
             pips.append((150, 120, 84))    # niente scatti (Abbattimento/Cucitombra: bruno)
         if getattr(u, "healcut_until", -1) > now:
             pips.append((214, 64, 80))     # cure ridotte (rosso)
+        if getattr(u, "itemlock_until", -1) > now:
+            pips.append((110, 76, 160))    # oggetti disattivati (Privazione: viola)
         if not pips:
             return
         r = int(u.radius * self.tile_size)

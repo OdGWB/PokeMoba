@@ -30,6 +30,7 @@ from .charcadet import CHARCADET_PASSIVES, CharcadetMixin
 from .noivern import ECHO_ID, NOIVERN_PASSIVES, NoivernMixin
 from .ursaring import URSA_PASSIVES, UrsaringMixin
 from .sneasel import SNEASEL_PASSIVES, SneaselMixin
+from .mienshao import MIEN_PASSIVES, PROJ_SHAPES, MienshaoMixin
 from .corviknight import CORVI_PASSIVES, CorviknightMixin
 from .eevee import EEVEE_PASSIVES, EeveeMixin
 from .item_effects import ItemEffectsMixin, cdr_to_haste
@@ -115,7 +116,7 @@ _SYNC_STATUSES = ("slow", "stun", "freeze", "confuse", "silence", "root", "sleep
 
 
 class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, NoivernMixin,
-            UrsaringMixin, SneaselMixin, ItemEffectsMixin):
+            UrsaringMixin, SneaselMixin, MienshaoMixin, ItemEffectsMixin):
     def __init__(self, world, map_data):
         self.world = world
         self.map = map_data
@@ -152,6 +153,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self._init_noivern()     # linea Noibat: ping, Tifone, Dragobolide
         self._init_ursa()        # linea Teddiursa: Profumino, balzi, Terremoto
         self._init_sneasel()     # linea Sneasel: scavalcamenti, Picchiaduro, Sporcolancio
+        self._init_mien()        # linea Mienfoo: balzi di Calcinvolo, Guardia Rapida
         self.vision = VisionSystem(self.world.grid)
         self._build_structures()
         self.jungle = JungleSystem(self)
@@ -206,6 +208,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self._update_noivern(dt)     # ping di Ecolocalizzazione, Tifone, Dragobolide (linea Noibat)
         self._update_ursa(dt)        # Miele, Dentistretti, balzi, Profumino, Terremoto (linea Teddiursa)
         self._update_sneasel(dt)     # Arraffalesto, Notte Fonda, Scalaroccia... (linea Sneasel)
+        self._update_mien(dt)        # Calcinvolo, Rigenergia, Individua, Danza (linea Mienfoo)
         self._update_rock_moves(dt)  # Rocciotomba / Pesobomba / Frana / Abbattimento
         self._update_spiritomb(dt)   # spiriti, Stordiraggio, Malcomune, Legione, Memento
         self._update_eevee(dt)       # Desiderio, Comete, Tuono, Bora, Divinazione, Idratazione
@@ -752,6 +755,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
                                    "big": attacker.minion_type == "cannon"})
         if self._item_dodge(attacker, target):   # Luminpolvere
             return
+        if self._mien_parry_aa(attacker, target):   # Individua (Mienshao)
+            return
         dmg = self._basic_damage(attacker, target)
         self._deal_damage(attacker, target, dmg)
         self._vamp(attacker, dmg, physical=True)
@@ -778,10 +783,14 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
                                            "mtype": "Ground", "fx": "miss"})
                 elif self._within_attack(u, tgt) and self._item_dodge(u, tgt):
                     pass   # Luminpolvere: schivato
+                elif self._within_attack(u, tgt) and self._mien_parry_aa(u, tgt):
+                    pass   # Individua (Mienshao): parato
                 elif self._within_attack(u, tgt):
+                    self._mien_before_aa(u, tgt)   # Maniche a Frusta: punto dolce
                     claws = self._claws_on(u)   # Ombrartigli: Spettro, sempre brutto colpo
                     dmg = ((self._aa_ghost_damage(u, tgt) if claws
-                            else self._basic_damage(u, tgt)) * self._item_aa_mult(u, tgt))
+                            else self._basic_damage(u, tgt)) * self._item_aa_mult(u, tgt)
+                           * self._mien_aa_mult(u))
                     if u.aa_stealth:       # Distacco: primo colpo furtivo potenziato
                         dmg *= config.DISTACCO_BONUS_MULT
                         u.stealth_shot_ready = False
@@ -793,6 +802,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
                     self._echo_after_aa(u, tgt)   # Ecolocalizzazione: ping ogni 3 colpi
                     self._ursa_after_aa(u, tgt)   # Luna Piena: attacchi base ad area
                     self._sneasel_after_aa(u, tgt)   # Arraffalesto, colpo d'agguato
+                    self._mien_after_aa(u, tgt)      # punto dolce, brutto colpo di Individua
                     self._spirit_wander(u, tgt)   # Spirito Vagante (Spiritomb)
                     self._cute_charm(u, tgt)      # Incantevole (Sylveon)
                     mt = u.types[0] if u.types else "Normal"
@@ -1675,7 +1685,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
                 "hurricane": "Shoot", "dracometeor": "Charge",
                 "honeyscent": "Shoot", "rest": "Sleep", "earthquake": "Rumble",
                 "nightslash": "Attack", "nightfall": "Charge", "beatup": "Attack",
-                "sludgelob": "Shoot"}.get(shape)
+                "sludgelob": "Shoot", "detect": "Charge", "fakeout": "Strike",
+                "sleevedance": "Twirl", "reversal": "Attack"}.get(shape)
         if anim:
             self.fx_events.append({"eid": p.id, "anim": anim})
         # Gli eventi visivi aggiunti dai _cast_* qui sotto vengono "taggati" con lo
@@ -1762,6 +1773,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             pass   # linea Teddiursa (engine/ursaring.py)
         elif self._sneasel_cast(p, mv, rank, origin, tgt, dirv):
             pass   # linea Sneasel (engine/sneasel.py)
+        elif self._mien_cast(p, mv, rank, origin, tgt, dirv):
+            pass   # linea Mienfoo (engine/mienshao.py)
         elif shape == "buff":
             self._apply_support(p, mv, rank, origin)
             self.fx_events.append({"kind": "buff", "c": (origin.x, origin.y),
@@ -2235,7 +2248,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         target.hp = min(target.max_hp, target.hp + amount)
         healed = target.hp - before
         if (healed > 0.0 and isinstance(caster, Pokemon) and target is not caster
-                and "king_rock" in caster.items):
+                and "king_rock" in self._fx_items(caster)):
             self._give_shield(caster, target, healed * KINGROCK_SHIELD_FRAC, KINGROCK_SHIELD_DUR)
 
     def _apply_silence(self, p, dur):   # Ripeti: solo autoattacchi, niente mosse
@@ -2398,7 +2411,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
     def _auto_reach(self, u) -> float:
         """Gittata dell'auto-attacco (passiva Distacco: molto più larga se nascosti)."""
         r = u.attack_range
-        if isinstance(u, Pokemon) and "zoom_lens" in u.items:
+        if isinstance(u, Pokemon) and "zoom_lens" in self._fx_items(u):
             r *= 1.15   # Zoomlente: +15% portata degli attacchi base
         if isinstance(u, Pokemon) and u.passive_id == "distacco" and self._is_hidden(u):
             r += config.DISTACCO_RANGE_BONUS
@@ -3293,6 +3306,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         # Bersaglio non bersagliabile (es. SUB sott'acqua): niente danno né CC.
         if isinstance(target, Pokemon) and target.untargetable_until > self.time:
             return
+        if self._mien_parry(caster, target, mv.shape in PROJ_SHAPES):   # Individua
+            return
         fx = mv.effects
         power = mv.power_at(rank)
         if power > 0:
@@ -3508,7 +3523,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         # Corpetto Assalto: le mosse di potenziamento statistiche (con bonus
         # passivo) non danno il potenziamento attivo a chi lo indossa.
         vest = (mv.passive is not None and isinstance(caster, Pokemon)
-                and "assault_vest" in caster.items)
+                and "assault_vest" in self._fx_items(caster))
         boosted = [a for a in targets if not (vest and a is caster)]
         atk = eff.get("atk")
         if atk and not vest:
@@ -3618,7 +3633,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             return
         if self._cc_immune(p) or p.untargetable_until > self.time:
             return
-        if "iron_ball" in p.items:
+        if "iron_ball" in self._fx_items(p):
             dur *= 0.4   # Ferropalla: lanci in aria subiti -60%
         now = self.time
         end = now + dur
@@ -3866,6 +3881,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         if p.passive_id in URSA_PASSIVES and self._bot_ursa_cast(p, target):
             return
         if p.passive_id in SNEASEL_PASSIVES and self._bot_sneasel_cast(p, target):
+            return
+        if p.passive_id in MIEN_PASSIVES and self._bot_mien_cast(p, target):
             return
         for slot in ("R", "Q", "W", "E"):
             ms = p.moveset.get(slot)

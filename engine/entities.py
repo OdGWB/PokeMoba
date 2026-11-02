@@ -342,6 +342,23 @@ class Pokemon(Unit):
     climb_ready_at: float = 0.0        # Scalaroccia: prossimo scavalcamento da qui
     healcut_until: float = -1.0        # cure ridotte (Sporcolancio)
     healcut_mult: float = 1.0
+    # Linea Mienfoo: Maniche a Frusta, Rigenergia, Individua, Bruciapelo,
+    # Danza delle Maniche; oggetti disattivati (stato generico, Privazione).
+    mien_act_at: float = -1e9          # ultima azione offensiva (attacco base, Q, E, R)
+    mien_regen: bool = False           # Rigenergia attiva (aggiornato dal Match)
+    mien_calm_at: float = -1e9         # da qui conta la calma (interfaccia)
+    fakeout_ready: bool = False        # Bruciapelo: stordimento pronto (interfaccia)
+    mien_crit_until: float = -1.0      # Individua: prossimo attacco base brutto colpo
+    parry_until: float = -1.0          # Individua: finestra di parata aperta fino a qui
+    parry_window: float = 0.5          # ultima finestra (si dimezza se ripetuta entro 6 s)
+    parry_cast_at: float = -1e9
+    parry_eff: dict | None = None
+    double_until: float = -1.0         # Doppio Bruciapelo: rilancio pronto fino a qui
+    double_cd: float = 0.0
+    dance_until: float = -1.0          # Danza delle Maniche in corso fino a qui
+    dance_seq: str = ""                # mosse già usate nella danza ("QE"...)
+    dance_mv: tuple | None = None
+    itemlock_until: float = -1.0       # oggetti disattivati (Privazione)
 
     def _bonus(self, stat: str) -> float:
         return (self.passive_bonus.get(stat, 0.0) + self.item_bonus.get(stat, 0.0)

@@ -108,15 +108,15 @@ class ItemEffectsMixin:
         return self.item_catalog.total_bonus(p.items, skip)
 
     def _heal_in_mult(self, p) -> float:
-        m = BIGROOT_MULT if isinstance(p, Pokemon) and "big_root" in p.items else 1.0
+        m = BIGROOT_MULT if isinstance(p, Pokemon) and "big_root" in self._fx_items(p) else 1.0
         return m * self._healcut_mult(p)   # cure ridotte (Sporcolancio)
 
     def _heal_out_mult(self, caster) -> float:
-        return SOOTHE_MULT if isinstance(caster, Pokemon) and "soothe_bell" in caster.items else 1.0
+        return SOOTHE_MULT if isinstance(caster, Pokemon) and "soothe_bell" in self._fx_items(caster) else 1.0
 
     def _give_shield(self, caster, target, amt, dur) -> None:
         """Scudo dato da `caster` (Creta Luce: +15% e +50% di durata)."""
-        if isinstance(caster, Pokemon) and "light_clay" in caster.items:
+        if isinstance(caster, Pokemon) and "light_clay" in self._fx_items(caster):
             amt *= LIGHTCLAY_AMT
             dur *= LIGHTCLAY_DUR
         self._apply_shield(target, amt, dur)
@@ -125,7 +125,7 @@ class ItemEffectsMixin:
         """Spostamento istantaneo (respinta o scatto), fermato dai muri."""
         if dirv.length() < 1e-6:
             dirv = Vec2(1.0, 0.0)
-        if knockback and isinstance(u, Pokemon) and "iron_ball" in u.items:
+        if knockback and isinstance(u, Pokemon) and "iron_ball" in self._fx_items(u):
             dist *= IRONBALL_MULT
         origin = Vec2(u.pos.x, u.pos.y)
         dest = self._clamp_to_wall(origin, origin + dirv.normalized() * dist)
@@ -144,17 +144,17 @@ class ItemEffectsMixin:
         p.cast_seq += 1
         key = (slot, mv.id)
         repeat = p.choice_key == key and self.time - p.choice_at <= CHOICE_WINDOW
-        p.choice_boost = mv.id if repeat and any(i in p.items for i in CHOICE_IDS) else ""
+        p.choice_boost = mv.id if repeat and any(i in self._fx_items(p) for i in CHOICE_IDS) else ""
         p.choice_key = key
         p.choice_at = self.time
-        if "wide_lens" in p.items and mv.range > 0:
+        if "wide_lens" in self._fx_items(p) and mv.range > 0:
             return Move(mv.slot, mv.max_rank, dict(mv.d, range=mv.range * WIDE_RANGE))
         return mv
 
     def _item_move_mult(self, caster, mv, target, eff) -> float:
         if not isinstance(caster, Pokemon) or not caster.items:
             return 1.0
-        items = caster.items
+        items = self._fx_items(caster)
         m = 1.0
         if caster.choice_boost and caster.choice_boost == mv.id:
             m *= CHOICE_MULT
@@ -176,13 +176,13 @@ class ItemEffectsMixin:
 
     def _item_after_move_hit(self, caster, mv, target, eff) -> None:
         # Assorbisfera: una sola volta per lancio, anche se colpisce piu' bersagli.
-        if (isinstance(caster, Pokemon) and "life_orb" in caster.items and caster.alive
+        if (isinstance(caster, Pokemon) and "life_orb" in self._fx_items(caster) and caster.alive
                 and caster.orb_paid_seq != caster.cast_seq):
             caster.orb_paid_seq = caster.cast_seq
             caster.hp = max(1.0, caster.hp - caster.max_hp * LIFEORB_COST)
         # Vulnerassicurazione: subire una mossa superefficace nemica.
         if (isinstance(target, Pokemon) and target.alive and eff > 1.0
-                and "weakness_policy" in target.items and isinstance(caster, Pokemon)
+                and "weakness_policy" in self._fx_items(target) and isinstance(caster, Pokemon)
                 and caster.team != target.team and self._item_ready(target, "weakness_policy")):
             target.wp_until = self.time + WP_DUR
             target.wp_active = True
@@ -192,13 +192,13 @@ class ItemEffectsMixin:
     # --- attacchi base ---------------------------------------------------------
     def _item_aa_windup(self, u) -> float:
         """Fattore del windup del nuovo attacco base (Rapidartigli: 0 = istantaneo)."""
-        u.aa_quick = ("quick_claw" in u.items
+        u.aa_quick = ("quick_claw" in self._fx_items(u)
                       and self.time - u.last_aa_at >= QUICKCLAW_IDLE)
         return 0.0 if u.aa_quick else 1.0
 
     def _item_aa_mult(self, u, tgt) -> float:
         m = QUICKCLAW_MULT if u.aa_quick else 1.0
-        if "zoom_lens" in u.items:
+        if "zoom_lens" in self._fx_items(u):
             reach = self._auto_reach(u) + getattr(tgt, "radius", 0.0)
             if u.pos.dist(tgt.pos) > 0.5 * reach:
                 m *= ZOOM_FAR_MULT
@@ -206,7 +206,7 @@ class ItemEffectsMixin:
 
     def _item_dodge(self, attacker, target) -> bool:
         """Luminpolvere: il possessore schiva il 15% degli attacchi base."""
-        if (isinstance(target, Pokemon) and "bright_powder" in target.items
+        if (isinstance(target, Pokemon) and "bright_powder" in self._fx_items(target)
                 and not isinstance(attacker, Structure) and random.random() < BRIGHT_DODGE):
             self.fx_events.append({"kind": "miss", "c": (target.pos.x, target.pos.y),
                                    "mtype": "Normal", "fx": "miss"})
@@ -215,14 +215,14 @@ class ItemEffectsMixin:
 
     def _item_after_aa(self, attacker, target) -> None:
         """Dopo un attacco base a segno: veleno di Fangopece, Bitorzolelmo."""
-        if (isinstance(attacker, Pokemon) and "black_sludge" in attacker.items
+        if (isinstance(attacker, Pokemon) and "black_sludge" in self._fx_items(attacker)
                 and isinstance(target, Pokemon) and target.alive and target.team != attacker.team):
             self._apply_poison(target, attacker,
                                SLUDGE_DPS_BASE + SLUDGE_DPS_ATK * attacker.eff_attack(),
                                SLUDGE_POISON_DUR)
         # Bitorzolelmo: chi colpisce in corpo a corpo (Pokémon e selvatici; non
         # minion, per non dare oro "passivo" col last-hit) subisce danno senza tipo.
-        if (isinstance(target, Pokemon) and "rocky_helmet" in target.items
+        if (isinstance(target, Pokemon) and "rocky_helmet" in self._fx_items(target)
                 and isinstance(attacker, (Pokemon, Wild)) and attacker.alive
                 and attacker.team != target.team and attacker.attack_range <= MELEE_REACH):
             self._deal_damage(target, attacker, HELMET_BASE + HELMET_DEF * target.eff_defense())
@@ -234,7 +234,7 @@ class ItemEffectsMixin:
             attacker.last_dealt_at = self.time
         if not isinstance(target, Pokemon) or not target.items or target.is_decoy:
             return
-        items = target.items
+        items = self._fx_items(target)
         if target.hp <= 0.0:
             if "focus_sash" in items and self._item_ready(target, "focus_sash"):
                 target.hp = 1.0
@@ -285,7 +285,7 @@ class ItemEffectsMixin:
         if not isinstance(p, Pokemon) or not p.alive or not 0 <= slot < len(p.items):
             return False
         iid = p.items[slot]
-        if not self._item_ready(p, iid):
+        if not self._item_ready(p, iid) or not self._fx_items(p):   # Privazione: spenti
             return False
         if iid == "mental_herb":
             self._cleanse(p)
@@ -315,7 +315,7 @@ class ItemEffectsMixin:
             p.smoke_hidden = False
             if not p.alive or not p.items:
                 continue
-            items = p.items
+            items = self._fx_items(p)
             regen = 0.0
             if "leftovers" in items:
                 regen += (LEFTOVERS_IDLE_REGEN if now - p.last_damaged_at >= LEFTOVERS_IDLE
