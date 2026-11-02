@@ -1,7 +1,7 @@
 """Profilo del giocatore: NICKNAME e IMMAGINE PROFILO (ritratto di un leggendario).
 
 Il profilo si salva sul PC del giocatore, FUORI dalla cartella del gioco
-(%APPDATA%/PokrLOL/profile.json), così mandare lo zip del gioco agli amici non
+(%APPDATA%/PokeMoba/profile.json), così mandare lo zip del gioco agli amici non
 si porta dietro il tuo nome. Al primo avvio non esiste e il gioco lo chiede.
 
 Le immagini sono i ritratti "Normal" di PMD Sprite Collab (CC BY-NC 4.0),
@@ -50,7 +50,7 @@ AVATAR_NAMES = dict(AVATARS)
 # --- profilo salvato -------------------------------------------------------------------
 def profile_path() -> Path:
     base = os.environ.get("APPDATA") or str(Path.home() / ".config")
-    return Path(base) / "PokrLOL" / "profile.json"
+    return Path(base) / "PokeMoba" / "profile.json"
 
 
 def clean_name(text) -> str:
@@ -59,10 +59,18 @@ def clean_name(text) -> str:
     return " ".join(text.split())[:NAME_MAX]
 
 
+def _legacy_profile_path() -> Path:
+    """Cartella usata quando il gioco si chiamava PokrLOL (il profilo si porta dietro)."""
+    return profile_path().parent.parent / "PokrLOL" / "profile.json"
+
+
 def load_profile(path=None):
     """{"name", "avatar"} oppure None se manca o è rotto (= va chiesto)."""
+    p = Path(path or profile_path())
+    if path is None and not p.is_file() and _legacy_profile_path().is_file():
+        p = _legacy_profile_path()
     try:
-        data = json.loads(Path(path or profile_path()).read_text(encoding="utf-8"))
+        data = json.loads(p.read_text(encoding="utf-8"))
         name = clean_name(data.get("name", ""))
         avatar = int(data.get("avatar", 0))
     except (OSError, ValueError, TypeError, AttributeError):

@@ -1,4 +1,4 @@
-"""Crediti (menu, tasto C): da dove vengono sprite, ritratti e librerie.
+"""Crediti (menu principale): da dove vengono sprite, ritratti e librerie.
 
 Le stesse informazioni stanno in CREDITS.md; gli autori dei ritratti profilo
 si leggono da assets/avatars/credits.json (scritto da tools/fetch_avatars.py).
@@ -13,6 +13,12 @@ from .online_lobby_scene import BG, DIM, GOLD, TEXT, font
 
 # (stile, testo): "h" titolo di sezione, "t" testo, "d" testo tenue, "" riga vuota
 INTRO = [
+    ("h", "PokéMoba"),
+    ("t", "MOBA amatoriale a tema Pokémon, in 2D dall'alto, scritto in Python con pygame."),
+    ("d", "Mappe 3v3 e 5v5 a lane, torri, campi neutrali, oggetti, multiplayer online/LAN."),
+    ("d", "Grafica della mappa, torri ed effetti disegnata via codice (pixel art)."),
+    ("d", "Progetto gratuito, non ufficiale e senza scopo di lucro."),
+    ("", ""),
     ("h", "Sprite dei Pokémon in partita"),
     ("t", "PMD Sprite Collab - https://sprites.pmdcollab.org/"),
     ("d", "Repository: github.com/PMDCollab/SpriteCollab - licenza CC BY-NC 4.0"),

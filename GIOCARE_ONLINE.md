@@ -1,4 +1,4 @@
-# Giocare a PokrLOL online con gli amici
+# Giocare a PokéMoba online con gli amici
 
 Niente server, niente account, niente costi. Uno di voi fa da **host** (la
 partita gira sul suo PC), gli altri si collegano a lui scambiandosi dei
@@ -10,7 +10,7 @@ partita gira sul suo PC), gli altri si collegano a lui scambiandosi dei
 
 1. Installa **Python 3.13** da <https://www.python.org/downloads/>.
    Durante l'installazione spunta **"Add python.exe to PATH"**.
-2. Fatti mandare dall'host la cartella del gioco **PokrLOL** (zip) e
+2. Fatti mandare dall'host la cartella del gioco **PokéMoba** (zip) e
    scompattala dove vuoi. Dovete avere tutti **la stessa versione**: se l'host
    aggiorna il gioco, rimandatevi la cartella.
 3. Apri la cartella, clicca sulla barra dell'indirizzo, scrivi `cmd` e premi

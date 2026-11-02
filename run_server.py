@@ -16,7 +16,7 @@ import config
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="PokrLOL - server LAN dedicato")
+    parser = argparse.ArgumentParser(description="PokéMoba - server LAN dedicato")
     parser.add_argument("--port", type=int, default=config.DEFAULT_PORT)
     args = parser.parse_args()
 

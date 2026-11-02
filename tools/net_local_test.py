@@ -288,7 +288,7 @@ def connect(host, client, slot, R):
 
 
 def run_auto():
-    tmp = Path(tempfile.gettempdir()) / "pokrlol_net_test"
+    tmp = Path(tempfile.gettempdir()) / "pokemoba_net_test"
     tmp.mkdir(parents=True, exist_ok=True)
     R = Report()
     t0 = time.monotonic()

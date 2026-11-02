@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parent
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="PokrLOL - client")
+    parser = argparse.ArgumentParser(description="PokéMoba - client")
     parser.add_argument("--single", action="store_true",
                         help="avvia subito una partita in locale contro i bot")
     parser.add_argument("--map", default="data/maps/map_3v3.json")

@@ -693,13 +693,25 @@ Passaggi completati:
 - ICONA e SCHERMATA DI CARICAMENTO (step_35). assets/ui/icon.png (+ .ico):
   quadrato "PM" ritagliato dall'immagine fornita, angoli trasparenti (flood-fill
   dagli angoli attraverso i pixel non neri). game/app.py _set_app_icon: set_icon
-  PRIMA di set_mode + AppUserModelID "PokrLOL.Game" (Windows: la barra mostra la
+  PRIMA di set_mode + AppUserModelID "PokeMoba.Game" (Windows: la barra mostra la
   nostra icona, non quella di python.exe). Nuovo game/loading_screen.py: sfondo
   assets/ui/loading_bg.jpg scalato "cover" (cache per dimensione finestra) con velo
   scuro, disco scuro + spinner a 12 tacche dorate al CENTRO + testo. Usata da
   char_select_scene (partita locale) e online_draft_scene (fase LOADING: disegna
   prima il caricamento, poi costruisce OnlineMatchScene). Screenshot: step_35.png,
   step_35_icon.png.
+- RINOMINA in PokéMoba + MENU PRINCIPALE rifatto (step_36). Nome visibile
+  "PokéMoba" (titolo finestra, README, guide); identificatori tecnici ASCII
+  "PokeMoba" (exe, cartella %APPDATA%\PokeMoba, AppUserModelID, logger); il
+  profilo della cartella vecchia PokrLOL viene letto ancora (avatars.load_profile).
+  game/scenes/menu_scene.py: titolo grande con ombra + 5 voci (Gioca,
+  Personalizzazione, Crediti, Tier list, Esci), frecce+Invio o clic. Nuovo
+  play_scene.py (mappa offline, online/LAN con pulsanti cliccabili; la char
+  select torna qui). Personalizzazione = profile_scene (nickname+immagine).
+  Crediti con sezione sul gioco. Nuovo tier_scene.py: tier list S-D
+  trascina-e-rilascia dei Pokémon del roster, salvata in
+  %APPDATA%\PokeMoba	ierlist.json (prima non esisteva nessuna tier list).
+  Screenshot: step_36_menu/_gioca/_tier/_personalizzazione/_crediti.
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

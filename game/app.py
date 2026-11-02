@@ -23,7 +23,7 @@ def _set_app_icon() -> None:
     if sys.platform == "win32":
         try:    # AppUserModelID proprio: la barra mostra la nostra icona, non quella di python.exe
             import ctypes
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("PokrLOL.Game")
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("PokeMoba.Game")
         except Exception:
             pass
     try:

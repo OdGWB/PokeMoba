@@ -16,7 +16,7 @@ SNAPSHOT_RATE = 20      # snapshot di rete al secondo (usato dalla Fase 5)
 # --- Finestra ----------------------------------------------------------------
 WINDOW_WIDTH = 1280     # dimensione INIZIALE della finestra (ridimensionabile)
 WINDOW_HEIGHT = 720
-WINDOW_TITLE = "PokrLOL"
+WINDOW_TITLE = "PokéMoba"
 
 # Risoluzione interna FISSA su cui si disegna il mondo (648x360 = 27x15 tile da
 # 24 px, 16:9). Viene scalata per riempire la finestra mantenendo le proporzioni

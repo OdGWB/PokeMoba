@@ -109,7 +109,7 @@ class ProfileScene:
         self.buttons.clear()
         big, mid, sm = font(max(24, H // 26), True), font(max(15, H // 46)), font(max(13, H // 56))
         x = int(W * 0.06)
-        t = big.render("Il tuo profilo" if not self.first else "Benvenuto! Crea il tuo profilo",
+        t = big.render("Personalizzazione" if not self.first else "Benvenuto! Crea il tuo profilo",
                        True, GOLD)
         surface.blit(t, (x, int(H * 0.05)))
         y = int(H * 0.05) + t.get_height() + 14
@@ -166,7 +166,7 @@ class ProfileScene:
         if self.error:
             surface.blit(sm.render(self.error, True, RED), (x + 430, by + 8))
         cr = sm.render("Ritratti: PMD Sprite Collab (sprites.pmdcollab.org), CC BY-NC 4.0. "
-                       "Autori nei Crediti del menu (C).", True, DIM)
+                       "Autori nei Crediti.", True, DIM)
         surface.blit(cr, (x, H - cr.get_height() - 10))
 
 

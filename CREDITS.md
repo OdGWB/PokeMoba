@@ -20,11 +20,11 @@ in conformità con i termini della licenza CC BY-NC 4.0.
 
 ## Immagini profilo — PMD Sprite Collab
 
-Le immagini profilo (scelte al primo avvio e dal menu con **P**) sono i
+Le immagini profilo (scelte al primo avvio e da **Personalizzazione** nel menu) sono i
 ritratti "Normal" dei Pokémon leggendari di **PMD Sprite Collab**, scaricati
 con `python tools/fetch_avatars.py` in `assets/avatars/` (dove ci sono anche
 `credits.json` e `CREDITS.md` con gli stessi crediti). Nel gioco i crediti
-sono nel menu, tasto **C**.
+sono nel menu, voce **Crediti**.
 
 Ritratti "Normal" da **PMD Sprite Collab** - https://sprites.pmdcollab.org/
 (repository https://github.com/PMDCollab/SpriteCollab), licenza

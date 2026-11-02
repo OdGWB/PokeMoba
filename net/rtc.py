@@ -42,7 +42,7 @@ NAT_FAILED_MSG = ("Connessione fallita: probabilmente uno dei due è dietro un N
                   "Servirebbe un server TURN (vedi net/ice_config.py).")
 _HB = bytes([HEARTBEAT])
 
-log = logging.getLogger("pokrlol.rtc")
+log = logging.getLogger("pokemoba.rtc")
 
 
 def available() -> bool:
@@ -109,7 +109,7 @@ def _patch_aioice():
     import aioice.ice as ice
 
     orig = ice.Connection.get_component_candidates
-    if getattr(orig, "_pokrlol", False):
+    if getattr(orig, "_pokemoba", False):
         return
 
     async def patched(self, component, addresses, timeout=5):
@@ -154,7 +154,7 @@ def _patch_aioice():
             t.cancel()
         return cands
 
-    patched._pokrlol = True
+    patched._pokemoba = True
     ice.Connection.get_component_candidates = patched
 
 

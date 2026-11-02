@@ -1,4 +1,4 @@
-# PokrLOL
+# PokéMoba
 
 MOBA 2D con i Pokémon, stile League of Legends, da giocare in LAN tra amici.
 Progetto personale **non commerciale**. Sprite da PMD SpriteCollab (CC BY-NC 4.0,
@@ -7,7 +7,7 @@ vedi [CREDITS.md](CREDITS.md); in gioco: menu, tasto **C**).
 **Profilo**: al primo avvio il gioco chiede il **nickname** (quello che vedono
 gli altri) e l'**immagine profilo**, un ritratto "Normal" di un leggendario da
 PMD Sprite Collab (`assets/avatars/`, si riscaricano con
-`python tools/fetch_avatars.py`). Si salva in `%APPDATA%\PokrLOL\profile.json`
+`python tools/fetch_avatars.py`). Si salva in `%APPDATA%\PokéMoba\profile.json`
 (fuori dalla cartella del gioco) e si cambia dal menu col tasto **P**. I bot non
 hanno immagine e si chiamano come il loro Pokémon.
 

@@ -1,12 +1,13 @@
-"""Menu iniziale: scelta della MAPPA (3v3 / 5v5), poi selezione del personaggio.
+"""Menu principale di PokéMoba: titolo e cinque voci.
 
-In basso le partite ONLINE (WebRTC, codici scambiati a mano): [O] ospita,
-[U] unisciti; e le vecchie partite LAN: [H] ospita (host), [J] unisciti (IP).
-In alto a destra il tuo profilo ([P] per cambiarlo); [C] apre i crediti.
+Gioca (mappa, offline / online / LAN: play_scene.py), Personalizzazione
+(nickname e immagine profilo), Crediti, Tier list ed Esci. Frecce + Invio o
+clic. In alto a destra il profilo. Qui restano anche i colori e la miniatura
+delle mappe, usati dalla schermata Gioca.
 """
 from __future__ import annotations
 
-import socket
+import math
 
 import pygame
 
@@ -52,101 +53,62 @@ def map_thumbnail(path):
     return img
 
 
+ENTRIES = [("Gioca", "play"), ("Personalizzazione", "profile"), ("Crediti", "credits"),
+           ("Tier list", "tier"), ("Esci", "quit")]
+
+
 class MenuScene:
     def __init__(self, app):
         self.app = app
         self.next_scene = None
-        self.mode = "menu"          # "menu" | "enter_ip"
-        self.ip_text = "127.0.0.1"
-        self.map_index = 0          # 0 = 3v3, 1 = 5v5
-        self._thumbs = [map_thumbnail(str(app.root / p)) for _, p in config.MAPS]
-        self._cards: list = []
+        self.sel = 0
+        self.t = 0.0
+        self._rects: list = []
         self._fonts = {}
 
+    # --- input -----------------------------------------------------------------
     def handle_events(self, events):
         for ev in events:
-            if self.mode == "menu":
-                if ev.type == pygame.MOUSEMOTION:
-                    for r, i in self._cards:
-                        if r.collidepoint(ev.pos):
-                            self.map_index = i
-                elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
-                    for r, i in self._cards:
-                        if r.collidepoint(ev.pos):
-                            self.map_index = i
-                            self._single()
-                if ev.type != pygame.KEYDOWN:
-                    continue
-                if ev.key in (pygame.K_LEFT, pygame.K_a, pygame.K_RIGHT, pygame.K_d,
-                              pygame.K_m):
-                    step = -1 if ev.key in (pygame.K_LEFT, pygame.K_a) else 1
-                    self.map_index = (self.map_index + step) % len(config.MAPS)
-                elif ev.key in (pygame.K_1, pygame.K_2) and ev.key - pygame.K_1 < len(config.MAPS):
-                    self.map_index = ev.key - pygame.K_1
-                    self._single()
+            if ev.type == pygame.MOUSEMOTION:
+                for r, i in self._rects:
+                    if r.collidepoint(ev.pos):
+                        self.sel = i
+            elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+                for r, i in self._rects:
+                    if r.collidepoint(ev.pos):
+                        self.sel = i
+                        self._activate(ENTRIES[i][1])
+            elif ev.type == pygame.KEYDOWN:
+                if ev.key in (pygame.K_DOWN, pygame.K_s):
+                    self.sel = (self.sel + 1) % len(ENTRIES)
+                elif ev.key in (pygame.K_UP, pygame.K_w):
+                    self.sel = (self.sel - 1) % len(ENTRIES)
                 elif ev.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_SPACE):
-                    self._single()
-                elif ev.key == pygame.K_h:
-                    self._host()
-                elif ev.key == pygame.K_j:
-                    self.mode = "enter_ip"
-                elif ev.key == pygame.K_o:
-                    from .online_lobby_scene import OnlineHostLobbyScene
-                    self.next_scene = OnlineHostLobbyScene(self.app, self.map_index)
-                elif ev.key == pygame.K_u:
-                    from .online_lobby_scene import OnlineJoinScene
-                    self.next_scene = OnlineJoinScene(self.app)
-                elif ev.key == pygame.K_p:
-                    from .profile_scene import ProfileScene
-                    self.next_scene = ProfileScene(self.app)
-                elif ev.key == pygame.K_c:
-                    from .credits_scene import CreditsScene
-                    self.next_scene = CreditsScene(self.app)
+                    self._activate(ENTRIES[self.sel][1])
                 elif ev.key == pygame.K_ESCAPE:
                     self.quit_app = True
-            elif self.mode == "enter_ip" and ev.type == pygame.KEYDOWN:
-                if ev.key == pygame.K_RETURN:
-                    self._join(self.ip_text.strip())
-                elif ev.key == pygame.K_ESCAPE:
-                    self.mode = "menu"
-                elif ev.key == pygame.K_BACKSPACE:
-                    self.ip_text = self.ip_text[:-1]
-                elif ev.unicode and (ev.unicode.isdigit() or ev.unicode in ".:"):
-                    self.ip_text += ev.unicode
+
+    def _activate(self, key):
+        if key == "play":
+            from .play_scene import PlayScene
+            self.next_scene = PlayScene(self.app)
+        elif key == "profile":
+            from .profile_scene import ProfileScene
+            self.next_scene = ProfileScene(self.app)
+        elif key == "credits":
+            from .credits_scene import CreditsScene
+            self.next_scene = CreditsScene(self.app)
+        elif key == "tier":
+            from .tier_scene import TierListScene
+            self.next_scene = TierListScene(self.app)
+        elif key == "quit":
+            self.quit_app = True
 
     def fixed_update(self):
         pass
 
     def update(self, dt):
-        pass
-
-    # --- costruzione scene ---------------------------------------------------
-    def _single(self):
-        from .char_select_scene import CharSelectScene
-        self.next_scene = CharSelectScene(self.app, self.map_index)
-
-    def _host(self):
-        from net.lan.server import GameServer
-        from net.lan.client import GameClient
-        from .lobby_scene import LobbyScene
-        server = GameServer(port=config.DEFAULT_PORT)
-        server.start()
-        client = GameClient("127.0.0.1", config.DEFAULT_PORT)
-        client.send_hello(self._nick("Host"))
-        self.app.server = server
-        self.next_scene = LobbyScene(self.app, client, server=server, is_host=True,
-                                     init_map_index=self.map_index)
-
-    def _join(self, ip):
-        from net.lan.client import GameClient
-        from .lobby_scene import LobbyScene
-        client = GameClient(ip, config.DEFAULT_PORT)
-        client.send_hello(self._nick("Ospite"))
-        self.next_scene = LobbyScene(self.app, client, is_host=False)
-
-    def _nick(self, default):
-        prof = getattr(self.app, "profile", None)
-        return prof["name"] if prof else (socket.gethostname()[:16] or default)
+        self.t += dt
 
     def draw(self, surface):
         surface.fill(BG)
@@ -160,71 +122,62 @@ class MenuScene:
             self._fonts[key] = pygame.font.SysFont("consolas", size, bold=bold)
         return self._fonts[key]
 
+    # --- disegno ------------------------------------------------------------------
     def draw_fullres(self, surface, font):
         W, H = surface.get_size()
         surface.fill(BG)
-        title_f = self._font(max(30, H // 14), bold=True)
-        big = self._font(max(22, H // 26), bold=True)
-        small = self._font(max(13, H // 50))
-        t = title_f.render("PokrLOL", True, GOLD)
-        surface.blit(t, (W // 2 - t.get_width() // 2, H // 14))
-        self._draw_profile(surface, W, H, small)
+        # Fascia di luce calda dietro il titolo (luce alto-sinistra, giungla cupa).
+        glow = pygame.Surface((W, int(H * 0.42)), pygame.SRCALPHA)
+        for i in range(glow.get_height()):
+            a = int(60 * (1 - i / glow.get_height()) ** 2)
+            pygame.draw.line(glow, (60, 90, 60, a), (0, i), (W, i))
+        surface.blit(glow, (0, 0))
 
-        if self.mode == "enter_ip":
-            cx = W // 2 - 170
-            surface.blit(big.render("IP dell'host:", True, TEXT), (cx, H // 3))
-            surface.blit(big.render(self.ip_text + "_", True, (255, 255, 255)),
-                         (cx, H // 3 + 50))
-            surface.blit(small.render("INVIO = unisciti    ESC = indietro", True, DIM),
-                         (cx, H // 3 + 110))
-            return
+        title_f = self._font(max(48, H // 7), bold=True)
+        tx = W // 2
+        ty = int(H * 0.10)
+        title = "PokéMoba"
+        sh = title_f.render(title, True, (8, 12, 10))
+        for dx, dy in ((6, 6), (4, 4), (2, 2)):
+            surface.blit(sh, (tx - sh.get_width() // 2 + dx, ty + dy))
+        out = title_f.render(title, True, (60, 46, 10))
+        for dx, dy in ((-2, 0), (2, 0), (0, -2), (0, 2)):
+            surface.blit(out, (tx - out.get_width() // 2 + dx, ty + dy))
+        surface.blit(title_f.render(title, True, GOLD), (tx - sh.get_width() // 2, ty))
+        sub = self._font(max(14, H // 48)).render(
+            "il MOBA dei Pokémon  -  giungla, lane e campi neutrali", True, DIM)
+        surface.blit(sub, (tx - sub.get_width() // 2, ty + sh.get_height() + 4))
 
-        s = small.render("Scegli la mappa  (clic, frecce + Invio, oppure 1 / 2)", True, DIM)
-        surface.blit(s, (W // 2 - s.get_width() // 2, H // 14 + t.get_height() + 8))
-
-        n = len(config.MAPS)
-        cw = min(int(W * 0.36), int(H * 0.52))
-        gap = int(W * 0.05)
-        x0 = W // 2 - (n * cw + (n - 1) * gap) // 2
-        y0 = int(H * 0.26)
-        ch = int(cw * 1.12)
-        self._cards = []
-        for i, (name, _) in enumerate(config.MAPS):
-            r = pygame.Rect(x0 + i * (cw + gap), y0, cw, ch)
-            self._cards.append((r, i))
-            on = i == self.map_index
+        bf = self._font(max(22, H // 26), bold=True)
+        bw, bh = min(int(W * 0.34), 460), max(44, H // 12)
+        gap = max(10, H // 70)
+        y0 = int(H * 0.38)
+        self._rects = []
+        for i, (label, key) in enumerate(ENTRIES):
+            r = pygame.Rect(tx - bw // 2, y0 + i * (bh + gap), bw, bh)
+            self._rects.append((r, i))
+            on = i == self.sel
             pygame.draw.rect(surface, PANEL_HI if on else PANEL, r, border_radius=8)
             pygame.draw.rect(surface, GOLD if on else BORDER, r, 3 if on else 1, border_radius=8)
-            side = int(cw * 0.8)
-            th = pygame.transform.scale(self._thumbs[i], (side, side))
-            surface.blit(th, (r.centerx - side // 2, r.y + int(cw * 0.08)))
-            nm = big.render(name, True, TEXT if on else (200, 205, 198))
-            surface.blit(nm, (r.centerx - nm.get_width() // 2, r.y + int(cw * 0.08) + side + 8))
-            info = small.render(MAP_INFO.get(name, ""), True, DIM)
-            surface.blit(info, (r.centerx - info.get_width() // 2,
-                                r.y + int(cw * 0.08) + side + 12 + nm.get_height()))
-
-        try:
-            ip = socket.gethostbyname(socket.gethostname())
-        except OSError:
-            ip = "?"
-        lan = small.render(f"LAN:  [H] ospita partita   [J] unisciti (IP)      "
-                           f"il tuo IP: {ip}  porta {config.DEFAULT_PORT}      [Esc] esci",
-                           True, DIM)
-        surface.blit(lan, (W // 2 - lan.get_width() // 2, H - lan.get_height() - H // 24))
-        onl = small.render("ONLINE (amici via Internet, codici su Discord/WhatsApp):  "
-                           "[O] ospita partita   [U] unisciti", True, GOLD)
-        surface.blit(onl, (W // 2 - onl.get_width() // 2,
-                           H - lan.get_height() - onl.get_height() - H // 24 - 8))
+            txt = bf.render(label, True, GOLD if on else TEXT)
+            surface.blit(txt, (r.centerx - txt.get_width() // 2,
+                               r.centery - txt.get_height() // 2))
+            if on:      # frecce che pulsano ai lati
+                k = 4 + int(3 * (1 + math.sin(self.t * 5)))
+                cy = r.centery
+                lx, rx = r.x - 24 - k, r.right + 24 + k
+                pygame.draw.polygon(surface, GOLD, [(lx, cy - 8), (lx + 12, cy), (lx, cy + 8)])
+                pygame.draw.polygon(surface, GOLD, [(rx, cy - 8), (rx - 12, cy), (rx, cy + 8)])
+        small = self._font(max(13, H // 56))
+        self._draw_profile(surface, W, H, small)
+        hint = small.render("frecce + Invio, oppure clic        F11: schermo intero", True, DIM)
+        surface.blit(hint, (W // 2 - hint.get_width() // 2, H - hint.get_height() - 12))
 
     def _draw_profile(self, surface, W, H, small):
-        """In alto a destra: immagine profilo + nickname, [P] cambia, [C] crediti."""
+        """In alto a destra: immagine profilo + nickname."""
         prof = getattr(self.app, "profile", None) or {}
         side = max(40, (H // 12) // 40 * 40)
         r = pygame.Rect(W - side - 24, 20, side, side)
         A.draw_avatar(surface, prof.get("avatar", 0), r, GOLD)
         nm = small.render(prof.get("name", "?"), True, TEXT)
-        surface.blit(nm, (r.x - nm.get_width() - 12, r.y + 4))
-        for i, txt in enumerate(("[P] profilo", "[C] crediti")):
-            h = small.render(txt, True, DIM)
-            surface.blit(h, (r.x - h.get_width() - 12, r.y + 8 + (i + 1) * (h.get_height() + 2)))
+        surface.blit(nm, (r.x - nm.get_width() - 12, r.centery - nm.get_height() // 2))

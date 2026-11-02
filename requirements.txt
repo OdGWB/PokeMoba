@@ -1,4 +1,4 @@
-# PokrLOL - dipendenze
+# PokéMoba - dipendenze
 
 # Rendering, input, finestra.
 pygame-ce>=2.4
