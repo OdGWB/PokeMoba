@@ -7,6 +7,7 @@ l'area di gioco visibile è la stessa a qualsiasi dimensione dello schermo.
 """
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pygame
@@ -17,10 +18,25 @@ MAX_FRAME_DT = 0.25
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _set_app_icon() -> None:
+    """Icona della finestra e della barra applicazioni (prima di set_mode)."""
+    if sys.platform == "win32":
+        try:    # AppUserModelID proprio: la barra mostra la nostra icona, non quella di python.exe
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("PokrLOL.Game")
+        except Exception:
+            pass
+    try:
+        pygame.display.set_icon(pygame.image.load(str(ROOT / "assets" / "ui" / "icon.png")))
+    except (pygame.error, FileNotFoundError):
+        pass
+
+
 class App:
     def __init__(self, initial="menu", map_path=None, pokemon_path=None, start_level=1,
                  start_items=None, start_armature=None):
         pygame.init()
+        _set_app_icon()
         self.windowed_size = (config.WINDOW_WIDTH, config.WINDOW_HEIGHT)
         self.fullscreen = False
         self.window = pygame.display.set_mode(self.windowed_size, pygame.RESIZABLE)

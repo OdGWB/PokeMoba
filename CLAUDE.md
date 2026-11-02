@@ -690,6 +690,16 @@ Passaggi completati:
   taxi_flights), arch_rain/thunder_left in UNIT_FLAGS. Screenshot: step_34_*
   (linea, hud_*, ogni mossa, tirolungo_mira, tuononda_arrivo,
   elettroraggio_carica, tuono_arrivo, conduzione, draft_duraludon).
+- ICONA e SCHERMATA DI CARICAMENTO (step_35). assets/ui/icon.png (+ .ico):
+  quadrato "PM" ritagliato dall'immagine fornita, angoli trasparenti (flood-fill
+  dagli angoli attraverso i pixel non neri). game/app.py _set_app_icon: set_icon
+  PRIMA di set_mode + AppUserModelID "PokrLOL.Game" (Windows: la barra mostra la
+  nostra icona, non quella di python.exe). Nuovo game/loading_screen.py: sfondo
+  assets/ui/loading_bg.jpg scalato "cover" (cache per dimensione finestra) con velo
+  scuro, disco scuro + spinner a 12 tacche dorate al CENTRO + testo. Usata da
+  char_select_scene (partita locale) e online_draft_scene (fase LOADING: disegna
+  prima il caricamento, poi costruisce OnlineMatchScene). Screenshot: step_35.png,
+  step_35_icon.png.
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

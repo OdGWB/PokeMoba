@@ -42,6 +42,7 @@ class OnlineDraftScene:
         self._cards: list = []
         self._sent_hover = None
         self._was_turn = False
+        self._loading_drawn = False
 
     # --- input ------------------------------------------------------------------------
     def handle_events(self, events):
@@ -94,8 +95,10 @@ class OnlineDraftScene:
         s = self.session
         s.poll()
         if s.phase == C.LOADING and s.start_info:
-            from .online_match_scene import OnlineMatchScene
-            self.next_scene = OnlineMatchScene(self.app, s, host=self.host)
+            # Prima si disegna la schermata di caricamento, poi si costruisce la partita.
+            if self._loading_drawn:
+                from .online_match_scene import OnlineMatchScene
+                self.next_scene = OnlineMatchScene(self.app, s, host=self.host)
             return
         turn = s.phase == C.DRAFT and s.draft_my_turn()
         if turn and not self._was_turn:
@@ -129,6 +132,11 @@ class OnlineDraftScene:
     # --- disegno ------------------------------------------------------------------------
     def draw_fullres(self, surface, f):
         W, H = surface.get_size()
+        if self.session.phase == C.LOADING:
+            from .. import loading_screen
+            loading_screen.draw(surface, self.t, "Caricamento della mappa...")
+            self._loading_drawn = True
+            return
         surface.fill(BG)
         self.buttons.clear()
         s = self.session

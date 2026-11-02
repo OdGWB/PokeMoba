@@ -311,12 +311,6 @@ class CharSelectScene:
             surface.blit(t, (r.centerx - t.get_width() // 2, r.centery - t.get_height() // 2))
 
     def _draw_loading(self, surface, W, H):
-        big = self._font(max(22, H // 24), bold=True)
-        d = self.defs[self.sel]
-        img = self._frame(self.idle[self.sel])
-        if img is not None:
-            pic = scale_nearest(img, H // 4)
-            surface.blit(pic, (W // 2 - pic.get_width() // 2, H // 2 - pic.get_height() - 20))
-        t = big.render(f"Caricamento della partita con {d.name}...", True, GOLD)
-        surface.blit(t, (W // 2 - t.get_width() // 2, H // 2 + 10))
+        from .. import loading_screen
+        loading_screen.draw(surface, self.t, "Caricamento della mappa...")
         self._drawn_loading = True
