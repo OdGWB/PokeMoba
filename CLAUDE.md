@@ -717,16 +717,26 @@ Passaggi completati:
   nulla) e "Personale" (la TierListScene trascina-e-rilascia salvata). Esc/
   Indietro dalla tier personale torna alla scelta, poi al menu.
   Screenshot: step_37_tier_scelta.png.
-- TIER LIST DEVELOPER dai bot (step_38). tools/tier_sim.py gioca partite 3v3
-  headless (Match + bot, squadre casuali bilanciate, 10 min di gioco; se nessuno
+- TIER LIST DEVELOPER dai bot (step_38/39). tools/tier_sim.py gioca partite 3v3
+  headless (Match + bot, squadre casuali bilanciate, 18 min di gioco; se nessuno
   vince decidono torri, uccisioni, danno; FastVision = visione nemici identica ma
-  ~3x piu veloce, solo nello script) -> tools/tier_matches.jsonl (336 partite,
-  ~1h30 su 7 processi). tools/tier_build.py ricava data/tier_developer.json:
-  punteggio = 50% vittorie + 25% K/D + 15% danno + 10% livello (z-score), posizione
-  1-17, tier S/A/B/C/D da 3/4/4/3/3, motivi e scontri diretti. game/scenes/
-  tier_scene.py: DeveloperTierScene (sola lettura, a sinistra = meglio, numero =
-  posizione) e DeveloperDetailScene (clic sul Pokemon: perche e li). Screenshot:
-  step_38_dev.png, step_38_dev_detail.png.
+  ~3x piu veloce, solo nello script) -> tools/tier_matches.jsonl (255 partite,
+  ~3.5h su 7 processi). Con 10 min i bot arrivavano al liv.8 di rado e Nincada
+  (Ninjask al liv.8) risultava ultimo per questo; a 18 min evolve nel 94% dei casi.
+  Metriche per unita' (wrapper sull'istanza Match, nessuna logica toccata): uccisioni,
+  morti, danno, danno subito, ASSIST (colpi entro 10s dalla morte), CC in secondi
+  (attribuito a chi lancia la mossa o all'ultimo che ha colpito, slow x0.4),
+  cure/scudi dati ad alleati, tempo al liv.8. tools/tier_build.py: punteggio PER
+  RUOLO (vittorie 40% + livello 5% + pesi del ruolo: tank = danno assorbito/CC/assist/
+  poche morti; supporto = assist/CC/cure; mago-tiratore = danno+K/D; assassino =
+  K/D+danno; combattente misto) con z-score, meno una piccola correzione per la
+  "fortuna di tipo" degli avversari incontrati (types.json). Tier S/A/B/C/D da
+  3/4/4/3/3. Scrive data/tier_developer.json con anche classifica delle forme
+  (linee con rami), tipi (superefficace/debole/resiste) e scontri diretti con
+  l'effetto dei tipi. game/scenes/tier_scene.py: DeveloperTierScene (sola lettura,
+  a sinistra = meglio, numero = posizione) e DeveloperDetailScene (due colonne:
+  motivi | forme, tipi, scontri). Screenshot: step_38_dev.png, step_38_dev_detail.png,
+  step_39_*.png.
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

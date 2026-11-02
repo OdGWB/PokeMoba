@@ -1,105 +1,493 @@
 {
- "matches": 336,
- "avg_winrate": 0.4999,
- "averages": {
-  "kills": 2.04,
-  "deaths": 4.11,
-  "dmg": 5158.95,
-  "taken": 11125.94,
-  "level": 7.6,
-  "kda": 0.51
- },
- "timeouts": 336,
+ "matches": 255,
+ "minutes": 17.9,
+ "avg_winrate": 0.5,
+ "reach8": 0.988,
  "list": [
   {
    "name": "Teddiursa",
    "pos": 1,
    "tier": "S",
-   "score": 2.871,
+   "score": 1.827,
    "role": "combattente",
    "types": [
     "Normal"
    ],
    "passive": "miele",
-   "games": 119,
-   "winrate": 0.7899,
-   "kills": 6.97,
-   "deaths": 3.81,
-   "kda": 1.83,
-   "dmg": 10923,
-   "taken": 15378,
-   "level": 10.26,
+   "games": 90,
+   "winrate": 0.7444,
+   "stats": [
+    {
+     "label": "Vittorie",
+     "value": "74%",
+     "avg": "50%"
+    },
+    {
+     "label": "K/D+assist",
+     "value": "2.80",
+     "avg": "1.41"
+    },
+    {
+     "label": "Danno",
+     "value": "28571",
+     "avg": "17192"
+    },
+    {
+     "label": "Danno subito",
+     "value": "45408",
+     "avg": "30239"
+    },
+    {
+     "label": "Morti",
+     "value": "6.1",
+     "avg": "7.2"
+    },
+    {
+     "label": "Livello",
+     "value": "14.6",
+     "avg": "12.0"
+    }
+   ],
    "ranks": {
     "winrate": 1,
-    "kda": 1,
-    "dmg": 1,
+    "level": 1,
     "taken": 1,
-    "deaths": 8,
-    "level": 1
+    "cc": 3,
+    "assists": 8,
+    "deaths_inv": 5,
+    "dmg": 1,
+    "support": 15,
+    "kda": 1
    },
    "summary": "È tra i più forti del roster (posizione 1 su 17, tier S).",
+   "weights": {
+    "Vittorie": 0.4,
+    "Livello": 0.05,
+    "Danno inflitto": 0.2,
+    "K/D (con assist)": 0.15,
+    "Danno assorbito": 0.1,
+    "Assist": 0.1
+   },
    "pros": [
-    "vince molto: 79% delle partite (1º su 17)",
-    "fa molte più uccisioni che morti (K/D 1.83, media 0.51)",
-    "infligge tanto danno: 10923 a partita (media 5159)",
-    "sale di livello in fretta (liv. medio 10.3)",
-    "regge i colpi: assorbe molto danno senza crollare"
+    "vince molto: 74% delle partite (1º su 17)",
+    "sale di livello in fretta (liv. medio 14.6) (1º su 17)",
+    "infligge tanto danno: 28571 a partita (media 17192) (1º su 17)",
+    "uccide e assiste molto più di quanto muoia (K/D+assist 2.80, media 1.41) (1º su 17)",
+    "assorbe tantissimo danno: 45408 a partita (media 30239) (1º su 17)"
    ],
    "cons": [
-    "nessun punto debole netto"
+    "nessun punto debole netto",
+    "i suoi tipi lo svantaggiano contro il roster (vantaggio -0.44)"
    ],
    "best": [
     {
-     "name": "Rookidee",
-     "winrate": 0.9090909090909091,
-     "games": 22
+     "name": "Spiritomb",
+     "winrate": 1.0,
+     "games": 12,
+     "off": 0.25,
+     "dfn": 1.0
+    },
+    {
+     "name": "Duraludon",
+     "winrate": 0.9444444444444444,
+     "games": 18,
+     "off": 0.5,
+     "dfn": 1.0
     },
     {
      "name": "Charcadet",
-     "winrate": 0.9047619047619048,
-     "games": 21
-    },
-    {
-     "name": "Nincada",
-     "winrate": 0.896551724137931,
-     "games": 29
+     "winrate": 0.9444444444444444,
+     "games": 18,
+     "off": 1.0,
+     "dfn": 1.0
     }
    ],
-   "worst": []
+   "worst": [
+    {
+     "name": "Roggenrola",
+     "winrate": 0.42105263157894735,
+     "games": 19,
+     "off": 0.5,
+     "dfn": 1.0
+    },
+    {
+     "name": "Noibat",
+     "winrate": 0.4666666666666667,
+     "games": 15,
+     "off": 1.0,
+     "dfn": 1.0
+    }
+   ],
+   "types_info": {
+    "types": [
+     "Normal"
+    ],
+    "strong_vs": [],
+    "weak_to": [
+     "Mienfoo"
+    ],
+    "resists": [],
+    "net": -0.44,
+    "luck": 0.03
+   },
+   "forms": []
   },
   {
    "name": "Charmander",
    "pos": 2,
    "tier": "S",
-   "score": 0.986,
+   "score": 1.191,
    "role": "mago mobile",
    "types": [
     "Fire"
    ],
    "passive": "fiammacoda",
-   "games": 119,
-   "winrate": 0.6134,
-   "kills": 3.1,
-   "deaths": 3.29,
-   "kda": 0.94,
-   "dmg": 7286,
-   "taken": 8356,
-   "level": 8.0,
+   "games": 90,
+   "winrate": 0.6778,
+   "stats": [
+    {
+     "label": "Vittorie",
+     "value": "68%",
+     "avg": "50%"
+    },
+    {
+     "label": "K/D+assist",
+     "value": "2.28",
+     "avg": "1.41"
+    },
+    {
+     "label": "Danno",
+     "value": "26238",
+     "avg": "17192"
+    },
+    {
+     "label": "Uccisioni",
+     "value": "7.7",
+     "avg": "4.5"
+    },
+    {
+     "label": "Morti",
+     "value": "5.5",
+     "avg": "7.2"
+    },
+    {
+     "label": "Livello",
+     "value": "12.8",
+     "avg": "12.0"
+    }
+   ],
    "ranks": {
     "winrate": 2,
-    "kda": 2,
-    "dmg": 2,
+    "level": 4,
     "taken": 17,
-    "deaths": 2,
-    "level": 4
+    "cc": 5,
+    "assists": 13,
+    "deaths_inv": 4,
+    "dmg": 2,
+    "support": 5,
+    "kda": 2
    },
    "summary": "È tra i più forti del roster (posizione 2 su 17, tier S).",
+   "weights": {
+    "Vittorie": 0.4,
+    "Livello": 0.05,
+    "Danno inflitto": 0.25,
+    "K/D (con assist)": 0.2,
+    "Assist": 0.1
+   },
    "pros": [
-    "vince molto: 61% delle partite (2º su 17)",
-    "fa molte più uccisioni che morti (K/D 0.94, media 0.51)",
-    "infligge tanto danno: 7286 a partita (media 5159)",
-    "muore raramente: 3.3 morti a partita (media 4.1)",
-    "sale di livello in fretta (liv. medio 8.0)"
+    "vince molto: 68% delle partite (2º su 17)",
+    "sale di livello in fretta (liv. medio 12.8) (4º su 17)",
+    "infligge tanto danno: 26238 a partita (media 17192) (2º su 17)",
+    "uccide e assiste molto più di quanto muoia (K/D+assist 2.28, media 1.41) (2º su 17)"
+   ],
+   "cons": [
+    "pochi assist: 4.7 a partita (media 5.1) (13º su 17)"
+   ],
+   "best": [
+    {
+     "name": "Charcadet",
+     "winrate": 0.9,
+     "games": 10,
+     "off": 0.5,
+     "dfn": 0.5
+    },
+    {
+     "name": "Poliwag",
+     "winrate": 0.8823529411764706,
+     "games": 17,
+     "off": 0.5,
+     "dfn": 2.0
+    },
+    {
+     "name": "Nincada",
+     "winrate": 0.8823529411764706,
+     "games": 17,
+     "off": 2.0,
+     "dfn": 2.0
+    }
+   ],
+   "worst": [
+    {
+     "name": "Teddiursa",
+     "winrate": 0.38095238095238093,
+     "games": 21,
+     "off": 1.0,
+     "dfn": 1.0
+    },
+    {
+     "name": "Roggenrola",
+     "winrate": 0.4117647058823529,
+     "games": 17,
+     "off": 0.5,
+     "dfn": 2.0
+    },
+    {
+     "name": "Snivy",
+     "winrate": 0.42857142857142855,
+     "games": 14,
+     "off": 2.0,
+     "dfn": 0.5
+    }
+   ],
+   "types_info": {
+    "types": [
+     "Fire"
+    ],
+    "strong_vs": [
+     "Rowlet",
+     "Snivy",
+     "Nincada",
+     "Sneasel"
+    ],
+    "weak_to": [
+     "Totodile",
+     "Nincada",
+     "Poliwag",
+     "Roggenrola"
+    ],
+    "resists": [
+     "Snivy",
+     "Charcadet"
+    ],
+    "net": -0.19,
+    "luck": 0.01
+   },
+   "forms": []
+  },
+  {
+   "name": "Snivy",
+   "pos": 3,
+   "tier": "S",
+   "score": 1.012,
+   "role": "combattente",
+   "types": [
+    "Grass"
+   ],
+   "passive": "inversione",
+   "games": 90,
+   "winrate": 0.6556,
+   "stats": [
+    {
+     "label": "Vittorie",
+     "value": "66%",
+     "avg": "50%"
+    },
+    {
+     "label": "K/D+assist",
+     "value": "1.82",
+     "avg": "1.41"
+    },
+    {
+     "label": "Danno",
+     "value": "24369",
+     "avg": "17192"
+    },
+    {
+     "label": "Danno subito",
+     "value": "30020",
+     "avg": "30239"
+    },
+    {
+     "label": "Morti",
+     "value": "7.1",
+     "avg": "7.2"
+    },
+    {
+     "label": "Livello",
+     "value": "13.0",
+     "avg": "12.0"
+    }
+   ],
+   "ranks": {
+    "winrate": 3,
+    "level": 3,
+    "taken": 7,
+    "cc": 6,
+    "assists": 6,
+    "deaths_inv": 8,
+    "dmg": 3,
+    "support": 9,
+    "kda": 5
+   },
+   "summary": "È tra i più forti del roster (posizione 3 su 17, tier S).",
+   "weights": {
+    "Vittorie": 0.4,
+    "Livello": 0.05,
+    "Danno inflitto": 0.2,
+    "K/D (con assist)": 0.15,
+    "Danno assorbito": 0.1,
+    "Assist": 0.1
+   },
+   "pros": [
+    "vince molto: 66% delle partite (3º su 17)",
+    "sale di livello in fretta (liv. medio 13.0) (3º su 17)",
+    "infligge tanto danno: 24369 a partita (media 17192) (3º su 17)",
+    "uccide e assiste molto più di quanto muoia (K/D+assist 1.82, media 1.41) (5º su 17)"
+   ],
+   "cons": [
+    "nessun punto debole netto",
+    "i suoi tipi lo svantaggiano contro il roster (vantaggio -0.81)"
+   ],
+   "best": [
+    {
+     "name": "Charcadet",
+     "winrate": 0.9333333333333333,
+     "games": 15,
+     "off": 0.5,
+     "dfn": 2.0
+    },
+    {
+     "name": "Spiritomb",
+     "winrate": 0.782608695652174,
+     "games": 23,
+     "off": 1.0,
+     "dfn": 1.0
+    },
+    {
+     "name": "Rookidee",
+     "winrate": 0.7777777777777778,
+     "games": 18,
+     "off": 0.5,
+     "dfn": 2.0
+    }
+   ],
+   "worst": [
+    {
+     "name": "Sneasel",
+     "winrate": 0.42857142857142855,
+     "games": 21,
+     "off": 1.0,
+     "dfn": 2.0
+    },
+    {
+     "name": "Roggenrola",
+     "winrate": 0.4375,
+     "games": 16,
+     "off": 2.0,
+     "dfn": 1.0
+    }
+   ],
+   "types_info": {
+    "types": [
+     "Grass"
+    ],
+    "strong_vs": [
+     "Totodile",
+     "Poliwag",
+     "Roggenrola"
+    ],
+    "weak_to": [
+     "Charmander",
+     "Gastly",
+     "Rowlet",
+     "Nincada",
+     "Rookidee",
+     "Charcadet",
+     "Noibat",
+     "Sneasel"
+    ],
+    "resists": [
+     "Totodile",
+     "Poliwag"
+    ],
+    "net": -0.81,
+    "luck": -0.1
+   },
+   "forms": []
+  },
+  {
+   "name": "Roggenrola",
+   "pos": 4,
+   "tier": "A",
+   "score": 0.863,
+   "role": "tank",
+   "types": [
+    "Rock"
+   ],
+   "passive": "sabbiafiume",
+   "games": 90,
+   "winrate": 0.6556,
+   "stats": [
+    {
+     "label": "Vittorie",
+     "value": "66%",
+     "avg": "50%"
+    },
+    {
+     "label": "Danno subito",
+     "value": "28613",
+     "avg": "30239"
+    },
+    {
+     "label": "CC (s)",
+     "value": "35",
+     "avg": "17"
+    },
+    {
+     "label": "Assist",
+     "value": "6.2",
+     "avg": "5.1"
+    },
+    {
+     "label": "Morti",
+     "value": "5.3",
+     "avg": "7.2"
+    },
+    {
+     "label": "Livello",
+     "value": "12.6",
+     "avg": "12.0"
+    }
+   ],
+   "ranks": {
+    "winrate": 4,
+    "level": 5,
+    "taken": 10,
+    "cc": 4,
+    "assists": 2,
+    "deaths_inv": 3,
+    "dmg": 4,
+    "support": 12,
+    "kda": 3
+   },
+   "summary": "È sopra la media (posizione 4 su 17, tier A).",
+   "weights": {
+    "Vittorie": 0.4,
+    "Livello": 0.05,
+    "Danno assorbito": 0.2,
+    "Controllo (CC)": 0.1,
+    "Assist": 0.1,
+    "Poche morti": 0.1,
+    "Danno inflitto": 0.05
+   },
+   "pros": [
+    "vince molto: 66% delle partite (4º su 17)",
+    "sale di livello in fretta (liv. medio 12.6) (5º su 17)",
+    "controlla molto i nemici: 35 s di CC a partita (media 17) (4º su 17)",
+    "fa tanti assist: 6.2 a partita (media 5.1) (2º su 17)",
+    "muore raramente: 5.3 morti a partita (media 7.2) (3º su 17)",
+    "infligge tanto danno: 23107 a partita (media 17192) (4º su 17)"
    ],
    "cons": [
     "nessun punto debole netto"
@@ -107,920 +495,1844 @@
    "best": [
     {
      "name": "Rookidee",
-     "winrate": 0.7916666666666666,
-     "games": 24
+     "winrate": 0.8181818181818182,
+     "games": 22,
+     "off": 2.0,
+     "dfn": 0.5
+    },
+    {
+     "name": "Nincada",
+     "winrate": 0.8125,
+     "games": 16,
+     "off": 1.0,
+     "dfn": 2.0
     },
     {
      "name": "Eevee",
-     "winrate": 0.7222222222222222,
-     "games": 18
-    },
-    {
-     "name": "Mienfoo",
-     "winrate": 0.72,
-     "games": 25
+     "winrate": 0.8125,
+     "games": 16,
+     "off": 1.0,
+     "dfn": 0.5
     }
    ],
    "worst": [
     {
+     "name": "Poliwag",
+     "winrate": 0.46153846153846156,
+     "games": 13,
+     "off": 1.0,
+     "dfn": 2.0
+    }
+   ],
+   "types_info": {
+    "types": [
+     "Rock"
+    ],
+    "strong_vs": [
+     "Charmander",
+     "Rowlet",
+     "Rookidee",
+     "Charcadet",
+     "Noibat",
+     "Sneasel"
+    ],
+    "weak_to": [
+     "Totodile",
+     "Rowlet",
+     "Snivy",
+     "Nincada",
+     "Poliwag",
+     "Mienfoo",
+     "Duraludon"
+    ],
+    "resists": [
+     "Charmander",
+     "Eevee",
+     "Rookidee",
+     "Charcadet",
+     "Teddiursa"
+    ],
+    "net": 0.12,
+    "luck": -0.03
+   },
+   "forms": []
+  },
+  {
+   "name": "Poliwag",
+   "pos": 5,
+   "tier": "A",
+   "score": 0.63,
+   "role": "combattente",
+   "types": [
+    "Water"
+   ],
+   "passive": "nuotovelox",
+   "games": 90,
+   "winrate": 0.5333,
+   "stats": [
+    {
+     "label": "Vittorie",
+     "value": "53%",
+     "avg": "50%"
+    },
+    {
+     "label": "K/D+assist",
+     "value": "2.12",
+     "avg": "1.41"
+    },
+    {
+     "label": "Danno",
+     "value": "15963",
+     "avg": "17192"
+    },
+    {
+     "label": "Danno subito",
+     "value": "32807",
+     "avg": "30239"
+    },
+    {
+     "label": "Morti",
+     "value": "5.2",
+     "avg": "7.2"
+    },
+    {
+     "label": "Livello",
+     "value": "12.5",
+     "avg": "12.0"
+    }
+   ],
+   "ranks": {
+    "winrate": 7,
+    "level": 6,
+    "taken": 5,
+    "cc": 1,
+    "assists": 1,
+    "deaths_inv": 2,
+    "dmg": 9,
+    "support": 11,
+    "kda": 4
+   },
+   "summary": "È sopra la media (posizione 5 su 17, tier A).",
+   "weights": {
+    "Vittorie": 0.4,
+    "Livello": 0.05,
+    "Danno inflitto": 0.2,
+    "K/D (con assist)": 0.15,
+    "Danno assorbito": 0.1,
+    "Assist": 0.1
+   },
+   "pros": [
+    "uccide e assiste molto più di quanto muoia (K/D+assist 2.12, media 1.41) (4º su 17)",
+    "assorbe tantissimo danno: 32807 a partita (media 30239) (5º su 17)",
+    "fa tanti assist: 7.2 a partita (media 5.1) (1º su 17)"
+   ],
+   "cons": [
+    "nessun punto debole netto"
+   ],
+   "best": [
+    {
+     "name": "Totodile",
+     "winrate": 0.8666666666666667,
+     "games": 15,
+     "off": 0.5,
+     "dfn": 0.5
+    },
+    {
+     "name": "Nincada",
+     "winrate": 0.7222222222222222,
+     "games": 18,
+     "off": 2.0,
+     "dfn": 1.0
+    },
+    {
+     "name": "Eevee",
+     "winrate": 0.6956521739130435,
+     "games": 23,
+     "off": 1.0,
+     "dfn": 1.0
+    }
+   ],
+   "worst": [
+    {
+     "name": "Charmander",
+     "winrate": 0.11764705882352941,
+     "games": 17,
+     "off": 2.0,
+     "dfn": 0.5
+    },
+    {
      "name": "Teddiursa",
-     "winrate": 0.28,
-     "games": 25
+     "winrate": 0.23529411764705882,
+     "games": 17,
+     "off": 1.0,
+     "dfn": 1.0
+    },
+    {
+     "name": "Snivy",
+     "winrate": 0.29411764705882354,
+     "games": 17,
+     "off": 0.5,
+     "dfn": 2.0
+    }
+   ],
+   "types_info": {
+    "types": [
+     "Water"
+    ],
+    "strong_vs": [
+     "Charmander",
+     "Nincada",
+     "Roggenrola",
+     "Charcadet"
+    ],
+    "weak_to": [
+     "Rowlet",
+     "Snivy"
+    ],
+    "resists": [
+     "Charmander",
+     "Totodile",
+     "Charcadet"
+    ],
+    "net": 0.0,
+    "luck": -0.07
+   },
+   "forms": [
+    {
+     "name": "Poliwrath",
+     "games": 90,
+     "score": 0.545,
+     "winrate": 0.533,
+     "kda": 2.12,
+     "dmg": 15963,
+     "assists": 7.2,
+     "cc": 71,
+     "types": [
+      "Water",
+      "Fighting"
+     ],
+     "share": 1.0,
+     "rank": 1
+    },
+    {
+     "name": "Politoad",
+     "games": 0,
+     "score": null,
+     "rank": 2
     }
    ]
   },
   {
    "name": "Sneasel",
-   "pos": 3,
-   "tier": "S",
-   "score": 0.793,
+   "pos": 6,
+   "tier": "A",
+   "score": 0.578,
    "role": "assassino",
    "types": [
     "Dark",
     "Ice"
    ],
    "passive": "soleluna",
-   "games": 119,
-   "winrate": 0.605,
-   "kills": 3.89,
-   "deaths": 5.22,
-   "kda": 0.75,
-   "dmg": 6439,
-   "taken": 11654,
-   "level": 8.3,
-   "ranks": {
-    "winrate": 3,
-    "kda": 3,
-    "dmg": 3,
-    "taken": 6,
-    "deaths": 15,
-    "level": 2
-   },
-   "summary": "È tra i più forti del roster (posizione 3 su 17, tier S).",
-   "pros": [
-    "vince molto: 61% delle partite (3º su 17)",
-    "fa molte più uccisioni che morti (K/D 0.75, media 0.51)",
-    "infligge tanto danno: 6439 a partita (media 5159)",
-    "sale di livello in fretta (liv. medio 8.3)"
-   ],
-   "cons": [
-    "muore spesso: 5.2 morti a partita (media 4.1)"
-   ],
-   "best": [
+   "games": 90,
+   "winrate": 0.6444,
+   "stats": [
     {
-     "name": "Nincada",
-     "winrate": 0.7777777777777778,
-     "games": 27
+     "label": "Vittorie",
+     "value": "64%",
+     "avg": "50%"
     },
     {
-     "name": "Spiritomb",
-     "winrate": 0.7142857142857143,
-     "games": 21
+     "label": "K/D+assist",
+     "value": "1.60",
+     "avg": "1.41"
     },
     {
-     "name": "Eevee",
-     "winrate": 0.6956521739130435,
-     "games": 23
+     "label": "Danno",
+     "value": "21741",
+     "avg": "17192"
+    },
+    {
+     "label": "Uccisioni",
+     "value": "9.3",
+     "avg": "4.5"
+    },
+    {
+     "label": "Morti",
+     "value": "9.1",
+     "avg": "7.2"
+    },
+    {
+     "label": "Livello",
+     "value": "13.6",
+     "avg": "12.0"
     }
    ],
-   "worst": [
-    {
-     "name": "Teddiursa",
-     "winrate": 0.4166666666666667,
-     "games": 24
-    },
-    {
-     "name": "Charmander",
-     "winrate": 0.4782608695652174,
-     "games": 23
-    }
-   ]
-  },
-  {
-   "name": "Snivy",
-   "pos": 4,
-   "tier": "A",
-   "score": 0.708,
-   "role": "combattente",
-   "types": [
-    "Grass"
-   ],
-   "passive": "inversione",
-   "games": 118,
-   "winrate": 0.5932,
-   "kills": 2.93,
-   "deaths": 3.95,
-   "kda": 0.74,
-   "dmg": 6397,
-   "taken": 10396,
-   "level": 8.07,
-   "ranks": {
-    "winrate": 4,
-    "kda": 4,
-    "dmg": 4,
-    "taken": 10,
-    "deaths": 9,
-    "level": 3
-   },
-   "summary": "È sopra la media (posizione 4 su 17, tier A).",
-   "pros": [
-    "vince molto: 59% delle partite (4º su 17)",
-    "fa molte più uccisioni che morti (K/D 0.74, media 0.51)",
-    "infligge tanto danno: 6397 a partita (media 5159)",
-    "sale di livello in fretta (liv. medio 8.1)"
-   ],
-   "cons": [
-    "nessun punto debole netto"
-   ],
-   "best": [
-    {
-     "name": "Noibat",
-     "winrate": 0.8,
-     "games": 20
-    },
-    {
-     "name": "Totodile",
-     "winrate": 0.7391304347826086,
-     "games": 23
-    },
-    {
-     "name": "Eevee",
-     "winrate": 0.7272727272727273,
-     "games": 22
-    }
-   ],
-   "worst": [
-    {
-     "name": "Teddiursa",
-     "winrate": 0.25,
-     "games": 16
-    },
-    {
-     "name": "Sneasel",
-     "winrate": 0.4,
-     "games": 25
-    }
-   ]
-  },
-  {
-   "name": "Poliwag",
-   "pos": 5,
-   "tier": "A",
-   "score": 0.349,
-   "role": "combattente",
-   "types": [
-    "Water"
-   ],
-   "passive": "nuotovelox",
-   "games": 119,
-   "winrate": 0.5714,
-   "kills": 1.82,
-   "deaths": 3.31,
-   "kda": 0.55,
-   "dmg": 4987,
-   "taken": 11479,
-   "level": 7.82,
    "ranks": {
     "winrate": 5,
-    "kda": 6,
-    "dmg": 9,
-    "taken": 7,
-    "deaths": 3,
-    "level": 7
-   },
-   "summary": "È sopra la media (posizione 5 su 17, tier A).",
-   "pros": [
-    "vince molto: 57% delle partite (5º su 17)",
-    "muore raramente: 3.3 morti a partita (media 4.1)"
-   ],
-   "cons": [
-    "nessun punto debole netto"
-   ],
-   "best": [
-    {
-     "name": "Nincada",
-     "winrate": 0.8571428571428571,
-     "games": 21
-    },
-    {
-     "name": "Eevee",
-     "winrate": 0.7857142857142857,
-     "games": 28
-    },
-    {
-     "name": "Totodile",
-     "winrate": 0.7058823529411765,
-     "games": 17
-    }
-   ],
-   "worst": [
-    {
-     "name": "Teddiursa",
-     "winrate": 0.19047619047619047,
-     "games": 21
-    },
-    {
-     "name": "Gastly",
-     "winrate": 0.42857142857142855,
-     "games": 21
-    },
-    {
-     "name": "Snivy",
-     "winrate": 0.42857142857142855,
-     "games": 21
-    }
-   ]
-  },
-  {
-   "name": "Charcadet",
-   "pos": 6,
-   "tier": "A",
-   "score": 0.054,
-   "role": "combattente",
-   "types": [
-    "Fire"
-   ],
-   "passive": "armature",
-   "games": 119,
-   "winrate": 0.5126,
-   "kills": 2.34,
-   "deaths": 4.63,
-   "kda": 0.5,
-   "dmg": 5198,
-   "taken": 13541,
-   "level": 7.59,
-   "ranks": {
-    "winrate": 8,
-    "kda": 8,
-    "dmg": 7,
-    "taken": 2,
-    "deaths": 13,
-    "level": 8
+    "level": 2,
+    "taken": 11,
+    "cc": 11,
+    "assists": 10,
+    "deaths_inv": 16,
+    "dmg": 6,
+    "support": 16,
+    "kda": 6
    },
    "summary": "È sopra la media (posizione 6 su 17, tier A).",
+   "weights": {
+    "Vittorie": 0.4,
+    "Livello": 0.05,
+    "K/D (con assist)": 0.25,
+    "Danno inflitto": 0.2,
+    "Assist": 0.1
+   },
    "pros": [
-    "regge i colpi: assorbe molto danno senza crollare"
+    "vince molto: 64% delle partite (5º su 17)",
+    "sale di livello in fretta (liv. medio 13.6) (2º su 17)"
    ],
    "cons": [
     "nessun punto debole netto"
    ],
    "best": [
+    {
+     "name": "Rowlet",
+     "winrate": 0.9411764705882353,
+     "games": 17,
+     "off": 4.0,
+     "dfn": 1.0
+    },
     {
      "name": "Eevee",
-     "winrate": 0.6666666666666666,
-     "games": 15
-    },
-    {
-     "name": "Noibat",
-     "winrate": 0.6551724137931034,
-     "games": 29
-    },
-    {
-     "name": "Roggenrola",
-     "winrate": 0.6470588235294118,
-     "games": 17
-    }
-   ],
-   "worst": [
-    {
-     "name": "Teddiursa",
-     "winrate": 0.09523809523809523,
-     "games": 21
-    },
-    {
-     "name": "Charmander",
-     "winrate": 0.3333333333333333,
-     "games": 18
-    },
-    {
-     "name": "Snivy",
-     "winrate": 0.391304347826087,
-     "games": 23
-    }
-   ]
-  },
-  {
-   "name": "Roggenrola",
-   "pos": 7,
-   "tier": "A",
-   "score": 0.029,
-   "role": "tank",
-   "types": [
-    "Rock"
-   ],
-   "passive": "sabbiafiume",
-   "games": 118,
-   "winrate": 0.5254,
-   "kills": 1.63,
-   "deaths": 3.73,
-   "kda": 0.44,
-   "dmg": 5169,
-   "taken": 12335,
-   "level": 7.28,
-   "ranks": {
-    "winrate": 7,
-    "kda": 9,
-    "dmg": 8,
-    "taken": 3,
-    "deaths": 7,
-    "level": 12
-   },
-   "summary": "È sopra la media (posizione 7 su 17, tier A).",
-   "pros": [
-    "regge i colpi: assorbe molto danno senza crollare"
-   ],
-   "cons": [
-    "nessun punto debole netto"
-   ],
-   "best": [
-    {
-     "name": "Nincada",
-     "winrate": 0.8461538461538461,
-     "games": 26
-    },
-    {
-     "name": "Totodile",
-     "winrate": 0.72,
-     "games": 25
-    },
-    {
-     "name": "Noibat",
-     "winrate": 0.6666666666666666,
-     "games": 18
-    }
-   ],
-   "worst": [
-    {
-     "name": "Teddiursa",
-     "winrate": 0.2916666666666667,
-     "games": 24
-    },
-    {
-     "name": "Charcadet",
-     "winrate": 0.35294117647058826,
-     "games": 17
-    },
-    {
-     "name": "Poliwag",
-     "winrate": 0.3888888888888889,
-     "games": 18
-    }
-   ]
-  },
-  {
-   "name": "Mienfoo",
-   "pos": 8,
-   "tier": "B",
-   "score": -0.048,
-   "role": "assassino",
-   "types": [
-    "Fighting"
-   ],
-   "passive": "manichefrusta",
-   "games": 118,
-   "winrate": 0.4661,
-   "kills": 2.55,
-   "deaths": 4.62,
-   "kda": 0.55,
-   "dmg": 5600,
-   "taken": 12281,
-   "level": 7.93,
-   "ranks": {
-    "winrate": 10,
-    "kda": 5,
-    "dmg": 5,
-    "taken": 4,
-    "deaths": 12,
-    "level": 6
-   },
-   "summary": "È nella fascia di mezzo (posizione 8 su 17, tier B).",
-   "pros": [
-    "fa molte più uccisioni che morti (K/D 0.55, media 0.51)",
-    "regge i colpi: assorbe molto danno senza crollare"
-   ],
-   "cons": [
-    "nessun punto debole netto"
-   ],
-   "best": [
-    {
-     "name": "Totodile",
-     "winrate": 0.7692307692307693,
-     "games": 26
-    },
-    {
-     "name": "Nincada",
-     "winrate": 0.68,
-     "games": 25
+     "winrate": 0.9333333333333333,
+     "games": 15,
+     "off": 1.0,
+     "dfn": 1.0
     },
     {
      "name": "Duraludon",
-     "winrate": 0.5882352941176471,
-     "games": 17
+     "winrate": 0.8,
+     "games": 15,
+     "off": 1.0,
+     "dfn": 2.0
     }
    ],
    "worst": [
     {
      "name": "Teddiursa",
-     "winrate": 0.2727272727272727,
-     "games": 22
+     "winrate": 0.1875,
+     "games": 16,
+     "off": 1.0,
+     "dfn": 1.0
     },
     {
      "name": "Charmander",
-     "winrate": 0.28,
-     "games": 25
-    },
-    {
-     "name": "Rowlet",
-     "winrate": 0.32,
-     "games": 25
+     "winrate": 0.42105263157894735,
+     "games": 19,
+     "off": 1.0,
+     "dfn": 2.0
     }
-   ]
-  },
-  {
-   "name": "Rowlet",
-   "pos": 9,
-   "tier": "B",
-   "score": -0.051,
-   "role": "tiratore",
-   "types": [
-    "Grass",
-    "Flying"
    ],
-   "passive": "distacco",
-   "games": 118,
-   "winrate": 0.5254,
-   "kills": 1.22,
-   "deaths": 3.57,
-   "kda": 0.34,
-   "dmg": 4889,
-   "taken": 9438,
-   "level": 7.29,
-   "ranks": {
-    "winrate": 6,
-    "kda": 11,
-    "dmg": 10,
-    "taken": 16,
-    "deaths": 5,
-    "level": 11
+   "types_info": {
+    "types": [
+     "Dark",
+     "Ice"
+    ],
+    "strong_vs": [
+     "Gastly",
+     "Rowlet",
+     "Snivy",
+     "Nincada",
+     "Rookidee",
+     "Noibat"
+    ],
+    "weak_to": [
+     "Charmander",
+     "Nincada",
+     "Roggenrola",
+     "Charcadet",
+     "Mienfoo",
+     "Duraludon"
+    ],
+    "resists": [
+     "Spiritomb"
+    ],
+    "net": 0.12,
+    "luck": 0.14
    },
-   "summary": "È nella fascia di mezzo (posizione 9 su 17, tier B).",
-   "pros": [
-    "nessun punto di forza netto: nella media del gruppo"
-   ],
-   "cons": [
-    "nessun punto debole netto"
-   ],
-   "best": [
+   "forms": [
     {
-     "name": "Nincada",
-     "winrate": 0.8571428571428571,
-     "games": 21
+     "name": "Weavile",
+     "games": 55,
+     "score": 0.761,
+     "winrate": 0.6,
+     "kda": 1.56,
+     "dmg": 23774,
+     "assists": 6.0,
+     "cc": 1,
+     "types": [
+      "Dark",
+      "Ice"
+     ],
+     "share": 0.611,
+     "rank": 1
     },
     {
-     "name": "Eevee",
-     "winrate": 0.7142857142857143,
-     "games": 28
-    },
-    {
-     "name": "Mienfoo",
-     "winrate": 0.68,
-     "games": 25
-    }
-   ],
-   "worst": [
-    {
-     "name": "Teddiursa",
-     "winrate": 0.11764705882352941,
-     "games": 17
-    },
-    {
-     "name": "Sneasel",
-     "winrate": 0.3181818181818182,
-     "games": 22
-    },
-    {
-     "name": "Snivy",
-     "winrate": 0.35714285714285715,
-     "games": 28
-    }
-   ]
-  },
-  {
-   "name": "Gastly",
-   "pos": 10,
-   "tier": "B",
-   "score": -0.082,
-   "role": "mago",
-   "types": [
-    "Ghost",
-    "Poison"
-   ],
-   "passive": "corpofunesto",
-   "games": 119,
-   "winrate": 0.5042,
-   "kills": 2.08,
-   "deaths": 4.06,
-   "kda": 0.51,
-   "dmg": 4029,
-   "taken": 10295,
-   "level": 7.5,
-   "ranks": {
-    "winrate": 9,
-    "kda": 7,
-    "dmg": 12,
-    "taken": 12,
-    "deaths": 10,
-    "level": 9
-   },
-   "summary": "È nella fascia di mezzo (posizione 10 su 17, tier B).",
-   "pros": [
-    "nessun punto di forza netto: nella media del gruppo"
-   ],
-   "cons": [
-    "nessun punto debole netto"
-   ],
-   "best": [
-    {
-     "name": "Nincada",
-     "winrate": 0.8148148148148148,
-     "games": 27
-    },
-    {
-     "name": "Rookidee",
-     "winrate": 0.7391304347826086,
-     "games": 23
-    },
-    {
-     "name": "Spiritomb",
-     "winrate": 0.6111111111111112,
-     "games": 18
-    }
-   ],
-   "worst": [
-    {
-     "name": "Teddiursa",
-     "winrate": 0.21739130434782608,
-     "games": 23
-    },
-    {
-     "name": "Snivy",
-     "winrate": 0.3,
-     "games": 20
-    },
-    {
-     "name": "Charmander",
-     "winrate": 0.34285714285714286,
-     "games": 35
-    }
-   ]
-  },
-  {
-   "name": "Spiritomb",
-   "pos": 11,
-   "tier": "B",
-   "score": -0.398,
-   "role": "supporto",
-   "types": [
-    "Ghost",
-    "Dark"
-   ],
-   "passive": "108spiriti",
-   "games": 119,
-   "winrate": 0.4538,
-   "kills": 0.74,
-   "deaths": 2.51,
-   "kda": 0.29,
-   "dmg": 3853,
-   "taken": 10217,
-   "level": 7.97,
-   "ranks": {
-    "winrate": 11,
-    "kda": 12,
-    "dmg": 13,
-    "taken": 13,
-    "deaths": 1,
-    "level": 5
-   },
-   "summary": "È nella fascia di mezzo (posizione 11 su 17, tier B).",
-   "pros": [
-    "muore raramente: 2.5 morti a partita (media 4.1)"
-   ],
-   "cons": [
-    "nessun punto debole netto"
-   ],
-   "best": [
-    {
-     "name": "Nincada",
-     "winrate": 0.5833333333333334,
-     "games": 24
-    },
-    {
-     "name": "Totodile",
-     "winrate": 0.5666666666666667,
-     "games": 30
-    },
-    {
-     "name": "Mienfoo",
-     "winrate": 0.5416666666666666,
-     "games": 24
-    }
-   ],
-   "worst": [
-    {
-     "name": "Teddiursa",
-     "winrate": 0.15789473684210525,
-     "games": 19
-    },
-    {
-     "name": "Sneasel",
-     "winrate": 0.2857142857142857,
-     "games": 21
-    },
-    {
-     "name": "Poliwag",
-     "winrate": 0.37037037037037035,
-     "games": 27
-    }
-   ]
-  },
-  {
-   "name": "Duraludon",
-   "pos": 12,
-   "tier": "C",
-   "score": -0.416,
-   "role": "supporto",
-   "types": [
-    "Steel",
-    "Dragon"
-   ],
-   "passive": "conduzione",
-   "games": 118,
-   "winrate": 0.4407,
-   "kills": 1.3,
-   "deaths": 3.34,
-   "kda": 0.39,
-   "dmg": 4577,
-   "taken": 10867,
-   "level": 7.32,
-   "ranks": {
-    "winrate": 13,
-    "kda": 10,
-    "dmg": 11,
-    "taken": 9,
-    "deaths": 4,
-    "level": 10
-   },
-   "summary": "È sotto la media (posizione 12 su 17, tier C).",
-   "pros": [
-    "muore raramente: 3.3 morti a partita (media 4.1)"
-   ],
-   "cons": [
-    "vince poco: solo 44% delle partite (13º su 17)"
-   ],
-   "best": [
-    {
-     "name": "Totodile",
-     "winrate": 0.6785714285714286,
-     "games": 28
-    },
-    {
-     "name": "Nincada",
-     "winrate": 0.6470588235294118,
-     "games": 17
-    },
-    {
-     "name": "Roggenrola",
-     "winrate": 0.5384615384615384,
-     "games": 26
-    }
-   ],
-   "worst": [
-    {
-     "name": "Teddiursa",
-     "winrate": 0.14814814814814814,
-     "games": 27
-    },
-    {
-     "name": "Charmander",
-     "winrate": 0.3333333333333333,
-     "games": 21
-    },
-    {
-     "name": "Snivy",
-     "winrate": 0.3448275862068966,
-     "games": 29
+     "name": "Sneasler",
+     "games": 35,
+     "score": 0.737,
+     "winrate": 0.714,
+     "kda": 1.67,
+     "dmg": 18548,
+     "assists": 3.8,
+     "cc": 13,
+     "types": [
+      "Fighting",
+      "Poison"
+     ],
+     "share": 0.389,
+     "rank": 2
     }
    ]
   },
   {
    "name": "Noibat",
-   "pos": 13,
-   "tier": "C",
-   "score": -0.523,
+   "pos": 7,
+   "tier": "A",
+   "score": 0.345,
    "role": "tiratore",
    "types": [
     "Flying",
     "Dragon"
    ],
    "passive": "ecolocalizzazione",
-   "games": 119,
-   "winrate": 0.4202,
-   "kills": 1.53,
-   "deaths": 5.39,
-   "kda": 0.28,
-   "dmg": 5404,
-   "taken": 9476,
-   "level": 7.17,
+   "games": 90,
+   "winrate": 0.5222,
+   "stats": [
+    {
+     "label": "Vittorie",
+     "value": "52%",
+     "avg": "50%"
+    },
+    {
+     "label": "K/D+assist",
+     "value": "1.19",
+     "avg": "1.41"
+    },
+    {
+     "label": "Danno",
+     "value": "23035",
+     "avg": "17192"
+    },
+    {
+     "label": "Uccisioni",
+     "value": "5.0",
+     "avg": "4.5"
+    },
+    {
+     "label": "Morti",
+     "value": "8.7",
+     "avg": "7.2"
+    },
+    {
+     "label": "Livello",
+     "value": "12.1",
+     "avg": "12.0"
+    }
+   ],
    "ranks": {
-    "winrate": 14,
-    "kda": 13,
-    "dmg": 6,
-    "taken": 15,
-    "deaths": 16,
-    "level": 13
+    "winrate": 8,
+    "level": 7,
+    "taken": 16,
+    "cc": 10,
+    "assists": 7,
+    "deaths_inv": 15,
+    "dmg": 5,
+    "support": 14,
+    "kda": 8
    },
-   "summary": "È sotto la media (posizione 13 su 17, tier C).",
+   "summary": "È sopra la media (posizione 7 su 17, tier A).",
+   "weights": {
+    "Vittorie": 0.4,
+    "Livello": 0.05,
+    "Danno inflitto": 0.25,
+    "K/D (con assist)": 0.2,
+    "Assist": 0.1
+   },
    "pros": [
-    "nessun punto di forza netto: nella media del gruppo"
+    "infligge tanto danno: 23035 a partita (media 17192) (5º su 17)",
+    "i suoi tipi lo favoriscono contro il roster (vantaggio +0.50)"
    ],
    "cons": [
-    "vince poco: solo 42% delle partite (14º su 17)",
-    "muore più di quanto uccida (K/D 0.28, media 0.51)",
-    "muore spesso: 5.4 morti a partita (media 4.1)"
+    "nessun punto debole netto"
    ],
    "best": [
     {
      "name": "Nincada",
-     "winrate": 0.6,
-     "games": 15
+     "winrate": 0.75,
+     "games": 12,
+     "off": 2.0,
+     "dfn": 0.5
     },
     {
-     "name": "Spiritomb",
-     "winrate": 0.5882352941176471,
-     "games": 17
+     "name": "Duraludon",
+     "winrate": 0.7,
+     "games": 20,
+     "off": 1.0,
+     "dfn": 2.0
     },
     {
-     "name": "Eevee",
-     "winrate": 0.5714285714285714,
-     "games": 21
+     "name": "Totodile",
+     "winrate": 0.6875,
+     "games": 16,
+     "off": 1.0,
+     "dfn": 0.5
     }
    ],
    "worst": [
     {
-     "name": "Snivy",
-     "winrate": 0.2,
-     "games": 20
+     "name": "Mienfoo",
+     "winrate": 0.3157894736842105,
+     "games": 19,
+     "off": 2.0,
+     "dfn": 0.5
     },
     {
      "name": "Charmander",
-     "winrate": 0.3,
-     "games": 20
+     "winrate": 0.3333333333333333,
+     "games": 15,
+     "off": 1.0,
+     "dfn": 0.5
     },
     {
+     "name": "Snivy",
+     "winrate": 0.3333333333333333,
+     "games": 18,
+     "off": 2.0,
+     "dfn": 0.25
+    }
+   ],
+   "types_info": {
+    "types": [
+     "Flying",
+     "Dragon"
+    ],
+    "strong_vs": [
+     "Rowlet",
+     "Snivy",
+     "Nincada",
+     "Mienfoo"
+    ],
+    "weak_to": [
+     "Roggenrola",
+     "Sneasel",
+     "Duraludon"
+    ],
+    "resists": [
+     "Charmander",
+     "Totodile",
+     "Snivy",
+     "Nincada",
+     "Poliwag",
+     "Charcadet",
+     "Mienfoo"
+    ],
+    "net": 0.5,
+    "luck": -0.06
+   },
+   "forms": []
+  },
+  {
+   "name": "Gastly",
+   "pos": 8,
+   "tier": "B",
+   "score": 0.137,
+   "role": "mago",
+   "types": [
+    "Ghost",
+    "Poison"
+   ],
+   "passive": "corpofunesto",
+   "games": 90,
+   "winrate": 0.5333,
+   "stats": [
+    {
+     "label": "Vittorie",
+     "value": "53%",
+     "avg": "50%"
+    },
+    {
+     "label": "K/D+assist",
+     "value": "1.43",
+     "avg": "1.41"
+    },
+    {
+     "label": "Danno",
+     "value": "12785",
+     "avg": "17192"
+    },
+    {
+     "label": "Uccisioni",
+     "value": "4.3",
+     "avg": "4.5"
+    },
+    {
+     "label": "Morti",
+     "value": "7.1",
+     "avg": "7.2"
+    },
+    {
+     "label": "Livello",
+     "value": "11.8",
+     "avg": "12.0"
+    }
+   ],
+   "ranks": {
+    "winrate": 6,
+    "level": 9,
+    "taken": 12,
+    "cc": 7,
+    "assists": 3,
+    "deaths_inv": 9,
+    "dmg": 12,
+    "support": 6,
+    "kda": 7
+   },
+   "summary": "È nella fascia di mezzo (posizione 8 su 17, tier B).",
+   "weights": {
+    "Vittorie": 0.4,
+    "Livello": 0.05,
+    "Danno inflitto": 0.25,
+    "K/D (con assist)": 0.2,
+    "Assist": 0.1
+   },
+   "pros": [
+    "fa tanti assist: 5.9 a partita (media 5.1) (3º su 17)",
+    "i suoi tipi lo favoriscono contro il roster (vantaggio +0.44)"
+   ],
+   "cons": [
+    "nessun punto debole netto"
+   ],
+   "best": [
+    {
+     "name": "Nincada",
+     "winrate": 0.8571428571428571,
+     "games": 21,
+     "off": 1.0,
+     "dfn": 2.0
+    },
+    {
+     "name": "Rowlet",
+     "winrate": 0.7777777777777778,
+     "games": 9,
+     "off": 2.0,
+     "dfn": 1.0
+    },
+    {
+     "name": "Rookidee",
+     "winrate": 0.7222222222222222,
+     "games": 18,
+     "off": 1.0,
+     "dfn": 1.0
+    }
+   ],
+   "worst": [
+    {
      "name": "Teddiursa",
-     "winrate": 0.3,
-     "games": 20
+     "winrate": 0.1875,
+     "games": 16,
+     "off": 1.0,
+     "dfn": 0.25
+    },
+    {
+     "name": "Sneasel",
+     "winrate": 0.23076923076923078,
+     "games": 13,
+     "off": 1.0,
+     "dfn": 2.0
+    },
+    {
+     "name": "Charmander",
+     "winrate": 0.3333333333333333,
+     "games": 27,
+     "off": 1.0,
+     "dfn": 1.0
+    }
+   ],
+   "types_info": {
+    "types": [
+     "Ghost",
+     "Poison"
+    ],
+    "strong_vs": [
+     "Rowlet",
+     "Snivy"
+    ],
+    "weak_to": [
+     "Nincada",
+     "Spiritomb",
+     "Sneasel"
+    ],
+    "resists": [
+     "Snivy",
+     "Eevee",
+     "Teddiursa",
+     "Mienfoo"
+    ],
+    "net": 0.44,
+    "luck": -0.1
+   },
+   "forms": []
+  },
+  {
+   "name": "Spiritomb",
+   "pos": 9,
+   "tier": "B",
+   "score": 0.006,
+   "role": "supporto",
+   "types": [
+    "Ghost",
+    "Dark"
+   ],
+   "passive": "108spiriti",
+   "games": 90,
+   "winrate": 0.4667,
+   "stats": [
+    {
+     "label": "Vittorie",
+     "value": "47%",
+     "avg": "50%"
+    },
+    {
+     "label": "Assist",
+     "value": "3.7",
+     "avg": "5.1"
+    },
+    {
+     "label": "CC (s)",
+     "value": "54",
+     "avg": "17"
+    },
+    {
+     "label": "Cure/scudi",
+     "value": "195",
+     "avg": "143"
+    },
+    {
+     "label": "Morti",
+     "value": "4.0",
+     "avg": "7.2"
+    },
+    {
+     "label": "Livello",
+     "value": "11.6",
+     "avg": "12.0"
+    }
+   ],
+   "ranks": {
+    "winrate": 9,
+    "level": 11,
+    "taken": 14,
+    "cc": 2,
+    "assists": 17,
+    "deaths_inv": 1,
+    "dmg": 17,
+    "support": 4,
+    "kda": 11
+   },
+   "summary": "È nella fascia di mezzo (posizione 9 su 17, tier B).",
+   "weights": {
+    "Vittorie": 0.4,
+    "Livello": 0.05,
+    "Assist": 0.2,
+    "Controllo (CC)": 0.15,
+    "Cure/scudi": 0.1,
+    "Poche morti": 0.1
+   },
+   "pros": [
+    "controlla molto i nemici: 54 s di CC a partita (media 17) (2º su 17)",
+    "cura/protegge molto gli alleati: 195 a partita (4º su 17)",
+    "muore raramente: 4.0 morti a partita (media 7.2) (1º su 17)",
+    "i suoi tipi lo favoriscono contro il roster (vantaggio +0.31)"
+   ],
+   "cons": [
+    "pochi assist: 3.7 a partita (media 5.1) (17º su 17)"
+   ],
+   "best": [
+    {
+     "name": "Charcadet",
+     "winrate": 0.85,
+     "games": 20,
+     "off": 1.0,
+     "dfn": 1.0
+    },
+    {
+     "name": "Rowlet",
+     "winrate": 0.75,
+     "games": 12,
+     "off": 1.0,
+     "dfn": 1.0
+    },
+    {
+     "name": "Totodile",
+     "winrate": 0.6521739130434783,
+     "games": 23,
+     "off": 1.0,
+     "dfn": 1.0
+    }
+   ],
+   "worst": [
+    {
+     "name": "Teddiursa",
+     "winrate": 0.0,
+     "games": 12,
+     "off": 1.0,
+     "dfn": 0.25
+    },
+    {
+     "name": "Snivy",
+     "winrate": 0.21739130434782608,
+     "games": 23,
+     "off": 1.0,
+     "dfn": 1.0
+    },
+    {
+     "name": "Sneasel",
+     "winrate": 0.3076923076923077,
+     "games": 13,
+     "off": 0.5,
+     "dfn": 1.0
+    }
+   ],
+   "types_info": {
+    "types": [
+     "Ghost",
+     "Dark"
+    ],
+    "strong_vs": [
+     "Gastly"
+    ],
+    "weak_to": [],
+    "resists": [
+     "Eevee",
+     "Teddiursa",
+     "Mienfoo"
+    ],
+    "net": 0.31,
+    "luck": 0.01
+   },
+   "forms": []
+  },
+  {
+   "name": "Charcadet",
+   "pos": 10,
+   "tier": "B",
+   "score": -0.298,
+   "role": "combattente",
+   "types": [
+    "Fire"
+   ],
+   "passive": "armature",
+   "games": 90,
+   "winrate": 0.4222,
+   "stats": [
+    {
+     "label": "Vittorie",
+     "value": "42%",
+     "avg": "50%"
+    },
+    {
+     "label": "K/D+assist",
+     "value": "1.11",
+     "avg": "1.41"
+    },
+    {
+     "label": "Danno",
+     "value": "15050",
+     "avg": "17192"
+    },
+    {
+     "label": "Danno subito",
+     "value": "37211",
+     "avg": "30239"
+    },
+    {
+     "label": "Morti",
+     "value": "8.1",
+     "avg": "7.2"
+    },
+    {
+     "label": "Livello",
+     "value": "11.4",
+     "avg": "12.0"
+    }
+   ],
+   "ranks": {
+    "winrate": 11,
+    "level": 12,
+    "taken": 3,
+    "cc": 17,
+    "assists": 9,
+    "deaths_inv": 11,
+    "dmg": 10,
+    "support": 2,
+    "kda": 12
+   },
+   "summary": "È nella fascia di mezzo (posizione 10 su 17, tier B).",
+   "weights": {
+    "Vittorie": 0.4,
+    "Livello": 0.05,
+    "Danno inflitto": 0.2,
+    "K/D (con assist)": 0.15,
+    "Danno assorbito": 0.1,
+    "Assist": 0.1
+   },
+   "pros": [
+    "assorbe tantissimo danno: 37211 a partita (media 30239) (3º su 17)"
+   ],
+   "cons": [
+    "nessun punto debole netto"
+   ],
+   "best": [
+    {
+     "name": "Rookidee",
+     "winrate": 0.8333333333333334,
+     "games": 12,
+     "off": 1.0,
+     "dfn": 1.0
+    },
+    {
+     "name": "Eevee",
+     "winrate": 0.7,
+     "games": 10,
+     "off": 1.0,
+     "dfn": 1.0
+    },
+    {
+     "name": "Duraludon",
+     "winrate": 0.6666666666666666,
+     "games": 15,
+     "off": 1.0,
+     "dfn": 1.0
+    }
+   ],
+   "worst": [
+    {
+     "name": "Teddiursa",
+     "winrate": 0.05555555555555555,
+     "games": 18,
+     "off": 1.0,
+     "dfn": 1.0
+    },
+    {
+     "name": "Snivy",
+     "winrate": 0.06666666666666667,
+     "games": 15,
+     "off": 2.0,
+     "dfn": 0.5
+    },
+    {
+     "name": "Charmander",
+     "winrate": 0.1,
+     "games": 10,
+     "off": 0.5,
+     "dfn": 0.5
+    }
+   ],
+   "types_info": {
+    "types": [
+     "Fire"
+    ],
+    "strong_vs": [
+     "Rowlet",
+     "Snivy",
+     "Nincada",
+     "Sneasel"
+    ],
+    "weak_to": [
+     "Totodile",
+     "Nincada",
+     "Poliwag",
+     "Roggenrola"
+    ],
+    "resists": [
+     "Charmander",
+     "Snivy"
+    ],
+    "net": -0.19,
+    "luck": 0.01
+   },
+   "forms": [
+    {
+     "name": "Ceruledge",
+     "games": 29,
+     "score": 1.327,
+     "winrate": 0.724,
+     "kda": 1.94,
+     "dmg": 22115,
+     "assists": 6.3,
+     "cc": 1,
+     "types": [
+      "Fire",
+      "Ghost"
+     ],
+     "share": 0.326,
+     "rank": 1
+    },
+    {
+     "name": "Armarouge",
+     "games": 60,
+     "score": -0.991,
+     "winrate": 0.283,
+     "kda": 0.84,
+     "dmg": 11781,
+     "assists": 4.8,
+     "cc": 2,
+     "types": [
+      "Fire",
+      "Psychic"
+     ],
+     "share": 0.674,
+     "rank": 2
     }
    ]
   },
   {
    "name": "Rookidee",
-   "pos": 14,
-   "tier": "C",
-   "score": -0.826,
+   "pos": 11,
+   "tier": "B",
+   "score": -0.315,
    "role": "tank",
    "types": [
     "Flying"
    ],
    "passive": "sguardofermo",
-   "games": 118,
-   "winrate": 0.4407,
-   "kills": 0.31,
-   "deaths": 3.71,
-   "kda": 0.08,
-   "dmg": 2766,
-   "taken": 12037,
-   "level": 6.67,
+   "games": 90,
+   "winrate": 0.3222,
+   "stats": [
+    {
+     "label": "Vittorie",
+     "value": "32%",
+     "avg": "50%"
+    },
+    {
+     "label": "Danno subito",
+     "value": "39852",
+     "avg": "30239"
+    },
+    {
+     "label": "CC (s)",
+     "value": "2",
+     "avg": "17"
+    },
+    {
+     "label": "Assist",
+     "value": "5.8",
+     "avg": "5.1"
+    },
+    {
+     "label": "Morti",
+     "value": "7.5",
+     "avg": "7.2"
+    },
+    {
+     "label": "Livello",
+     "value": "10.3",
+     "avg": "12.0"
+    }
+   ],
    "ranks": {
-    "winrate": 12,
-    "kda": 17,
-    "dmg": 17,
-    "taken": 5,
-    "deaths": 6,
-    "level": 15
+    "winrate": 17,
+    "level": 17,
+    "taken": 2,
+    "cc": 16,
+    "assists": 4,
+    "deaths_inv": 10,
+    "dmg": 16,
+    "support": 13,
+    "kda": 14
    },
-   "summary": "È sotto la media (posizione 14 su 17, tier C).",
+   "summary": "È nella fascia di mezzo (posizione 11 su 17, tier B).",
+   "weights": {
+    "Vittorie": 0.4,
+    "Livello": 0.05,
+    "Danno assorbito": 0.2,
+    "Controllo (CC)": 0.1,
+    "Assist": 0.1,
+    "Poche morti": 0.1,
+    "Danno inflitto": 0.05
+   },
    "pros": [
-    "nessun punto di forza netto: nella media del gruppo"
+    "assorbe tantissimo danno: 39852 a partita (media 30239) (2º su 17)",
+    "fa tanti assist: 5.8 a partita (media 5.1) (4º su 17)",
+    "ha poco danno, ma è normale per un tank: qui conta quanto assorbe e controlla"
    ],
    "cons": [
-    "muore più di quanto uccida (K/D 0.08, media 0.51)",
-    "infligge poco danno: 2766 a partita (media 5159)",
-    "sale di livello piano (liv. medio 6.7)"
+    "vince poco: solo 32% delle partite (17º su 17)",
+    "sale di livello piano (liv. medio 10.3) (17º su 17)",
+    "controlla poco i nemici: 2 s di CC a partita (media 17) (16º su 17)",
+    "infligge poco danno: 9346 a partita (media 17192) (16º su 17)"
    ],
    "best": [
     {
      "name": "Totodile",
-     "winrate": 0.7222222222222222,
-     "games": 18
+     "winrate": 0.5,
+     "games": 14,
+     "off": 1.0,
+     "dfn": 1.0
+    },
+    {
+     "name": "Mienfoo",
+     "winrate": 0.5,
+     "games": 18,
+     "off": 2.0,
+     "dfn": 0.5
     },
     {
      "name": "Eevee",
-     "winrate": 0.6666666666666666,
-     "games": 27
-    },
-    {
-     "name": "Nincada",
-     "winrate": 0.65,
-     "games": 20
+     "winrate": 0.5,
+     "games": 20,
+     "off": 1.0,
+     "dfn": 1.0
     }
    ],
    "worst": [
     {
      "name": "Teddiursa",
-     "winrate": 0.09090909090909091,
-     "games": 22
+     "winrate": 0.058823529411764705,
+     "games": 17,
+     "off": 1.0,
+     "dfn": 1.0
     },
     {
-     "name": "Charmander",
-     "winrate": 0.20833333333333334,
-     "games": 24
+     "name": "Charcadet",
+     "winrate": 0.16666666666666666,
+     "games": 12,
+     "off": 1.0,
+     "dfn": 1.0
+    },
+    {
+     "name": "Roggenrola",
+     "winrate": 0.18181818181818182,
+     "games": 22,
+     "off": 0.5,
+     "dfn": 2.0
+    }
+   ],
+   "types_info": {
+    "types": [
+     "Flying"
+    ],
+    "strong_vs": [
+     "Rowlet",
+     "Snivy",
+     "Nincada",
+     "Mienfoo"
+    ],
+    "weak_to": [
+     "Roggenrola",
+     "Sneasel"
+    ],
+    "resists": [
+     "Snivy",
+     "Nincada",
+     "Mienfoo"
+    ],
+    "net": 0.19,
+    "luck": -0.05
+   },
+   "forms": []
+  },
+  {
+   "name": "Mienfoo",
+   "pos": 12,
+   "tier": "C",
+   "score": -0.347,
+   "role": "assassino",
+   "types": [
+    "Fighting"
+   ],
+   "passive": "manichefrusta",
+   "games": 90,
+   "winrate": 0.4667,
+   "stats": [
+    {
+     "label": "Vittorie",
+     "value": "47%",
+     "avg": "50%"
+    },
+    {
+     "label": "K/D+assist",
+     "value": "1.08",
+     "avg": "1.41"
+    },
+    {
+     "label": "Danno",
+     "value": "16375",
+     "avg": "17192"
+    },
+    {
+     "label": "Uccisioni",
+     "value": "4.9",
+     "avg": "4.5"
+    },
+    {
+     "label": "Morti",
+     "value": "8.5",
+     "avg": "7.2"
+    },
+    {
+     "label": "Livello",
+     "value": "12.1",
+     "avg": "12.0"
+    }
+   ],
+   "ranks": {
+    "winrate": 10,
+    "level": 8,
+    "taken": 6,
+    "cc": 13,
+    "assists": 14,
+    "deaths_inv": 13,
+    "dmg": 8,
+    "support": 17,
+    "kda": 13
+   },
+   "summary": "È sotto la media (posizione 12 su 17, tier C).",
+   "weights": {
+    "Vittorie": 0.4,
+    "Livello": 0.05,
+    "K/D (con assist)": 0.25,
+    "Danno inflitto": 0.2,
+    "Assist": 0.1
+   },
+   "pros": [
+    "nessun punto di forza netto: nella media del gruppo"
+   ],
+   "cons": [
+    "muore più di quanto uccida o assista (K/D+assist 1.08, media 1.41) (13º su 17)",
+    "pochi assist: 4.2 a partita (media 5.1) (14º su 17)",
+    "i suoi tipi lo svantaggiano contro il roster (vantaggio -0.25)"
+   ],
+   "best": [
+    {
+     "name": "Noibat",
+     "winrate": 0.6842105263157895,
+     "games": 19,
+     "off": 0.5,
+     "dfn": 2.0
     },
     {
      "name": "Gastly",
-     "winrate": 0.2608695652173913,
-     "games": 23
+     "winrate": 0.6666666666666666,
+     "games": 12,
+     "off": 0.125,
+     "dfn": 1.0
+    },
+    {
+     "name": "Eevee",
+     "winrate": 0.6,
+     "games": 15,
+     "off": 2.0,
+     "dfn": 1.0
     }
-   ]
+   ],
+   "worst": [
+    {
+     "name": "Teddiursa",
+     "winrate": 0.23529411764705882,
+     "games": 17,
+     "off": 2.0,
+     "dfn": 1.0
+    },
+    {
+     "name": "Charmander",
+     "winrate": 0.2777777777777778,
+     "games": 18,
+     "off": 1.0,
+     "dfn": 1.0
+    },
+    {
+     "name": "Poliwag",
+     "winrate": 0.3333333333333333,
+     "games": 15,
+     "off": 1.0,
+     "dfn": 1.0
+    }
+   ],
+   "types_info": {
+    "types": [
+     "Fighting"
+    ],
+    "strong_vs": [
+     "Roggenrola",
+     "Eevee",
+     "Teddiursa",
+     "Sneasel",
+     "Duraludon"
+    ],
+    "weak_to": [
+     "Rowlet",
+     "Rookidee",
+     "Noibat"
+    ],
+    "resists": [
+     "Roggenrola"
+    ],
+    "net": -0.25,
+    "luck": -0.02
+   },
+   "forms": []
+  },
+  {
+   "name": "Duraludon",
+   "pos": 13,
+   "tier": "C",
+   "score": -0.358,
+   "role": "supporto",
+   "types": [
+    "Steel",
+    "Dragon"
+   ],
+   "passive": "conduzione",
+   "games": 90,
+   "winrate": 0.3667,
+   "stats": [
+    {
+     "label": "Vittorie",
+     "value": "37%",
+     "avg": "50%"
+    },
+    {
+     "label": "Assist",
+     "value": "5.0",
+     "avg": "5.1"
+    },
+    {
+     "label": "CC (s)",
+     "value": "9",
+     "avg": "17"
+    },
+    {
+     "label": "Cure/scudi",
+     "value": "1392",
+     "avg": "143"
+    },
+    {
+     "label": "Morti",
+     "value": "6.2",
+     "avg": "7.2"
+    },
+    {
+     "label": "Livello",
+     "value": "11.0",
+     "avg": "12.0"
+    }
+   ],
+   "ranks": {
+    "winrate": 15,
+    "level": 14,
+    "taken": 9,
+    "cc": 8,
+    "assists": 11,
+    "deaths_inv": 6,
+    "dmg": 11,
+    "support": 1,
+    "kda": 9
+   },
+   "summary": "È sotto la media (posizione 13 su 17, tier C).",
+   "weights": {
+    "Vittorie": 0.4,
+    "Livello": 0.05,
+    "Assist": 0.2,
+    "Controllo (CC)": 0.15,
+    "Cure/scudi": 0.1,
+    "Poche morti": 0.1
+   },
+   "pros": [
+    "cura/protegge molto gli alleati: 1392 a partita (1º su 17)",
+    "i suoi tipi lo favoriscono contro il roster (vantaggio +0.62)"
+   ],
+   "cons": [
+    "vince poco: solo 37% delle partite (15º su 17)",
+    "sale di livello piano (liv. medio 11.0) (14º su 17)"
+   ],
+   "best": [
+    {
+     "name": "Rowlet",
+     "winrate": 0.6428571428571429,
+     "games": 14,
+     "off": 1.0,
+     "dfn": 0.5
+    },
+    {
+     "name": "Nincada",
+     "winrate": 0.5714285714285714,
+     "games": 14,
+     "off": 1.0,
+     "dfn": 2.0
+    },
+    {
+     "name": "Poliwag",
+     "winrate": 0.55,
+     "games": 20,
+     "off": 1.0,
+     "dfn": 0.5
+    }
+   ],
+   "worst": [
+    {
+     "name": "Teddiursa",
+     "winrate": 0.05555555555555555,
+     "games": 18,
+     "off": 1.0,
+     "dfn": 0.5
+    },
+    {
+     "name": "Sneasel",
+     "winrate": 0.2,
+     "games": 15,
+     "off": 2.0,
+     "dfn": 1.0
+    },
+    {
+     "name": "Roggenrola",
+     "winrate": 0.2222222222222222,
+     "games": 18,
+     "off": 2.0,
+     "dfn": 0.5
+    }
+   ],
+   "types_info": {
+    "types": [
+     "Steel",
+     "Dragon"
+    ],
+    "strong_vs": [
+     "Roggenrola",
+     "Noibat",
+     "Sneasel"
+    ],
+    "weak_to": [
+     "Nincada",
+     "Mienfoo"
+    ],
+    "resists": [
+     "Totodile",
+     "Rowlet",
+     "Snivy",
+     "Poliwag",
+     "Roggenrola",
+     "Eevee",
+     "Rookidee",
+     "Teddiursa"
+    ],
+    "net": 0.62,
+    "luck": 0.1
+   },
+   "forms": []
+  },
+  {
+   "name": "Rowlet",
+   "pos": 14,
+   "tier": "C",
+   "score": -0.504,
+   "role": "tiratore",
+   "types": [
+    "Grass",
+    "Flying"
+   ],
+   "passive": "distacco",
+   "games": 90,
+   "winrate": 0.3667,
+   "stats": [
+    {
+     "label": "Vittorie",
+     "value": "37%",
+     "avg": "50%"
+    },
+    {
+     "label": "K/D+assist",
+     "value": "1.15",
+     "avg": "1.41"
+    },
+    {
+     "label": "Danno",
+     "value": "17876",
+     "avg": "17192"
+    },
+    {
+     "label": "Uccisioni",
+     "value": "2.6",
+     "avg": "4.5"
+    },
+    {
+     "label": "Morti",
+     "value": "7.0",
+     "avg": "7.2"
+    },
+    {
+     "label": "Livello",
+     "value": "11.7",
+     "avg": "12.0"
+    }
+   ],
+   "ranks": {
+    "winrate": 14,
+    "level": 10,
+    "taken": 15,
+    "cc": 14,
+    "assists": 5,
+    "deaths_inv": 7,
+    "dmg": 7,
+    "support": 8,
+    "kda": 10
+   },
+   "summary": "È sotto la media (posizione 14 su 17, tier C).",
+   "weights": {
+    "Vittorie": 0.4,
+    "Livello": 0.05,
+    "Danno inflitto": 0.25,
+    "K/D (con assist)": 0.2,
+    "Assist": 0.1
+   },
+   "pros": [
+    "fa tanti assist: 5.4 a partita (media 5.1) (5º su 17)"
+   ],
+   "cons": [
+    "vince poco: solo 37% delle partite (14º su 17)"
+   ],
+   "best": [
+    {
+     "name": "Rookidee",
+     "winrate": 0.625,
+     "games": 16,
+     "off": 1.0,
+     "dfn": 2.0
+    },
+    {
+     "name": "Totodile",
+     "winrate": 0.5555555555555556,
+     "games": 9,
+     "off": 2.0,
+     "dfn": 0.5
+    },
+    {
+     "name": "Mienfoo",
+     "winrate": 0.5,
+     "games": 18,
+     "off": 2.0,
+     "dfn": 0.5
+    }
+   ],
+   "worst": [
+    {
+     "name": "Sneasel",
+     "winrate": 0.058823529411764705,
+     "games": 17,
+     "off": 1.0,
+     "dfn": 4.0
+    },
+    {
+     "name": "Teddiursa",
+     "winrate": 0.21428571428571427,
+     "games": 14,
+     "off": 1.0,
+     "dfn": 1.0
+    },
+    {
+     "name": "Gastly",
+     "winrate": 0.2222222222222222,
+     "games": 9,
+     "off": 1.0,
+     "dfn": 2.0
+    }
+   ],
+   "types_info": {
+    "types": [
+     "Grass",
+     "Flying"
+    ],
+    "strong_vs": [
+     "Totodile",
+     "Snivy",
+     "Nincada",
+     "Poliwag",
+     "Roggenrola",
+     "Mienfoo"
+    ],
+    "weak_to": [
+     "Charmander",
+     "Gastly",
+     "Roggenrola",
+     "Rookidee",
+     "Charcadet",
+     "Noibat",
+     "Sneasel"
+    ],
+    "resists": [
+     "Totodile",
+     "Snivy",
+     "Poliwag",
+     "Mienfoo"
+    ],
+    "net": 0.12,
+    "luck": 0.05
+   },
+   "forms": []
   },
   {
    "name": "Eevee",
    "pos": 15,
    "tier": "D",
-   "score": -0.948,
+   "score": -0.811,
    "role": "combattente",
    "types": [
     "Normal"
    ],
    "passive": "adattabilita",
-   "games": 119,
-   "winrate": 0.3866,
-   "kills": 0.88,
-   "deaths": 4.09,
-   "kda": 0.22,
-   "dmg": 3264,
-   "taken": 11362,
-   "level": 6.62,
+   "games": 90,
+   "winrate": 0.3889,
+   "stats": [
+    {
+     "label": "Vittorie",
+     "value": "39%",
+     "avg": "50%"
+    },
+    {
+     "label": "K/D+assist",
+     "value": "0.73",
+     "avg": "1.41"
+    },
+    {
+     "label": "Danno",
+     "value": "11266",
+     "avg": "17192"
+    },
+    {
+     "label": "Danno subito",
+     "value": "33040",
+     "avg": "30239"
+    },
+    {
+     "label": "Morti",
+     "value": "8.1",
+     "avg": "7.2"
+    },
+    {
+     "label": "Livello",
+     "value": "10.4",
+     "avg": "12.0"
+    }
+   ],
    "ranks": {
-    "winrate": 15,
-    "kda": 14,
-    "dmg": 16,
-    "taken": 8,
-    "deaths": 11,
-    "level": 16
+    "winrate": 13,
+    "level": 16,
+    "taken": 4,
+    "cc": 15,
+    "assists": 15,
+    "deaths_inv": 12,
+    "dmg": 15,
+    "support": 3,
+    "kda": 16
    },
    "summary": "È tra i più deboli del roster (posizione 15 su 17, tier D).",
+   "weights": {
+    "Vittorie": 0.4,
+    "Livello": 0.05,
+    "Danno inflitto": 0.2,
+    "K/D (con assist)": 0.15,
+    "Danno assorbito": 0.1,
+    "Assist": 0.1
+   },
    "pros": [
-    "nessun punto di forza netto: nella media del gruppo"
+    "assorbe tantissimo danno: 33040 a partita (media 30239) (4º su 17)"
    ],
    "cons": [
-    "vince poco: solo 39% delle partite (15º su 17)",
-    "muore più di quanto uccida (K/D 0.22, media 0.51)",
-    "infligge poco danno: 3264 a partita (media 5159)",
-    "sale di livello piano (liv. medio 6.6)"
+    "vince poco: solo 39% delle partite (13º su 17)",
+    "sale di livello piano (liv. medio 10.4) (16º su 17)",
+    "infligge poco danno: 11266 a partita (media 17192) (15º su 17)",
+    "muore più di quanto uccida o assista (K/D+assist 0.73, media 1.41) (16º su 17)",
+    "pochi assist: 4.2 a partita (media 5.1) (15º su 17)",
+    "i suoi tipi lo svantaggiano contro il roster (vantaggio -0.44)"
    ],
    "best": [
     {
-     "name": "Totodile",
-     "winrate": 0.6875,
-     "games": 16
+     "name": "Duraludon",
+     "winrate": 0.5555555555555556,
+     "games": 18,
+     "off": 0.5,
+     "dfn": 1.0
     },
     {
-     "name": "Nincada",
-     "winrate": 0.625,
-     "games": 24
-    },
-    {
-     "name": "Mienfoo",
+     "name": "Rowlet",
      "winrate": 0.5454545454545454,
-     "games": 22
+     "games": 22,
+     "off": 1.0,
+     "dfn": 1.0
+    },
+    {
+     "name": "Totodile",
+     "winrate": 0.5384615384615384,
+     "games": 13,
+     "off": 1.0,
+     "dfn": 1.0
     }
    ],
    "worst": [
     {
-     "name": "Teddiursa",
-     "winrate": 0.16666666666666666,
-     "games": 24
+     "name": "Sneasel",
+     "winrate": 0.06666666666666667,
+     "games": 15,
+     "off": 1.0,
+     "dfn": 1.0
     },
     {
-     "name": "Poliwag",
-     "winrate": 0.21428571428571427,
-     "games": 28
+     "name": "Charmander",
+     "winrate": 0.18181818181818182,
+     "games": 11,
+     "off": 1.0,
+     "dfn": 1.0
     },
     {
-     "name": "Snivy",
-     "winrate": 0.2727272727272727,
-     "games": 22
+     "name": "Roggenrola",
+     "winrate": 0.1875,
+     "games": 16,
+     "off": 0.5,
+     "dfn": 1.0
+    }
+   ],
+   "types_info": {
+    "types": [
+     "Normal"
+    ],
+    "strong_vs": [],
+    "weak_to": [
+     "Mienfoo"
+    ],
+    "resists": [],
+    "net": -0.44,
+    "luck": -0.03
+   },
+   "forms": [
+    {
+     "name": "Flareon",
+     "games": 8,
+     "score": -0.52,
+     "winrate": 0.375,
+     "kda": 1.0,
+     "dmg": 16535,
+     "assists": 4.8,
+     "cc": 4,
+     "types": [
+      "Fire"
+     ],
+     "share": 0.095,
+     "rank": 1
+    },
+    {
+     "name": "Jolteon",
+     "games": 8,
+     "score": -0.547,
+     "winrate": 0.375,
+     "kda": 1.06,
+     "dmg": 15311,
+     "assists": 5.5,
+     "cc": 3,
+     "types": [
+      "Electric"
+     ],
+     "share": 0.095,
+     "rank": 2
+    },
+    {
+     "name": "Sylveon",
+     "games": 17,
+     "score": -0.631,
+     "winrate": 0.412,
+     "kda": 0.81,
+     "dmg": 12173,
+     "assists": 4.4,
+     "cc": 0,
+     "types": [
+      "Fairy"
+     ],
+     "share": 0.202,
+     "rank": 3
+    },
+    {
+     "name": "Glaceon",
+     "games": 13,
+     "score": -0.635,
+     "winrate": 0.462,
+     "kda": 0.84,
+     "dmg": 11618,
+     "assists": 4.1,
+     "cc": 6,
+     "types": [
+      "Ice"
+     ],
+     "share": 0.155,
+     "rank": 4
+    },
+    {
+     "name": "Espeon",
+     "games": 11,
+     "score": -0.807,
+     "winrate": 0.364,
+     "kda": 0.87,
+     "dmg": 14980,
+     "assists": 4.5,
+     "cc": 2,
+     "types": [
+      "Psychic"
+     ],
+     "share": 0.131,
+     "rank": 5
+    },
+    {
+     "name": "Umbreon",
+     "games": 13,
+     "score": -0.919,
+     "winrate": 0.462,
+     "kda": 0.46,
+     "dmg": 5865,
+     "assists": 3.5,
+     "cc": 2,
+     "types": [
+      "Dark"
+     ],
+     "share": 0.155,
+     "rank": 6
+    },
+    {
+     "name": "Leafeon",
+     "games": 9,
+     "score": -1.016,
+     "winrate": 0.333,
+     "kda": 0.65,
+     "dmg": 9213,
+     "assists": 5.0,
+     "cc": 2,
+     "types": [
+      "Grass"
+     ],
+     "share": 0.107,
+     "rank": 7
+    },
+    {
+     "name": "Vaporeon",
+     "games": 5,
+     "score": -1.452,
+     "winrate": 0.2,
+     "kda": 0.61,
+     "dmg": 7487,
+     "assists": 3.8,
+     "cc": 0,
+     "types": [
+      "Water"
+     ],
+     "share": 0.06,
+     "rank": 8
     }
    ]
   },
@@ -1028,125 +2340,295 @@
    "name": "Totodile",
    "pos": 16,
    "tier": "D",
-   "score": -0.987,
+   "score": -0.841,
    "role": "combattente",
    "types": [
     "Water"
    ],
    "passive": "forzabruta",
-   "games": 119,
-   "winrate": 0.3782,
-   "kills": 0.62,
-   "deaths": 4.82,
-   "kda": 0.13,
-   "dmg": 3469,
-   "taken": 10301,
-   "level": 6.92,
+   "games": 90,
+   "winrate": 0.3889,
+   "stats": [
+    {
+     "label": "Vittorie",
+     "value": "39%",
+     "avg": "50%"
+    },
+    {
+     "label": "K/D+assist",
+     "value": "0.78",
+     "avg": "1.41"
+    },
+    {
+     "label": "Danno",
+     "value": "11398",
+     "avg": "17192"
+    },
+    {
+     "label": "Danno subito",
+     "value": "29974",
+     "avg": "30239"
+    },
+    {
+     "label": "Morti",
+     "value": "8.5",
+     "avg": "7.2"
+    },
+    {
+     "label": "Livello",
+     "value": "11.1",
+     "avg": "12.0"
+    }
+   ],
    "ranks": {
-    "winrate": 16,
-    "kda": 16,
+    "winrate": 12,
+    "level": 13,
+    "taken": 8,
+    "cc": 9,
+    "assists": 12,
+    "deaths_inv": 14,
     "dmg": 14,
-    "taken": 11,
-    "deaths": 14,
-    "level": 14
+    "support": 7,
+    "kda": 15
    },
    "summary": "È tra i più deboli del roster (posizione 16 su 17, tier D).",
+   "weights": {
+    "Vittorie": 0.4,
+    "Livello": 0.05,
+    "Danno inflitto": 0.2,
+    "K/D (con assist)": 0.15,
+    "Danno assorbito": 0.1,
+    "Assist": 0.1
+   },
    "pros": [
     "nessun punto di forza netto: nella media del gruppo"
    ],
    "cons": [
-    "vince poco: solo 38% delle partite (16º su 17)",
-    "muore più di quanto uccida (K/D 0.13, media 0.51)",
-    "infligge poco danno: 3469 a partita (media 5159)",
-    "muore spesso: 4.8 morti a partita (media 4.1)",
-    "sale di livello piano (liv. medio 6.9)"
+    "sale di livello piano (liv. medio 11.1) (13º su 17)",
+    "infligge poco danno: 11398 a partita (media 17192) (14º su 17)",
+    "muore più di quanto uccida o assista (K/D+assist 0.78, media 1.41) (15º su 17)"
    ],
    "best": [
     {
      "name": "Nincada",
-     "winrate": 0.8235294117647058,
-     "games": 17
+     "winrate": 0.6923076923076923,
+     "games": 13,
+     "off": 2.0,
+     "dfn": 1.0
     },
     {
-     "name": "Noibat",
-     "winrate": 0.6071428571428571,
-     "games": 28
+     "name": "Rookidee",
+     "winrate": 0.5,
+     "games": 14,
+     "off": 1.0,
+     "dfn": 1.0
+    },
+    {
+     "name": "Duraludon",
+     "winrate": 0.5,
+     "games": 22,
+     "off": 0.5,
+     "dfn": 1.0
     }
    ],
    "worst": [
     {
-     "name": "Mienfoo",
-     "winrate": 0.23076923076923078,
-     "games": 26
+     "name": "Poliwag",
+     "winrate": 0.13333333333333333,
+     "games": 15,
+     "off": 0.5,
+     "dfn": 0.5
     },
     {
-     "name": "Snivy",
-     "winrate": 0.2608695652173913,
-     "games": 23
+     "name": "Charmander",
+     "winrate": 0.1875,
+     "games": 16,
+     "off": 2.0,
+     "dfn": 0.5
     },
     {
-     "name": "Teddiursa",
-     "winrate": 0.2608695652173913,
-     "games": 23
+     "name": "Sneasel",
+     "winrate": 0.2222222222222222,
+     "games": 18,
+     "off": 1.0,
+     "dfn": 1.0
     }
-   ]
+   ],
+   "types_info": {
+    "types": [
+     "Water"
+    ],
+    "strong_vs": [
+     "Charmander",
+     "Nincada",
+     "Roggenrola",
+     "Charcadet"
+    ],
+    "weak_to": [
+     "Rowlet",
+     "Snivy"
+    ],
+    "resists": [
+     "Charmander",
+     "Poliwag",
+     "Charcadet"
+    ],
+    "net": 0.0,
+    "luck": 0.05
+   },
+   "forms": []
   },
   {
    "name": "Nincada",
    "pos": 17,
    "tier": "D",
-   "score": -1.51,
+   "score": -1.254,
    "role": "assassino",
    "types": [
     "Bug",
     "Ground"
    ],
    "passive": "muta",
-   "games": 118,
-   "winrate": 0.2712,
-   "kills": 0.76,
-   "deaths": 5.86,
-   "kda": 0.13,
-   "dmg": 3451,
-   "taken": 9730,
-   "level": 6.48,
+   "games": 90,
+   "winrate": 0.3444,
+   "stats": [
+    {
+     "label": "Vittorie",
+     "value": "34%",
+     "avg": "50%"
+    },
+    {
+     "label": "K/D+assist",
+     "value": "0.58",
+     "avg": "1.41"
+    },
+    {
+     "label": "Danno",
+     "value": "12464",
+     "avg": "17192"
+    },
+    {
+     "label": "Uccisioni",
+     "value": "2.5",
+     "avg": "4.5"
+    },
+    {
+     "label": "Morti",
+     "value": "11.1",
+     "avg": "7.2"
+    },
+    {
+     "label": "Livello",
+     "value": "10.8",
+     "avg": "12.0"
+    }
+   ],
    "ranks": {
-    "winrate": 17,
-    "kda": 15,
-    "dmg": 15,
-    "taken": 14,
-    "deaths": 17,
-    "level": 17
+    "winrate": 16,
+    "level": 15,
+    "taken": 13,
+    "cc": 12,
+    "assists": 16,
+    "deaths_inv": 17,
+    "dmg": 13,
+    "support": 10,
+    "kda": 17
    },
    "summary": "È tra i più deboli del roster (posizione 17 su 17, tier D).",
+   "weights": {
+    "Vittorie": 0.4,
+    "Livello": 0.05,
+    "K/D (con assist)": 0.25,
+    "Danno inflitto": 0.2,
+    "Assist": 0.1
+   },
    "pros": [
     "nessun punto di forza netto: nella media del gruppo"
    ],
    "cons": [
-    "vince poco: solo 27% delle partite (17º su 17)",
-    "muore più di quanto uccida (K/D 0.13, media 0.51)",
-    "infligge poco danno: 3451 a partita (media 5159)",
-    "muore spesso: 5.9 morti a partita (media 4.1)",
-    "sale di livello piano (liv. medio 6.5)"
+    "vince poco: solo 34% delle partite (16º su 17)",
+    "sale di livello piano (liv. medio 10.8) (15º su 17)",
+    "muore più di quanto uccida o assista (K/D+assist 0.58, media 1.41) (17º su 17)",
+    "infligge poco danno: 12464 a partita (media 17192) (13º su 17)",
+    "pochi assist: 3.9 a partita (media 5.1) (16º su 17)"
    ],
-   "best": [],
-   "worst": [
+   "best": [
     {
-     "name": "Teddiursa",
-     "winrate": 0.10344827586206896,
-     "games": 29
-    },
-    {
-     "name": "Poliwag",
-     "winrate": 0.14285714285714285,
-     "games": 21
+     "name": "Rookidee",
+     "winrate": 0.7142857142857143,
+     "games": 14,
+     "off": 0.5,
+     "dfn": 2.0
     },
     {
      "name": "Rowlet",
-     "winrate": 0.14285714285714285,
-     "games": 21
+     "winrate": 0.5294117647058824,
+     "games": 17,
+     "off": 1.0,
+     "dfn": 2.0
+    },
+    {
+     "name": "Charcadet",
+     "winrate": 0.5294117647058824,
+     "games": 17,
+     "off": 2.0,
+     "dfn": 2.0
     }
-   ]
+   ],
+   "worst": [
+    {
+     "name": "Charmander",
+     "winrate": 0.11764705882352941,
+     "games": 17,
+     "off": 2.0,
+     "dfn": 2.0
+    },
+    {
+     "name": "Teddiursa",
+     "winrate": 0.13636363636363635,
+     "games": 22,
+     "off": 1.0,
+     "dfn": 1.0
+    },
+    {
+     "name": "Gastly",
+     "winrate": 0.14285714285714285,
+     "games": 21,
+     "off": 2.0,
+     "dfn": 1.0
+    }
+   ],
+   "types_info": {
+    "types": [
+     "Bug",
+     "Ground"
+    ],
+    "strong_vs": [
+     "Charmander",
+     "Gastly",
+     "Snivy",
+     "Roggenrola",
+     "Charcadet",
+     "Sneasel",
+     "Duraludon"
+    ],
+    "weak_to": [
+     "Charmander",
+     "Totodile",
+     "Rowlet",
+     "Poliwag",
+     "Rookidee",
+     "Charcadet",
+     "Noibat",
+     "Sneasel"
+    ],
+    "resists": [
+     "Mienfoo"
+    ],
+    "net": -0.12,
+    "luck": 0.07
+   },
+   "forms": []
   }
  ]
 }

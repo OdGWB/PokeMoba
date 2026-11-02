@@ -33,7 +33,8 @@ from engine.grid import TILE_BUSH  # noqa: E402
 from engine.vision import BUSH_REVEAL, VisionSystem  # noqa: E402
 
 LANES = ["top", "mid", "bot"]
-MAX_TIME = 10 * 60.0        # secondi di gioco: oltre, si decide per torri/uccisioni/danno
+MAX_TIME = 18 * 60.0        # secondi di gioco: oltre, si decide per torri/uccisioni/danno
+ASSIST_WINDOW = 10.0     # secondi: chi ha colpito la vittima entro questo tempo e' assistente
 SLOT_OFFSET = {"top": Vec2(-1.2, 0.0), "mid": Vec2(0.0, 0.0), "bot": Vec2(0.0, 1.2)}
 
 
@@ -121,11 +122,21 @@ def play(job):
     orig_death = match._on_death
     orig_dmg = match._deal_damage
 
+    last_hit = {}                   # id vittima -> {id attaccante: tempo ultimo colpo}
+    ctx = {"caster": None}          # chi sta lanciando una mossa in questo momento
+
+    for s in stat.values():
+        s.update(assists=0, cc=0.0, support=0.0, t8=None)
+
     def on_death(victim, killer):
         if isinstance(victim, Pokemon) and victim.id in stat:
             stat[victim.id]["deaths"] += 1
             if isinstance(killer, Pokemon) and killer.id in stat and killer.team != victim.team:
                 stat[killer.id]["kills"] += 1
+            kid = killer.id if killer is not None else None
+            for aid, t in last_hit.pop(victim.id, {}).items():
+                if aid != kid and match.time - t <= ASSIST_WINDOW:
+                    stat[aid]["assists"] += 1
         return orig_death(victim, killer)
 
     def deal(attacker, target, amount, *a, **kw):
@@ -136,17 +147,85 @@ def play(job):
             stat[target.id]["taken"] += lost
             if isinstance(attacker, Pokemon) and attacker.id in stat and attacker.team != target.team:
                 stat[attacker.id]["dmg"] += lost
+                last_hit.setdefault(target.id, {})[attacker.id] = match.time
             return r
         return orig_dmg(attacker, target, amount, *a, **kw)
 
+    def source_of(target):
+        """Chi ha causato un controllo: chi sta lanciando, altrimenti chi ha colpito per ultimo."""
+        c = ctx["caster"]
+        if c is not None and c.team != target.team:
+            return c
+        hits = last_hit.get(target.id)
+        if hits:
+            aid, t = max(hits.items(), key=lambda kv: kv[1])
+            if match.time - t <= 3.0:
+                return next((u for u in units if u.id == aid), None)
+        return None
+
+    def wrap_cc(name, weight, dur_index):
+        orig = getattr(match, name)
+
+        def f(p, *args, **kw):
+            if isinstance(p, Pokemon) and p.id in stat:
+                src = source_of(p)
+                if src is not None and src.id in stat:
+                    try:
+                        stat[src.id]["cc"] += weight * float(args[dur_index])
+                    except (IndexError, TypeError, ValueError):
+                        pass
+            return orig(p, *args, **kw)
+        setattr(match, name, f)
+
+    # (nome, peso, posizione della durata negli argomenti dopo `p`)
+    for name, w, di in (("_apply_stun", 1.0, 0), ("_apply_root", 1.0, 0),
+                        ("_apply_sleep", 1.0, 0), ("_apply_fear", 1.0, 1),
+                        ("_apply_airborne", 1.0, 0), ("_apply_confuse", 0.6, 0),
+                        ("_apply_slow", 0.4, 1)):
+        if hasattr(match, name):
+            wrap_cc(name, w, di)
+
+    orig_cast = match._cast
+
+    def cast(p, *a, **kw):
+        prev, ctx["caster"] = ctx["caster"], p
+        try:
+            return orig_cast(p, *a, **kw)
+        finally:
+            ctx["caster"] = prev
+
+    orig_heal = match._give_heal
+    orig_shield = match._give_shield
+
+    def heal(caster, target, amount):
+        hp0 = target.hp
+        r = orig_heal(caster, target, amount)
+        if (isinstance(caster, Pokemon) and caster.id in stat and target is not caster
+                and isinstance(target, Pokemon) and target.id in stat):
+            stat[caster.id]["support"] += max(0.0, target.hp - hp0)
+        return r
+
+    def shield(caster, target, amt, dur):
+        if (isinstance(caster, Pokemon) and caster.id in stat and target is not caster
+                and isinstance(target, Pokemon) and target.id in stat):
+            stat[caster.id]["support"] += max(0.0, amt)
+        return orig_shield(caster, target, amt, dur)
+
     match._on_death = on_death
     match._deal_damage = deal
+    match._cast = cast
+    match._give_heal = heal
+    match._give_shield = shield
 
     dt = config.TICK_DT
     tick = 0
     while match.winner is None and match.time < MAX_TIME:
         match.update(dt, tick)
         tick += 1
+        if tick % 30 == 0:
+            for p in units:
+                if p.level >= 8 and stat[p.id]["t8"] is None:
+                    stat[p.id]["t8"] = round(match.time, 1)
 
     timeout = match.winner is None
     if timeout:
@@ -164,6 +243,9 @@ def play(job):
         s = stat[p.id]
         s["level"] = p.level
         s["final_name"] = p.name
+        s["types"] = list(p.types)
+        s["cc"] = round(s["cc"], 1)
+        s["support"] = round(s["support"])
         s["gold"] = round(float(getattr(p, "gold", 0)))
     return {"seed": seed, "winner": winner, "timeout": timeout, "time": round(match.time, 1),
             "units": list(stat.values())}
@@ -192,7 +274,7 @@ def make_jobs(n, start_seed, per_pokemon_balanced=True):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--matches", type=int, default=336)
+    ap.add_argument("--matches", type=int, default=255)
     ap.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 2))
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--out", default=str(ROOT / "tools" / "tier_matches.jsonl"))

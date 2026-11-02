@@ -320,13 +320,7 @@ class DeveloperDetailScene(_DevBase):
             y += mid.get_height() + 2
         y += 10
 
-        av = self.data["averages"]
-        stats = [("Vittorie", f"{e['winrate'] * 100:.0f}%", f"{self.data['avg_winrate'] * 100:.0f}%"),
-                 ("Uccisioni", f"{e['kills']:.1f}", f"{av['kills']:.1f}"),
-                 ("Morti", f"{e['deaths']:.1f}", f"{av['deaths']:.1f}"),
-                 ("K/D", f"{e['kda']:.2f}", f"{av['kda']:.2f}"),
-                 ("Danno", f"{e['dmg']}", f"{av['dmg']:.0f}"),
-                 ("Livello", f"{e['level']:.1f}", f"{av['level']:.1f}")]
+        stats = [(s["label"], s["value"], s["avg"]) for s in e["stats"]]
         sw = cw // len(stats)
         sh = int(H * 0.11)
         for i, (lab, val, ref) in enumerate(stats):
@@ -337,39 +331,71 @@ class DeveloperDetailScene(_DevBase):
             surface.blit(big.render(val, True, TEXT), (r.x + 6, r.y + 4 + small.get_height()))
             surface.blit(small.render(f"media {ref}", True, DIM),
                          (r.x + 6, r.bottom - small.get_height() - 4))
-        y += sh + 14
+        y += sh + 12
 
-        def block(title, items, color):
-            nonlocal y
-            surface.blit(big.render(title, True, color), (x, y))
-            y += big.get_height() + 2
-            for it in items:
-                surface.blit(mid.render("•", True, color), (x + 4, y))
-                for ln in _wrap(mid, it, cw - 22):
-                    surface.blit(mid.render(ln, True, TEXT), (x + 20, y))
-                    y += mid.get_height() + 1
-            y += 8
+        # Due colonne: a sinistra i motivi, a destra forme, tipi e scontri.
+        gap = 18
+        colw = (cw - gap) // 2
+        cur = {"x": x, "w": colw, "y": y}
+        GREEN, RED = (130, 200, 100), (230, 120, 90)
 
-        def duel(title, items, color):
-            nonlocal y
+        def title(txt, color):
+            surface.blit(mid.render(txt, True, color), (cur["x"], cur["y"]))
+            cur["y"] += mid.get_height() + 1
+
+        def line(txt, color=TEXT, bullet=None, indent=14):
+            if bullet:
+                surface.blit(mid.render("•", True, bullet), (cur["x"] + 2, cur["y"]))
+            for ln in _wrap(mid, txt, cur["w"] - indent - 4):
+                surface.blit(mid.render(ln, True, color), (cur["x"] + indent, cur["y"]))
+                cur["y"] += mid.get_height() + 1
+
+        title("Punti di forza", GREEN)
+        for it in e["pros"]:
+            line(it, bullet=GREEN)
+        cur["y"] += 6
+        title("Punti deboli", RED)
+        for it in e["cons"]:
+            line(it, bullet=RED)
+
+        cur.update(x=x + colw + gap, y=y)
+        if e["forms"]:
+            title("Classifica delle forme", GOLD)
+            for f in e["forms"]:
+                if f["score"] is None:
+                    line(f"{f['name']}: troppo poche partite ({f['games']})", DIM, indent=14)
+                    continue
+                line(f"{f['rank']}º {f['name']}  vitt. {f['winrate'] * 100:.0f}%  K/D {f['kda']:.2f}  "
+                     f"danno {f['dmg']}  ({f['share'] * 100:.0f}% delle volte)",
+                     GOLD if f["rank"] == 1 else TEXT, indent=14)
+            cur["y"] += 6
+        ti = e["types_info"]
+        title("Tipi: " + "/".join(ti["types"]), GOLD)
+        if ti["strong_vs"]:
+            line("Superefficace su: " + ", ".join(ti["strong_vs"]), GREEN)
+        if ti["weak_to"]:
+            line("Debole contro: " + ", ".join(ti["weak_to"]), RED)
+        if ti["resists"]:
+            line("Resiste a: " + ", ".join(ti["resists"]), DIM)
+        cur["y"] += 6
+
+        def duels(label, items, color):
             if not items:
                 return
-            txt = ", ".join(f"{d['name']} ({d['winrate'] * 100:.0f}%)" for d in items)
-            surface.blit(mid.render(title, True, color), (x, y))
-            y += mid.get_height() + 1
-            for ln in _wrap(mid, txt, cw - 20):
-                surface.blit(mid.render(ln, True, TEXT), (x + 20, y))
-                y += mid.get_height() + 1
-            y += 4
+            title(label, color)
+            for d in items:
+                tag = ("tipo favorevole" if d["off"] > d["dfn"] else
+                       "tipo sfavorevole" if d["off"] < d["dfn"] else "tipi pari")
+                line(f"{d['name']} {d['winrate'] * 100:.0f}% ({tag})", indent=14)
+        duels("Va meglio contro", e["best"], GREEN)
+        duels("Soffre contro", e["worst"], RED)
 
-        block("Perché sta qui: punti di forza", e["pros"], (130, 200, 100))
-        block("Punti deboli", e["cons"], (230, 120, 90))
-        duel("Va meglio quando affronta:", e["best"], (130, 200, 100))
-        duel("Soffre quando affronta:", e["worst"], (230, 120, 90))
-
-        note = small.render("Posizione calcolata dalle partite dei bot: vittorie 50%, K/D 25%, "
-                            "danno 15%, livello 10%.", True, DIM)
-        surface.blit(note, (x, H - note.get_height() - 18))
+        wtxt = ", ".join(f"{k} {int(v * 100)}%" for k, v in e["weights"].items())
+        note = small.render("Punteggio per ruolo: " + wtxt, True, DIM)
+        while note.get_width() > cw and len(wtxt) > 10:
+            wtxt = wtxt[:-6] + "…"
+            note = small.render("Punteggio per ruolo: " + wtxt, True, DIM)
+        surface.blit(note, (x, H - note.get_height() - 10))
         bh = mid.get_height() + 14
         self.buttons.draw(surface, (pad, H - bh - 12, 200, bh), "Indietro  (Esc)", self._back, mid)
 
