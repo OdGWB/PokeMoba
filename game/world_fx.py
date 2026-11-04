@@ -19,7 +19,7 @@ import pygame
 
 import config
 
-from . import (arch_fx, charcadet_fx, corvi_fx, eevee_fx, hatt_fx, mien_fx, noivern_fx,
+from . import (arch_fx, charcadet_fx, corvi_fx, eevee_fx, hatt_fx, mag_fx, mien_fx, noivern_fx,
                sneasel_fx, spirit_fx, ursa_fx)
 from .fx import draw_avalanche, draw_sandstorm, type_color
 
@@ -148,6 +148,23 @@ def draw_world_effects(surface, camera, world, m, team, vision, now, player_id,
     for o in getattr(m, "moon_orbs", ()):
         if seen(o["pos"], o["team"]):
             hatt_fx.draw_moon_orb(surface, camera, o, now)
+    # Linea Magnemite: Campo Elettrico, pilastro di Bombagnete e cariche sui muri
+    # (visibili a tutti), Scia Ionica, interazioni in corso, Tuonoshock in volo.
+    for z in getattr(m, "mag_fields", ()):
+        mag_fx.draw_mag_field(surface, camera, z, now)
+    for tr in getattr(m, "ion_trails", ()):
+        if seen(tr["c"], tr["team"]):
+            mag_fx.draw_ion_trail(surface, camera, tr, now)
+    for pl in getattr(m, "mag_pillars", ()):
+        mag_fx.draw_mag_pillar(surface, camera, pl, now)
+    for w in getattr(m, "mag_walls", ()):
+        mag_fx.draw_wall_charge(surface, camera, w, now)
+    for ln in getattr(m, "mag_links", ()):
+        if seen(ln["c"], ln["team"]):
+            mag_fx.draw_mag_link(surface, camera, ln, now)
+    for o in getattr(m, "mag_bolts", ()):
+        if seen(o["pos"], o["team"]):
+            mag_fx.draw_bolt(surface, camera, o, now)
 
 
 def draw_projectiles(surface, camera, m, now=0.0) -> None:

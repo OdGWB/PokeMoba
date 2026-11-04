@@ -1,0 +1,113 @@
+{
+  "_comment": "Magnemite -> Magneton (liv.4) -> Magnezone (liv.8). Mago di CONTROLLO ad alta difficolta' basato sulle CARICHE MAGNETICHE. Tipi: Elettro/Acciaio. Statistiche = valori base reali (la derivazione le scala). Passiva Magnetismo (engine/magnezone.py, tutte e tre le forme): le mosse applicano una carica + o - a nemici, alleati o muri per 4 s (8 s sui nemici Acciaio); due cariche entro 5 tile interagiscono (opposte si attraggono, uguali si respingono; alleati e muri fanno da ancora). Q Tuonoshock = proiettile rapido, carica + al primo nemico o muro; W Campo Magnetico = carica - su un nemico (danno) o su un alleato (scudo); E Voltcambio = scatto che inverte le cariche attraversate. Q5/W6/E7 potenziamenti, R al liv.8 a scelta (Bombagnete o Campo Elettrico) con la polarita' scelta al lancio.",
+  "dex": 81,
+  "name": "Magnemite",
+  "types": ["Electric", "Steel"],
+  "role": "mago",
+  "recommended_items": ["choice_specs", "magnet", "light_clay", "wide_lens"],
+  "color": [170, 180, 196],
+  "radius": 0.32,
+  "base_speed": 3.3,
+  "attack_range": 4.6,
+  "attack_cooldown": 1.0,
+  "ranged": true,
+  "sprite_dir": "assets/pokemon/0081",
+  "passive": "magnetismo",
+  "attack_fx": "magshot",
+
+  "base_stats": {"hp": 25, "attack": 35, "defense": 70, "sp_attack": 95, "sp_defense": 55, "speed": 45},
+
+  "evolutions": [
+    {"stage": 0, "level": 1, "name": "Magnemite", "dex": 81, "sprite_dir": "assets/pokemon/0081",
+     "types": ["Electric", "Steel"], "passive": "magnetismo", "role": "mago", "color": [170, 180, 196],
+     "attack_fx": "magshot", "attack_range": 4.6, "ranged": true, "radius": 0.32,
+     "base_stats": {"hp": 25, "attack": 35, "defense": 70, "sp_attack": 95, "sp_defense": 55, "speed": 45}},
+
+    {"stage": 1, "level": 4, "name": "Magneton", "dex": 82, "sprite_dir": "assets/pokemon/0082",
+     "types": ["Electric", "Steel"], "passive": "magnetismo", "role": "mago", "color": [160, 172, 192],
+     "attack_fx": "magshot", "attack_range": 4.8, "ranged": true, "radius": 0.44,
+     "base_stats": {"hp": 50, "attack": 60, "defense": 95, "sp_attack": 120, "sp_defense": 70, "speed": 70}},
+
+    {"stage": 2, "level": 8, "name": "Magnezone", "dex": 462, "sprite_dir": "assets/pokemon/0462",
+     "types": ["Electric", "Steel"], "passive": "magnetismo", "role": "mago", "color": [150, 164, 190],
+     "attack_fx": "magshot", "attack_range": 5.0, "ranged": true, "radius": 0.54,
+     "base_stats": {"hp": 70, "attack": 70, "defense": 115, "sp_attack": 130, "sp_defense": 90, "speed": 60}}
+  ],
+
+  "moves": {
+    "Q": {
+      "base": {"id": "thundershock", "name": "Tuonoshock", "type": "Electric", "category": "special",
+               "shape": "magbolt", "fx": "magbolt", "target": "direction",
+               "power": [45, 70, 95, 120], "ratio": 0.75,
+               "cooldown": [6, 5.5, 5, 4.5], "range": 9.0, "radius": 0.4,
+               "effects": {"bolt_speed": 20.0}},
+      "upgrades": [
+        {"id": "electroweb", "name": "Elettrotela", "type": "Electric", "category": "special",
+         "shape": "magbolt", "fx": "electroweb", "target": "direction",
+         "power": [40, 62, 85, 108], "ratio": 0.65,
+         "cooldown": [6.5, 6, 5.5, 5], "range": 9.0, "radius": 0.5,
+         "effects": {"bolt_speed": 16.0, "pierce": true, "slow": {"mult": 0.8, "duration": 1.0}}},
+        {"id": "steelcannon", "name": "Falcecannone", "type": "Electric", "category": "special",
+         "shape": "magbolt", "fx": "steelcannon", "target": "direction",
+         "power": [68, 105, 143, 180], "ratio": 1.1,
+         "cooldown": [7, 6.5, 6, 5.5], "range": 9.0, "radius": 0.5,
+         "effects": {"bolt_speed": 10.0, "big": true, "root": {"duration": 1.0}}}
+      ]
+    },
+    "W": {
+      "base": {"id": "magnetfield", "name": "Campo Magnetico", "type": "Steel", "category": "special",
+               "shape": "magfield", "fx": "magfield", "target": "point",
+               "power": [40, 65, 90, 115], "ratio": 0.6,
+               "cooldown": [9, 8.5, 8, 7.5], "range": 7.0, "radius": 1.3,
+               "effects": {"mag_shield": {"amount": [60, 90, 120, 150], "scaling": 0.35, "duration": 3.0}}},
+      "upgrades": [
+        {"id": "doublepolarity", "name": "Doppia Polarità", "type": "Steel", "category": "special",
+         "shape": "magfield", "fx": "magfield", "target": "point",
+         "power": [40, 65, 90, 115], "ratio": 0.6,
+         "cooldown": [9, 8.5, 8, 7.5], "range": 7.0, "radius": 1.3,
+         "effects": {"mag_shield": {"amount": [60, 90, 120, 150], "scaling": 0.35,
+                                    "duration": 5.0, "mult": 1.5}}},
+        {"id": "magnetchain", "name": "Catena", "type": "Steel", "category": "special",
+         "shape": "magfield", "fx": "magfield", "target": "point",
+         "power": [40, 65, 90, 115], "ratio": 0.6,
+         "cooldown": [9, 8.5, 8, 7.5], "range": 7.0, "radius": 1.3,
+         "effects": {"mag_shield": {"amount": [60, 90, 120, 150], "scaling": 0.35, "duration": 3.0},
+                     "chain": {"range": 4.0, "mult": 0.5}}}
+      ]
+    },
+    "E": {
+      "base": {"id": "voltswitch", "name": "Voltcambio", "type": "Electric", "category": "none",
+               "shape": "voltdash", "fx": "voltdash", "target": "point",
+               "power": [0, 0, 0, 0],
+               "cooldown": [10, 9.5, 9, 8.5], "range": 3.5, "radius": 0.8,
+               "effects": {}},
+      "upgrades": [
+        {"id": "doubledash", "name": "Doppio scatto", "type": "Electric", "category": "none",
+         "shape": "voltdash", "fx": "voltdash", "target": "point",
+         "power": [0, 0, 0, 0],
+         "cooldown": [0.6, 0.6, 0.6, 0.6], "charges": 2, "charge_time": 10, "refund_on_hit": false,
+         "range": 3.5, "radius": 0.8,
+         "effects": {}},
+        {"id": "iontrail", "name": "Scia Ionica", "type": "Electric", "category": "none",
+         "shape": "voltdash", "fx": "voltdash", "target": "point",
+         "power": [0, 0, 0, 0],
+         "cooldown": [10, 9.5, 9, 8.5], "range": 3.5, "radius": 0.8,
+         "effects": {"trail": 2.0}}
+      ]
+    },
+    "R": {
+      "upgrades": [
+        {"id": "magnetbomb", "name": "Bombagnete", "type": "Steel", "category": "special",
+         "shape": "magpillar", "fx": "magpillar", "target": "point",
+         "power": [110, 165, 220], "ratio": 0.8,
+         "cooldown": [100, 90, 80], "range": 7.0, "radius": 6.0,
+         "effects": {"duration": 4.0, "land": 0.35, "polarity": true}},
+        {"id": "electricterrain", "name": "Campo Elettrico", "type": "Electric", "category": "none",
+         "shape": "magterrain", "fx": "magterrain", "target": "point",
+         "power": [0, 0, 0],
+         "cooldown": [100, 90, 80], "range": 7.0, "radius": 5.0,
+         "effects": {"duration": 6.0, "range_bonus": 1.5, "polarity": true}}
+      ]
+    }
+  }
+}

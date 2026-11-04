@@ -389,6 +389,10 @@ class Pokemon(Unit):
     powder_until: float = -1.0         # Magipolvere: tipo Psico fino a qui
     powder_types: list | None = None   # tipi da rimettere a fine Magipolvere
     powder_dex: int = 0
+    mag_sign: int = 0                  # carica magnetica (Magnetismo): +1, -1, 0 = nessuna
+    mag_until: float = -1.0            # la carica scade qui
+    mag_src: int = 0                   # id del Magnemite che l'ha applicata
+    mag_team: int = -1                 # squadra del Magnemite (per lui: nemico o ancora)
 
     def _bonus(self, stat: str) -> float:
         return (self.passive_bonus.get(stat, 0.0) + self.item_bonus.get(stat, 0.0)

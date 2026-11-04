@@ -19,7 +19,7 @@ from engine.jungle import CODE_WEATHER, WEATHER_NAMES, apply_weather, ring_tiles
 from engine.vec import Vec2
 from engine.vision import VisionSystem
 
-from .. import hud
+from .. import hud, mag_fx
 from ..camera import Camera
 from ..fx import type_color
 from ..input_controller import champs_only_held
@@ -164,15 +164,29 @@ class NetMatchScene:
                     self.client.send_move(tx, ty)
             elif ev.type == pygame.KEYDOWN and ev.key == pygame.K_s:
                 self.client.send_stop()
+            elif ((ev.type == pygame.MOUSEWHEEL
+                   or (ev.type == pygame.KEYDOWN and ev.key == pygame.K_TAB))
+                  and self.aiming_slot is not None
+                  and mag_fx.has_polarity(self._aim_move(self.aiming_slot))):
+                mag_fx.toggle_polarity()   # Bombagnete / Campo Elettrico: + <-> -
 
     def _tile(self, pos):
         wx, wy = self.camera.screen_window_to_world(*pos)
         return wx / config.TILE_SIZE, wy / config.TILE_SIZE
 
+    def _aim_move(self, slot):
+        """Variante attiva della mossa dello slot (indice 0-3), o None."""
+        h = self.world.hud
+        if not h:
+            return None
+        name = ["Q", "W", "E", "R"][slot]
+        return self._variant_move(self.disp_moveset.get(name), h["slots"][name]["variant"])
+
     def _cast(self, slot, pos):
         tx, ty = self._tile(pos)
-        hold = (pygame.time.get_ticks() - self.aim_start) / 1000.0
-        self.client.send_cast(slot, tx, ty, hold=min(1.5, max(0.0, hold)))
+        hold = min(1.5, max(0.0, (pygame.time.get_ticks() - self.aim_start) / 1000.0))
+        hold = mag_fx.cast_hold(self._aim_move(slot), hold)   # R a polarità: il segno
+        self.client.send_cast(slot, tx, ty, hold=hold)
 
     def _left_click(self, pos):
         tx, ty = self._tile(pos)

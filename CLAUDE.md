@@ -828,6 +828,47 @@ Passaggi completati:
   quello del motore). Velocita' di movimento/attacco e tempi invariati.
   AnimData.xml: letto anche <HitFrame> (pulsante "colpo del file").
   Screenshot: step_43_menu, step_43_editor_idle/_mossa/_aa/_rayquaza.
+- LINEA MAGNEMITE > MAGNETON > MAGNEZONE (step_44), grafica nuova in
+  game/mag_fx.py (logica in engine/magnezone.py). Sprite PMD Sprite Collab in
+  assets/pokemon/0081/0082/0462. Forme nuove in _draw_shapes (mag_fx.SHAPES):
+  saetta a zig-zag tra due punti rifatta a ogni frame (ziglink), linee di
+  campo magnetico (fieldlines: archi POCO gonfi, bulge ~0,1; a 0,3 formavano
+  un'enorme "lente" viola che copriva tutto), badge della carica che compare
+  (signpop), frecce dell'inversione di Voltcambio (fliparrows), anello
+  schiacciato che crepita (magring: impulsi di pilastro e campo). Riusa
+  energy/flash/ring/hexshell (fx.py) e impactstar (Sneasel). BADGE della
+  carica: dischetto 11x11 rosso con "+" o blu con "-" (in cache, contorno
+  scuro, luce in alto a sinistra), sopra la barra della vita con un alone
+  tenue (a destra della vena di rabbia se l'unità è anche agitata), lampeggia
+  nell'ultimo secondo; visibile a tutti. Disegni PERSISTENTI (world_fx):
+  Tuonoshock in volo con la SAETTA che lo segue dal punto di lancio (max 2,2
+  tile; Elettrotela = rete esagonale azzurra che gira, Falcecannone = sfera
+  d'acciaio lenta con l'anello di scariche), cariche sui muri (badge sul punto
+  colpito + anello che pulsa), Scia Ionica (corsia gialla tenue che crepita con
+  i "+" rossi; con la fascia scura sembrava un sentiero), pilastro di
+  Bombagnete = calamita a FERRO DI CAVALLO pixel art (_pillar_sprite, per
+  pixel e in cache: arco + gambe del colore della polarità, punte d'acciaio,
+  gamba destra in ombra; la prima versione a colonna sembrava una pila di
+  mattoni) che cade dall'alto sul mirino, area di 6 tile tratteggiata e
+  granelli che scorrono, barra del tempo STRETTA (larga sembrava una barra
+  della vita); Campo Elettrico = ellisse gialla con bordo che crepita, piccole
+  scariche a terra (spessore 2, a 1 px restava solo il nucleo bianco e
+  sembravano vermi) e i segni della polarità che salgono; interazioni in corso
+  (linee di campo viola tese per i trascinamenti, strisce e scarica dietro chi
+  è respinto). POLARITÀ della R: mentre si mira, rotella del mouse o Tab
+  alternano + / - (mag_fx._POLARITY, ricordata tra un lancio e l'altro); il
+  mirino mostra il badge grande e l'area del colore scelto, l'HUD della passiva
+  il badge in alto a destra; viaggia nel campo `hold` del lancio (1,0 = "-"),
+  quindi il formato dei pacchetti non cambia (InputController e
+  NetMatchScene). HUD: Magnetismo = calamita rossa/blu + "N carichi" (nemici
+  carichi visibili). Online: mag_bolts/ion_trails/mag_links in
+  net/visual.LISTS (mag_bolts anche in online_world.MOVING), mag_walls/
+  mag_pillars/mag_fields a entrambe le squadre, mag_sign in UNIT_FLAGS
+  (mag_until passa da solo come timer). Screenshot: step_44_* (draft_magnemite,
+  tuonoshock/_volo, cariche, attrazione, urto, respinta,
+  campomagnetico_alleato, ancora, catena, muro_carico/_trascina, voltcambio,
+  scia_ionica, elettrotela/_volo, falcecannone/_volo, bombagnete_mira/
+  _caduta/_dopo, campoelettrico/_dopo, hud, hud_polarita).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

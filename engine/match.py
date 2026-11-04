@@ -33,6 +33,7 @@ from .sneasel import SNEASEL_PASSIVES, SneaselMixin
 from .mienshao import MIEN_PASSIVES, PROJ_SHAPES, MienshaoMixin
 from .archaludon import ARCH_PASSIVES, ArchaludonMixin
 from .hatterene import HATT_PASSIVES, HattereneMixin
+from .magnezone import MAG_PASSIVES, MagnezoneMixin
 from .corviknight import CORVI_PASSIVES, CorviknightMixin
 from .eevee import EEVEE_PASSIVES, EeveeMixin
 from .item_effects import ItemEffectsMixin, cdr_to_haste
@@ -149,11 +150,13 @@ CAST_ANIMS = {"projectile": "Shoot", "bubble": "Shoot",
             "metalsound": "Charge", "irondefense": "Charge", "electroshot": "Charge",
             "thunderstorm": "Shoot",
             "psyburst": "Shoot", "psybeam": "Shoot", "hattvoice": "Swing",
-            "moonorb": "Shoot", "trickroom": "Charge", "witchwave": "Charge"}
+            "moonorb": "Shoot", "trickroom": "Charge", "witchwave": "Charge",
+            "magbolt": "Shoot", "magfield": "SpAttack", "voltdash": "Charge",
+            "magpillar": "SpAttack", "magterrain": "Charge"}
 
 class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, NoivernMixin,
             UrsaringMixin, SneaselMixin, MienshaoMixin, ArchaludonMixin,
-            HattereneMixin, BasicAttackMixin, ItemEffectsMixin):
+            HattereneMixin, MagnezoneMixin, BasicAttackMixin, ItemEffectsMixin):
     def __init__(self, world, map_data):
         self.world = world
         self.map = map_data
@@ -193,6 +196,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self._init_mien()        # linea Mienfoo: balzi di Calcinvolo, Guardia Rapida
         self._init_arch()        # linea Duraludon: Tuononda, Elettroraggio, Tuono
         self._init_hatt()        # linea Hatenna: Confusione, Forza Lunare, Distortozona, Strega
+        self._init_mag()         # linea Magnemite: cariche magnetiche, Bombagnete, Campo Elettrico
         self._init_basic_attack()   # attacco base: proiettili a ricerca
         self.vision = VisionSystem(self.world.grid)
         self._build_structures()
@@ -251,6 +255,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self._update_mien(dt)        # Calcinvolo, Rigenergia, Individua, Danza (linea Mienfoo)
         self._update_arch(dt)        # Tuononda, Elettroraggio, Tuono (linea Duraludon)
         self._update_hatt(dt)        # Confusione, Forza Lunare, Distortozona, Quiete (linea Hatenna)
+        self._update_mag(dt)         # cariche magnetiche, Tuonoshock, Bombagnete... (linea Magnemite)
         self._update_rock_moves(dt)  # Rocciotomba / Pesobomba / Frana / Abbattimento
         self._update_spiritomb(dt)   # spiriti, Stordiraggio, Malcomune, Legione, Memento
         self._update_eevee(dt)       # Desiderio, Comete, Tuono, Bora, Divinazione, Idratazione
@@ -267,6 +272,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self._update_sandstorms(dt)  # Sabbiafiume: tempesta di sabbia attorno a Gigalith
         self.world.tick(dt)          # movimento + collisioni
         self._update_tosses(dt)      # Ribaltiro: arco del nemico lanciato (dopo le collisioni)
+        self._update_mag_drags(dt)   # Magnetismo: trascinamenti e spinte (dopo le collisioni)
         self._update_regen(dt)
         self._update_plates(dt)      # placche delle torri (oro ai vicini)
         self._update_gold(dt)
@@ -1716,6 +1722,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             return
         if not self._sneasel_precheck(p, mv, Vec2(tx, ty)):   # Picchiaduro, Agguato
             return
+        if not self._mag_precheck(p, mv, Vec2(tx, ty)):   # Campo Magnetico senza bersaglio
+            return
         self._sneasel_on_cast(p, mv)   # Notte Fonda: lanciare una mossa toglie l'invisibilità
         # Lanciare annulla un attacco base in CARICAMENTO (il ciclo non si consuma);
         # se il colpo è già uscito il recupero continua da dove era (niente punizione).
@@ -1731,6 +1739,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             ms.cooldown_remaining *= p.spite_mult
         mv = self._item_on_cast(p, mv, slot)   # Scelta, Assorbisfera, Grandelente (+portata)
         self._hatt_on_cast(p)   # Quiete (Hatenna): lanciare vicino alla linea agita
+        mv = self._mag_on_cast(p, mv)   # Campo Elettrico: +50% portata (linea Magnemite)
         origin = Vec2(p.pos.x, p.pos.y)
         tgt = Vec2(tx, ty)
         to = tgt - origin
@@ -1831,6 +1840,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             pass   # linea Duraludon (engine/archaludon.py)
         elif self._hatt_cast(p, mv, rank, origin, tgt, dirv):
             pass   # linea Hatenna (engine/hatterene.py)
+        elif self._mag_cast(p, mv, rank, origin, tgt, dirv):
+            pass   # linea Magnemite (engine/magnezone.py)
         elif shape == "buff":
             self._apply_support(p, mv, rank, origin)
             self.fx_events.append({"kind": "buff", "c": (origin.x, origin.y),
@@ -3958,6 +3969,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         if p.passive_id in ARCH_PASSIVES and self._bot_arch_cast(p, target):
             return
         if p.passive_id in HATT_PASSIVES and self._bot_hatt_cast(p, target):
+            return
+        if p.passive_id in MAG_PASSIVES and self._bot_mag_cast(p, target):
             return
         for slot in ("R", "Q", "W", "E"):
             ms = p.moveset.get(slot)

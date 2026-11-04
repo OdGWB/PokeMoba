@@ -10,6 +10,7 @@ Stile LoL / MOBA:
   - S: ferma (tiene la posizione: attacca solo chi è già a portata).
   - Maiusc tenuto: "solo Pokémon" (il clic sinistro ignora minion, neutrali e
     strutture, sia sul bersaglio sia nell'attacco-movimento).
+  - Rotella o Tab mentre si mira una R a polarità (Magnezone): alterna + / -.
 
 L'input non tocca lo stato: produce Command con numero di sequenza.
 """
@@ -19,6 +20,7 @@ import pygame
 
 import config
 from engine.entities import Pokemon, Structure, Unit
+from game import mag_fx
 from sim.commands import (AttackCommand, AttackMoveCommand, CastMoveCommand,
                           MoveCommand, RankMoveCommand, StopCommand)
 
@@ -57,11 +59,11 @@ class InputController:
             elif ev.type == pygame.KEYUP and ev.key in ABILITY_KEYS:
                 slot = ABILITY_KEYS[ev.key]
                 if self.aiming_slot == slot:
-                    commands.append(self._cast_at_mouse(slot, camera, pygame.mouse.get_pos()))
+                    commands.append(self._cast_at_mouse(slot, camera, pygame.mouse.get_pos(), me))
                     self.aiming_slot = None
             elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
                 if self.aiming_slot:
-                    commands.append(self._cast_at_mouse(self.aiming_slot, camera, ev.pos))
+                    commands.append(self._cast_at_mouse(self.aiming_slot, camera, ev.pos, me))
                     self.aiming_slot = None
                 else:
                     commands.append(self._left_click(ev.pos, camera, world, me))
@@ -74,6 +76,10 @@ class InputController:
                                                 entity_id=self.controlled_id, x=tx, y=ty))
             elif ev.type == pygame.KEYDOWN and ev.key == pygame.K_s:
                 commands.append(StopCommand(seq=self._next_seq(), entity_id=self.controlled_id))
+            elif ((ev.type == pygame.MOUSEWHEEL
+                   or (ev.type == pygame.KEYDOWN and ev.key == pygame.K_TAB))
+                  and self.aiming_slot and mag_fx.has_polarity(self._move(me, self.aiming_slot))):
+                mag_fx.toggle_polarity()   # Bombagnete / Campo Elettrico: + <-> -
         return commands
 
     # --- aiuto ---------------------------------------------------------------
@@ -83,11 +89,17 @@ class InputController:
         ms = me.moveset.get(slot)
         return bool(ms and ms.chosen and ms.unlocked and ms.rank > 0)
 
-    def _cast_at_mouse(self, slot, camera, pos):
+    @staticmethod
+    def _move(me, slot):
+        ms = me.moveset.get(slot) if me is not None and getattr(me, "moveset", None) else None
+        return ms.chosen if ms is not None else None
+
+    def _cast_at_mouse(self, slot, camera, pos, me=None):
         tx, ty = self._world_tile(camera, pos)
-        hold = (pygame.time.get_ticks() - self.aim_start) / 1000.0
+        hold = min(1.5, max(0.0, (pygame.time.get_ticks() - self.aim_start) / 1000.0))
+        hold = mag_fx.cast_hold(self._move(me, slot), hold)   # R a polarità: il segno
         return CastMoveCommand(seq=self._next_seq(), entity_id=self.controlled_id,
-                               slot=slot, x=tx, y=ty, hold=min(1.5, max(0.0, hold)))
+                               slot=slot, x=tx, y=ty, hold=hold)
 
     def _left_click(self, pos, camera, world, me):
         tx, ty = self._world_tile(camera, pos)

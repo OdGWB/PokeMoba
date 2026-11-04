@@ -18,7 +18,7 @@ import pygame
 
 import config
 
-from . import (arch_fx, charcadet_fx, corvi_fx, eevee_fx, hatt_fx, mien_fx, noivern_fx,
+from . import (arch_fx, charcadet_fx, corvi_fx, eevee_fx, hatt_fx, mag_fx, mien_fx, noivern_fx,
                sneasel_fx, ursa_fx)
 from . import structure_gfx
 
@@ -1480,6 +1480,8 @@ class FXSystem:
                 arch_fx.draw_shape(overlay, s, S, ts, f, a)
             elif kind in hatt_fx.SHAPES:   # linea Hatenna: increspature, Psicoraggio, note, ciocche
                 hatt_fx.draw_shape(overlay, s, S, ts, f, a)
+            elif kind in mag_fx.SHAPES:   # linea Magnemite: saette, linee di campo, cariche
+                mag_fx.draw_shape(overlay, s, S, ts, f, a)
         surface.blit(overlay, (0, 0))
 
     # Registro degli stili d'attacco: nome ("fx" nel JSON / "attack_fx") -> handler.
@@ -1551,4 +1553,5 @@ class FXSystem:
         **arch_fx.STYLES,
         # linea Hatenna (game/hatt_fx.py)
         **hatt_fx.STYLES,
+        **mag_fx.STYLES,
     }
