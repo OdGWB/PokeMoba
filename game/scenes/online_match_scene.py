@@ -22,7 +22,7 @@ import config
 from net import client as C
 from net.prediction import Predictor
 
-from .. import arch_fx
+from .. import arch_fx, hud
 from ..fx import FXSystem
 from ..hud_passives import PassiveCtx, draw_passive
 from ..online_world import MovementModel, OnlineWorld
@@ -182,8 +182,6 @@ class OnlineMatchScene(NetMatchScene):
     # --- HUD --------------------------------------------------------------------------------
     def hud_lines(self):
         lines = super().hud_lines()
-        lines[-1] = ("ONLINE  Dx: muovi  Sx: attacca  Q/W/E/R  Ctrl+tasto: grado  "
-                     "F3: rete" + ("  F2: slot" if self.host else "") + "  ESC: esci")
         s = self.session
         now = time.monotonic()
         for t, txt in list(s.events):
@@ -208,6 +206,11 @@ class OnlineMatchScene(NetMatchScene):
             self.slot_panel.draw(surface, font)
         if self.session.phase in (C.ENDED, C.LOST):
             self._draw_end(surface)
+
+    @property
+    def HELP(self):
+        return ("ONLINE  Dx muovi  Sx attacca  Q/W/E/R mosse  Ctrl+tasto grado  F3 rete"
+                + ("  F2 slot" if self.host else "") + "  ESC esci")
 
     def _portrait(self, sprite_dir, side):
         """Ritratto di una forma (primo fotogramma Idle), come MatchScene._portrait."""
@@ -241,12 +244,12 @@ class OnlineMatchScene(NetMatchScene):
         for sl, ms in self.disp_moveset.items():
             ms.chosen = self._variant_move(ms, h["slots"][sl]["variant"])
         me.moveset = self.disp_moveset
-        W, H = surface.get_size()
-        bw, bh, gap = 72, 56, 10
-        total = 4 * bw + 3 * gap
-        x0 = (W - total) // 2
+        bar = getattr(self, "_bar", None)
+        if bar is None:
+            return
+        px, py, ph = bar.passive_at
         from engine.jungle import CODE_WEATHER
-        draw_passive(surface, font, me, x0 + total + 14, H - bh - 12, bh, PassiveCtx(
+        draw_passive(surface, hud.font(13), me, px, py, ph, PassiveCtx(
             now=self.world.match_time, portrait=self._portrait,
             in_rain=bool(mv.get("in_rain")),
             weather=CODE_WEATHER.get(h.get("weather", 0), "clear")))

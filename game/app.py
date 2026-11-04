@@ -125,14 +125,15 @@ class App:
         self._draw_hud()
         fullres = getattr(self.scene, "draw_fullres", None)
         if fullres is not None:
+            self.scene.fps = self.clock.get_fps()   # mostrato dall'HUD della partita
             fullres(self.window, self.font)
         pygame.display.flip()
 
     def _draw_hud(self):
+        # Solo messaggi temporanei (eventi di rete, debug F3): l'HUD vero della
+        # partita e' disegnato dalla scena in draw_fullres (game/hud.py).
         lines = list(self.scene.hud_lines()) if hasattr(self.scene, "hud_lines") else []
-        if lines:
-            lines.append(f"FPS: {self.clock.get_fps():.0f}")
-        y = 6
+        y = 62
         for line in lines:
             self.window.blit(self.font.render(line, True, (0, 0, 0)), (9, y + 1))
             self.window.blit(self.font.render(line, True, (240, 240, 240)), (8, y))

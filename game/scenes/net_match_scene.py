@@ -19,7 +19,9 @@ from engine.jungle import CODE_WEATHER, WEATHER_NAMES, apply_weather, ring_tiles
 from engine.vec import Vec2
 from engine.vision import VisionSystem
 
+from .. import hud
 from ..camera import Camera
+from ..fx import type_color
 from ..minimap import Minimap
 from ..networld import NetWorld
 from ..particles import ParticleSystem
@@ -336,102 +338,131 @@ class NetMatchScene:
         return ms.base
 
     def hud_lines(self):
-        h = self.world.hud
-        lines = []
-        if h is not None:
-            t = int(h["time"])
-            lines.append(f"Tempo {t // 60:02d}:{t % 60:02d}   Nucleo BLU {int(h['core0'])}   "
-                         f"Nucleo ROSSO {int(h['core1'])}   Lv.{h['level']}   "
-                         f"Oro {int(h.get('gold', 0))}   "
-                         f"Meteo: {WEATHER_NAMES.get(CODE_WEATHER.get(h.get('weather', 0), 'clear'), '?')}"
-                         f"  (P: negozio)")
-            if self.world.winner is not None:
-                squad = "BLU" if self.world.winner == 0 else "ROSSO"
-                lines.append(f">>> VITTORIA squadra {squad}! <<<")
-        lines.append("ONLINE  Dx: muovi  Sx: attacca  Q/W/E/R: mosse  Ctrl+tasto: grado  ESC: esci")
-        return lines
+        # L'HUD vero e' in draw_fullres (game/hud.py); qui solo messaggi temporanei.
+        return []
+
+    HELP = "ONLINE  Dx muovi  Sx attacca  Q/W/E/R mosse  Ctrl+tasto grado  ESC esci"
+
+    # --- HUD a piena risoluzione (game/hud.py, uguale alla partita locale) -------------
+    def _my_form(self, me):
+        """(nome, sprite_dir) della forma attuale, dal dex dell'entità."""
+        dex = getattr(me, "dex", None) if me is not None else None
+        for e in self.pdef.evolutions or ():
+            if e.get("dex") is not None and int(e["dex"]) == dex:
+                return e.get("name") or self.pdef.name, e.get("sprite_dir") or self.pdef.sprite_dir
+        return self.pdef.name, self.pdef.sprite_dir
+
+    def _player_view(self, h, me) -> hud.PlayerView:
+        name, sd = self._my_form(me)
+        port = getattr(self, "_portrait", None)
+        dead = me is None or me.id in getattr(self.world, "dead", ())
+        return hud.PlayerView(
+            name=name, level=h["level"], xp=h["xp"],
+            hp=me.hp if me is not None else 0.0,
+            max_hp=me.max_hp if me is not None else 1.0,
+            portrait=port(sd, hud.PORT - 14) if (port and sd) else None,
+            gold=int(h.get("gold", 0)), items=list(h.get("items", [])),
+            stats=self._info_rows(h, me), alive=not dead, points=h["points"],
+            rank_hint="Ctrl+Q/W/E/R", team=self.team)
+
+    def _info_rows(self, h, me) -> list:
+        """Online le statistiche non viaggiano nello snapshot: al loro posto ruolo,
+        tipi e oggetti (righe senza etichetta: ("", testo, colore))."""
+        role, types = self.pdef.role, self.pdef.types
+        dex = getattr(me, "dex", None)
+        for e in self.pdef.evolutions or ():   # ruolo e tipi della forma attuale
+            if e.get("dex") is not None and int(e["dex"]) == dex:
+                role, types = e.get("role") or role, e.get("types") or types
+        rows = [("", (role or "").capitalize(), hud.TRIM_HI)]
+        rows += [("", t, type_color(t)) for t in types[:2]]
+        rows.append(("Oggetti", f"{len(h.get('items', []))}/6", ""))
+        return rows
+
+    def _slot_views(self, h) -> list:
+        pend = {["Q", "W", "E", "R"][i] for i in self._pending()}
+        charges = self._me_vis().get("charges", {})
+        out = []
+        for sl in ("Q", "W", "E", "R"):
+            s = h["slots"][sl]
+            ms = self.disp_moveset.get(sl)
+            mv = self._variant_move(ms, s["variant"])
+            maxr = ms.max_rank if ms is not None else (3 if sl == "R" else 4)
+            v = hud.SlotView(key=sl, rank=s["rank"], max_rank=maxr,
+                             can_rank=h["points"] > 0 and s["rank"] < maxr,
+                             evolvable=sl in pend and ms is not None and bool(ms.upgrades))
+            if mv is not None:
+                v.name, v.mtype = mv.name, mv.type
+                ch = charges.get(sl)
+                if ch is not None and s["rank"] > 0 and mv.charges > 0:
+                    whole = max(0, min(mv.charges, int(ch + 1e-6)))
+                    v.charges = (whole, mv.charges, 1.0 if whole >= mv.charges else ch - int(ch))
+                elif s["rank"] > 0 and s["cd"] > 0:
+                    v.cd_left = s["cd"]
+                    v.cd_frac = s["cd"] / max(0.1, mv.cooldown_at(s["rank"]))
+            else:
+                v.can_rank = False
+                v.locked = "Liv. 8" if (s["variant"] == -2 or h["level"] < 8) else "Evolvi"
+                if ms is None:
+                    v.max_rank = 0
+            out.append(v)
+        return out
+
+    def _match_view(self, h) -> hud.MatchView:
+        cores = {c.team: c for c in self.world.cores()}
+        dead = getattr(self.world, "dead", set())
+        teams = tuple(tuple(-1.0 if (q.id in dead or not getattr(q, "alive", True)) else 0.0
+                            for q in self.world.pokemons() if q.team == t) for t in (0, 1))
+        return hud.MatchView(
+            time=h["time"],
+            cores=tuple((cores[t].hp, cores[t].max_hp) if t in cores
+                        else (float(h.get(f"core{t}", 0)), float(config.CORE_HP))
+                        for t in (0, 1)),
+            teams=teams, next_wave=None,
+            weather=WEATHER_NAMES.get(CODE_WEATHER.get(h.get("weather", 0), "clear"), ""),
+            winner=self.world.winner, player_team=self.team)
 
     def draw_fullres(self, surface, font):
         h = self.world.hud
         if h is None:
             return
-        slots = ["Q", "W", "E", "R"]
-        bw, bh, gap = 72, 56, 10
-        total = len(slots) * bw + (len(slots) - 1) * gap
-        W, H = surface.get_size()
-        x0 = (W - total) // 2
-        y0 = H - bh - 12
-        avail = h["points"]
-        for i, sl in enumerate(slots):
-            bx = x0 + i * (bw + gap)
-            rect = pygame.Rect(bx, y0, bw, bh)
-            pygame.draw.rect(surface, (28, 30, 36), rect)
-            pygame.draw.rect(surface, (95, 95, 108), rect, 1)
-            s = h["slots"][sl]
-            ms = self.disp_moveset.get(sl)
-            mv = self._variant_move(ms, s["variant"])
-            name = mv.name if mv is not None else ("R: lv.8" if s["variant"] == -2 else "—")
-            on_cd = mv is not None and s["rank"] > 0 and s["cd"] > 0
-            if on_cd:
-                frac = max(0.0, min(1.0, s["cd"] / max(0.1, mv.cooldown_at(s["rank"]))))
-                ov = pygame.Surface((bw, int(bh * frac)), pygame.SRCALPHA)
-                ov.fill((10, 12, 20, 180)); surface.blit(ov, (bx, y0))
-            surface.blit(font.render(sl, True, (255, 230, 120)), (bx + 5, y0 + 3))
-            ncol = (140, 140, 150) if on_cd else (230, 230, 230)
-            surface.blit(font.render(name[:10], True, ncol), (bx + 5, y0 + bh - 20))
-            if on_cd:
-                txt = f"{s['cd']:.0f}" if s["cd"] >= 1.0 else f"{s['cd']:.1f}"
-                num = font.render(txt, True, (255, 255, 255))
-                surface.blit(num, (bx + bw // 2 - num.get_width() // 2,
-                                   y0 + bh // 2 - num.get_height() // 2 - 2))
-            ch = self._me_vis().get("charges", {}).get(sl)
-            if mv is not None and ch is not None and s["rank"] > 0:
-                # Mossa a cariche (Erboscivolata): badge col numero di cariche pronte.
-                whole = max(0, min(mv.charges, int(ch + 1e-6)))
-                badge = (120, 220, 140) if whole > 0 else (160, 160, 170)
-                cxp, cyp = bx + bw - 12, y0 + bh - 13
-                pygame.draw.circle(surface, (16, 20, 26), (cxp, cyp), 9)
-                pygame.draw.circle(surface, badge, (cxp, cyp), 9, 1)
-                nn = font.render(str(whole), True, badge)
-                surface.blit(nn, (cxp - nn.get_width() // 2, cyp - nn.get_height() // 2))
-            maxr = 3 if sl == "R" else 4
-            pip_w = (bw - 12) // maxr
-            for r in range(maxr):
-                col = (120, 210, 120) if r < s["rank"] else (70, 70, 82)
-                pygame.draw.rect(surface, col, pygame.Rect(bx + 6 + r * pip_w, y0 + 21, pip_w - 2, 5))
-        if avail > 0:
-            surface.blit(font.render(f"Punti mossa: {avail} (Ctrl+Q/W/E/R)", True,
-                                     (120, 220, 120)), (x0, y0 - 22))
         me = self.world.get(self.your_id)
         self.minimap.draw(surface, self.world, self.camera, self.vision, self.team,
                           self.map_data.dens, me)
-        if self._pending():
-            self._draw_choice_menu(surface, font)
+        right = self.minimap.rect.x
+        hud.draw_top(surface, self._match_view(h), getattr(self, "fps", None))
+        hud.text(surface, self.HELP, (8, 6), 12, hud.DIM)
+        icon = lambda iid, size: self.shop._icon(self.item_catalog, iid, size, font)
+        self._bar = hud.draw_bar(surface, self._player_view(h, me), self._slot_views(h),
+                                 type_color, icon, right_limit=right)
+        # Popup delle evoluzioni (online si sceglie con 1/2 la prima in coda).
+        pend = [["Q", "W", "E", "R"][i] for i in self._pending()]
+        pend = [sl for sl in pend if self.disp_moveset.get(sl) and self.disp_moveset[sl].upgrades]
+        if pend:
+            near = self._near_base()
+            sizes = [hud.choice_size(sl, self.disp_moveset[sl].upgrades[:2]) for sl in pend]
+            anchors = [self._bar.slot_rects[sl].centerx for sl in pend]
+            bottom = self._bar.rect.y - (30 if h["points"] > 0 else 8)
+            for k, (sl, r) in enumerate(zip(pend, hud.layout_popups(sizes, anchors, bottom,
+                                                                      right))):
+                if not near:
+                    title, col = f"Evolvi {sl} - torna in BASE", (236, 170, 110)
+                elif k == 0:
+                    title, col = f"Evolvi {sl} - premi 1 / 2", hud.GOLD
+                else:
+                    title, col = f"Evolvi {sl} - dopo {pend[0]}", hud.DIM
+                hud.draw_choice(surface, r, title, self.disp_moveset[sl].upgrades[:2],
+                                type_color, False, col)
+        if self.world.winner is not None:
+            win = self.world.winner == self.team
+            hud.draw_banner(surface, "VITTORIA!" if win else "SCONFITTA",
+                            f"Ha vinto la squadra {'BLU' if self.world.winner == 0 else 'ROSSA'}",
+                            (255, 230, 120) if win else (240, 120, 110),
+                            y=surface.get_height() // 3)
+        elif me is None or me.id in getattr(self.world, "dead", ()):
+            hud.draw_banner(surface, "ABBATTUTO", "Rinasci in base tra poco", (240, 120, 110))
 
         if self.shop.open:
             near = me is not None and me.pos.dist(self.base) <= config.SHOP_RANGE
             self.shop.draw(surface, font, self.item_catalog, h.get("gold", 0),
                            h.get("items", []), self.pdef.recommended_items or self.pdef.role,
                            near, self._me_vis().get("item_cd", {}), self.world.match_time)
-
-    def _draw_choice_menu(self, surface, font):
-        slot = ["Q", "W", "E", "R"][self._pending()[0]]
-        ms = self.disp_moveset.get(slot)
-        if not ms or not ms.upgrades:
-            return
-        W, H = surface.get_size()
-        panel = pygame.Rect(W // 2 - 230, H // 2 - 80, 460, 150)
-        bg = pygame.Surface((panel.w, panel.h), pygame.SRCALPHA); bg.fill((18, 18, 26, 235))
-        surface.blit(bg, panel)
-        pygame.draw.rect(surface, (210, 200, 120), panel, 2)
-        title = "EVOLUZIONE - scegli l'ultimate (R)" if slot == "R" else f"EVOLUZIONE - potenziamento {slot}"
-        surface.blit(font.render(title, True, (255, 230, 120)), (panel.x + 14, panel.y + 10))
-        for i, mv in enumerate(ms.upgrades[:2]):
-            surface.blit(font.render(f"[{i + 1}]  {mv.name}", True, (235, 235, 235)),
-                         (panel.x + 18, panel.y + 40 + i * 40))
-            surface.blit(font.render(f"{mv.type} · {mv.shape} · {mv.category}", True,
-                                     (165, 165, 180)), (panel.x + 46, panel.y + 58 + i * 40))
-        near = self._near_base()
-        hint = "Premi 1 / 2 per scegliere" if near else "Torna in BASE per scegliere"
-        surface.blit(font.render(hint, True, (150, 220, 150) if near else (230, 170, 120)),
-                     (panel.x + 14, panel.bottom - 22))

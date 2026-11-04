@@ -737,6 +737,41 @@ Passaggi completati:
   a sinistra = meglio, numero = posizione) e DeveloperDetailScene (due colonne:
   motivi | forme, tipi, scontri). Screenshot: step_38_dev.png, step_38_dev_detail.png,
   step_39_*.png.
+- HUD DI PARTITA rifatto (step_40), nuovo game/hud.py condiviso da MatchScene e
+  NetMatchScene/OnlineMatchScene (le scene costruiscono PlayerView/SlotView/
+  MatchView, hud.py disegna: nessuna logica). Prima: righe di testo in alto e
+  caselle 72x56 coi nomi tagliati a 10 lettere. (1) BARRA IN BASSO (pannello scuro
+  con cornice d'oro, a sinistra della minimappa): statistiche + oro | ritratto con
+  medaglione del livello e nome (velo + secondi se abbattuto) | passiva
+  (hud_passives, colonna larga PASSIVE_W=94 per Armature/Eevee) + caselle Q W E R
+  (tinta del TIPO della mossa, tasto e "+" del grado DENTRO la casella, velo e
+  secondi di ricarica, cariche, tacche del grado, lucchetto "Liv. 8"/"Evolvi") col
+  NOME SOTTO in un carattere UNICO per la barra (name_size 13..11, due righe solo
+  se serve; il "+" delle varianti e' un segno dorato) | sotto: barra VITA (tacche
+  ogni 500) e barra ESPERIENZA "x / y -> Lv.n" (xp_progress da CUMULATIVE_XP) |
+  6 oggetti con le icone del negozio (ShopUI._icon). Targhetta "+N punti mossa"
+  sopra la barra. (2) STRISCIA IN ALTO: tempo, vita dei due nuclei, pallini dei
+  Pokemon (vivo/caduto) + "rinasce Ns", prossima ondata, meteo, FPS a destra.
+  (3) AVVISI (draw_banner) sotto la striscia: richiamo con barra, abbattuto,
+  vittoria/sconfitta. (4) POPUP delle EVOLUZIONI: layout_popups li mette in fila
+  sopra la barra, ognuno centrato sulla sua casella e spinto di lato quanto basta
+  (a capo verso l'alto se non ci stanno), mai sopra la minimappa; nome intero +
+  tipo colorato (draw_choice). Online stesso layout (scelta coi tasti 1/2); al
+  posto delle statistiche (non nello snapshot) ruolo e tipi della forma attuale.
+  App._draw_hud ora disegna solo messaggi temporanei (eventi rete, F3) a y=62.
+  Screenshot: step_40_hud (evoluzioni), _gioco (ricariche, oggetti, richiamo),
+  _eevee (abbattuto + popup Eevee), _charcadet/_zoom, step_40_online_60.
+- HUD piu' COMPATTO coi NOMI DENTRO le caselle (step_41), su feedback (troppo
+  spazio tra le caselle). Barra 752x150 -> 680x120: SLOT_GAP 16 -> 5, caselle
+  72x52, statistiche/ritratto/oggetti piu' piccoli (ITEM 27). Il nome della
+  mossa sta in basso DENTRO la casella (1-2 righe, carattere 11-12 unico per la
+  barra); niente piu' gemma al centro: tasto in alto a sinistra, "+" in alto a
+  destra, secondi di ricarica o pallino delle cariche in alto al centro,
+  striscia del colore del tipo sul fondo. Parole troppo lunghe: trattino a fine
+  sillaba (_wrap_name: V|CV o VC|CV, doppie divise, niente s+cons/gn/cons+r-l-h:
+  "Danza-dipiume", "Elettro-raggio"). Le etichette della passiva usano
+  hud.font(13) per stare tra le caselle e la barra della vita.
+  Screenshot: step_41_hud, _gioco, _eevee, _mienfoo, _online.
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

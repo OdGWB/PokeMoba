@@ -34,6 +34,8 @@ from ..renderer import Renderer
 from ..shop_ui import ShopUI
 from ..sprites.animator import FallbackAnimator, SpriteAnimator
 from ..sprites.spritesheet import load_pokemon_animations, make_wild_animator
+from .. import hud
+from ..fx import type_color
 from ..hud_passives import PassiveCtx, draw_passive
 from ..world_fx import draw_projectiles, draw_world_effects, update_world_fx
 
@@ -523,240 +525,197 @@ class MatchScene:
             self._portraits[key] = img
         return self._portraits[key]
 
-    def _respawn_status(self, team: int) -> str:
-        name = "BLU" if team == 0 else "ROSSO"
-        pk = [p for p in self.world.pokemons() if p.team == team]
-        alive = sum(p.alive for p in pk)
-        dead = [p for p in pk if not p.alive]
-        if dead:
-            soon = min(p.respawn_timer for p in dead)
-            return f"{name} {alive}/{len(pk)} vivi (prossimo {soon:.0f}s)"
-        return f"{name} {alive}/{len(pk)} vivi"
-
     def hud_lines(self) -> list[str]:
-        cam = "AGGANCIATA" if self.camera_locked else "LIBERA"
-        lines = []
-        if self.match is not None:
-            t = int(self.match.time)
-            cores = {c.team: c for c in self.world.cores()}
-            c0 = int(cores[0].hp) if 0 in cores else 0
-            c1 = int(cores[1].hp) if 1 in cores else 0
-            next_wave = max(0, int(self.match._wave_timer))
-            lines.append(f"Tempo {t // 60:02d}:{t % 60:02d}   Nucleo BLU {c0}   "
-                         f"Nucleo ROSSO {c1}   Prossima ondata: {next_wave}s")
-            from engine.jungle import WEATHER_NAMES
-            lines.append(f"Respawn - {self._respawn_status(0)}   {self._respawn_status(1)}   "
-                         f"Meteo: {WEATHER_NAMES.get(self.match.jungle.weather, '?')}")
-            p = self.player
-            atkm = "+" if p.atk_mult > 1.0 else ""
-            difm = "+" if p.def_buff_active else ("-" if p.def_debuff_active else "")
-            # L'Att. Speciale non e' un valore di danno ma il MOLTIPLICATORE abilita'
-            # (0,6 + 0,004 x SpA_eff); l'AP vero viene dagli oggetti. Mostro entrambi
-            # cosi' lo "speciale" non sembra zero.
-            lines.append(
-                f"{p.name} Lv.{p.level}  HP {int(p.hp)}/{int(p.max_hp)}  "
-                f"Atk {int(p.eff_attack())}{atkm}  Dif {int(p.eff_defense())}{difm}  "
-                f"DifSp {int(p.eff_sp_defense())}  MoltAbil x{p.ability_mult:.2f}  "
-                f"AP {int(p.eff_sp_attack())}  Oro {int(p.gold)}  (P: negozio)")
-            if self.player.recalling:
-                left = max(0.0, self.player.recall_until - self.match.time)
-                lines.append(f"RICHIAMO in corso... {left:.1f}s (muoviti o subisci danno per annullare)")
-            if not self.player.alive:
-                lines.append(f"ABBATTUTO - respawn tra {self.player.respawn_timer:.0f}s")
-            if self.match.winner is not None:
-                squad = "BLU" if self.match.winner == 0 else "ROSSO"
-                lines.append(f">>> VITTORIA squadra {squad}! <<<")
-        lines.append(f"camera: {cam}   Dx: muovi  Sx: attacca  Q/W/E/R: mosse  "
-                     f"Ctrl/clic: grado  B: richiamo  P: negozio  Y: camera  ESC: esci")
-        return lines
+        # L'HUD vero e' in draw_fullres (game/hud.py); qui niente righe di testo.
+        return []
 
-    # --- UI a piena risoluzione (barra mosse + menu evoluzione) --------------
+    # --- UI a piena risoluzione (game/hud.py) --------------------------------
+    def _player_view(self) -> hud.PlayerView:
+        p = self.player
+        sd = self._dex_sprite.get(p.dex) or self.pdef.sprite_dir
+        atkm = "+" if p.atk_mult > 1.0 else ""
+        difm = "+" if p.def_buff_active else ("-" if p.def_debuff_active else "")
+        # L'Att. Speciale vero (AP) viene dagli oggetti; il moltiplicatore abilita'
+        # (0,6 + 0,004 x SpA_eff) si mostra a parte cosi' lo speciale non sembra zero.
+        stats = [("Attacco", int(p.eff_attack()), atkm),
+                 ("Difesa", int(p.eff_defense()), difm),
+                 ("Dif. Sp.", int(p.eff_sp_defense()), ""),
+                 ("Att. Sp.", int(p.eff_sp_attack()), ""),
+                 ("Abilità", f"x{p.ability_mult:.2f}", "")]
+        return hud.PlayerView(
+            name=p.name, level=p.level, xp=p.xp, hp=p.hp, max_hp=p.max_hp,
+            portrait=self._portrait(sd, hud.PORT - 14) if sd else None,
+            gold=int(p.gold), items=list(p.items), stats=stats, alive=p.alive,
+            respawn_left=max(0.0, p.respawn_timer),
+            points=skills.available_points(p), team=p.team)
+
+    def _slot_views(self) -> list:
+        p = self.player
+        avail = skills.available_points(p)
+        out = []
+        for sl in ("Q", "W", "E", "R"):
+            ms = p.moveset.get(sl)
+            s = hud.SlotView(key=sl)
+            if ms is not None:
+                s.rank, s.max_rank = ms.rank, ms.max_rank
+                s.can_rank = avail > 0 and skills.can_rank_up(p, sl)
+                s.evolvable = sl in p.pending_choices and bool(ms.upgrades)
+            if ms and ms.chosen and ms.unlocked:
+                mv = ms.chosen
+                s.name, s.mtype = mv.name, mv.type
+                if mv.charges > 0 and ms.rank > 0:
+                    cur = ms.charges_cur if ms.charges_cur >= 0 else float(mv.charges)
+                    whole = max(0, min(mv.charges, int(cur + 1e-6)))
+                    prog = 1.0 if whole >= mv.charges else (cur - int(cur))
+                    s.charges = (whole, mv.charges, prog)
+                elif ms.rank > 0 and ms.cooldown_remaining > 0:
+                    s.cd_left = ms.cooldown_remaining
+                    s.cd_frac = ms.cooldown_remaining / max(0.1, mv.cooldown_at(ms.rank))
+            elif ms and (not ms.unlocked or ms.chosen is None):
+                s.can_rank = False
+                s.locked = "Liv. 8" if p.level < 8 else "Scegli"
+            elif ms is None:
+                # Eevee/rami: l'ultimate arriva con la forma (o col liv. 8)
+                s.locked = "Liv. 8" if p.level < 8 else "Evolvi"
+                s.max_rank = 0
+            out.append(s)
+        return out
+
+    def _match_view(self) -> hud.MatchView:
+        from engine.jungle import WEATHER_NAMES
+        cores = {c.team: c for c in self.world.cores()}
+        teams = tuple(tuple(0.0 if q.alive else max(0.1, q.respawn_timer)
+                            for q in self.world.pokemons() if q.team == t) for t in (0, 1))
+        return hud.MatchView(
+            time=self.match.time,
+            cores=tuple((cores[t].hp, cores[t].max_hp) if t in cores else (0.0, 1.0)
+                        for t in (0, 1)),
+            teams=teams, next_wave=max(0.0, self.match._wave_timer),
+            weather=WEATHER_NAMES.get(self.match.jungle.weather, ""),
+            winner=self.match.winner, player_team=self.player.team)
+
     def draw_fullres(self, surface, font) -> None:
         if self.match is None:
             return
         p = self.player
-        W, H = surface.get_size()
-        slots = ["Q", "W", "E", "R"]
-        bw, bh, gap = 72, 56, 10
-        total = len(slots) * bw + (len(slots) - 1) * gap
-        x0 = (W - total) // 2
-        y0 = H - bh - 12
-        avail = skills.available_points(p)
-
-        self._skill_rects = {}
-        self._choice_rects = []
         near_base = p.pos.dist(p.spawn_pos) <= config.SHOP_RANGE
-        for i, sl in enumerate(slots):
-            bx = x0 + i * (bw + gap)
-            rect = pygame.Rect(bx, y0, bw, bh)
-            self._skill_rects[sl] = rect
-            ms = p.moveset.get(sl)
-            pygame.draw.rect(surface, (28, 30, 36), rect)
-            evolvable = ms is not None and sl in p.pending_choices and ms.upgrades
-            if evolvable:
-                pygame.draw.rect(surface, (235, 210, 90), rect, 2)   # bordo: evolvibile
-            else:
-                pygame.draw.rect(surface, (95, 95, 108), rect, 1)
-            name = "—"
-            on_cd = False
-            cd_left = 0.0
-            charge_count = None
-            if ms and ms.chosen and ms.unlocked:
-                mv = ms.chosen
-                name = mv.name
-                if mv.charges > 0 and ms.rank > 0:
-                    # Mossa a cariche (Erboscivolata): riempimento + numero di cariche.
-                    cur = ms.charges_cur if ms.charges_cur >= 0 else float(mv.charges)
-                    whole = max(0, min(mv.charges, int(cur + 1e-6)))
-                    charge_count = whole
-                    prog = 1.0 if whole >= mv.charges else (cur - int(cur))
-                    if whole == 0:
-                        on_cd = True
-                        # velo scuro che si svuota dal basso col caricarsi della carica
-                        empty_h = int(bh * (1.0 - prog))
-                        ov = pygame.Surface((bw, empty_h), pygame.SRCALPHA)
-                        ov.fill((10, 12, 20, 180))
-                        surface.blit(ov, (bx, y0))
-                    elif whole < mv.charges:
-                        # barra sottile: ricarica della prossima carica
-                        pw = int((bw - 10) * prog)
-                        pygame.draw.rect(surface, (40, 44, 54), pygame.Rect(bx + 5, y0 + bh - 6, bw - 10, 4))
-                        pygame.draw.rect(surface, (120, 200, 140), pygame.Rect(bx + 5, y0 + bh - 6, pw, 4))
-                elif ms.rank > 0 and ms.cooldown_remaining > 0:
-                    on_cd = True
-                    cd_left = ms.cooldown_remaining
-                    frac = max(0.0, min(1.0, ms.cooldown_remaining / max(0.1, mv.cooldown_at(ms.rank))))
-                    # Velo scuro che "cala" dall'alto man mano che la ricarica scende.
-                    ov = pygame.Surface((bw, int(bh * frac)), pygame.SRCALPHA)
-                    ov.fill((10, 12, 20, 180))
-                    surface.blit(ov, (bx, y0))
-            elif ms and not ms.unlocked:
-                name = "R: lv.8"
-            elif ms is None and sl == "R" and p.passive_id == "adattabilita":
-                name = "R: evolvi"   # Eevee: l'ultimate arriva con la forma
-            surface.blit(font.render(sl, True, (255, 230, 120)), (bx + 5, y0 + 3))
-            ncol = (140, 140, 150) if on_cd else (230, 230, 230)
-            surface.blit(font.render(name[:10], True, ncol), (bx + 5, y0 + bh - 20))
-            if on_cd and cd_left > 0:                     # secondi mancanti (solo mosse a cooldown)
-                txt = f"{cd_left:.0f}" if cd_left >= 1.0 else f"{cd_left:.1f}"
-                num = font.render(txt, True, (255, 255, 255))
-                surface.blit(num, (bx + bw // 2 - num.get_width() // 2,
-                                   y0 + bh // 2 - num.get_height() // 2 - 2))
-            if charge_count is not None:                  # badge col numero di cariche
-                badge = (120, 220, 140) if charge_count > 0 else (160, 160, 170)
-                cxp, cyp = bx + bw - 12, y0 + bh - 13
-                pygame.draw.circle(surface, (16, 20, 26), (cxp, cyp), 9)
-                pygame.draw.circle(surface, badge, (cxp, cyp), 9, 1)
-                nn = font.render(str(charge_count), True, badge)
-                surface.blit(nn, (cxp - nn.get_width() // 2, cyp - nn.get_height() // 2))
-            if ms:
-                pip_w = (bw - 12) // ms.max_rank
-                for r in range(ms.max_rank):
-                    col = (120, 210, 120) if r < ms.rank else (70, 70, 82)
-                    pygame.draw.rect(surface, col,
-                                     pygame.Rect(bx + 6 + r * pip_w, y0 + 21, pip_w - 2, 5))
-                if avail > 0 and skills.can_rank_up(p, sl):   # pallino "+": clic per il grado
-                    pygame.draw.circle(surface, (120, 220, 120), (bx + bw - 9, y0 + 10), 6)
-                    surface.blit(font.render("+", True, (10, 30, 10)), (bx + bw - 13, y0 + 1))
-            if evolvable:
-                self._draw_slot_choice(surface, font, sl, ms, bx, y0, bw, near_base)
-
-        if avail > 0:
-            surface.blit(font.render(f"Punti mossa: {avail}  (clic sul + o Ctrl+tasto)",
-                                     True, (120, 220, 120)), (x0, y0 - 22))
-        # Passiva (anime, Inversione, Muta, Sabbia, Spiriti, Eevee): game/hud_passives.py,
-        # stesso disegno della partita online.
-        draw_passive(surface, font, p, x0 + total + 14, y0, bh, PassiveCtx(
-            now=self.match.time, portrait=self._portrait, in_rain=self.match._in_rain(p),
-            weather=self.match.jungle.weather))
+        right = None
         if self.minimap is not None:
             self.minimap.draw(surface, self.world, self.camera, self.vision,
                               self.player.team, self.map_data.dens, self.player)
+            right = self.minimap.rect.x
+        hud.draw_top(surface, self._match_view(), getattr(self, "fps", None))
+        hud.text(surface, "Dx muovi  Sx attacca  Q/W/E/R mosse  Ctrl+tasto grado  "
+                 "Y camera  ESC esci", (8, 6), 12, hud.DIM)
+        icon = lambda iid, size: self.shop._icon(self.match.item_catalog, iid, size, font)
+        lay = hud.draw_bar(surface, self._player_view(), self._slot_views(), type_color,
+                           icon, right_limit=right)
+        self._skill_rects = dict(lay.slot_rects)
+        self._choice_rects = []
+        # Passiva (anime, Inversione, Muta, Sabbia, Spiriti, Eevee): game/hud_passives.py,
+        # stesso disegno della partita online.
+        px, py, ph = lay.passive_at
+        draw_passive(surface, hud.font(13), p, px, py, ph, PassiveCtx(
+            now=self.match.time, portrait=self._portrait, in_rain=self.match._in_rain(p),
+            weather=self.match.jungle.weather))
+        # Popup delle evoluzioni: in fila sopra la barra, mai sovrapposti.
+        evo = [sl for sl in ("Q", "W", "E", "R")
+               if sl in p.pending_choices and p.moveset.get(sl) and p.moveset[sl].upgrades]
+        if evo:
+            sizes = [self._choice_size(sl) for sl in evo]
+            anchors = [lay.slot_rects[sl].centerx for sl in evo]
+            bottom = lay.rect.y - (30 if skills.available_points(p) > 0 else 8)
+            rects = hud.layout_popups(sizes, anchors, bottom, right or surface.get_width())
+            for sl, r in zip(evo, rects):
+                self._draw_slot_choice(surface, sl, p.moveset[sl], r, near_base,
+                                       first=(sl == p.pending_choices[0]))
+        # Avvisi al centro
+        if self.match.winner is not None:
+            squad = "BLU" if self.match.winner == 0 else "ROSSA"
+            win = self.match.winner == p.team
+            hud.draw_banner(surface, "VITTORIA!" if win else "SCONFITTA",
+                            f"Ha vinto la squadra {squad}",
+                            (255, 230, 120) if win else (240, 120, 110),
+                            y=surface.get_height() // 3)
+        elif not p.alive:
+            hud.draw_banner(surface, "ABBATTUTO", f"Rinasci tra {p.respawn_timer:.0f}s",
+                            (240, 120, 110))
+        elif p.recalling:
+            left = max(0.0, p.recall_until - self.match.time)
+            hud.draw_banner(surface, f"RICHIAMO  {left:.1f}s",
+                            "muoviti o subisci danno per annullare", (150, 200, 255),
+                            frac=1.0 - left / config.RECALL_TIME)
 
-        if self.shop.open and self.match is not None:
-            near = p.pos.dist(p.spawn_pos) <= config.SHOP_RANGE
+        if self.shop.open:
             self.shop.draw(surface, font, self.match.item_catalog, p.gold, p.items,
-                           p.rec_items or self.pdef.role, near, p.item_cd, self.match.time)
+                           p.rec_items or self.pdef.role, near_base, p.item_cd, self.match.time)
 
-    def _draw_slot_choice(self, surface, font, sl, ms, bx, y0, bw, near_base) -> None:
-        """Piccola scelta del potenziamento sopra lo slot (al posto del pop-up)."""
+    def _choice_size(self, sl) -> tuple:
         if self.player.passive_id == "adattabilita" and sl in CHOICE_SLOTS:
-            self._draw_eevee_choice(surface, font, sl, ms, bx, y0, bw, near_base)
-            return
-        opts = ms.upgrades[:2]
-        ph = 22 + 18 * len(opts)
-        panel = pygame.Rect(bx - 44, y0 - ph - 6, bw + 88, ph)
-        bg = pygame.Surface((panel.w, panel.h), pygame.SRCALPHA)
-        bg.fill((20, 20, 28, 235))
-        surface.blit(bg, panel)
-        pygame.draw.rect(surface, (235, 210, 90), panel, 1)
-        title = f"Evolvi {sl} (clic):" if near_base else f"Evolvi {sl} - vai in BASE"
-        surface.blit(font.render(title, True, (235, 210, 90)), (panel.x + 6, panel.y + 3))
-        for i, mv in enumerate(opts):
-            oy = panel.y + 20 + i * 18
-            r = pygame.Rect(panel.x + 5, oy, panel.w - 10, 17)
-            if near_base:
-                pygame.draw.rect(surface, (44, 48, 60), r)
-                self._choice_rects.append((r, sl, i))
-            surface.blit(font.render(f"{i + 1}. {mv.name}", True, (230, 230, 235)), (r.x + 4, oy + 1))
+            return 340, 64 + 22 * 2
+        return hud.choice_size(sl, self.player.moveset[sl].upgrades[:2])
 
-    def _draw_eevee_choice(self, surface, font, sl, ms, bx, y0, bw, near_base) -> None:
+    def _draw_slot_choice(self, surface, sl, ms, panel, near_base, first=False) -> None:
+        """Scelta del potenziamento di una mossa, nel rettangolo dato da layout_popups."""
+        if self.player.passive_id == "adattabilita" and sl in CHOICE_SLOTS:
+            self._draw_eevee_choice(surface, sl, ms, panel, near_base)
+            return
+        if near_base:
+            title = f"Evolvi {sl}" + (" - clic o 1/2" if first else " - clic")
+        else:
+            title = f"Evolvi {sl} - torna in BASE"
+        rows = hud.draw_choice(surface, panel, title, ms.upgrades[:2], type_color, near_base,
+                               hud.GOLD if near_base else (236, 170, 110))
+        self._choice_rects += [(r, sl, i) for i, r in enumerate(rows)]
+
+    def _draw_eevee_choice(self, surface, sl, ms, panel, near_base) -> None:
         """Scelta di Eevee: ogni opzione è un asse di ruolo; accanto, le forme a cui
         porta. In cima l'anteprima "Con queste scelte diventerai: [forma]",
         aggiornata a ogni scelta (e all'opzione sotto il mouse)."""
         p = self.player
         opts = ms.upgrades[:2]
         axis = eevee_fx.CHOICE_AXES.get(sl, ("", ""))
-        lh = 18
-        pw = 330
-        ph = 60 + lh * len(opts)
-        # sopra la riga "Punti mossa" (y0 - 22), così non si sovrappongono
-        panel = pygame.Rect(bx + bw // 2 - pw // 2, y0 - ph - 26, pw, ph)
-        W = surface.get_width()
-        panel.x = max(4, min(panel.x, W - pw - 4))
-        bg = pygame.Surface((panel.w, panel.h), pygame.SRCALPHA)
-        bg.fill((20, 20, 28, 235))
-        surface.blit(bg, panel)
-        pygame.draw.rect(surface, (235, 210, 90), panel, 1)
-        title = f"Evolvi {sl} (clic):" if near_base else f"Evolvi {sl} - vai in BASE"
-        surface.blit(font.render(title, True, (235, 210, 90)), (panel.x + 6, panel.y + 3))
+        lh = 22
+        hud.panel(surface, panel, trim=hud.TRIM_HI)
+        title = f"Evolvi {sl} - clic" if near_base else f"Evolvi {sl} - torna in BASE"
+        hud.text(surface, title, (panel.x + 10, panel.y + 6), 14,
+                 hud.GOLD if near_base else (236, 170, 110), bold=True)
         mouse = pygame.mouse.get_pos()
         hover = None
         rows = []
         for i, mv in enumerate(opts):
-            oy = panel.y + 58 + i * lh
-            r = pygame.Rect(panel.x + 5, oy, panel.w - 10, lh - 1)
+            oy = panel.y + 62 + i * lh
+            r = pygame.Rect(panel.x + 6, oy, panel.w - 12, lh - 2)
             rows.append((i, mv, r, oy))
             if r.collidepoint(mouse):
                 hover = i
         # Anteprima: forme raggiungibili con le scelte fatte (+ l'opzione sotto il mouse).
         cands = eevee_candidates(p, {sl: hover} if hover is not None else None)
-        x = panel.x + 6
-        y = panel.y + 21
-        lab = font.render("Con queste scelte diventerai:", True, (210, 205, 190))
-        surface.blit(lab, (x, y))
-        x = panel.x + 10
-        y += 18
+        hud.text(surface, "Con queste scelte diventerai:", (panel.x + 10, panel.y + 25), 13,
+                 (210, 205, 190))
+        x, y = panel.x + 12, panel.y + 42
         if len(cands) == len(eevee_forms(p)):
-            surface.blit(font.render("?", True, (235, 225, 200)), (x, y))
+            hud.text(surface, "?", (x, y), 14, (235, 225, 200), bold=True)
         else:
             for k, st in enumerate(cands):
-                col = eevee_fx.readable(st["form_color"])
-                t = font.render(st["name"] + ("" if k == len(cands) - 1 else " /"), True, col)
-                if x + t.get_width() > panel.right - 4:
+                s = st["name"] + ("" if k == len(cands) - 1 else " /")
+                w = hud.font(14, True).size(s)[0]
+                if x + w > panel.right - 4:
                     break
-                surface.blit(t, (x, y))
-                x += t.get_width() + 4
+                hud.text(surface, s, (x, y), 14, eevee_fx.readable(st["form_color"]), bold=True)
+                x += w + 5
         for i, mv, r, oy in rows:
             if near_base:
-                pygame.draw.rect(surface, (60, 64, 80) if i == hover else (44, 48, 60), r)
+                pygame.draw.rect(surface, (64, 70, 90) if i == hover else (38, 42, 54), r,
+                                 border_radius=4)
                 self._choice_rects.append((r, sl, i))
-            txt = f"{i + 1}. {mv.name} ({axis[i]})"
-            surface.blit(font.render(txt, True, (230, 230, 235)), (r.x + 4, oy + 1))
+            hud.text(surface, f"{i + 1}. {mv.name} ({axis[i]})", (r.x + 6, oy + 2), 14,
+                     hud.TEXT, bold=True)
             # pallini colorati delle forme a cui porta questa opzione
             dots = eevee_candidates(p, {sl: i})
-            dx = r.right - 8
+            dx = r.right - 10
             for st in reversed(dots):
-                pygame.draw.circle(surface, eevee_fx.readable(st["form_color"]), (dx, oy + lh // 2), 5)
-                pygame.draw.circle(surface, (15, 15, 20), (dx, oy + lh // 2), 5, 1)
+                cy = oy + lh // 2 - 1
+                pygame.draw.circle(surface, eevee_fx.readable(st["form_color"]), (dx, cy), 5)
+                pygame.draw.circle(surface, (15, 15, 20), (dx, cy), 5, 1)
                 dx -= 12
