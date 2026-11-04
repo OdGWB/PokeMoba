@@ -1,0 +1,106 @@
+{
+  "_comment": "Swinub -> Piloswine (liv.4) -> Mamoswine (liv.8). Jungler TANK d'ingaggio (stile Sejuani): danno delle mosse medio-basso, il valore e' nell'ingaggio e nel controllo. Tipi: Ghiaccio/Terra. Statistiche = valori base reali (la derivazione le scala). Passive che si sommano (engine/mamoswine.py): Fiuto (Swinub e successivi) = nella giungla vede le impronte dei Pokemon nemici degli ultimi 8 s anche nella nebbia, +30% di danno ai neutrali e ai leggendari; Grassospesso (da Piloswine) = -50% di danno dalle mosse Fuoco e Ghiaccio + scudo del 10% degli HP max che torna pieno dopo 8 s senza danni; Gelo (Mamoswine) = mosse e attacchi base a segno su un Pokemon nemico gli danno 1 accumulo (5 s, max 4); a 4 il prossimo attacco base lo congela 1 s (una volta ogni 8 s per nemico). Q5/W6/E7 potenziamenti, R al liv.8 a scelta (Terremoto o Era Glaciale).",
+  "dex": 220,
+  "name": "Swinub",
+  "types": ["Ice", "Ground"],
+  "role": "tank",
+  "recommended_items": ["assault_vest", "king_rock", "poke_flute"],
+  "color": [150, 112, 82],
+  "radius": 0.36,
+  "base_speed": 3.4,
+  "attack_range": 1.6,
+  "attack_cooldown": 1.05,
+  "sprite_dir": "assets/pokemon/0220",
+  "passive": "fiuto",
+  "attack_fx": "slash",
+
+  "base_stats": {"hp": 50, "attack": 50, "defense": 40, "sp_attack": 30, "sp_defense": 30, "speed": 50},
+
+  "evolutions": [
+    {"stage": 0, "level": 1, "name": "Swinub", "dex": 220, "sprite_dir": "assets/pokemon/0220",
+     "types": ["Ice", "Ground"], "passive": "fiuto", "radius": 0.36, "ranged": false,
+     "base_stats": {"hp": 50, "attack": 50, "defense": 40, "sp_attack": 30, "sp_defense": 30, "speed": 50}},
+    {"stage": 1, "level": 4, "name": "Piloswine", "dex": 221, "sprite_dir": "assets/pokemon/0221",
+     "types": ["Ice", "Ground"], "passive": "grassospesso", "radius": 0.5, "ranged": false,
+     "base_stats": {"hp": 100, "attack": 100, "defense": 80, "sp_attack": 60, "sp_defense": 60, "speed": 50}},
+    {"stage": 2, "level": 8, "name": "Mamoswine", "dex": 473, "sprite_dir": "assets/pokemon/0473",
+     "types": ["Ice", "Ground"], "passive": "gelo", "radius": 0.64, "ranged": false,
+     "base_stats": {"hp": 110, "attack": 130, "defense": 80, "sp_attack": 70, "sp_defense": 60, "speed": 80}}
+  ],
+
+  "moves": {
+    "Q": {
+      "base": {"id": "iceshard", "name": "Geloscheggia", "type": "Ice", "category": "special",
+               "shape": "projectile", "fx": "iceshard", "target": "direction",
+               "power": [44, 70, 90, 115], "ratio": 0.7,
+               "cooldown": [4, 3.5, 3, 2.5], "range": 4.5, "radius": 0.35},
+      "upgrades": [
+        {"id": "icetrail", "name": "Scia Ghiacciata", "type": "Ice", "category": "special",
+         "shape": "icetrail", "fx": "icetrail", "target": "point",
+         "power": [30, 45, 60, 75], "ratio": 0.4,
+         "cooldown": [9, 8.5, 8, 7.5], "range": 4.5, "radius": 0.7,
+         "effects": {"trail": 4.0, "ally_speed": 1.3, "foe_slow": 0.7}},
+        {"id": "takedown", "name": "Riduttore", "type": "Normal", "category": "physical",
+         "shape": "takedown", "fx": "takedown", "target": "direction",
+         "power": [55, 80, 105, 130], "ratio": 0.75,
+         "cooldown": [10, 9.5, 9, 8.5], "range": 6.0, "radius": 0.7,
+         "effects": {"knockback": 2.0, "recoil": 0.1}}
+      ]
+    },
+    "W": {
+      "base": {"id": "avalanche_swine", "name": "Valanga", "type": "Ice", "category": "physical",
+               "shape": "cone", "fx": "powdersnow", "target": "direction",
+               "power": [40, 60, 80, 100], "ratio": 0.6,
+               "cooldown": [6, 5.5, 5, 4.5], "range": 2.3, "angle": 45,
+               "effects": {"revenge": {"mult": 2.0, "window": 3.0}}},
+      "upgrades": [
+        {"id": "bora", "name": "Bora", "type": "Ice", "category": "special",
+         "shape": "cone", "fx": "bora", "target": "direction",
+         "power": [40, 60, 80, 100], "ratio": 0.55,
+         "cooldown": [6, 5.5, 5, 4.5], "range": 2.3, "angle": 67.5,
+         "effects": {"revenge": {"mult": 2.0, "window": 3.0},
+                     "slow": {"mult": 0.6, "duration": 2.0}}},
+        {"id": "icefang", "name": "Gelodenti", "type": "Ice", "category": "physical",
+         "shape": "icefang", "fx": "icefang", "target": "direction",
+         "power": [50, 75, 100, 125], "ratio": 0.7,
+         "cooldown": [6, 5.5, 5, 4.5], "range": 1.9, "angle": 70,
+         "effects": {"revenge": {"mult": 2.0, "window": 3.0}, "frost_stacks": 2}}
+      ]
+    },
+    "E": {
+      "base": {"id": "ancientpower", "name": "Forzantica", "type": "Rock", "category": "special",
+               "shape": "ancientpower", "fx": "ancientpower", "target": "point",
+               "power": [40, 60, 80, 100], "ratio": 0.5,
+               "cooldown": [9, 8.5, 8, 7.5], "range": 5.5, "radius": 2.0,
+               "effects": {"all_stats": {"mult": 1.1, "duration": 4.0}}},
+      "upgrades": [
+        {"id": "swinerockslide", "name": "Frana", "type": "Rock", "category": "special",
+         "shape": "ancientpower", "fx": "swinerockslide", "target": "point",
+         "power": [40, 60, 80, 100], "ratio": 0.5,
+         "cooldown": [9, 8.5, 8, 7.5], "range": 5.5, "radius": 3.0,
+         "effects": {"all_stats": {"mult": 1.1, "duration": 4.0},
+                     "stun_chance": {"chance": 0.3, "duration": 0.75}}},
+        {"id": "stealthrock", "name": "Levitoroccia", "type": "Rock", "category": "physical",
+         "shape": "spikes", "scale": "defense", "target": "point",
+         "power": [10, 14, 19, 24], "ratio": 0.07,
+         "cooldown": [15, 14, 13, 12], "range": 5.5, "radius": 2.4,
+         "effects": {"duration": 8.0, "interval": 1.5}}
+      ]
+    },
+    "R": {
+      "upgrades": [
+        {"id": "earthquake", "name": "Terremoto", "type": "Ground", "category": "special",
+         "shape": "earthquake", "fx": "earthquake", "target": "self",
+         "power": [38, 56, 73], "ratio": 0.3,
+         "cooldown": [80, 70, 60], "range": 0, "radius": 3.5,
+         "effects": {"duration": 3.0, "interval": 0.5, "slow": {"mult": 0.65, "duration": 0.8}}},
+        {"id": "iceage", "name": "Era Glaciale", "type": "Ice", "category": "special",
+         "shape": "iceage", "fx": "iceage", "target": "direction",
+         "power": [100, 150, 200], "ratio": 0.6,
+         "cooldown": [100, 90, 80], "range": 12.0, "radius": 0.6,
+         "effects": {"block_speed": 14.0, "block_freeze": 1.5, "storm_radius": 3.0, "storm_dur": 3.0,
+                     "storm_slow": 0.6}}
+      ]
+    }
+  }
+}

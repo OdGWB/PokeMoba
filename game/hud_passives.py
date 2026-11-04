@@ -16,7 +16,7 @@ import pygame
 
 from engine.eevee import eevee_candidates, eevee_forms
 
-from . import arch_fx, eevee_fx, hatt_fx, mag_fx, mien_fx, sneasel_fx, ursa_fx
+from . import arch_fx, eevee_fx, hatt_fx, mag_fx, mien_fx, sneasel_fx, swine_fx, ursa_fx
 
 
 @dataclass
@@ -27,6 +27,7 @@ class PassiveCtx:
     weather: str = "clear"
     agitated: int = 0            # Quiete: nemici agitati visibili (linea Hatenna)
     charged: int = 0             # Magnetismo: nemici con una carica (linea Magnemite)
+    frost_ready: int = 0         # Gelo: nemici con 4 accumuli pronti (linea Swinub)
 
 
 def draw_passive(surface, font, p, bx, y0, bh, ctx) -> None:
@@ -153,6 +154,9 @@ def draw_passive(surface, font, p, bx, y0, bh, ctx) -> None:
         _draw_quiet(surface, font, p, bx, y0, bh, ctx)
     if p.passive_id == "magnetismo":
         _draw_magnet(surface, font, p, bx, y0, bh, ctx)
+    # Linea Swinub: Fiuto, Grassospesso (scudo), Gelo (nemici pronti al congelamento).
+    if p.passive_id in ("fiuto", "grassospesso", "gelo"):
+        _draw_swine(surface, font, p, bx, y0, bh, ctx)
 
     # Linea Teddiursa: Miele (vasetti) e, da Ursaring, Dentistretti.
     if p.passive_id in ("miele", "dentistretti"):
@@ -540,6 +544,37 @@ def _draw_magnet(surface, font, p, bx, y0, bh, ctx) -> None:
     ms = mset.get("R")
     if ms is not None and mag_fx.has_polarity(getattr(ms, "chosen", None)):
         mag_fx.blit_badge(surface, box.right - 8, box.top + 8, mag_fx.polarity())
+    pygame.draw.rect(surface, frame, box, 2)
+    surface.blit(font.render(name, True, frame), (bx - 4, y0 - 18))
+
+
+def _draw_swine(surface, font, p, bx, y0, bh, ctx) -> None:
+    """Swinub/Piloswine/Mamoswine: muso che annusa su fondo scuro. Da
+    Piloswine a destra la barra dello scudo di Grassospesso (bianco-ghiaccio);
+    da Mamoswine, quanti nemici visibili hanno 4 accumuli di Gelo."""
+    pid = p.passive_id
+    fat = pid in ("grassospesso", "gelo")
+    box = pygame.Rect(bx, y0, bh + (8 if fat else 0), bh)
+    n = int(getattr(ctx, "frost_ready", 0))
+    pygame.draw.rect(surface, (30, 40, 52) if n else (36, 30, 26), box)
+    swine_fx.draw_snout_icon(surface, bx + bh // 2, box.centery - 1, max(5, bh // 4))
+    frame = swine_fx.ICE_HI if n else (196, 170, 140)
+    if fat:
+        cap = max(1.0, getattr(p, "max_hp", 1.0) * 0.10)
+        frac = max(0.0, min(1.0, getattr(p, "fat_shield", 0.0) / cap))
+        bar = pygame.Rect(box.right - 9, box.top + 4, 5, bh - 8)
+        pygame.draw.rect(surface, (20, 26, 34), bar)
+        fh = int(bar.height * frac)
+        pygame.draw.rect(surface, swine_fx.FAT, pygame.Rect(bar.left, bar.bottom - fh, bar.width, fh))
+        pygame.draw.rect(surface, swine_fx.ICE_DK, bar, 1)
+    if pid == "gelo":
+        name = "Gelo: %d pront%s" % (n, "o" if n == 1 else "i") if n else "Fiuto + Gelo"
+        if n:
+            swine_fx.draw_flake(surface, box.left + 7, box.top + 7, 4, 255, swine_fx.ICE)
+    elif pid == "grassospesso":
+        name = "Fiuto + Grassospesso"
+    else:
+        name = "Fiuto"
     pygame.draw.rect(surface, frame, box, 2)
     surface.blit(font.render(name, True, frame), (bx - 4, y0 - 18))
 

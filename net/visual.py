@@ -40,6 +40,7 @@ LISTS = {
     "mien_leaps": ("c", "team"), "wave_zones": ("c", "team"), "thunder_marks": ("c", "team"),
     "hatt_marks": ("c", "team"), "moon_orbs": ("pos", "team"), "witch_waves": ("c", "team"),
     "mag_bolts": ("pos", "team"), "ion_trails": ("c", "team"), "mag_links": ("c", "team"),
+    "ice_trails": ("c", "team"), "glacial_blocks": ("pos", "team"), "ice_storms": ("c", "team"),
 }
 # Campi solo di logica (oggetti del motore, insiemi di bersagli già colpiti).
 SKIP = {"mv", "hit", "touched", "since", "rank", "explode", "first", "caught"}
@@ -48,7 +49,8 @@ UNIT_FLAGS = {"air_z": 0.0, "sand_radius": 0.0, "invisible": False, "submerged":
               "spirit_awaken": 0, "smoke_hidden": False, "armor_blocks": 0, "echo_count": 0,
               "honey": 0, "guts_active": False,
               "snatch_down": 0, "snatch_up": 0, "mien_regen": False,
-              "arch_rain": False, "thunder_left": 0, "agitated": False, "mag_sign": 0}
+              "arch_rain": False, "thunder_left": 0, "agitated": False, "mag_sign": 0,
+              "frost_stacks": 0, "fat_shield": 0.0}
 # Il proprio Pokémon: passive e ricariche mostrate nell'interfaccia.
 ME_FIELDS = ("passive_id", "soul_charges", "inversion_stacks", "muta_cd_until", "muta_cd_max",
              "form_until", "sandstorm_boost_until", "sand_radius", "spirit_charges",
@@ -136,6 +138,13 @@ def capture_visual(match, team: int, player=None) -> dict:
         items = [_clean(d) for d in getattr(match, name, ())]
         if items:
             out[name] = items
+    # Fiuto (linea Swinub): le impronte dei nemici le vede SOLO la squadra che
+    # fiuta, anche nella nebbia.
+    tracks = [{"pos": d["pos"], "t": round(d["t"], 2), "dir": d["dir"], "side": d["side"],
+               "big": d["big"], "viewer": d["viewer"]}
+              for d in getattr(match, "swine_tracks", ()) if d.get("viewer") == team]
+    if tracks:
+        out["swine_tracks"] = tracks
     # Balzi della linea Teddiursa: l'atterraggio di Luna Piena lo vedono tutti.
     leaps = [_clean(lp) for lp in getattr(match, "bear_leaps", ())
              if lp.get("fx") == "fullmoon" or seen(lp["c"], lp["team"])]

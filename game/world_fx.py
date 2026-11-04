@@ -20,7 +20,7 @@ import pygame
 import config
 
 from . import (arch_fx, charcadet_fx, corvi_fx, eevee_fx, hatt_fx, mag_fx, mien_fx, noivern_fx,
-               sneasel_fx, spirit_fx, ursa_fx)
+               sneasel_fx, spirit_fx, swine_fx, ursa_fx)
 from .fx import draw_avalanche, draw_sandstorm, type_color
 
 
@@ -165,6 +165,20 @@ def draw_world_effects(surface, camera, world, m, team, vision, now, player_id,
     for o in getattr(m, "mag_bolts", ()):
         if seen(o["pos"], o["team"]):
             mag_fx.draw_bolt(surface, camera, o, now)
+    # Linea Swinub: Scia Ghiacciata, bufera e blocco di Era Glaciale, impronte
+    # del Fiuto (solo per la squadra che fiuta, anche nella nebbia).
+    for tr in getattr(m, "ice_trails", ()):
+        if seen(tr["c"], tr["team"]):
+            swine_fx.draw_ice_trail(surface, camera, tr, now)
+    for z in getattr(m, "ice_storms", ()):
+        if seen(z["c"], z["team"]):
+            swine_fx.draw_ice_storm(surface, camera, z, now)
+    for o in getattr(m, "glacial_blocks", ()):
+        if seen(o["pos"], o["team"]):
+            swine_fx.draw_glacial_block(surface, camera, o, now)
+    tracks = getattr(m, "swine_tracks", ())
+    if tracks:
+        swine_fx.draw_tracks(surface, camera, tracks, team, now)
 
 
 def draw_projectiles(surface, camera, m, now=0.0) -> None:

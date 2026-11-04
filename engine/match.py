@@ -34,6 +34,7 @@ from .mienshao import MIEN_PASSIVES, PROJ_SHAPES, MienshaoMixin
 from .archaludon import ARCH_PASSIVES, ArchaludonMixin
 from .hatterene import HATT_PASSIVES, HattereneMixin
 from .magnezone import MAG_PASSIVES, MagnezoneMixin
+from .mamoswine import MamoswineMixin
 from .corviknight import CORVI_PASSIVES, CorviknightMixin
 from .eevee import EEVEE_PASSIVES, EeveeMixin
 from .item_effects import ItemEffectsMixin, cdr_to_haste
@@ -83,7 +84,8 @@ SHEDINJA_TYPES = ["Bug", "Ghost"]
 SHEDINJA_DEX = 292
 # Tipi superefficaci contro Coleottero/Spettro: bucano la Magidifesa (letali).
 _SHEDINJA_WEAK = {"Fire", "Flying", "Rock", "Ghost", "Dark"}
-MUTA_WILD_MULT = 1.30     # danno ai Pokémon neutrali (come Miele/Scalaroccia)
+FORZABRUTA_WILD_MULT = 1.30   # ForzaBruta (Totodile): danno ai neutrali
+MUTA_WILD_MULT = 1.30    # danno ai Pokémon neutrali (come Miele/Scalaroccia)
 MUTA_DURATION = 5.0       # s in forma Shedinja
 MUTA_COOLDOWN = 150.0      # ricarica condivisa Muta/Rancore
 MUTA_REVERT_HP = 0.30      # Muta: torna Ninjask col 30% degli HP max
@@ -152,11 +154,13 @@ CAST_ANIMS = {"projectile": "Shoot", "bubble": "Shoot",
             "psyburst": "Shoot", "psybeam": "Shoot", "hattvoice": "Swing",
             "moonorb": "Shoot", "trickroom": "Charge", "witchwave": "Charge",
             "magbolt": "Shoot", "magfield": "SpAttack", "voltdash": "Charge",
-            "magpillar": "SpAttack", "magterrain": "Charge"}
+            "magpillar": "SpAttack", "magterrain": "Charge",
+            "icetrail": "Charge", "takedown": "Attack", "icefang": "Attack",
+            "ancientpower": "Shoot", "iceage": "Shoot"}
 
 class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, NoivernMixin,
             UrsaringMixin, SneaselMixin, MienshaoMixin, ArchaludonMixin,
-            HattereneMixin, MagnezoneMixin, BasicAttackMixin, ItemEffectsMixin):
+            HattereneMixin, MagnezoneMixin, MamoswineMixin, BasicAttackMixin, ItemEffectsMixin):
     def __init__(self, world, map_data):
         self.world = world
         self.map = map_data
@@ -197,6 +201,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self._init_arch()        # linea Duraludon: Tuononda, Elettroraggio, Tuono
         self._init_hatt()        # linea Hatenna: Confusione, Forza Lunare, Distortozona, Strega
         self._init_mag()         # linea Magnemite: cariche magnetiche, Bombagnete, Campo Elettrico
+        self._init_swine()       # linea Swinub: impronte, Scia Ghiacciata, Era Glaciale
         self._init_basic_attack()   # attacco base: proiettili a ricerca
         self.vision = VisionSystem(self.world.grid)
         self._build_structures()
@@ -256,6 +261,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self._update_arch(dt)        # Tuononda, Elettroraggio, Tuono (linea Duraludon)
         self._update_hatt(dt)        # Confusione, Forza Lunare, Distortozona, Quiete (linea Hatenna)
         self._update_mag(dt)         # cariche magnetiche, Tuonoshock, Bombagnete... (linea Magnemite)
+        self._update_swine(dt)       # Fiuto, Grassospesso, Gelo, Era Glaciale (linea Swinub)
         self._update_rock_moves(dt)  # Rocciotomba / Pesobomba / Frana / Abbattimento
         self._update_spiritomb(dt)   # spiriti, Stordiraggio, Malcomune, Legione, Memento
         self._update_eevee(dt)       # Desiderio, Comete, Tuono, Bora, Divinazione, Idratazione
@@ -273,6 +279,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self.world.tick(dt)          # movimento + collisioni
         self._update_tosses(dt)      # Ribaltiro: arco del nemico lanciato (dopo le collisioni)
         self._update_mag_drags(dt)   # Magnetismo: trascinamenti e spinte (dopo le collisioni)
+        self._update_swine_shoves(dt)  # Riduttore: respinta (dopo le collisioni)
         self._update_regen(dt)
         self._update_plates(dt)      # placche delle torri (oro ai vicini)
         self._update_gold(dt)
@@ -1009,9 +1016,14 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             return
         amount *= self._honey_wild_mult(attacker, target)   # Miele: +30% ai neutrali
         amount *= self._sneasel_wild_mult(attacker, target)   # Scalaroccia: +30% ai neutrali
+        amount *= self._swine_wild_mult(attacker, target)   # Fiuto: +30% ai neutrali
+        amount *= self._swine_type_mult(target, dmg_type)   # Grassospesso: -50% Fuoco/Ghiaccio
         if (isinstance(target, Wild) and isinstance(attacker, Pokemon)
                 and attacker.passive_id == "muta"):
             amount *= MUTA_WILD_MULT   # Muta (linea Nincada): +30% ai neutrali
+        if (isinstance(target, Wild) and isinstance(attacker, Pokemon)
+                and attacker.passive_id == "forzabruta"):
+            amount *= FORZABRUTA_WILD_MULT   # ForzaBruta (linea Totodile): +30% ai neutrali
         # Clone esca (Doppioteam): qualunque danno lo dissolve, senza ricompense.
         if isinstance(target, Pokemon) and target.is_decoy:
             if amount > 0.0:
@@ -1047,6 +1059,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             absorbed = min(target.shield, amount)
             target.shield -= absorbed
             amount -= absorbed
+        if isinstance(target, Pokemon) and not ignore_shield:
+            amount = self._fat_absorb(target, amount)   # Grassospesso (dopo gli altri scudi)
         target.hp -= amount
         if isinstance(target, Pokemon) and target.endure_until > self.time:
             target.hp = max(1.0, target.hp)   # Resistenza: non scende sotto 1 HP
@@ -1842,6 +1856,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             pass   # linea Hatenna (engine/hatterene.py)
         elif self._mag_cast(p, mv, rank, origin, tgt, dirv):
             pass   # linea Magnemite (engine/magnezone.py)
+        elif self._swine_cast(p, mv, rank, origin, tgt, dirv):
+            pass   # linea Swinub (engine/mamoswine.py)
         elif shape == "buff":
             self._apply_support(p, mv, rank, origin)
             self.fx_events.append({"kind": "buff", "c": (origin.x, origin.y),
@@ -3440,6 +3456,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
                 raw *= 1.0 + float(fx["execute"]) * (1.0 - target.hp / target.max_hp)
             raw *= mult
             raw *= self._hatt_dmg_mult(caster, target, mv)   # Quiete / Strega della Foresta
+            raw *= self._swine_dmg_mult(caster, target, mv)   # Valanga: x2 su chi l'ha colpito
             raw *= self._item_move_mult(caster, mv, target, eff)   # Scelta, Metronomo, ...
             crit_bonus = HIGH_CRIT_CHANCE if mv.d.get("high_crit") else 0.0
             crit_bonus += float(mv.d.get("crit_bonus", 0.0))   # Lacerazione: +20%
@@ -3484,6 +3501,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
                 and target.team != caster.team):
             self._add_inversion(caster)
         self._sneasel_on_hit(caster, target)   # Arraffalesto, colpo d'agguato di Notte Fonda
+        self._swine_on_hit(caster, target, mv)   # Gelo (accumuli), Frana (stordimento)
 
     def _apply_hit_effects(self, caster, target, fx) -> None:
         """Controlli e debuff di una mossa sul Pokémon colpito."""
@@ -3891,6 +3909,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             if p.passive_id == "nuotovelox" and self._in_rain(p):
                 p.speed *= NUOTOVELOX_SPEED   # +20% in acqua/pioggia
             p.speed *= self._hatt_speed_mult(p)   # Distortozona (Hatterene)
+            p.speed *= self._swine_speed_mult(p)   # Scia Ghiacciata, Forzantica
             # Nitrocarica: cariche di velocità cumulabili (scadono insieme).
             if p.fc_until > self.time and p.fc_stacks > 0:
                 p.speed *= 1.0 + p.fc_per * p.fc_stacks

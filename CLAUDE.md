@@ -869,6 +869,37 @@ Passaggi completati:
   campomagnetico_alleato, ancora, catena, muro_carico/_trascina, voltcambio,
   scia_ionica, elettrotela/_volo, falcecannone/_volo, bombagnete_mira/
   _caduta/_dopo, campoelettrico/_dopo, hud, hud_polarita).
+- LINEA SWINUB > PILOSWINE > MAMOSWINE (step_45), grafica nuova in
+  game/swine_fx.py (logica in engine/mamoswine.py). Sprite PMD Sprite Collab
+  in assets/pokemon/0220/0221/0473. Forme nuove in _draw_shapes
+  (swine_fx.SHAPES): getto di neve nel cono (snowcone; Bora con tre raffiche
+  CORTE che scorrono: lunghe da un capo all'altro sembravano corde tese),
+  sasso a parabola (rockarc: Forzantica, resta un attimo a terra e svanisce),
+  sasso che cade dall'alto (rockfall: Frana), raggiera di cristalli
+  (iceburst), frecce che salgono (uparrows), zanne di ghiaccio (icefangs:
+  Gelodenti; le "jaws" bianche di Eevee sparivano su sprite chiari, e con la
+  gengiva sembravano una clessidra). Riusa windline, impactstar, groundring,
+  pebble, flake, flash, ring. All'arrivo dei sassi solo due sassolini: gli
+  anelli a terra sembravano ciambelle di corda, l'anello grande con le crepe
+  una ruota. Disegni PERSISTENTI (world_fx): IMPRONTE del Fiuto (zampa 9x10
+  pixel art viola tenue, 8 direzioni in cache, alternate sinistra/destra,
+  sbiadiscono in 8 s; disegnate DOPO la nebbia, solo per la squadra che fiuta),
+  Scia Ghiacciata (corsia di ghiaccio a bordo frastagliato con riflessi),
+  blocco di Era Glaciale in volo (cubo 2.5D con crepa, scia di neve, ombra a
+  terra), bufera (ellisse con bordo tratteggiato che gira, raffiche curve,
+  fiocchi che vorticano). Sulla barra della vita (visibili a tutti): scudo di
+  Grassospesso = segmento bianco-ghiaccio in coda; accumuli di Gelo = 4
+  posti sotto la barra, croce azzurra con contorno a 4 vicini (a 8 vicini
+  diventavano quadrotti attaccati), BIANCHE a 4 accumuli; Forzantica = tre
+  sassi in orbita. Il congelamento usa il blocco di ghiaccio di Eevee. HUD:
+  muso che annusa + nomi delle passive attive, barra dello scudo da
+  Piloswine, "Gelo: N pronti" (nemici visibili con 4 accumuli). Online:
+  ice_trails/glacial_blocks/ice_storms in net/visual.LISTS (glacial_blocks
+  anche in online_world.MOVING), swine_tracks SOLO alla squadra che fiuta,
+  frost_stacks/fat_shield in UNIT_FLAGS. Screenshot: step_45_* (draft_swinub,
+  impronte, hud_swinub, grassospesso, hud_piloswine, valanga, bora,
+  gelodenti, gelo_accumuli, gelo_congelato, hud, scia/_dopo, riduttore/_mira,
+  forzantica/_volo, frana/_dopo, eraglaciale_mira/_volo/_colpo/_bufera).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

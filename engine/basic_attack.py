@@ -234,6 +234,7 @@ class BasicAttackMixin:
         self._ursa_after_aa(u, tgt)   # Luna Piena: attacchi base ad area
         self._sneasel_after_aa(u, tgt)   # Arraffalesto, colpo d'agguato
         self._mien_after_aa(u, tgt)      # punto dolce, brutto colpo di Individua
+        self._swine_after_aa(u, tgt)     # Gelo (Mamoswine): accumuli e congelamento
         self._spirit_wander(u, tgt)   # Spirito Vagante (Spiritomb)
         self._cute_charm(u, tgt)      # Incantevole (Sylveon)
 

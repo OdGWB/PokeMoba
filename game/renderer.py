@@ -17,6 +17,7 @@ from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
                          TILE_PUDDLE, TILE_RIVER, TILE_WALL)
 from . import spirit_fx
 from . import (arch_fx, charcadet_fx, corvi_fx, eevee_fx, hatt_fx, mag_fx, mien_fx, noivern_fx,
+               swine_fx,
                sneasel_fx, ursa_fx)
 from . import structure_gfx
 from .fx import EMBER, ROCK_HI, ROCK_MID, ROCK_OUT, ROCK_SH, type_color
@@ -631,6 +632,8 @@ class Renderer:
             return   # linea Hatenna
         if mag_fx.draw_aim(surface, S, ts, ox, oy, nx, ny, dist, move):
             return   # linea Magnemite (R: polarita' scelta)
+        if swine_fx.draw_aim(surface, S, ts, ox, oy, nx, ny, dist, move):
+            return   # linea Swinub
         if shape == "rockwave":   # Rocciotomba: corsia dell'onda + pilastro in fondo
             ex, ey = ox + nx * rng, oy + ny * rng
             pygame.draw.line(surface, col, S(ox, oy), S(ex, ey), max(2, int(move.radius * ts)))
@@ -884,6 +887,7 @@ class Renderer:
                     arch_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # Conduzione, Tuono
                     hatt_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # agitato, Magipolvere
                     mag_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # carica + / -
+                    swine_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # Forzantica
                 if in_bush:
                     self._draw_hidden_hint(surface, e, gx, gy, now)
                 self._draw_unit_hp(surface, e, gx, gy, grow)
@@ -1062,10 +1066,15 @@ class Renderer:
         top = gy - 2 * r - 8
         w = max(14, r * 2)
         self._hp_bar(surface, gx, top, max(0.0, u.hp / u.max_hp), col, width=w)
+        row = 0
         if isinstance(u, Pokemon) and noivern_fx.has_echo(u):   # cariche del ping
             noivern_fx.draw_echo_pips(surface, u, gx, top, w)
+            row = 1
         elif isinstance(u, Pokemon) and ursa_fx.has_honey(u):   # vasetti di miele
             ursa_fx.draw_honey_pips(surface, u, gx, top, w)
+            row = 1
+        if isinstance(u, Pokemon):   # scudo di Grassospesso, accumuli di Gelo
+            swine_fx.draw_hp_extras(surface, u, gx, top, w, row)
 
     def _hp_bar(self, surface, cx, top_y, frac, team_col, width):
         h = 3

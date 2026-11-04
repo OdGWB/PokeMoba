@@ -28,7 +28,7 @@ from ..camera import Camera
 from ..fx import FXSystem
 from ..input_controller import InputController
 from ..minimap import Minimap
-from .. import anim_tuning, arch_fx, eevee_fx, hatt_fx, mag_fx, spirit_fx
+from .. import anim_tuning, arch_fx, eevee_fx, hatt_fx, mag_fx, spirit_fx, swine_fx
 from ..particles import ParticleSystem
 from ..renderer import Renderer
 from ..shop_ui import ShopUI
@@ -632,6 +632,9 @@ class MatchScene:
                 self.world, p, self.match.time,
                 lambda e: self.match.vision.is_enemy_visible(p.team, e.id)),
             charged=mag_fx.count_charged(
+                self.world, p, self.match.time,
+                lambda e: self.match.vision.is_enemy_visible(p.team, e.id)),
+            frost_ready=swine_fx.count_frozen_ready(
                 self.world, p, self.match.time,
                 lambda e: self.match.vision.is_enemy_visible(p.team, e.id))))
         # Popup delle evoluzioni: in fila sopra la barra, mai sovrapposti.

@@ -393,6 +393,15 @@ class Pokemon(Unit):
     mag_until: float = -1.0            # la carica scade qui
     mag_src: int = 0                   # id del Magnemite che l'ha applicata
     mag_team: int = -1                 # squadra del Magnemite (per lui: nemico o ancora)
+    # Linea Swinub: Gelo (accumuli sul nemico), Grassospesso (scudo), Forzantica.
+    frost_stacks: int = 0              # accumuli di Gelo (0..4, visibili a tutti)
+    frost_until: float = -1.0          # gli accumuli scadono qui
+    frost_src: int = 0                 # id del Mamoswine che li ha dati
+    frost_lock_until: float = -1.0     # niente congelamento da Gelo fino a qui
+    fat_shield: float = 0.0            # Grassospesso: scudo che si rigenera
+    ancient_until: float = -1.0        # Forzantica: statistiche +10% fino a qui
+    ancient_mult: float = 1.0
+    ancient_active: bool = False       # aggiornato dal Match
 
     def _bonus(self, stat: str) -> float:
         return (self.passive_bonus.get(stat, 0.0) + self.item_bonus.get(stat, 0.0)
@@ -419,6 +428,8 @@ class Pokemon(Unit):
             atk *= 1.25  # Vulnerassicurazione: +25% Attacco
         if self.snatch_down or self.snatch_up:
             atk *= self.snatch_mult()   # Arraffalesto (Weavile): Attacco rubato
+        if self.ancient_active:
+            atk *= self.ancient_mult    # Forzantica (Mamoswine): tutte le statistiche
         return atk
 
     def eff_sp_attack(self) -> float:
@@ -436,6 +447,8 @@ class Pokemon(Unit):
             ap *= self.calm_mult   # Calmamente: +Att. Sp. temporaneo
         if self.snatch_down or self.snatch_up:
             ap *= self.snatch_mult()   # Arraffalesto (Weavile): Att. Sp. rubato
+        if self.ancient_active:
+            ap *= self.ancient_mult    # Forzantica
         return ap
 
     def snatch_mult(self) -> float:
@@ -452,6 +465,8 @@ class Pokemon(Unit):
             d = (d - self.def_debuff_amt) * self.def_debuff_mult
         if self.def_buff_active:        # Indurimento: +difesa temporanea
             d *= self.def_buff_mult
+        if self.ancient_active:
+            d *= self.ancient_mult      # Forzantica
         return max(0.0, d)
 
     def eff_sp_defense(self) -> float:
@@ -463,6 +478,8 @@ class Pokemon(Unit):
             d *= self.calm_mult
         if self.passive_id == "sabbiafiume" and self.stage >= 2:
             d *= 1.3   # Sabbiafiume (Gigalith): +30% Dif. Sp.
+        if self.ancient_active:
+            d *= self.ancient_mult      # Forzantica
         return max(0.0, d)
     # Ordine corrente impartito dal giocatore (o dal controllo): guida l'IA.
     #   "idle" | "move" | "attack" | "attackmove" | "stop" (stop = tieni la posizione)
