@@ -30,6 +30,7 @@ _STAT_LABELS = [
     ("crit", "brutto colpo", True), ("lifesteal", "rubavita", True),
     ("omnivamp", "rubavita (anche mosse)", True), ("cdr", "rid. ricariche", True),
     ("heal_power", "cure/scudi", True),
+    ("armor_pen_pct", "penetr. Dif.", True), ("magic_pen_pct", "penetr. Dif.Sp.", True),
 ]
 
 

@@ -4,7 +4,7 @@
   "name": "Poliwag",
   "types": ["Water"],
   "role": "combattente",
-  "recommended_items": ["weakness_policy", "black_sludge", "choice_scarf", "expert_belt"],
+  "recommended_items": ["weakness_policy", "black_sludge", "focus_band", "rusted_sword"],
   "color": [90, 130, 200],
   "radius": 0.34,
   "base_speed": 3.6,

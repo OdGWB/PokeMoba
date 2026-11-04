@@ -4,7 +4,7 @@
   "name": "Charmander",
   "types": ["Fire"],
   "role": "mago mobile",
-  "recommended_items": ["choice_specs", "life_orb", "wide_lens", "metronome"],
+  "recommended_items": ["choice_specs", "life_orb", "magnet", "charcoal"],
   "color": [237, 122, 66],
   "radius": 0.42,
   "base_speed": 3.6,

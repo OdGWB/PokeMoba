@@ -3,7 +3,7 @@
   "name": "Bulbasaur",
   "types": ["Grass", "Poison"],
   "role": "supporto",
-  "recommended_items": ["king_rock", "soothe_bell", "light_clay", "exp_share"],
+  "recommended_items": ["king_rock", "soothe_bell", "poke_flute", "exp_share"],
   "color": [110, 190, 120],
   "radius": 0.42,
   "base_speed": 3.55,

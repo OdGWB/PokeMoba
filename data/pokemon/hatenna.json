@@ -4,7 +4,7 @@
   "name": "Hatenna",
   "types": ["Psychic"],
   "role": "mago",
-  "recommended_items": ["choice_specs", "light_clay", "wide_lens", "life_orb"],
+  "recommended_items": ["choice_specs", "spell_tag", "magnet", "light_clay"],
   "color": [176, 120, 196],
   "radius": 0.34,
   "base_speed": 3.3,

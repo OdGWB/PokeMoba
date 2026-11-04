@@ -736,6 +736,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         if isinstance(attacker, Pokemon) and attacker.rampage_until > self.time:
             cd *= 0.5   # Oltraggio: attacca più in fretta
         attacker.attack_timer = cd
+        if isinstance(attacker, Pokemon):
+            cd *= self._item_aa_cd_mult(attacker)   # Gelomai: -20% vel. d'attacco
         # FX dell'auto-attacco dei Pokémon (così si vede quando si attacca):
         # fendente per il corpo a corpo, piccolo colpo per chi tira da lontano.
         if isinstance(attacker, Pokemon):
@@ -835,6 +837,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         if u.rampage_until > self.time:
             cd *= 0.5   # Oltraggio: attacca più in fretta
         u.aa_active = True
+        cd *= self._item_aa_cd_mult(u)   # Gelomai: -20% vel. d'attacco
         u.aa_target_id = t.id
         u.aa_until = self.time + cd * AA_WINDUP_FRAC * self._item_aa_windup(u)
         u.attack_timer = cd            # il cooldown parte dall'inizio dell'attacco

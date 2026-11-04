@@ -22,8 +22,8 @@ class TestItems(unittest.TestCase):
 
     def test_catalog_shape(self):
         self.assertEqual(len(self.cat.base_ids), 7)
-        self.assertEqual(len(self.cat.intermediate_ids), 7)
-        self.assertEqual(len(self.cat.completed_ids), 26)
+        self.assertEqual(len(self.cat.intermediate_ids), 13)
+        self.assertEqual(len(self.cat.completed_ids), 36)
         for it in self.cat.items.values():
             self.assertTrue(it.icon, it.id)
             for c in it.build_from:
@@ -43,11 +43,19 @@ class TestItems(unittest.TestCase):
                          3000 - 350 - 350 - 300)
 
     def test_discount_all_components(self):
-        self.assertEqual(self.cat.effective_price("choice_band", ["muscle_band", "scope_lens"]), 900)
+        self.assertEqual(self.cat.effective_price("choice_band", ["muscle_band", "scope_lens", "protein"]), 550)
 
     def test_components_consumed(self):
         comps = self.cat.components_in("choice_band", ["muscle_band", "scope_lens", "hp_up"])
         self.assertEqual(set(comps), {"muscle_band", "scope_lens"})
+
+    def test_recipes_two_intermediates_plus_vitamin(self):
+        # Regola: completo = 2 intermedi + 1 vitamina (eccezioni: Roccia di Re, Condividi Esp.).
+        for iid in self.cat.completed_ids:
+            if iid in ("king_rock", "exp_share"):
+                continue
+            kinds = [self.cat.items[c].tier for c in self.cat.items[iid].build_from]
+            self.assertEqual(sorted(kinds), [1, 2, 2], iid)
 
     def test_group_rules(self):
         self.assertFalse(self.cat.group_ok("choice_specs", ["choice_band"]))
@@ -155,6 +163,65 @@ class TestItemEffects(unittest.TestCase):
     def test_cdr_to_haste(self):
         self.give(self.a, "soothe_bell")
         self.assertAlmostEqual(100.0 / (100.0 + self.a.ability_haste), 0.85, places=5)
+
+    def test_penetration_stats(self):
+        self.give(self.a, "dragon_fang", "magnet")
+        self.assertAlmostEqual(self.a.armor_pen_pct, 0.20)
+        self.assertAlmostEqual(self.a.magic_pen_pct, 0.20)
+
+    def test_healcut_from_poison_barb(self):
+        self.give(self.a, "poison_barb")
+        self.match._item_after_aa(self.a, self.b)
+        self.assertAlmostEqual(self.match._healcut_mult(self.b), 0.6)
+
+    def test_charcoal_burns_on_move_only(self):
+        self.give(self.a, "charcoal")
+        self.match._item_after_aa(self.a, self.b)
+        self.assertLess(self.b.ember_until, self.match.time)
+        self.match._item_after_move_hit(self.a, None, self.b, 1.0)
+        hp0 = self.b.hp
+        self.match._update_items(1.0)
+        self.assertAlmostEqual(hp0 - self.b.hp, self.b.max_hp * 0.01, places=3)
+
+    def test_focus_band_shield(self):
+        self.give(self.b, "focus_band")
+        self.match._deal_damage(self.a, self.b, self.b.max_hp * 0.75)
+        self.assertGreater(self.b.shield, 0.0)
+        self.assertAlmostEqual(self.b.shield, self.b.max_hp * 0.30, places=3)
+
+    def test_rusted_sword_stacks(self):
+        self.give(self.a, "rusted_sword")
+        base = self.a.eff_attack()
+        for _ in range(5):
+            self.match._item_after_aa(self.a, self.b)
+        self.assertEqual(self.a.rust_n, 5)
+        self.assertAlmostEqual(self.a.eff_attack(), base * 1.15, places=3)
+        self.match.time += 10.0
+        self.match._update_items(0.1)
+        self.assertEqual(self.a.rust_n, 0)
+
+    def test_never_melt_ice_slows_attacker(self):
+        self.give(self.b, "never_melt_ice")
+        self.match._item_after_aa(self.a, self.b)
+        self.assertAlmostEqual(self.match._item_aa_cd_mult(self.a), 1.25)
+
+    def test_mystic_water_aura(self):
+        self.give(self.b, "mystic_water")
+        ally = self.world.spawn_pokemon(pos=self.b.pos + Vec2(2.0, 0.0), team=1, dex=1, name="X",
+                                        color=(0, 0, 0), speed=3.5,
+                                        base_stats=self.a.base_stats.__dict__)
+        d0 = ally.eff_sp_defense()
+        self.match._update_items(0.1)
+        self.assertAlmostEqual(ally.eff_sp_defense(), d0 + 20.0)
+        self.assertEqual(self.b.aura_spdef, 0.0)   # il possessore non conta
+        self.assertEqual(self.a.aura_spdef, 0.0)   # squadra diversa
+
+    def test_poke_flute_cleanses_and_hastes(self):
+        self.give(self.a, "poke_flute")
+        self.match._apply_sleep(self.a, 5.0)
+        self.assertTrue(self.match.use_item(self.a, 0))
+        self.assertFalse(self.match._immobile(self.a))
+        self.assertAlmostEqual(self.a.speed_mult, 1.2)
 
 
 if __name__ == "__main__":

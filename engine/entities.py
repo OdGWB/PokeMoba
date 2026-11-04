@@ -154,6 +154,13 @@ class Pokemon(Unit):
     wp_until: float = -1.0             # Vulnerassicurazione attiva fino a qui
     wp_active: bool = False            # aggiornato in _update_items (per eff_attack)
     smoke_hidden: bool = False         # dentro la propria Palla Fumo (invisibile)
+    ember_until: float = -1.0          # Carbonella: bruciatura (1% HP max/s, senza tipo)
+    ember_src: int | None = None
+    aspd_slow_until: float = -1.0      # Gelomai: -20% velocita' d'attacco
+    rust_stacks: int = 0               # Spada Arrugginita: cariche (+3% Attacco l'una)
+    rust_until: float = -1.0
+    rust_n: int = 0                    # cariche attive (aggiornato in _update_items)
+    aura_spdef: float = 0.0            # Acqua Mistica: Dif. Sp. dall'aura di un alleato
     # Buff Giudizio di Arceus (Fase 7)
     judgment_until: float = -1.0
     judgment_plate: str = ""
@@ -384,6 +391,8 @@ class Pokemon(Unit):
         if self.atk_debuff_active:
             base -= self.atk_debuff_amt
         atk = max(0.0, base) * self.atk_mult
+        if self.rust_n:
+            atk *= 1.0 + 0.03 * self.rust_n   # Spada Arrugginita
         if self.burn_active and self.passive_id != "dentistretti":
             atk *= 0.75   # Scottatura (Fiammacoda): -25% Attacco mentre brucia
         if self.guts_active:
@@ -434,7 +443,8 @@ class Pokemon(Unit):
         return max(0.0, d)
 
     def eff_sp_defense(self) -> float:
-        d = self.stats.sp_defense + self._bonus("sp_defense") + self._soul()
+        d = (self.stats.sp_defense + self._bonus("sp_defense") + self._soul()
+             + self.aura_spdef)
         if self.spdef_debuff_active:
             d = (d - self.spdef_debuff_amt) * self.spdef_debuff_mult
         if self.calm_active:            # Calmamente: +Dif. Sp. temporanea

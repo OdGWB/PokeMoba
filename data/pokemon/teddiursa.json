@@ -4,7 +4,7 @@
   "name": "Teddiursa",
   "types": ["Normal"],
   "role": "combattente",
-  "recommended_items": ["muscle_band", "shell_bell", "scope_lens", "leftovers"],
+  "recommended_items": ["shell_bell", "rusted_sword", "focus_band", "leftovers"],
   "color": [196, 132, 72],
   "radius": 0.38,
   "base_speed": 3.5,

@@ -4,7 +4,7 @@
   "name": "Snivy",
   "types": ["Grass"],
   "role": "combattente",
-  "recommended_items": ["expert_belt", "weakness_policy", "black_sludge", "choice_scarf"],
+  "recommended_items": ["expert_belt", "weakness_policy", "rusted_sword", "choice_scarf"],
   "color": [120, 200, 130],
   "radius": 0.40,
   "base_speed": 3.75,

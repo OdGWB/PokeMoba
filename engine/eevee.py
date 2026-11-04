@@ -392,7 +392,8 @@ class EeveeMixin:
                      "poison_until", "confuse_until", "silence_until", "fear_until",
                      "charm_until", "blind_until", "def_debuff_until", "spdef_debuff_until",
                      "atk_debuff_until", "burn_until", "dashlock_until",
-                     "memento_weak_until", "spite_until", "curse_until", "taunt_until"):
+                     "memento_weak_until", "spite_until", "curse_until", "taunt_until",
+                     "ember_until", "aspd_slow_until"):
             setattr(p, attr, -1.0)
         p.sleep_arm_at = -1.0
         p.slow_mult = 1.0

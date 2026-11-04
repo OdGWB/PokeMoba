@@ -48,6 +48,13 @@ ICONS = {
     "light_clay": "light-clay", "soothe_bell": "soothe-bell", "exp_share": "exp-share",
     "focus_sash": "focus-sash", "mental_herb": "mental-herb", "smoke_ball": "smoke-ball",
     "eject_button": "eject-button",
+    # rework oggetti (36 completi, 13 intermedi)
+    "silk_scarf": "silk-scarf", "twisted_spoon": "twisted-spoon", "sharp_beak": "sharp-beak",
+    "black_belt": "black-belt", "miracle_seed": "miracle-seed", "thick_club": "thick-club",
+    "dragon_fang": "dragon-fang", "poison_barb": "poison-barb", "magnet": "magnet",
+    "charcoal": "charcoal", "spell_tag": "spell-tag", "focus_band": "focus-band",
+    "rusted_sword": "rusted-sword", "never_melt_ice": "never-melt-ice",
+    "mystic_water": "mystic-water", "poke_flute": "poke-flute",
     # consumabili / visione (non ancora in items.json)
     "potion": "potion", "full_heal": "full-heal", "escape_rope": "escape-rope",
     "poke_ball": "poke-ball", "silph_scope": "silph-scope",

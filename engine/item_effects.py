@@ -76,8 +76,31 @@ EJECT_SCAN = 12.0          # raggio in cui cercare il nemico più vicino
 BIKE_IDLE = 5.0            # Bicicletta: niente danni (fatti o subiti) da 5s...
 BIKE_EXTRA = 1.12          # ...+12% velocità extra
 
+SEED_REGEN = 0.003         # Miracolseme: 0,3% HP max/s
+HEALCUT_MULT = 0.6         # Velenpuntale / Spettrotarga: cure ricevute -40%...
+HEALCUT_DUR = 3.0          # ...per 3s
+EMBER_FRAC = 0.01          # Carbonella: 1% degli HP max del bersaglio al secondo...
+EMBER_DUR = 3.0            # ...per 3s (si rinnova, non si cumula)
+BAND_FRAC = 0.30           # Bandana: sotto il 30% HP...
+BAND_SHIELD = 0.30         # ...scudo pari al 30% degli HP max...
+BAND_DUR = 4.0             # ...per 4s
+BAND_CD = 60.0
+RUST_ATK = 0.03            # Spada Arrugginita: +3% Attacco per carica (in Pokemon.eff_attack)...
+RUST_MAX = 5               # ...fino a 5 cariche...
+RUST_DUR = 4.0             # ...per 4s dall'ultimo colpo...
+RUST_SPEED = 1.10          # ...a 5 cariche +10% velocità di movimento
+ICE_SLOW = 0.8             # Gelomai: chi lo colpisce con un attacco base ha -20% vel. d'attacco...
+ICE_DUR = 2.0              # ...per 2s
+AURA_RADIUS = 6.0          # Acqua Mistica: alleati entro 6 tile...
+AURA_SPDEF = 20.0          # ...+20 Dif. Sp.
+FLUTE_RADIUS = 6.0         # Pokéflauto (attivabile): alleati entro 6 tile...
+FLUTE_SPEED = 1.2          # ...+20% velocità per 2s e via sonno/confusione/paralisi
+FLUTE_DUR = 2.0
+FLUTE_CD = 90.0
+
 ITEM_COOLDOWNS = {"weakness_policy": WP_CD, "red_card": REDCARD_CD, "focus_sash": SASH_CD,
-                  "mental_herb": MENTAL_CD, "smoke_ball": SMOKE_CD, "eject_button": EJECT_CD}
+                  "mental_herb": MENTAL_CD, "smoke_ball": SMOKE_CD, "eject_button": EJECT_CD,
+                  "focus_band": BAND_CD, "poke_flute": FLUTE_CD}
 
 
 def cdr_to_haste(cdr: float) -> float:
@@ -120,6 +143,27 @@ class ItemEffectsMixin:
             amt *= LIGHTCLAY_AMT
             dur *= LIGHTCLAY_DUR
         self._apply_shield(target, amt, dur)
+
+    def _item_aa_cd_mult(self, u) -> float:
+        """Gelomai: chi è stato rallentato attacca più piano (cooldown × 1/0.8)."""
+        return 1.0 / ICE_SLOW if getattr(u, "aspd_slow_until", -1.0) > self.time else 1.0
+
+    def _item_hits_foe(self, caster, target) -> bool:
+        return (isinstance(caster, Pokemon) and caster.alive and isinstance(target, Pokemon)
+                and target.alive and target.team != caster.team and not target.is_decoy)
+
+    def _item_hit_debuffs(self, caster, target, is_move) -> None:
+        """Effetti su colpo a segno contro un Pokémon nemico: cure ridotte
+        (Velenpuntale su attacchi e mosse, Spettrotarga sulle mosse), bruciatura
+        di Carbonella (solo mosse)."""
+        if not self._item_hits_foe(caster, target) or not caster.items:
+            return
+        items = self._fx_items(caster)
+        if "poison_barb" in items or (is_move and "spell_tag" in items):
+            self._apply_healcut(target, HEALCUT_MULT, HEALCUT_DUR)
+        if is_move and "charcoal" in items:
+            target.ember_until = self.time + EMBER_DUR
+            target.ember_src = caster.id
 
     def _item_push(self, u, dirv, dist, knockback=True) -> None:
         """Spostamento istantaneo (respinta o scatto), fermato dai muri."""
@@ -175,6 +219,7 @@ class ItemEffectsMixin:
         return m
 
     def _item_after_move_hit(self, caster, mv, target, eff) -> None:
+        self._item_hit_debuffs(caster, target, True)   # Carbonella, Spettrotarga, Velenpuntale
         # Assorbisfera: una sola volta per lancio, anche se colpisce piu' bersagli.
         if (isinstance(caster, Pokemon) and "life_orb" in self._fx_items(caster) and caster.alive
                 and caster.orb_paid_seq != caster.cast_seq):
@@ -215,6 +260,16 @@ class ItemEffectsMixin:
 
     def _item_after_aa(self, attacker, target) -> None:
         """Dopo un attacco base a segno: veleno di Fangopece, Bitorzolelmo."""
+        self._item_hit_debuffs(attacker, target, False)   # Velenpuntale
+        if self._item_hits_foe(attacker, target) and attacker.items:
+            if "rusted_sword" in self._fx_items(attacker):   # Spada Arrugginita
+                attacker.rust_stacks = (min(RUST_MAX, attacker.rust_stacks + 1)
+                                        if attacker.rust_until > self.time else 1)
+                attacker.rust_until = self.time + RUST_DUR
+                attacker.rust_n = attacker.rust_stacks
+        if (isinstance(target, Pokemon) and isinstance(attacker, Pokemon) and target.items
+                and attacker.team != target.team and "never_melt_ice" in self._fx_items(target)):
+            attacker.aspd_slow_until = self.time + ICE_DUR   # Gelomai
         if (isinstance(attacker, Pokemon) and "black_sludge" in self._fx_items(attacker)
                 and isinstance(target, Pokemon) and target.alive and target.team != attacker.team):
             self._apply_poison(target, attacker,
@@ -242,6 +297,11 @@ class ItemEffectsMixin:
                 self._item_fx(target, "focus_sash", "Fighting", 1.0)
             else:
                 return
+        if ("focus_band" in items and 0.0 < target.hp < BAND_FRAC * target.max_hp
+                and self._item_ready(target, "focus_band")):
+            self._item_cooldown(target, "focus_band")
+            self._apply_shield(target, target.max_hp * BAND_SHIELD, BAND_DUR)
+            self._item_fx(target, "focus_band", "Fighting", 1.0)
         if ("red_card" in items and amount > REDCARD_FRAC * target.max_hp
                 and isinstance(attacker, Pokemon) and attacker.alive
                 and attacker.team != target.team and self._item_ready(target, "red_card")):
@@ -293,6 +353,17 @@ class ItemEffectsMixin:
             p.airborne_start = -1.0
             p.air_z = 0.0
             self._item_fx(p, "mental_herb", "Psychic", 1.2)
+        elif iid == "poke_flute":
+            now = self.time
+            for q in self.world.pokemons():
+                if (q.team != p.team or not q.alive or q.is_decoy
+                        or q.pos.dist(p.pos) > FLUTE_RADIUS):
+                    continue
+                q.sleep_until = q.confuse_until = q.root_until = -1.0
+                q.sleep_arm_at = -1.0
+                if not (q.speed_until > now and q.speed_mult >= FLUTE_SPEED):
+                    self._apply_speed(q, FLUTE_SPEED, FLUTE_DUR)
+                self._item_fx(q, "poke_flute", "Normal", 1.0)
         elif iid == "smoke_ball":
             c = Vec2(p.pos.x, p.pos.y)
             self.item_clouds.append({"center": c, "radius": SMOKE_RADIUS,
@@ -310,13 +381,27 @@ class ItemEffectsMixin:
         """Dopo _update_status (che ricalcola p.speed e p.invisible): rigenerazioni,
         Bicicletta, Vulnerassicurazione e nubi della Palla Fumo."""
         now = self.time
+        aura_holders = []
         for p in self.world.pokemons():
             p.wp_active = p.wp_until > now
             p.smoke_hidden = False
+            p.aura_spdef = 0.0
+            if p.rust_n and p.rust_until <= now:
+                p.rust_stacks = p.rust_n = 0
+            if p.ember_until > now and p.alive and p.ember_src is not None:   # Carbonella
+                src = self.world.get(p.ember_src)
+                if src is not None and src.alive:
+                    self._deal_damage(src, p, EMBER_FRAC * p.max_hp * dt)
             if not p.alive or not p.items:
                 continue
             items = self._fx_items(p)
+            if "mystic_water" in items:
+                aura_holders.append(p)
+            if p.rust_n >= RUST_MAX and "rusted_sword" in items:
+                p.speed *= RUST_SPEED
             regen = 0.0
+            if "miracle_seed" in items:
+                regen += SEED_REGEN
             if "leftovers" in items:
                 regen += (LEFTOVERS_IDLE_REGEN if now - p.last_damaged_at >= LEFTOVERS_IDLE
                           else LEFTOVERS_REGEN)
@@ -327,6 +412,10 @@ class ItemEffectsMixin:
             if ("bicycle" in items and now - p.last_damaged_at >= BIKE_IDLE
                     and now - p.last_dealt_at >= BIKE_IDLE):
                 p.speed *= BIKE_EXTRA
+        for h in aura_holders:   # Acqua Mistica: aura +20 Dif. Sp. agli alleati vicini (non cumulabile)
+            for q in self.world.pokemons():
+                if q is not h and q.alive and q.team == h.team and q.pos.dist(h.pos) <= AURA_RADIUS:
+                    q.aura_spdef = AURA_SPDEF
         if self.item_clouds:
             keep = []
             for c in self.item_clouds:

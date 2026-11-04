@@ -1,104 +1,121 @@
 {
   "_comment": "Catalogo oggetti a 3 livelli (vitamine -> intermedi -> completi). 'build_from' = componenti che si fondono nell'oggetto (il prezzo e' il TOTALE: nel negozio si paga la differenza coi componenti posseduti, anche annidati). 'stats' si sommano tra oggetti uguali; gli effetti unici (engine/item_effects.py, per id) no. Chiavi di 'stats': hp/attack/defense/sp_attack/sp_defense piatte; attack_speed, move_speed_pct, crit, lifesteal, omnivamp, cdr (riduzione ricariche), heal_power in FRAZIONE (0.12 = 12%). 'group': choice/boots/exp_share = al massimo uno per Pokemon (exp_share: uno per squadra). 'category' = scheda del negozio. 'icon' = file in assets/items/ (tools/fetch_items.py, PokeAPI/sprites); se manca, segnaposto con l'iniziale.",
 
-  "categories": [
-    ["vitamins", "Vitamine"], ["intermediate", "Intermedi"], ["physical", "Fisici"],
-    ["special", "Speciali"], ["hybrid", "Ibridi"], ["fighter", "Combattenti"],
-    ["tank", "Tank"], ["support", "Supporto"], ["utility", "Utilità"]
-  ],
+  "categories": [["vitamins", "Vitamine"], ["intermediate", "Intermedi"], ["physical", "Fisici"], ["special", "Speciali"], ["hybrid", "Ibridi"], ["fighter", "Combattenti"], ["tank", "Tank"], ["support", "Supporto"], ["utility", "Utilità"]],
 
   "base": [
-    {"id": "hp_up",         "name": "PS-su",           "icon": "hp-up",         "category": "vitamins", "price": 400, "stats": {"hp": 150}},
-    {"id": "protein",       "name": "Proteina",        "icon": "protein",       "category": "vitamins", "price": 350, "stats": {"attack": 10}},
-    {"id": "iron",          "name": "Ferro",           "icon": "iron",          "category": "vitamins", "price": 300, "stats": {"defense": 15}},
-    {"id": "calcium",       "name": "Calcio",          "icon": "calcium",       "category": "vitamins", "price": 400, "stats": {"sp_attack": 20}},
-    {"id": "zinc",          "name": "Zinco",           "icon": "zinc",          "category": "vitamins", "price": 400, "stats": {"sp_defense": 20}},
-    {"id": "carbos",        "name": "Carburante",      "icon": "carbos",        "category": "vitamins", "price": 300, "stats": {"attack_speed": 0.12}},
-    {"id": "running_shoes", "name": "Scarpe da Corsa", "icon": "running-shoes", "category": "vitamins", "price": 300, "stats": {"move_speed_pct": 0.10}, "group": "boots",
-     "note": "Scarpe: al massimo un paio per Pokemon."}
+    {"id": "hp_up", "name": "PS-su", "icon": "hp-up", "category": "vitamins", "price": 400, "stats": {"hp": 150}},
+    {"id": "protein", "name": "Proteina", "icon": "protein", "category": "vitamins", "price": 350, "stats": {"attack": 10}},
+    {"id": "iron", "name": "Ferro", "icon": "iron", "category": "vitamins", "price": 300, "stats": {"defense": 15}},
+    {"id": "calcium", "name": "Calcio", "icon": "calcium", "category": "vitamins", "price": 400, "stats": {"sp_attack": 20}},
+    {"id": "zinc", "name": "Zinco", "icon": "zinc", "category": "vitamins", "price": 400, "stats": {"sp_defense": 20}},
+    {"id": "carbos", "name": "Carburante", "icon": "carbos", "category": "vitamins", "price": 300, "stats": {"attack_speed": 0.12}},
+    {"id": "running_shoes", "name": "Scarpe da Corsa", "icon": "running-shoes", "category": "vitamins", "price": 300, "stats": {"move_speed_pct": 0.1}, "group": "boots", "note": "Scarpe: al massimo un paio per Pokemon."}
   ],
 
   "intermediate": [
-    {"id": "muscle_band",  "name": "Muscolbanda",   "icon": "muscle-band",  "category": "intermediate", "price": 1100, "build_from": ["protein", "protein"],  "stats": {"attack": 25}},
-    {"id": "wise_glasses", "name": "Saggiocchiali", "icon": "wise-glasses", "category": "intermediate", "price": 1200, "build_from": ["calcium", "calcium"],  "stats": {"sp_attack": 45}},
-    {"id": "scope_lens",   "name": "Mirino",        "icon": "scope-lens",   "category": "intermediate", "price": 1000, "build_from": ["carbos"],              "stats": {"attack_speed": 0.18, "crit": 0.15}},
-    {"id": "shell_bell",   "name": "Conchinella",   "icon": "shell-bell",   "category": "intermediate", "price": 1000, "build_from": ["hp_up", "protein"],    "stats": {"hp": 150, "attack": 12, "lifesteal": 0.08}},
-    {"id": "hard_stone",   "name": "Pietradura",    "icon": "hard-stone",   "category": "intermediate", "price": 1000, "build_from": ["iron", "hp_up"],       "stats": {"defense": 25, "hp": 200}},
-    {"id": "bicycle",      "name": "Bicicletta",    "icon": "bicycle",      "category": "intermediate", "price": 1000, "build_from": ["running_shoes"],       "stats": {"move_speed_pct": 0.18}, "group": "boots",
-     "note": "+12% velocita' extra se non infligge ne' subisce danni da 5 secondi. Scarpe: al massimo un paio."},
-    {"id": "eviolite",     "name": "Evolcondensa",  "icon": "eviolite",     "category": "intermediate", "price": 1200, "build_from": ["iron", "zinc"],        "stats": {"defense": 45, "sp_defense": 45},
-     "note": "Funziona solo se il Pokemon NON e' alla forma finale: dopo l'evoluzione finale non da' nulla."}
+    {"id": "muscle_band", "name": "Muscolbanda", "icon": "muscle-band", "category": "intermediate", "price": 1100, "build_from": ["protein", "protein"], "stats": {"attack": 25}},
+    {"id": "wise_glasses", "name": "Saggiocchiali", "icon": "wise-glasses", "category": "intermediate", "price": 1200, "build_from": ["calcium", "calcium"], "stats": {"sp_attack": 45}},
+    {"id": "scope_lens", "name": "Mirino", "icon": "scope-lens", "category": "intermediate", "price": 1000, "build_from": ["carbos"], "stats": {"attack_speed": 0.18, "crit": 0.15}},
+    {"id": "shell_bell", "name": "Conchinella", "icon": "shell-bell", "category": "intermediate", "price": 1000, "build_from": ["hp_up", "protein"], "stats": {"hp": 150, "attack": 12, "lifesteal": 0.08}},
+    {"id": "hard_stone", "name": "Pietradura", "icon": "hard-stone", "category": "intermediate", "price": 1000, "build_from": ["iron", "hp_up"], "stats": {"defense": 25, "hp": 200}},
+    {"id": "silk_scarf", "name": "Sciarpa Seta", "icon": "silk-scarf", "category": "intermediate", "price": 1050, "build_from": ["zinc", "zinc"], "stats": {"sp_defense": 45}},
+    {"id": "twisted_spoon", "name": "Cucchiaio Torto", "icon": "twisted-spoon", "category": "intermediate", "price": 850, "build_from": ["calcium"], "stats": {"sp_attack": 25, "cdr": 0.1}},
+    {"id": "sharp_beak", "name": "Beccaffilato", "icon": "sharp-beak", "category": "intermediate", "price": 900, "build_from": ["carbos", "carbos"], "stats": {"attack_speed": 0.3}},
+    {"id": "black_belt", "name": "Cinturanera", "icon": "black-belt", "category": "intermediate", "price": 1000, "build_from": ["protein", "iron"], "stats": {"attack": 15, "defense": 25}},
+    {"id": "miracle_seed", "name": "Miracolseme", "icon": "miracle-seed", "category": "intermediate", "price": 1000, "build_from": ["calcium", "hp_up"], "stats": {"sp_attack": 25, "hp": 150}, "note": "Rigenera lo 0,3% degli HP max al secondo."},
+    {"id": "thick_club", "name": "Ossospesso", "icon": "thick-club", "category": "intermediate", "price": 950, "build_from": ["hp_up", "hp_up"], "stats": {"hp": 350}},
+    {"id": "bicycle", "name": "Bicicletta", "icon": "bicycle", "category": "intermediate", "price": 1000, "build_from": ["running_shoes"], "stats": {"move_speed_pct": 0.18}, "group": "boots", "note": "+12% velocita' extra se non infligge ne' subisce danni da 5 secondi. Scarpe: al massimo un paio."},
+    {"id": "eviolite", "name": "Evolcondensa", "icon": "eviolite", "category": "intermediate", "price": 1200, "build_from": ["iron", "zinc"], "stats": {"defense": 45, "sp_defense": 45}, "note": "Funziona solo se il Pokemon NON e' alla forma finale: dopo l'evoluzione finale non da' nulla."}
   ],
 
   "completed": [
-    {"id": "choice_band",  "name": "Fascia Scelta", "icon": "choice-band",  "category": "physical", "price": 3000, "build_from": ["muscle_band", "scope_lens"], "stats": {"attack": 55, "crit": 0.20}, "group": "choice",
-     "note": "Scelta: la stessa mossa usata due volte di fila entro 5s fa +25% di danno la seconda volta; una mossa diversa azzera. Un solo oggetto Scelta."},
-    {"id": "quick_claw",   "name": "Rapidartigli",  "icon": "quick-claw",   "category": "physical", "price": 2800, "build_from": ["scope_lens", "carbos"],      "stats": {"attack_speed": 0.40, "crit": 0.20, "move_speed_pct": 0.05},
-     "note": "Dopo 3s senza attaccare, il primo attacco base e' istantaneo e fa +30% di danno."},
-    {"id": "choice_scarf", "name": "Stola Scelta",  "icon": "choice-scarf", "category": "physical", "price": 2700, "build_from": ["muscle_band", "carbos"],     "stats": {"attack": 40, "attack_speed": 0.15, "move_speed_pct": 0.12}, "group": "choice",
-     "note": "Scelta: la stessa mossa usata due volte di fila entro 5s fa +25% di danno la seconda volta. Un solo oggetto Scelta."},
-    {"id": "zoom_lens",    "name": "Zoomlente",     "icon": "zoom-lens",    "category": "physical", "price": 2800, "build_from": ["scope_lens", "protein"],     "stats": {"attack": 40, "attack_speed": 0.25, "crit": 0.15},
-     "note": "+15% portata degli attacchi base; oltre meta' portata gli attacchi base fanno +15% di danno."},
-
-    {"id": "choice_specs", "name": "Lente Scelta",  "icon": "choice-specs", "category": "special", "price": 2900, "build_from": ["wise_glasses", "calcium"],   "stats": {"sp_attack": 95, "cdr": 0.08}, "group": "choice",
-     "note": "Scelta: la stessa mossa usata due volte di fila entro 5s fa +25% di danno la seconda volta. Un solo oggetto Scelta."},
-    {"id": "metronome",    "name": "Metronomo",     "icon": "metronome",    "category": "special", "price": 2900, "build_from": ["wise_glasses", "hp_up"],     "stats": {"sp_attack": 70, "hp": 200},
-     "note": "Ogni colpo consecutivo della stessa mossa sullo stesso bersaglio fa +10% di danno, fino a +50%."},
-    {"id": "wide_lens",    "name": "Grandelente",   "icon": "wide-lens",    "category": "special", "price": 2800, "build_from": ["wise_glasses", "zinc"],      "stats": {"sp_attack": 75, "sp_defense": 25},
-     "note": "+20% portata delle mosse."},
-    {"id": "big_root",     "name": "Granradice",    "icon": "big-root",     "category": "special", "price": 2900, "build_from": ["wise_glasses", "shell_bell"], "stats": {"sp_attack": 60, "hp": 150, "omnivamp": 0.12},
-     "note": "Rubavita 12% anche sulle mosse. Le cure ricevute sono piu' forti del 20%."},
-
-    {"id": "life_orb",     "name": "Assorbisfera",  "icon": "life-orb",     "category": "hybrid", "price": 3000, "build_from": ["muscle_band", "wise_glasses"],   "stats": {"attack": 30, "sp_attack": 50},
-     "note": "Le mosse fanno +15% di danno, ma ogni mossa che colpisce costa il 3% degli HP massimi."},
-    {"id": "expert_belt",  "name": "Abilcintura",   "icon": "expert-belt",  "category": "hybrid", "price": 2750, "build_from": ["protein", "calcium", "hp_up"], "stats": {"attack": 25, "sp_attack": 40, "hp": 200},
-     "note": "I colpi superefficaci fanno +25% di danno."},
-
-    {"id": "weakness_policy", "name": "Vulnerassicurazione", "icon": "weakness-policy", "category": "fighter", "price": 2800, "build_from": ["hard_stone", "muscle_band"], "stats": {"attack": 30, "defense": 25, "hp": 250},
-     "note": "Quando subisce una mossa superefficace: +25% Attacco e Att. Sp. per 5s (ricarica 15s)."},
-    {"id": "black_sludge", "name": "Fangopece",     "icon": "black-sludge", "category": "fighter", "price": 2650, "build_from": ["shell_bell", "protein"],      "stats": {"attack": 35, "hp": 300, "lifesteal": 0.05},
-     "note": "Rigenera lo 0,5% degli HP max al secondo (1,5% se di tipo Veleno). Gli attacchi base avvelenano per 3s (danno leggero)."},
-
-    {"id": "assault_vest", "name": "Corpetto Assalto", "icon": "assault-vest", "category": "tank", "price": 2700, "build_from": ["zinc", "hard_stone"],          "stats": {"hp": 350, "sp_defense": 70},
-     "note": "Le mosse di potenziamento statistiche danno solo il bonus passivo, non quello attivo."},
-    {"id": "rocky_helmet", "name": "Bitorzolelmo",  "icon": "rocky-helmet", "category": "tank", "price": 2600, "build_from": ["hard_stone", "iron"],          "stats": {"hp": 250, "defense": 65},
-     "note": "Chi colpisce il possessore in corpo a corpo subisce danno senza tipo pari a 15 + 20% della sua Difesa."},
-    {"id": "leftovers",    "name": "Avanzi",        "icon": "leftovers",    "category": "tank", "price": 2700, "build_from": ["hp_up", "hp_up", "zinc"],      "stats": {"hp": 550, "sp_defense": 20},
-     "note": "Rigenera lo 0,5% degli HP max al secondo, il 2% se non subisce danni da 6s."},
-    {"id": "red_card",     "name": "Cartelrossa",   "icon": "red-card",     "category": "tank", "price": 2600, "build_from": ["iron", "zinc", "hp_up"],       "stats": {"hp": 200, "defense": 30, "sp_defense": 40},
-     "note": "Se un singolo colpo toglie piu' del 15% degli HP max, l'attaccante viene respinto di 4 tile (ricarica 20s)."},
-    {"id": "iron_ball",    "name": "Ferropalla",    "icon": "iron-ball",    "category": "tank", "price": 2700, "build_from": ["iron", "zinc", "hard_stone"],  "stats": {"hp": 200, "defense": 80, "sp_defense": 60, "move_speed_pct": -0.10},
-     "note": "La durata di lanci in aria e respinte subiti e' ridotta del 60%."},
-    {"id": "bright_powder","name": "Luminpolvere",  "icon": "bright-powder","category": "tank", "price": 2550, "build_from": ["iron", "iron", "hp_up"],      "stats": {"hp": 250, "defense": 55},
-     "note": "15% di probabilita' di schivare gli attacchi base (non le mosse)."},
-
-    {"id": "king_rock",    "name": "Roccia di Re",  "icon": "kings-rock",   "category": "support", "price": 1300, "build_from": ["hp_up", "zinc"],            "stats": {"hp": 200, "sp_defense": 25, "heal_power": 0.15},
-     "note": "Cure e scudi dati +15%; curando un alleato gli da' anche uno scudo (30% della cura, 3s). Se Poliwhirl ce l'ha al liv.8 evolve in POLITOAD (invece che Poliwrath)."},
-    {"id": "light_clay",   "name": "Creta Luce",    "icon": "light-clay",   "category": "support", "price": 2400, "build_from": ["hp_up", "calcium", "zinc"],  "stats": {"hp": 250, "sp_attack": 30, "sp_defense": 30, "cdr": 0.10},
-     "note": "Gli scudi dati dal possessore sono piu' forti del 15% e durano il 50% in piu'."},
-    {"id": "soothe_bell",  "name": "Calmanella",    "icon": "soothe-bell",  "category": "support", "price": 2300, "build_from": ["hp_up", "calcium"],          "stats": {"hp": 250, "sp_attack": 40, "cdr": 0.15},
-     "note": "Le cure date dal possessore sono piu' forti del 15%."},
-    {"id": "exp_share",    "name": "Condividi Esp.","icon": "exp-share",    "category": "support", "price": 1000, "build_from": ["hp_up"],                    "stats": {"hp": 150, "move_speed_pct": 0.05}, "group": "exp_share",
-     "note": "Quando un alleato entro 8 tile da' l'ultimo colpo a un minion, ricevi 10 oro e il 30% dell'esperienza (senza togliere nulla all'alleato). Massimo uno per squadra."},
-
-    {"id": "focus_sash",   "name": "Focalnastro",   "icon": "focus-sash",   "category": "utility", "price": 2400, "build_from": ["hp_up", "hard_stone"],       "stats": {"hp": 300, "defense": 20},
-     "note": "Quando subisce un colpo letale sopravvive con 1 HP (ricarica 90s)."},
-    {"id": "mental_herb",  "name": "Mentalerba",    "icon": "mental-herb",  "category": "utility", "price": 2500, "build_from": ["zinc", "calcium"],            "stats": {"sp_attack": 45, "sp_defense": 40}, "active": true,
-     "note": "ATTIVABILE (tasto dello slot, 1-6): rimuove tutti gli stati alterati e i controlli (ricarica 90s)."},
-    {"id": "smoke_ball",   "name": "Palla Fumo",    "icon": "smoke-ball",   "category": "utility", "price": 2200, "build_from": ["carbos", "hp_up"],            "stats": {"hp": 200, "attack_speed": 0.20, "move_speed_pct": 0.05}, "active": true,
-     "note": "ATTIVABILE (tasto dello slot, 1-6): nube di fumo di 3 tile per 3s; dentro sei invisibile e hai +30% velocita' (ricarica 75s)."},
-    {"id": "eject_button", "name": "Pulsantefuga",  "icon": "eject-button", "category": "utility", "price": 2700, "build_from": ["hard_stone", "zinc", "hp_up"], "stats": {"hp": 400, "defense": 25, "sp_defense": 20},
-     "note": "Quando gli HP scendono sotto il 30% scatta di 4 tile lontano dal nemico piu' vicino (ricarica 60s)."}
+    {"id": "choice_band", "name": "Fascia Scelta", "icon": "choice-band", "category": "physical", "price": 3000, "build_from": ["muscle_band", "scope_lens", "protein"], "stats": {"attack": 55, "crit": 0.2}, "group": "choice", "note": "Scelta: la stessa mossa usata due volte di fila entro 5s fa +25% di danno la seconda volta; una mossa diversa azzera. Un solo oggetto Scelta."},
+    {"id": "quick_claw", "name": "Rapidartigli", "icon": "quick-claw", "category": "physical", "price": 2800, "build_from": ["scope_lens", "sharp_beak", "carbos"], "stats": {"attack_speed": 0.4, "crit": 0.2, "move_speed_pct": 0.05}, "note": "Dopo 3s senza attaccare, il primo attacco base e' istantaneo e fa +30% di danno."},
+    {"id": "choice_scarf", "name": "Stola Scelta", "icon": "choice-scarf", "category": "physical", "price": 2800, "build_from": ["muscle_band", "sharp_beak", "protein"], "stats": {"attack": 40, "attack_speed": 0.15, "move_speed_pct": 0.12}, "group": "choice", "note": "Scelta: la stessa mossa usata due volte di fila entro 5s fa +25% di danno la seconda volta; una mossa diversa azzera. Un solo oggetto Scelta."},
+    {"id": "zoom_lens", "name": "Zoomlente", "icon": "zoom-lens", "category": "physical", "price": 2800, "build_from": ["scope_lens", "sharp_beak", "protein"], "stats": {"attack": 40, "attack_speed": 0.25, "crit": 0.15}, "note": "+15% portata degli attacchi base; oltre meta' portata gli attacchi base fanno +15% di danno."},
+    {"id": "dragon_fang", "name": "Dragodente", "icon": "dragon-fang", "category": "physical", "price": 3000, "build_from": ["muscle_band", "black_belt", "protein"], "stats": {"attack": 45, "cdr": 0.1, "armor_pen_pct": 0.2}, "note": "Penetrazione: ignora il 20% della Difesa del bersaglio."},
+    {"id": "poison_barb", "name": "Velenpuntale", "icon": "poison-barb", "category": "physical", "price": 2700, "build_from": ["muscle_band", "sharp_beak", "carbos"], "stats": {"attack": 30, "attack_speed": 0.3}, "note": "Attacchi base e mosse applicano cure ridotte del 40% per 3s."},
+    {"id": "choice_specs", "name": "Lente Scelta", "icon": "choice-specs", "category": "special", "price": 3000, "build_from": ["wise_glasses", "twisted_spoon", "calcium"], "stats": {"sp_attack": 95, "cdr": 0.08}, "group": "choice", "note": "Scelta: la stessa mossa usata due volte di fila entro 5s fa +25% di danno la seconda volta; una mossa diversa azzera. Un solo oggetto Scelta."},
+    {"id": "metronome", "name": "Metronomo", "icon": "metronome", "category": "special", "price": 2900, "build_from": ["wise_glasses", "miracle_seed", "calcium"], "stats": {"sp_attack": 70, "hp": 200}, "note": "Ogni colpo consecutivo della stessa mossa sullo stesso bersaglio fa +10% di danno, fino a +50%."},
+    {"id": "wide_lens", "name": "Grandelente", "icon": "wide-lens", "category": "special", "price": 2900, "build_from": ["wise_glasses", "silk_scarf", "calcium"], "stats": {"sp_attack": 75, "sp_defense": 35}, "note": "+20% portata delle mosse."},
+    {"id": "big_root", "name": "Granradice", "icon": "big-root", "category": "special", "price": 3000, "build_from": ["wise_glasses", "shell_bell", "hp_up"], "stats": {"sp_attack": 60, "hp": 250, "omnivamp": 0.12}, "note": "Rubavita 12% anche sulle mosse. Le cure ricevute sono piu' forti del 20%."},
+    {"id": "magnet", "name": "Magnete", "icon": "magnet", "category": "special", "price": 2900, "build_from": ["wise_glasses", "twisted_spoon", "hp_up"], "stats": {"sp_attack": 70, "hp": 200, "cdr": 0.1, "magic_pen_pct": 0.2}, "note": "Penetrazione: ignora il 20% della Dif. Sp. del bersaglio."},
+    {"id": "charcoal", "name": "Carbonella", "icon": "charcoal", "category": "special", "price": 3000, "build_from": ["wise_glasses", "miracle_seed", "hp_up"], "stats": {"sp_attack": 65, "hp": 300}, "note": "Le mosse che colpiscono un Pokemon nemico lo bruciano: danno senza tipo pari all'1% dei suoi HP max al secondo per 3s (non cumulabile, si rinnova). Ottimo contro i tank."},
+    {"id": "spell_tag", "name": "Spettrotarga", "icon": "spell-tag", "category": "special", "price": 2800, "build_from": ["wise_glasses", "twisted_spoon", "zinc"], "stats": {"sp_attack": 60, "sp_defense": 25, "cdr": 0.1}, "note": "Le mosse applicano cure ridotte del 40% per 3s."},
+    {"id": "life_orb", "name": "Assorbisfera", "icon": "life-orb", "category": "hybrid", "price": 3100, "build_from": ["muscle_band", "wise_glasses", "hp_up"], "stats": {"attack": 30, "sp_attack": 50, "hp": 150}, "note": "Le mosse fanno +15% di danno, ma ogni mossa che colpisce costa il 3% degli HP max."},
+    {"id": "expert_belt", "name": "Abilcintura", "icon": "expert-belt", "category": "hybrid", "price": 2900, "build_from": ["black_belt", "miracle_seed", "hp_up"], "stats": {"attack": 25, "sp_attack": 40, "hp": 300, "defense": 20}, "note": "I colpi superefficaci fanno +25% di danno."},
+    {"id": "weakness_policy", "name": "Vulnerassicurazione", "icon": "weakness-policy", "category": "fighter", "price": 2900, "build_from": ["hard_stone", "muscle_band", "iron"], "stats": {"attack": 30, "defense": 40, "hp": 250}, "note": "Quando subisce una mossa superefficace: +25% Attacco e Att. Sp. per 5s (ricarica 15s)."},
+    {"id": "black_sludge", "name": "Fangopece", "icon": "black-sludge", "category": "fighter", "price": 2800, "build_from": ["shell_bell", "black_belt", "hp_up"], "stats": {"attack": 35, "hp": 350, "defense": 20, "lifesteal": 0.05}, "note": "Rigenera lo 0,5% degli HP max al secondo (1,5% se di tipo Veleno). Gli attacchi base avvelenano per 3s (danno leggero)."},
+    {"id": "focus_band", "name": "Bandana", "icon": "focus-band", "category": "fighter", "price": 2800, "build_from": ["black_belt", "thick_club", "protein"], "stats": {"attack": 30, "hp": 400, "defense": 20}, "note": "Quando gli HP scendono sotto il 30%, ottiene uno scudo pari al 30% degli HP max per 4s (ricarica 60s)."},
+    {"id": "rusted_sword", "name": "Spada Arrugginita", "icon": "rusted-sword", "category": "fighter", "price": 3000, "build_from": ["black_belt", "muscle_band", "carbos"], "stats": {"attack": 40, "defense": 25, "attack_speed": 0.15}, "note": "Ogni attacco base su un Pokemon nemico da' +3% Attacco per 4s, cumulabile fino a 5 volte; a 5 cariche +10% velocita' di movimento."},
+    {"id": "assault_vest", "name": "Corpetto Assalto", "icon": "assault-vest", "category": "tank", "price": 2800, "build_from": ["silk_scarf", "thick_club", "zinc"], "stats": {"hp": 350, "sp_defense": 75}, "note": "Le mosse di potenziamento statistiche danno solo il bonus passivo, non quello attivo."},
+    {"id": "rocky_helmet", "name": "Bitorzolelmo", "icon": "rocky-helmet", "category": "tank", "price": 2700, "build_from": ["hard_stone", "black_belt", "iron"], "stats": {"hp": 250, "defense": 70}, "note": "Chi colpisce il possessore in corpo a corpo subisce danno senza tipo pari a 15 + 20% della sua Difesa."},
+    {"id": "leftovers", "name": "Avanzi", "icon": "leftovers", "category": "tank", "price": 2800, "build_from": ["thick_club", "miracle_seed", "hp_up"], "stats": {"hp": 650, "sp_attack": 20}, "note": "Rigenera lo 0,5% degli HP max al secondo, il 2% se non subisce danni da 6s."},
+    {"id": "red_card", "name": "Cartelrossa", "icon": "red-card", "category": "tank", "price": 2700, "build_from": ["hard_stone", "silk_scarf", "iron"], "stats": {"hp": 200, "defense": 40, "sp_defense": 45}, "note": "Se un singolo colpo toglie piu' del 15% degli HP max, l'attaccante viene respinto di 4 tile (ricarica 20s)."},
+    {"id": "iron_ball", "name": "Ferropalla", "icon": "iron-ball", "category": "tank", "price": 2900, "build_from": ["hard_stone", "silk_scarf", "hp_up"], "stats": {"hp": 350, "defense": 80, "sp_defense": 60, "move_speed_pct": -0.1}, "note": "La durata di lanci in aria e respinte subiti e' ridotta del 60%."},
+    {"id": "bright_powder", "name": "Luminpolvere", "icon": "bright-powder", "category": "tank", "price": 2650, "build_from": ["hard_stone", "thick_club", "iron"], "stats": {"hp": 550, "defense": 40}, "note": "15% di probabilita' di schivare gli attacchi base (non le mosse)."},
+    {"id": "never_melt_ice", "name": "Gelomai", "icon": "never-melt-ice", "category": "tank", "price": 2800, "build_from": ["hard_stone", "thick_club", "zinc"], "stats": {"hp": 500, "defense": 30, "sp_defense": 25}, "note": "I Pokemon che ti colpiscono con un attacco base hanno -20% velocita' d'attacco per 2s."},
+    {"id": "mystic_water", "name": "Acqua Mistica", "icon": "mystic-water", "category": "tank", "price": 2700, "build_from": ["silk_scarf", "thick_club", "hp_up"], "stats": {"hp": 500, "sp_defense": 45}, "note": "Aura: gli alleati entro 6 tile hanno +20 Dif. Sp."},
+    {"id": "king_rock", "name": "Roccia di Re", "icon": "kings-rock", "category": "support", "price": 1500, "build_from": ["thick_club", "zinc"], "stats": {"hp": 300, "sp_defense": 20, "heal_power": 0.15}, "note": "Cure e scudi dati +15%; curando un alleato gli da' anche uno scudo (30% della cura, 3s). Se Poliwhirl ce l'ha al liv.8 evolve in POLITOAD (invece che Poliwrath)."},
+    {"id": "light_clay", "name": "Creta Luce", "icon": "light-clay", "category": "support", "price": 2600, "build_from": ["silk_scarf", "twisted_spoon", "hp_up"], "stats": {"hp": 150, "sp_attack": 25, "sp_defense": 45, "cdr": 0.1}, "note": "Gli scudi dati dal possessore sono piu' forti del 15% e durano il 50% in piu'."},
+    {"id": "soothe_bell", "name": "Calmanella", "icon": "soothe-bell", "category": "support", "price": 2500, "build_from": ["twisted_spoon", "miracle_seed", "hp_up"], "stats": {"hp": 300, "sp_attack": 50, "cdr": 0.15}, "note": "Le cure date dal possessore sono piu' forti del 15%."},
+    {"id": "exp_share", "name": "Condividi Esp.", "icon": "exp-share", "category": "support", "price": 1000, "build_from": ["hp_up"], "stats": {"hp": 150, "move_speed_pct": 0.05}, "group": "exp_share", "note": "Quando un alleato entro 8 tile da' l'ultimo colpo a un minion, ricevi 10 oro e il 30% dell'esperienza (senza togliere nulla all'alleato). Massimo uno per squadra."},
+    {"id": "poke_flute", "name": "Pokéflauto", "icon": "poke-flute", "category": "support", "price": 2600, "build_from": ["silk_scarf", "twisted_spoon", "calcium"], "stats": {"sp_attack": 45, "sp_defense": 45, "cdr": 0.15}, "active": true, "note": "ATTIVABILE (tasto dello slot, 1-6): gli alleati entro 6 tile (te incluso) si liberano da sonno, confusione e paralisi e hanno +20% velocita' per 2s (ricarica 90s)."},
+    {"id": "focus_sash", "name": "Focalnastro", "icon": "focus-sash", "category": "utility", "price": 2600, "build_from": ["thick_club", "hard_stone", "hp_up"], "stats": {"hp": 500, "defense": 25}, "note": "Quando subisce un colpo letale sopravvive con 1 HP (ricarica 90s)."},
+    {"id": "mental_herb", "name": "Mentalerba", "icon": "mental-herb", "category": "utility", "price": 2700, "build_from": ["silk_scarf", "twisted_spoon", "zinc"], "stats": {"sp_attack": 25, "sp_defense": 65, "cdr": 0.1}, "active": true, "note": "ATTIVABILE (tasto dello slot, 1-6): rimuove tutti gli stati alterati e i controlli (ricarica 90s)."},
+    {"id": "smoke_ball", "name": "Palla Fumo", "icon": "smoke-ball", "category": "utility", "price": 2500, "build_from": ["sharp_beak", "thick_club", "carbos"], "stats": {"hp": 350, "attack_speed": 0.4, "move_speed_pct": 0.05}, "active": true, "note": "ATTIVABILE (tasto dello slot, 1-6): nube di fumo di 3 tile per 3s; dentro sei invisibile e hai +30% velocita' (ricarica 75s)."},
+    {"id": "eject_button", "name": "Pulsantefuga", "icon": "eject-button", "category": "utility", "price": 2700, "build_from": ["thick_club", "silk_scarf", "iron"], "stats": {"hp": 350, "defense": 15, "sp_defense": 45}, "note": "Quando gli HP scendono sotto il 30% scatta di 4 tile lontano dal nemico piu' vicino (ricarica 60s)."}
   ],
 
   "recommended": {
-    "default": ["choice_band", "weakness_policy", "focus_sash", "leftovers"],
-    "combattente": ["weakness_policy", "black_sludge", "choice_scarf", "quick_claw"],
-    "assassino": ["choice_band", "quick_claw", "zoom_lens", "black_sludge"],
-    "tiratore": ["zoom_lens", "quick_claw", "choice_band", "weakness_policy"],
-    "mago": ["choice_specs", "metronome", "wide_lens", "big_root"],
-    "mago mobile": ["choice_specs", "life_orb", "wide_lens", "metronome"],
-    "tank": ["assault_vest", "rocky_helmet", "leftovers", "iron_ball"],
-    "supporto": ["king_rock", "soothe_bell", "light_clay", "exp_share"]
+    "default": [
+      "choice_band",
+      "weakness_policy",
+      "focus_sash",
+      "leftovers"
+    ],
+    "combattente": [
+      "weakness_policy",
+      "black_sludge",
+      "focus_band",
+      "rusted_sword"
+    ],
+    "assassino": [
+      "dragon_fang",
+      "quick_claw",
+      "zoom_lens",
+      "poison_barb"
+    ],
+    "tiratore": [
+      "zoom_lens",
+      "quick_claw",
+      "dragon_fang",
+      "poison_barb"
+    ],
+    "mago": [
+      "choice_specs",
+      "magnet",
+      "charcoal",
+      "spell_tag"
+    ],
+    "mago mobile": [
+      "choice_specs",
+      "life_orb",
+      "wide_lens",
+      "magnet"
+    ],
+    "tank": [
+      "assault_vest",
+      "rocky_helmet",
+      "never_melt_ice",
+      "mystic_water"
+    ],
+    "supporto": [
+      "king_rock",
+      "soothe_bell",
+      "poke_flute",
+      "exp_share"
+    ]
   }
 }
