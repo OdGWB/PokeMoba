@@ -109,9 +109,10 @@ class TestMienshao(unittest.TestCase):
     def test_sweet_spot_aa(self):
         self.level(2)
         er = self.e.radius
-        self.e.pos = Vec2(26.5 + er + 1.4, 47.5)      # bordo a 1,4 tile: punto dolce
+        ur = self.u.radius                            # portata misurata da bordo a bordo
+        self.e.pos = Vec2(26.5 + ur + er + 1.4, 47.5)      # bordi a 1,4 tile: punto dolce
         sweet = self.aa_once(self.e)
-        self.e.pos = Vec2(26.5 + er + 0.55, 47.5)     # troppo vicino
+        self.e.pos = Vec2(26.5 + ur + er + 0.55, 47.5)     # troppo vicino
         near = self.aa_once(self.e)
         self.assertAlmostEqual(sweet / near, SWEET_MULT, places=2)
 
@@ -119,7 +120,7 @@ class TestMienshao(unittest.TestCase):
         self.level(2)
         ms = self.u.moveset["Q"]
         ms.cooldown_remaining = 5.0
-        self.e.pos = Vec2(26.5 + self.e.radius + 1.4, 47.5)
+        self.e.pos = Vec2(26.5 + self.u.radius + self.e.radius + 1.4, 47.5)
         self.aa_once(self.e)
         self.assertAlmostEqual(ms.cooldown_remaining, 4.0)
 

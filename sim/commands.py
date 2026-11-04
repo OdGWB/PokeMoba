@@ -36,9 +36,11 @@ class AttackCommand(Command):
 
 @dataclass
 class AttackMoveCommand(Command):
-    """Vai verso un punto attaccando i nemici incontrati (attack-move)."""
+    """Vai verso un punto attaccando i nemici incontrati (attack-move).
+    champs_only: tasto "solo Pokémon" tenuto (ignora minion, neutrali, strutture)."""
     x: float = 0.0
     y: float = 0.0
+    champs_only: bool = False
 
 
 @dataclass

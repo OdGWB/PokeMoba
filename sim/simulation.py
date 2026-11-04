@@ -56,6 +56,9 @@ class Simulation:
             unit.stop()
         elif isinstance(cmd, AttackMoveCommand):
             self._set_order(unit, "attackmove", point=Vec2(cmd.x, cmd.y))
+            if hasattr(unit, "champs_only"):
+                unit.champs_only = bool(getattr(cmd, "champs_only", False))
+                unit.target_id = None   # nuovo attacco-movimento: si sceglie da capo
         elif isinstance(cmd, CastMoveCommand):
             # Il lancio vero lo esegue il Match al prossimo tick (autoritativo).
             if hasattr(unit, "pending_cast"):
@@ -100,6 +103,8 @@ class Simulation:
             unit.order = order
             unit.order_target_id = target_id
             unit.order_point = point
+            unit.idle_anchor = None     # nuovo ordine: nuova ancora d'inseguimento
+            unit.champs_only = False
 
     def _apply_move(self, unit, tx: float, ty: float) -> None:
         if not getattr(unit, "alive", True):

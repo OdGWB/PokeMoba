@@ -69,7 +69,9 @@ CMD_ATTACKMOVE = 2
 CMD_CAST = 3
 CMD_STOP = 6
 CMD_RECALL = 9
-STATE_CMDS = (CMD_MOVE, CMD_ATTACK, CMD_ATTACKMOVE, CMD_CAST, CMD_STOP, CMD_RECALL)
+CMD_ATTACKMOVE_CHAMP = 10   # attacco-movimento col tasto "solo Pokémon"
+STATE_CMDS = (CMD_MOVE, CMD_ATTACK, CMD_ATTACKMOVE, CMD_CAST, CMD_STOP, CMD_RECALL,
+              CMD_ATTACKMOVE_CHAMP)
 MAX_CMDS_PER_INPUT = 16      # comandi ridondanti al massimo per pacchetto
 SLOTS_QWER = ["Q", "W", "E", "R"]   # indice di slot mossa 0..3 nei comandi
 # Nel byte dello slot di CMD_CAST i 6 bit alti portano la pressione del tasto
@@ -276,7 +278,7 @@ def enc_input(ack_snap, cmds) -> bytes:
     for c in cmds:
         k = c["kind"]
         w.u16(c["seq"]).u8(k)
-        if k in (CMD_MOVE, CMD_ATTACKMOVE):
+        if k in (CMD_MOVE, CMD_ATTACKMOVE, CMD_ATTACKMOVE_CHAMP):
             w.pos(c["x"]).pos(c["y"])
         elif k == CMD_ATTACK:
             w.u16(c["target_id"])
@@ -300,7 +302,7 @@ def dec_input(data) -> dict:
     for _ in range(n):
         c = {"seq": r.u16(), "kind": r.u8()}
         k = c["kind"]
-        if k in (CMD_MOVE, CMD_ATTACKMOVE):
+        if k in (CMD_MOVE, CMD_ATTACKMOVE, CMD_ATTACKMOVE_CHAMP):
             c["x"] = r.pos(); c["y"] = r.pos()
         elif k == CMD_ATTACK:
             c["target_id"] = r.u16()

@@ -206,6 +206,14 @@ class Pokemon(Unit):
     aa_active: bool = False            # True = windup in corso
     aa_until: float = -1.0             # istante in cui il danno è garantito
     aa_target_id: int | None = None
+    # Velocità d'attacco (engine/basic_attack.py): base del livello + bonus SOMMATI
+    # (oggetti/passive); il tetto e i moltiplicatori temporanei si applicano al lancio.
+    as_base: float = 0.0               # attacchi/s del livello senza bonus (0 = usa attack_speed)
+    as_bonus: float = 0.0              # somma dei bonus % (0.2 + 0.3 = +50%)
+    # Scelta del bersaglio: punto d'ancoraggio dell'auto-acquisizione da fermo
+    # (limite d'inseguimento) e tasto "solo Pokémon" dell'attacco-movimento.
+    idle_anchor: Vec2 | None = None
+    champs_only: bool = False
     # Stati alterati aggiuntivi (linea Gastly)
     root_until: float = -1.0           # paralisi: non si muove ma può agire (rooted)
     sleep_until: float = -1.0          # sonno: immobile, rotto dal primo danno
@@ -453,7 +461,7 @@ class Pokemon(Unit):
             d *= 1.3   # Sabbiafiume (Gigalith): +30% Dif. Sp.
         return max(0.0, d)
     # Ordine corrente impartito dal giocatore (o dal controllo): guida l'IA.
-    #   "idle" | "move" | "attack" | "attackmove" | "stop"
+    #   "idle" | "move" | "attack" | "attackmove" | "stop" (stop = tieni la posizione)
     order: str = "idle"
     order_target_id: int | None = None
     order_point: Vec2 | None = None

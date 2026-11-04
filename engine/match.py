@@ -36,6 +36,8 @@ from .hatterene import HATT_PASSIVES, HattereneMixin
 from .corviknight import CORVI_PASSIVES, CorviknightMixin
 from .eevee import EEVEE_PASSIVES, EeveeMixin
 from .item_effects import ItemEffectsMixin, cdr_to_haste
+from .basic_attack import (ACQUIRE_EXTRA, AMOVE_DROP_EXTRA, AMOVE_EXTRA, AS_CAP,
+                           IDLE_CHASE_LEASH, BasicAttackMixin)
 from .spiritomb import PASSIVE_ID as SPIRITOMB_PASSIVE, SpiritombMixin
 from .stats import (CRIT_MULT, HIGH_CRIT_CHANCE, STAB_MULT, Stats,
                     ability_haste_factor, combine_tenacity as stat_combine_ten,
@@ -70,7 +72,6 @@ _MINION_RETALIATE = 2.5     # s: finestra per ritorsione contro chi li ha colpit
 XP_RADIUS = 8.0             # tile: raggio entro cui i nemici ricevono esperienza
 # Livello a cui si sblocca la SCELTA del potenziamento di ogni slot (scaglionata).
 SLOT_UPGRADE_LEVEL = {"Q": 5, "W": 6, "E": 7, "R": 8}
-AA_WINDUP_FRAC = 0.2   # frazione dell'attacco spesa nel windup (danno a fine windup)
 
 # --- Forma Shedinja (passiva Muta / R Rancore, linea Nincada) ----------------
 # Statistiche base REALI dello Shedinja (HP a 1 FISSO: non derivato). Coleottero/
@@ -119,7 +120,7 @@ _SYNC_STATUSES = ("slow", "stun", "freeze", "confuse", "silence", "root", "sleep
 
 class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, NoivernMixin,
             UrsaringMixin, SneaselMixin, MienshaoMixin, ArchaludonMixin,
-            HattereneMixin, ItemEffectsMixin):
+            HattereneMixin, BasicAttackMixin, ItemEffectsMixin):
     def __init__(self, world, map_data):
         self.world = world
         self.map = map_data
@@ -159,6 +160,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self._init_mien()        # linea Mienfoo: balzi di Calcinvolo, Guardia Rapida
         self._init_arch()        # linea Duraludon: Tuononda, Elettroraggio, Tuono
         self._init_hatt()        # linea Hatenna: Confusione, Forza Lunare, Distortozona, Strega
+        self._init_basic_attack()   # attacco base: proiettili a ricerca
         self.vision = VisionSystem(self.world.grid)
         self._build_structures()
         self.jungle = JungleSystem(self)
@@ -442,42 +444,101 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             p.order = "idle"         # arrivato: passa a idle (auto-attacco di prossimità)
 
         if p.order == "attack":
+            # Clic su un nemico: lo insegue finché non è a portata, poi attacca.
             t = self.world.get(p.order_target_id) if p.order_target_id is not None else None
-            if t is not None and getattr(t, "alive", False) and t.team != p.team:
+            if self._aa_target_ok(p, t):
                 p.target_id = t.id
-                if self._within_attack(p, t):
-                    p.stop()
-                    self._face(p, t)
-                else:
-                    self._chase(p, t, dt)
+                self._chase_or_hold(p, t, dt)
                 return
-            p.order = "idle"
+            p.order = "idle"          # morto o sparito nella nebbia: smetti di inseguire
+            p.idle_anchor = None
+            p.target_id = None
+            p.stop()
 
+        reach = self._auto_reach(p) + p.radius
         if p.order == "attackmove":
-            tgt = self._acquire_target(p, BOT_AGGRO)
-            if tgt is not None:
-                p.target_id = tgt.id
-                if self._within_attack(p, tgt):
-                    p.stop()
-                    self._face(p, tgt)
-                else:
-                    self._chase(p, tgt, dt)
+            # Attacco-movimento: verso il punto, attaccando il primo nemico valido
+            # che entra nel raggio d'acquisizione (il più vicino al CURSORE).
+            t = self.world.get(p.target_id) if p.target_id is not None else None
+            keep = (self._aa_target_ok(p, t, p.champs_only)
+                    and p.pos.dist(t.pos) <= reach + t.radius + AMOVE_EXTRA + AMOVE_DROP_EXTRA)
+            if not keep:
+                t = self._acquire_near_point(p, reach + AMOVE_EXTRA,
+                                             p.order_point or p.pos, p.champs_only)
+            if t is not None:
+                p.target_id = t.id
+                self._chase_or_hold(p, t, dt)
                 return
             p.target_id = None
             if p.order_point is not None and p.pos.dist(p.order_point) > 0.5:
                 self._move_towards(p, p.order_point, dt, use_astar=True)
             else:
                 p.order = "idle"
+                p.idle_anchor = None
                 p.stop()
             return
 
-        # idle / stop: auto-attacco del nemico più vicino a portata.
-        tgt = self._acquire_target(p, self._auto_reach(p) + 1.5)
-        if tgt is not None and self._within_attack(p, tgt):
-            p.target_id = tgt.id
-            self._face(p, tgt)
+        # idle / stop: da fermo attacca chi entra nel raggio d'acquisizione (un po'
+        # più ampio della portata) e lo insegue per poco; "stop" tiene la posizione.
+        hold = p.order == "stop"
+        st = self._ai.setdefault(p.id, {})
+        if p.idle_anchor is None:
+            p.idle_anchor = Vec2(p.pos.x, p.pos.y)
+        can_chase = not hold and p.pos.dist(p.idle_anchor) <= IDLE_CHASE_LEASH
+        acq = reach + (0.0 if hold else ACQUIRE_EXTRA)
+        t = self.world.get(p.target_id) if p.target_id is not None else None
+        if not (self._aa_target_ok(p, t) and (self._within_attack(p, t)
+                                               or (can_chase and p.pos.dist(t.pos)
+                                                   <= acq + t.radius + 1.0))):
+            t = self._acquire_near_point(p, acq, p.pos, False)
+        if t is not None and (self._within_attack(p, t)
+                              or (p.aa_active and p.aa_target_id == t.id)):
+            p.target_id = t.id
+            if st.pop("idle_chase", False):
+                p.stop()
+            self._face(p, t)
+        elif t is not None and can_chase:
+            p.target_id = t.id
+            st["idle_chase"] = True
+            self._chase(p, t, dt)
         else:
+            # Limite d'inseguimento: l'attacco automatico non trascina per la mappa.
             p.target_id = None
+            if st.pop("idle_chase", False):
+                p.stop()
+
+    def _aa_target_ok(self, p, t, champs_only: bool = False) -> bool:
+        """Bersaglio valido per l'attacco base di `p`: vivo, nemico, bersagliabile
+        e VISTO dalla sua squadra (niente attacchi a chi sta nella nebbia)."""
+        if t is None or not getattr(t, "alive", False) or t.team == p.team:
+            return False
+        if champs_only and not isinstance(t, Pokemon):
+            return False
+        if isinstance(t, Pokemon) and (t.untargetable_until > self.time or t.submerged):
+            return False
+        if isinstance(t, Unit) and not self.vision.is_enemy_visible(p.team, t.id):
+            return False
+        return True
+
+    def _acquire_near_point(self, p, radius: float, point, champs_only: bool):
+        """Nemico valido entro `radius` (bordo a bordo) da `p`, il più vicino a `point`."""
+        best, bd = None, 1e9
+        for e in self._combat_hash.query_radius(p.pos.x, p.pos.y, radius + 1.5):
+            if e is p or not self._aa_target_ok(p, e, champs_only):
+                continue
+            if p.pos.dist(e.pos) > radius + getattr(e, "radius", 0.0):
+                continue
+            d = point.dist(e.pos)
+            if d < bd:
+                best, bd = e, d
+        return best
+
+    def _chase_or_hold(self, p, t, dt: float) -> None:
+        if self._within_attack(p, t):
+            p.stop()
+            self._face(p, t)
+        else:
+            self._chase(p, t, dt)
 
     def _ai_bot(self, p: Pokemon, dt: float) -> None:
         if self._immobile(p):
@@ -605,12 +666,18 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         return best
 
     def _within_attack(self, u, target) -> bool:
-        reach = getattr(u, "attack_range", 0.0) + getattr(target, "radius", 0.0)
         if isinstance(u, Pokemon):
-            reach = self._auto_reach(u) + getattr(target, "radius", 0.0)
+            return u.pos.dist(target.pos) <= self._aa_reach(u, target)   # bordo a bordo
+        reach = getattr(u, "attack_range", 0.0) + getattr(target, "radius", 0.0)
         return u.pos.dist(target.pos) <= reach
 
     def _chase(self, u, target, dt: float) -> None:
+        if isinstance(u, Pokemon) and u.aa_active and u.aa_target_id == target.id:
+            # Caricamento in corso: resta fermo, il colpo esce con la tolleranza
+            # (inseguire vorrebbe dire muoversi e annullarlo).
+            u.stop()
+            self._face(u, target)
+            return
         if isinstance(u, Minion):
             u.chasing = True
         bb = getattr(u, "bush_blocks", False)   # minion: aggira i cespugli
@@ -631,7 +698,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         if m.pos.dist(wp) <= _WAYPOINT_REACHED and m.lane_idx < len(m.lane_points) - 1:
             m.lane_idx += 1
             wp = m.lane_points[m.lane_idx]
-        m.set_path([wp])
+        # Se il tratto dritto verso il waypoint e' ostruito (muro/cespuglio) usa A*.
+        self._move_towards(m, wp, config.TICK_DT, use_astar=True)
         m.facing = direction_index(wp.x - m.pos.x, wp.y - m.pos.y)
 
     def _follow_bot_lane(self, p: Pokemon, dt: float) -> None:
@@ -647,11 +715,11 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             idx += 1
             wp = pts[idx]
         st["lane_idx"] = idx
-        self._set_step(p, wp, dt)
+        self._move_towards(p, wp, dt, use_astar=True)
 
     def _set_step(self, u, dest: Vec2, dt: float) -> None:
-        """Movimento diretto verso dest (un waypoint singolo)."""
-        u.set_path([dest])
+        """Movimento verso dest: diretto se la via e' libera, altrimenti A*."""
+        self._move_towards(u, dest, dt, use_astar=True)
 
     def _move_towards(self, u, dest: Vec2, dt: float, use_astar: bool = False) -> None:
         bb = getattr(u, "bush_blocks", False)   # minion: aggira i cespugli
@@ -681,6 +749,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         for c in self.world.combatants():
             if c.attack_timer > 0.0:
                 c.attack_timer = max(0.0, c.attack_timer - dt)
+        self._update_aa_projectiles(dt)   # attacchi base a distanza in volo
 
         # Minion e Pokémon colpiscono il proprio target se a tiro.
         for u in self.world.alive_units():
@@ -688,7 +757,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
                 if (self._immobile(u) or u.submerged or u.channel_until > self.time
                         or u.memento_until > self.time or u.puddle_until > self.time
                         or u.charm_until > self.time):
-                    u.aa_active = False   # stordito/immerso/canalizza: perde il windup
+                    self._aa_cancel(u)   # stordito/immerso/canalizza: perde il windup
                     continue
                 self._pokemon_auto_attack(u)
                 continue
@@ -714,10 +783,22 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
                 continue
             if isinstance(e, Minion):
                 enemy_minions.append(e)
-            elif isinstance(e, Pokemon):
+            elif isinstance(e, Pokemon) and e.untargetable_until <= self.time:
                 enemy_pokes.append(e)
+        cands ={e.id: e for e in enemy_minions}
+        cands.update((p.id, p) for p in enemy_pokes)
         target = None
-        if enemy_minions:
+        # Richiesta d'aiuto: chi ha colpito un Pokémon alleato sotto la torre.
+        forced = getattr(tower, "_forced_id", None)
+        if forced is not None:
+            target = cands.get(forced)
+            tower._forced_id = None
+        # Il bersaglio resta lo stesso finché è vivo e a tiro (stile LoL).
+        if target is None and tower.target_id is not None:
+            target = cands.get(tower.target_id)
+        if target is not None:
+            pass
+        elif enemy_minions:
             target = min(enemy_minions, key=lambda m: tower.pos.dist(m.pos))
         else:
             # Un Pokémon viene colpito solo se ha fatto danno a un alleato di recente.
@@ -735,9 +816,9 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         cd = attacker.attack_cooldown
         if isinstance(attacker, Pokemon) and attacker.rampage_until > self.time:
             cd *= 0.5   # Oltraggio: attacca più in fretta
-        attacker.attack_timer = cd
         if isinstance(attacker, Pokemon):
             cd *= self._item_aa_cd_mult(attacker)   # Gelomai: -20% vel. d'attacco
+        attacker.attack_timer = cd
         # FX dell'auto-attacco dei Pokémon (così si vede quando si attacca):
         # fendente per il corpo a corpo, piccolo colpo per chi tira da lontano.
         if isinstance(attacker, Pokemon):
@@ -771,79 +852,6 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self._vamp(attacker, dmg, physical=True)
         self._item_after_aa(attacker, target)
 
-    def _pokemon_auto_attack(self, u) -> None:
-        """Auto-attacco con windup/recovery (stile LoL). Il danno è garantito solo
-        a fine windup; muoversi o lanciare un'abilità prima lo annulla (senza perdere
-        il cooldown). Dopo che il colpo è partito ci si può muovere (kiting)."""
-        t = self.world.get(u.target_id) if u.target_id is not None else None
-        if u.confuse_until > self.time:
-            t = self._nearest_ally(u)   # confuso: colpisce gli alleati
-        if u.aa_active:
-            tgt = self.world.get(u.aa_target_id)
-            if u.moving or tgt is None or not getattr(tgt, "alive", False):
-                u.aa_active = False
-                if u.moving:
-                    u.attack_timer = 0.0   # windup annullato: niente cooldown perso
-                return
-            if self.time >= u.aa_until:    # fine windup: danno garantito + colpo
-                if self._within_attack(u, tgt) and u.blind_until > self.time:
-                    # Turbosabbia: l'attacco base va a vuoto.
-                    self.fx_events.append({"kind": "miss", "c": (tgt.pos.x, tgt.pos.y),
-                                           "mtype": "Ground", "fx": "miss"})
-                elif self._within_attack(u, tgt) and self._item_dodge(u, tgt):
-                    pass   # Luminpolvere: schivato
-                elif self._within_attack(u, tgt) and self._mien_parry_aa(u, tgt):
-                    pass   # Individua (Mienshao): parato
-                elif self._within_attack(u, tgt):
-                    self._mien_before_aa(u, tgt)   # Maniche a Frusta: punto dolce
-                    claws = self._claws_on(u)   # Ombrartigli: Spettro, sempre brutto colpo
-                    dmg = ((self._aa_ghost_damage(u, tgt) if claws
-                            else self._basic_damage(u, tgt)) * self._item_aa_mult(u, tgt)
-                           * self._mien_aa_mult(u))
-                    if u.aa_stealth:       # Distacco: primo colpo furtivo potenziato
-                        dmg *= config.DISTACCO_BONUS_MULT
-                        u.stealth_shot_ready = False
-                        u.reveal_block_until = self.time + config.DISTACCO_REVEAL_BLOCK
-                    self._deal_damage(u, tgt, dmg, dmg_type="Ghost" if claws else None)
-                    self._vamp(u, dmg, physical=True)
-                    self._item_after_aa(u, tgt)   # Fangopece / Bitorzolelmo
-                    self._after_aa(u, tgt)        # Doppia Lama (Ceruledge)
-                    self._echo_after_aa(u, tgt)   # Ecolocalizzazione: ping ogni 3 colpi
-                    self._ursa_after_aa(u, tgt)   # Luna Piena: attacchi base ad area
-                    self._sneasel_after_aa(u, tgt)   # Arraffalesto, colpo d'agguato
-                    self._mien_after_aa(u, tgt)      # punto dolce, brutto colpo di Individua
-                    self._spirit_wander(u, tgt)   # Spirito Vagante (Spiritomb)
-                    self._cute_charm(u, tgt)      # Incantevole (Sylveon)
-                    mt = u.types[0] if u.types else "Normal"
-                    self.fx_events.append({"kind": "attack", "a": (u.pos.x, u.pos.y),
-                                           "b": (tgt.pos.x, tgt.pos.y), "mtype": mt,
-                                           "melee": u.attack_range <= 2.2,
-                                           "fx": "shadowclawhit" if claws else u.attack_fx})
-                u.aa_active = False
-                u.last_aa_at = self.time
-                u.aa_quick = False
-            return
-        # Nuovo attacco: servono bersaglio a tiro, cooldown pronto e stare fermi.
-        if t is None or not getattr(t, "alive", False) or not self._within_attack(u, t):
-            return
-        if u.attack_timer > 0.0 or u.moving:
-            return
-        # Passiva Distacco: ricarica il colpo furtivo quando sei allo scoperto.
-        if u.passive_id == "distacco" and not self._is_hidden(u):
-            u.stealth_shot_ready = True
-        u.aa_stealth = (u.passive_id == "distacco" and u.stealth_shot_ready
-                        and self._is_hidden(u))
-        cd = u.attack_cooldown
-        if u.rampage_until > self.time:
-            cd *= 0.5   # Oltraggio: attacca più in fretta
-        u.aa_active = True
-        cd *= self._item_aa_cd_mult(u)   # Gelomai: -20% vel. d'attacco
-        u.aa_target_id = t.id
-        u.aa_until = self.time + cd * AA_WINDUP_FRAC * self._item_aa_windup(u)
-        u.attack_timer = cd            # il cooldown parte dall'inizio dell'attacco
-        self._face(u, t)
-        self.fx_events.append({"eid": u.id, "anim": "Attack"})   # avvia l'anim
-
     def _nearest_ally(self, u):
         best, bd = None, 1e9
         for e in self._combat_hash.query_radius(u.pos.x, u.pos.y, u.attack_range + 2.0):
@@ -856,25 +864,34 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
                 best, bd = e, d
         return best
 
-    def _basic_damage(self, attacker, target) -> float:
+    def _aa_power(self, attacker) -> tuple[float, bool]:
+        """Potenza grezza dell'attacco base di un Pokémon e se è speciale."""
+        if attacker.passive_id == ECHO_ID:
+            # Ecolocalizzazione (Noibat/Noivern): onda sonora, danno speciale.
+            return self._echo_power(attacker), True
+        power = attacker.eff_attack()
+        if attacker.rampage_until > self.time:
+            power *= 1.4   # Oltraggio: attacchi base più forti
+        return power, False
+
+    def _basic_damage(self, attacker, target, power: float | None = None,
+                      magic: bool | None = None) -> float:
         """Danno di un attacco base: fisico, mitigato dalla difesa del bersaglio.
 
-        - Pokémon: usano l'Attacco effettivo (con buff/passivi).
+        - Pokémon: usano l'Attacco effettivo (con buff/passivi); `power`/`magic`
+          permettono di passare la potenza fotografata al rilascio (proiettili).
         - Torri: potenza con "ramp" crescente sullo stesso bersaglio (anti-dive).
         - Minion: potenza fissa, ridotta contro le strutture (grattano lento).
         """
-        magic = False
-        if isinstance(attacker, Pokemon) and attacker.passive_id == ECHO_ID:
-            # Ecolocalizzazione (Noibat/Noivern): onda sonora, danno speciale.
-            power = self._echo_power(attacker)
-            magic = True
-        elif isinstance(attacker, Pokemon):
-            power = attacker.eff_attack()
-            if attacker.rampage_until > self.time:
-                power *= 1.4   # Oltraggio: attacchi base più forti
+        if isinstance(attacker, Pokemon):
+            if power is None:
+                power, magic = self._aa_power(attacker)
+            magic = bool(magic)
         elif isinstance(attacker, Structure):
+            magic = False
             power = attacker.attack_damage * self._tower_ramp(attacker, target)
         else:  # Minion o Wild
+            magic = False
             power = attacker.attack_damage
             if isinstance(target, Structure):
                 power *= config.STRUCT_MINION_DMG_MULT
@@ -1006,6 +1023,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         # nemici vicini che difendono l'alleato colpito.
         if isinstance(attacker, Pokemon) and isinstance(target, Pokemon):
             setattr(attacker, "_minion_aggro_at", self.time)
+            if attacker.team != target.team and amount > 0.0 and not target.is_decoy:
+                self._call_for_help(attacker, target)   # minion e torre della vittima
             if attacker.team != target.team:   # registra per gli assist
                 dmg = getattr(target, "_damagers", None)
                 if dmg is None:
@@ -1287,7 +1306,10 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         # Velocita' (con eventuali extra MS/AS dagli oggetti; non toccati da M).
         p.move_speed_base = (d.move_speed_tiles * max(0.1, 1.0 + _b("move_speed_pct"))
                              + _b("move_speed"))
-        as_total = min(2.5, d.attack_speed * (1.0 + _b("attack_speed")))
+        # Attacchi/s = base del livello × (1 + somma dei bonus), con un tetto.
+        p.as_base = d.attack_speed
+        p.as_bonus = _b("attack_speed")
+        as_total = min(AS_CAP, d.attack_speed * (1.0 + p.as_bonus))
         p.attack_speed = as_total
         p.attack_cooldown = 1.0 / as_total if as_total > 0 else 1.0
         p.ability_mult = d.ability_mult
@@ -1659,9 +1681,11 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         if not self._sneasel_precheck(p, mv, Vec2(tx, ty)):   # Picchiaduro, Agguato
             return
         self._sneasel_on_cast(p, mv)   # Notte Fonda: lanciare una mossa toglie l'invisibilità
-        if p.aa_active:              # lanciare annulla un auto-attacco in windup
-            p.aa_active = False
-            p.attack_timer = 0.0
+        # Lanciare annulla un attacco base in CARICAMENTO (il ciclo non si consuma);
+        # se il colpo è già uscito il recupero continua da dove era (niente punizione).
+        self._aa_cancel(p)
+        if mv.d.get("aa_reset"):     # mosse che azzerano il ciclo: il prossimo attacco parte subito
+            self._aa_reset(p)
         if mv.charges > 0:           # Erboscivolata: consuma una carica (scatto)
             if ms.charges_cur < 0:
                 ms.charges_cur = float(mv.charges)
@@ -4012,6 +4036,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
                     p.pos = Vec2(p.spawn_pos.x, p.spawn_pos.y)
                     p.stop()
                     p.target_id = None
+                    p.idle_anchor = None   # l'ancora d'inseguimento riparte dalla base
+                    p.aa_active = False
 
     def _check_win(self) -> None:
         for core in self.world.cores():

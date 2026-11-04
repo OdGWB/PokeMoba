@@ -579,14 +579,15 @@ class HostSession:
                                   MoveCommand, RecallCommand, StopCommand)
         g = self.world.grid
         k, eid, seq = c["kind"], s.entity_id, c["seq"]   # entità SEMPRE dallo slot
-        if k in (P.CMD_MOVE, P.CMD_ATTACKMOVE, P.CMD_CAST):
+        if k in (P.CMD_MOVE, P.CMD_ATTACKMOVE, P.CMD_ATTACKMOVE_CHAMP, P.CMD_CAST):
             pt = V.clamp_point(c["x"], c["y"], g.width, g.height)
             if pt is None:
                 return None
             if k == P.CMD_MOVE:
                 return MoveCommand(seq=seq, entity_id=eid, x=pt[0], y=pt[1])
-            if k == P.CMD_ATTACKMOVE:
-                return AttackMoveCommand(seq=seq, entity_id=eid, x=pt[0], y=pt[1])
+            if k in (P.CMD_ATTACKMOVE, P.CMD_ATTACKMOVE_CHAMP):
+                return AttackMoveCommand(seq=seq, entity_id=eid, x=pt[0], y=pt[1],
+                                         champs_only=k == P.CMD_ATTACKMOVE_CHAMP)
             if not V.valid_move_slot(c["slot"]):
                 return None
             return CastMoveCommand(seq=seq, entity_id=eid, slot=P.SLOTS_QWER[c["slot"]],

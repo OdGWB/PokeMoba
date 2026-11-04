@@ -78,6 +78,7 @@ class TestNoivern(unittest.TestCase):
             self.match._pokemon_auto_attack(self.n)
             self.match.time = self.n.aa_until + 0.01
             self.match._pokemon_auto_attack(self.n)
+            self.match._update_aa_projectiles(1.0)   # a distanza: il proiettile arriva
 
     def test_evolves_into_noivern_at_8(self):
         self.level(7)

@@ -515,11 +515,13 @@ def draw_sweet_ring(surface, u, gx, gy, ts):
     reach = 1.5 if u.dex == 619 else 2.1
     if "zoom_lens" in getattr(u, "items", ()):
         reach *= 1.15
+    own = getattr(u, "radius", 0.35)   # portata da bordo a bordo: + il proprio raggio
+    reach += own
     key = int(reach * ts)
     surf = _ring_cache.get(key)
     if surf is None:
         R = int((reach + 0.35) * ts)
-        r = int((reach * 0.7 + 0.35) * ts)
+        r = int(((reach - own) * 0.7 + own + 0.35) * ts)
         surf = pygame.Surface((R * 2 + 4, R * 2 + 4), pygame.SRCALPHA)
         o = (R + 2, R + 2)
         pygame.draw.circle(surf, (*GOLD, 34), o, R)

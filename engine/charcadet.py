@@ -418,10 +418,11 @@ class CharcadetMixin:
     def _claw_reach(self, u, r) -> float:
         return r * u.shadowclaw_mult if self._claws_on(u) else r
 
-    def _aa_ghost_damage(self, u, tgt, mult=1.0) -> float:
+    def _aa_ghost_damage(self, u, tgt, mult=1.0, power=None) -> float:
         """Colpo base di tipo Spettro (secondo colpo di Doppia Lama, Ombrartigli):
-        fisico, con efficacia del tipo; con Ombrartigli è sempre brutto colpo."""
-        power = u.eff_attack() * mult
+        fisico, con efficacia del tipo; con Ombrartigli è sempre brutto colpo.
+        `power`: Attacco fotografato al rilascio dell'attacco base."""
+        power = (u.eff_attack() if power is None else power) * mult
         if isinstance(tgt, Pokemon):
             power *= self.types.moba_multiplier("Ghost", tgt.types)
             if tgt.passive_id == "mantelneve":
@@ -444,7 +445,7 @@ class CharcadetMixin:
             u = self.world.get(dh["caster_id"])
             t = self.world.get(dh["target_id"])
             if (u is None or t is None or not u.alive or not getattr(t, "alive", False)
-                    or u.pos.dist(t.pos) > self._auto_reach(u) + getattr(t, "radius", 0.0) + 0.8):
+                    or u.pos.dist(t.pos) > self._auto_reach(u) + u.radius + getattr(t, "radius", 0.0) + 0.8):
                 continue
             dmg = self._aa_ghost_damage(u, t, DOUBLE_MULT)
             self._deal_damage(u, t, dmg, dmg_type="Ghost")

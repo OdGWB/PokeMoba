@@ -244,7 +244,7 @@ class ItemEffectsMixin:
     def _item_aa_mult(self, u, tgt) -> float:
         m = QUICKCLAW_MULT if u.aa_quick else 1.0
         if "zoom_lens" in self._fx_items(u):
-            reach = self._auto_reach(u) + getattr(tgt, "radius", 0.0)
+            reach = self._aa_reach(u, tgt)   # bordo a bordo
             if u.pos.dist(tgt.pos) > 0.5 * reach:
                 m *= ZOOM_FAR_MULT
         return m

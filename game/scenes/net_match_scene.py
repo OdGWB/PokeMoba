@@ -12,7 +12,7 @@ import pygame
 import config
 from engine import moves as moves_mod
 from engine.content import load_map, load_pokemon_def
-from engine.entities import Structure, Unit
+from engine.entities import Pokemon, Structure, Unit
 from engine.grid import TILE_FLOOR, TILE_WALL
 from engine.items import ItemCatalog
 from engine.jungle import CODE_WEATHER, WEATHER_NAMES, apply_weather, ring_tiles
@@ -22,6 +22,7 @@ from engine.vision import VisionSystem
 from .. import hud
 from ..camera import Camera
 from ..fx import type_color
+from ..input_controller import champs_only_held
 from ..minimap import Minimap
 from ..networld import NetWorld
 from ..particles import ParticleSystem
@@ -175,18 +176,21 @@ class NetMatchScene:
 
     def _left_click(self, pos):
         tx, ty = self._tile(pos)
-        tgt = self._pick_enemy(tx, ty)
+        champs = champs_only_held()   # Maiusc: "solo Pokémon"
+        tgt = self._pick_enemy(tx, ty, champs)
         if tgt is not None:
             self.client.send_attack(tgt.id)
         else:
-            self.client.send_attackmove(tx, ty)
+            self.client.send_attackmove(tx, ty, champs_only=champs)
 
-    def _pick_enemy(self, tx, ty):
+    def _pick_enemy(self, tx, ty, champs_only=False):
         best, bd = None, 1e9
         for e in self.world.combatants():
             if e.team == self.team or not getattr(e, "alive", False):
                 continue
             if not isinstance(e, (Unit, Structure)):
+                continue
+            if champs_only and not isinstance(e, Pokemon):
                 continue
             d = ((e.pos.x - tx) ** 2 + (e.pos.y - ty) ** 2) ** 0.5
             if d <= PICK_RADIUS + getattr(e, "radius", 0.0) and d < bd:

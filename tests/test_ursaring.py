@@ -86,6 +86,8 @@ class TestUrsaring(unittest.TestCase):
         self.assertEqual(self.u.types, ["Ground", "Normal"])
 
     def test_honey_from_camp_and_heal(self):
+        # Fermi sul posto: col raggio d'acquisizione i due si attaccherebbero da soli.
+        self.u.order = self.e.order = "stop"
         for i in range(4):
             w = self.wild(Vec2(28.0, 45.0 + i))
             self.match._deal_damage(self.u, w, w.hp + 1.0)

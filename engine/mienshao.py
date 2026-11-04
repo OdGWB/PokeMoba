@@ -101,7 +101,7 @@ class MienshaoMixin:
         """Prima del danno dell'attacco base: punto dolce e brutto colpo di Individua."""
         if not isinstance(u, Pokemon) or u.passive_id != MIEN_ID:
             return
-        d = u.pos.dist(tgt.pos) - getattr(tgt, "radius", 0.0)
+        d = u.pos.dist(tgt.pos) - getattr(tgt, "radius", 0.0) - u.radius   # bordo a bordo
         u._mien_sweet = self._sweet(d, self._auto_reach(u))
         if u.mien_crit_until > self.time:
             u._force_crit = True

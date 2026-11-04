@@ -7,7 +7,9 @@ Stile LoL / MOBA:
     sinistro) per lanciare la mossa verso il punto del mouse; clic destro
     annulla la mira.
   - Ctrl + Q/W/E/R: assegna un punto grado alla mossa.
-  - S: ferma.
+  - S: ferma (tiene la posizione: attacca solo chi è già a portata).
+  - Maiusc tenuto: "solo Pokémon" (il clic sinistro ignora minion, neutrali e
+    strutture, sia sul bersaglio sia nell'attacco-movimento).
 
 L'input non tocca lo stato: produce Command con numero di sequenza.
 """
@@ -16,9 +18,14 @@ from __future__ import annotations
 import pygame
 
 import config
-from engine.entities import Structure, Unit
+from engine.entities import Pokemon, Structure, Unit
 from sim.commands import (AttackCommand, AttackMoveCommand, CastMoveCommand,
                           MoveCommand, RankMoveCommand, StopCommand)
+
+def champs_only_held() -> bool:
+    """Tasto "solo Pokémon" (Maiusc) tenuto premuto."""
+    return bool(pygame.key.get_mods() & pygame.KMOD_SHIFT)
+
 
 ABILITY_KEYS = {pygame.K_q: "Q", pygame.K_w: "W", pygame.K_e: "E", pygame.K_r: "R"}
 PICK_RADIUS = 1.4
@@ -84,17 +91,19 @@ class InputController:
 
     def _left_click(self, pos, camera, world, me):
         tx, ty = self._world_tile(camera, pos)
-        target = self._pick_enemy(world, me, tx, ty)
+        champs = champs_only_held()
+        target = self._pick_enemy(world, me, tx, ty, champs)
         if target is not None:
             return AttackCommand(seq=self._next_seq(), entity_id=self.controlled_id,
                                  target_id=target.id)
-        return AttackMoveCommand(seq=self._next_seq(), entity_id=self.controlled_id, x=tx, y=ty)
+        return AttackMoveCommand(seq=self._next_seq(), entity_id=self.controlled_id,
+                                 x=tx, y=ty, champs_only=champs)
 
     def _world_tile(self, camera, pos):
         wx, wy = camera.screen_window_to_world(*pos)
         return wx / config.TILE_SIZE, wy / config.TILE_SIZE
 
-    def _pick_enemy(self, world, me, tx: float, ty: float):
+    def _pick_enemy(self, world, me, tx: float, ty: float, champs_only: bool = False):
         if world is None or me is None:
             return None
         best, best_d = None, 1e9
@@ -102,6 +111,8 @@ class InputController:
             if e.team == me.team or not getattr(e, "alive", False):
                 continue
             if not isinstance(e, (Unit, Structure)):
+                continue
+            if champs_only and not isinstance(e, Pokemon):
                 continue
             d = ((e.pos.x - tx) ** 2 + (e.pos.y - ty) ** 2) ** 0.5
             if d <= PICK_RADIUS + getattr(e, "radius", 0.0) and d < best_d:
