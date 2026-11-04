@@ -32,18 +32,18 @@
     "Q": {
       "base": {"id": "highjumpkick", "name": "Calcinvolo", "type": "Fighting", "category": "physical",
                "shape": "jumpkick", "fx": "jumpkick", "target": "direction",
-               "power": [120, 180, 240, 300], "ratio": 1.2,
+               "power": [95, 145, 190, 240], "ratio": 1.45,
                "cooldown": [9, 8.5, 8, 7.5], "range": 5.0, "radius": 1.0,
                "effects": {"leap_time": 0.45, "crash": 0.15, "crash_stun": 0.5}},
       "upgrades": [
         {"id": "jumpkickreckless", "name": "Temerarietà", "type": "Fighting", "category": "physical",
          "shape": "jumpkick", "fx": "jumpkick", "target": "direction",
-         "power": [156, 234, 312, 390], "ratio": 1.56,
+         "power": [125, 185, 250, 310], "ratio": 1.85,
          "cooldown": [9, 8.5, 8, 7.5], "range": 5.0, "radius": 1.0,
          "effects": {"leap_time": 0.45, "crash": 0.30, "crash_stun": 0.5}},
         {"id": "jumpkicksafe", "name": "Calcio Controllato", "type": "Fighting", "category": "physical",
          "shape": "jumpkick", "fx": "jumpkick", "target": "direction",
-         "power": [120, 180, 240, 300], "ratio": 1.2,
+         "power": [95, 145, 190, 240], "ratio": 1.45,
          "cooldown": [9, 8.5, 8, 7.5], "range": 5.0, "radius": 1.0,
          "effects": {"leap_time": 0.45, "crash": 0.0, "crash_stun": 0.0, "miss_cd_mult": 2.0}}
       ]
@@ -70,18 +70,18 @@
     "E": {
       "base": {"id": "fakeout", "name": "Bruciapelo", "type": "Normal", "category": "physical",
                "shape": "fakeout", "fx": "fakeout", "target": "direction",
-               "power": [70, 105, 140, 175], "ratio": 0.9,
+               "power": [55, 85, 110, 140], "ratio": 0.85,
                "cooldown": [8, 7.5, 7, 6.5], "range": 2.2, "radius": 0.5,
                "effects": {"stun": {"duration": 1.0}, "calm": 4.0, "weak": 0.4}},
       "upgrades": [
         {"id": "fakeoutdark", "name": "Privazione", "type": "Dark", "category": "physical",
          "shape": "fakeout", "fx": "fakeoutdark", "target": "direction",
-         "power": [70, 105, 140, 175], "ratio": 0.9,
+         "power": [55, 85, 110, 140], "ratio": 0.85,
          "cooldown": [8, 7.5, 7, 6.5], "range": 2.2, "radius": 0.5,
          "effects": {"itemlock": 3.0}},
         {"id": "fakeoutdouble", "name": "Doppio Bruciapelo", "type": "Normal", "category": "physical",
          "shape": "fakeout", "fx": "fakeout", "target": "direction",
-         "power": [70, 105, 140, 175], "ratio": 0.9,
+         "power": [55, 85, 110, 140], "ratio": 0.85,
          "cooldown": [8, 7.5, 7, 6.5], "range": 2.2, "radius": 0.5,
          "effects": {"stun": {"duration": 1.0}, "calm": 4.0, "weak": 0.4, "double": 3.0}}
       ]
@@ -90,12 +90,12 @@
       "upgrades": [
         {"id": "sleevedance", "name": "Danza delle Maniche", "type": "Fighting", "category": "physical",
          "shape": "sleevedance", "fx": "sleevedance", "target": "self",
-         "power": [260, 390, 520], "ratio": 1.4,
+         "power": [210, 310, 415], "ratio": 1.8,
          "cooldown": [90, 80, 70], "range": 0, "radius": 2.6,
          "effects": {"duration": 6.0}},
         {"id": "reversal", "name": "Contropiede", "type": "Fighting", "category": "physical",
          "shape": "reversal", "fx": "reversal", "target": "direction",
-         "power": [120, 180, 240], "ratio": 1.0,
+         "power": [95, 145, 190], "ratio": 0.8,
          "cooldown": [60, 50, 40], "range": 2.2, "radius": 0.6,
          "effects": {"max_mult": 3.0, "low_hp": 0.15}}
       ]

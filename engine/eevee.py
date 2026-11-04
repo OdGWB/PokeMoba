@@ -140,7 +140,11 @@ class EeveeMixin:
             if d < bd:
                 who, bd = a, d
         delay = float(mv.effects.get("delay", 2.0))
-        amt = self._rank_val(mv.effects.get("heal", []), rank) * p.heal_power
+        base_heal = self._rank_val(mv.effects.get("heal", []), rank)
+        stat = (max(p.eff_attack(), p.eff_sp_attack()) if mv.effects.get("heal_stat") == "best"
+                else p.eff_sp_attack())
+        base_heal += float(mv.effects.get("heal_scaling", 0.0)) * stat
+        amt = base_heal * p.heal_power
         amt += p.max_hp * float(mv.effects.get("heal_maxhp", 0.0))
         self.wishes.append({"caster_id": p.id, "target_id": who.id, "start": self.time,
                             "at": self.time + delay, "amount": amt})
@@ -279,7 +283,7 @@ class EeveeMixin:
                 for e in self._eevee_foes(bz["team"], bz["c"], bz["radius"], structures=False):
                     seen.add(e.id)
                     bz["since"].setdefault(e.id, self.time)
-                    self._hit(caster, bz["mv"], bz["rank"], e, mult=1.0 / bz["ticks"])
+                    self._hit(caster, bz["mv"], bz["rank"], e)   # danno in JSON PER COLPO
                     if isinstance(e, Pokemon):
                         self._apply_slow(e, slow, bz["interval"] + 0.15)
                 for eid in [k for k in bz["since"] if k not in seen]:
@@ -324,7 +328,8 @@ class EeveeMixin:
     def _cast_gleam(self, p, mv, rank, origin, tgt, dirv):
         for e in list(self._eevee_foes(p.team, origin, mv.radius)):
             self._hit(p, mv, rank, e)
-        heal = self._rank_val(mv.effects.get("heal", []), rank) * p.heal_power
+        heal = (self._rank_val(mv.effects.get("heal", []), rank)
+                + float(mv.effects.get("heal_scaling", 0.0)) * p.eff_sp_attack()) * p.heal_power
         for a in self.world.pokemons():
             if (a.team == p.team and a.alive and not a.is_decoy
                     and origin.dist(a.pos) <= mv.radius + a.radius):

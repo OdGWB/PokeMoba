@@ -33,19 +33,19 @@
     "Q": {
       "base": {"id": "flashcannon", "name": "Cannonflash", "type": "Steel", "category": "special",
                "shape": "flashcannon", "fx": "flashcannon", "target": "direction",
-               "power": [55, 85, 115, 145], "ratio": 0.45,
+               "power": [44, 70, 90, 115], "ratio": 0.7,
                "cooldown": [7, 6.5, 6, 5.5], "range": 10.0, "radius": 0.5,
                "effects": {"spdef_debuff": {"amount": 0, "mult": 0.85, "duration": 3.0}}},
       "upgrades": [
         {"id": "flashcannonlong", "name": "Tiro Lungo", "type": "Steel", "category": "special",
          "shape": "flashcannon", "fx": "flashcannon", "target": "direction",
-         "power": [55, 85, 115, 145], "ratio": 0.45,
+         "power": [44, 70, 90, 115], "ratio": 0.7,
          "cooldown": [7, 6.5, 6, 5.5], "range": 10.0, "radius": 0.5,
          "effects": {"spdef_debuff": {"amount": 0, "mult": 0.85, "duration": 3.0},
                      "hold": {"time": 1.0, "range": 0.4, "power": 0.5}}},
         {"id": "flashcannonburst", "name": "Raffica", "type": "Steel", "category": "special",
          "shape": "flashcannon", "fx": "flashcannon", "target": "direction",
-         "power": [38, 60, 80, 102], "ratio": 0.32,
+         "power": [30, 48, 65, 80], "ratio": 0.5,
          "cooldown": [0.6, 0.6, 0.6, 0.6], "charges": 2, "charge_time": 6.5,
          "range": 10.0, "radius": 0.5,
          "effects": {"spdef_debuff": {"amount": 0, "mult": 0.85, "duration": 3.0}}}
@@ -60,7 +60,7 @@
       "upgrades": [
         {"id": "thunderwavebolt", "name": "Fulmine", "type": "Electric", "category": "special",
          "shape": "thunderwave", "fx": "thunderwave", "target": "point",
-         "power": [80, 120, 160, 200], "ratio": 0.5,
+         "power": [65, 95, 130, 160], "ratio": 0.95,
          "cooldown": [9, 8.5, 8, 7.5], "range": 8.0, "radius": 1.6,
          "effects": {"delay": 0.75}},
         {"id": "thunderwaveplus", "name": "Tuononda +", "type": "Electric", "category": "special",
@@ -73,7 +73,7 @@
     "E": {
       "base": {"id": "dragontail", "name": "Codadrago", "type": "Dragon", "category": "physical",
                "shape": "dragontail", "fx": "dragontail", "target": "direction",
-               "power": [60, 90, 120, 150], "ratio": 0.5,
+               "power": [48, 70, 95, 120], "ratio": 0.7,
                "cooldown": [11, 10.5, 10, 9.5], "range": 2.6, "radius": 0.6,
                "effects": {"push": 4.0}},
       "upgrades": [
@@ -86,7 +86,7 @@
          "shape": "irondefense", "fx": "irondefense", "target": "ally",
          "power": [0, 0, 0, 0], "ratio": 0.0,
          "cooldown": [12, 11.5, 11, 10.5], "range": 6.0, "radius": 1.5,
-         "effects": {"shield": [70, 110, 150, 190], "shield_ratio": 0.35,
+         "effects": {"shield": [70, 110, 150, 190], "shield_ratio": 0.65,
                      "def_mult": 1.3, "duration": 3.0}}
       ]
     },
@@ -94,12 +94,12 @@
       "upgrades": [
         {"id": "electroshot", "name": "Elettroraggio", "type": "Electric", "category": "special",
          "shape": "electroshot", "fx": "electroshot", "target": "direction",
-         "power": [240, 360, 480], "ratio": 0.85,
+         "power": [190, 290, 385], "ratio": 1.65,
          "cooldown": [100, 90, 80], "range": 25.0, "radius": 0.8,
          "effects": {"charge": 1.5, "spa_mult": 1.3, "spa_dur": 4.0}},
         {"id": "thunderstorm", "name": "Tuono", "type": "Electric", "category": "special",
          "shape": "thunderstorm", "fx": "thunderstorm", "target": "point",
-         "power": [130, 195, 260], "ratio": 0.5,
+         "power": [70, 105, 140], "ratio": 0.6,
          "cooldown": [90, 80, 70], "range": 14.0, "radius": 1.5,
          "effects": {"bolts": 3, "window": 5.0, "delay": 0.75,
                      "paralyze": {"duration": 1.0, "chance": 0.5}, "rain_mult": 1.5}}

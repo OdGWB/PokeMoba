@@ -23,14 +23,14 @@
      "base_stats": {"hp": 55, "attack": 55, "defense": 50, "sp_attack": 45, "sp_defense": 65, "speed": 55}},
 
     {"stage": 1, "level": 8, "name": "Jolteon", "dex": 135, "sprite_dir": "assets/pokemon/0135",
-     "types": ["Electric"], "move_type": "Electric", "passive": "assorbivolt", "role": "tiratore",
+     "types": ["Electric"], "move_type": "Electric", "move_category": "special", "passive": "assorbivolt", "role": "tiratore",
      "color": [250, 214, 60], "form_color": [250, 214, 60],
      "attack_fx": "bolt", "attack_range": 4.0, "ranged": true, "radius": 0.44,
      "requires": {"choices": {"Q": 0, "W": 0, "E": 0}},
      "base_stats": {"hp": 65, "attack": 65, "defense": 60, "sp_attack": 110, "sp_defense": 95, "speed": 130},
      "moves": {"R": {"upgrades": [
        {"id": "thunder", "name": "Tuono", "type": "Electric", "category": "special", "shape": "thunder",
-        "target": "point", "power": [60, 85, 110], "ratio": 0.3,
+        "target": "point", "power": [19, 27, 35], "ratio": 0.15,
         "cooldown": [90, 80, 70], "range": 8.0, "radius": 3.2,
         "effects": {"duration": 2.0, "interval": 0.16, "strike_radius": 1.1}}]}}},
 
@@ -42,31 +42,31 @@
      "base_stats": {"hp": 65, "attack": 130, "defense": 60, "sp_attack": 95, "sp_defense": 110, "speed": 65},
      "moves": {"R": {"upgrades": [
        {"id": "flareblitz", "name": "Fuococarica", "type": "Fire", "category": "physical", "shape": "dash",
-        "fx": "flareblitz", "target": "direction", "power": [250, 350, 450], "ratio": 1.2,
+        "fx": "flareblitz", "target": "direction", "power": [200, 280, 360], "ratio": 1.55,
         "cooldown": [80, 72, 64], "range": 7.0, "radius": 0.8,
         "effects": {"recoil": 0.2}}]}}},
 
     {"stage": 1, "level": 8, "name": "Espeon", "dex": 196, "sprite_dir": "assets/pokemon/0196",
-     "types": ["Psychic"], "move_type": "Psychic", "passive": "sincronismo", "role": "mago",
+     "types": ["Psychic"], "move_type": "Psychic", "move_category": "special", "passive": "sincronismo", "role": "mago",
      "color": [170, 100, 210], "form_color": [170, 100, 210],
      "attack_fx": "orb", "attack_range": 3.8, "ranged": true, "radius": 0.44,
      "requires": {"choices": {"Q": 0, "W": 1, "E": 0}},
      "base_stats": {"hp": 65, "attack": 65, "defense": 60, "sp_attack": 130, "sp_defense": 95, "speed": 110},
      "moves": {"R": {"upgrades": [
        {"id": "futuresight", "name": "Divinazione", "type": "Psychic", "category": "special",
-        "shape": "futuresight", "target": "point", "power": [260, 360, 460], "ratio": 0.9,
+        "shape": "futuresight", "target": "point", "power": [210, 290, 370], "ratio": 1.6,
         "cooldown": [80, 70, 60], "range": 16.0, "radius": 2.6,
         "effects": {"delay": 2.0}}]}}},
 
     {"stage": 1, "level": 8, "name": "Glaceon", "dex": 471, "sprite_dir": "assets/pokemon/0471",
-     "types": ["Ice"], "move_type": "Ice", "passive": "mantelneve", "role": "mago",
+     "types": ["Ice"], "move_type": "Ice", "move_category": "special", "passive": "mantelneve", "role": "mago",
      "color": [140, 220, 245], "form_color": [140, 220, 245],
      "attack_fx": "shard", "attack_range": 3.6, "ranged": true, "radius": 0.44,
      "requires": {"choices": {"Q": 0, "W": 1, "E": 1}},
      "base_stats": {"hp": 65, "attack": 60, "defense": 110, "sp_attack": 130, "sp_defense": 95, "speed": 65},
      "moves": {"R": {"upgrades": [
        {"id": "blizzard", "name": "Bora", "type": "Ice", "category": "special", "shape": "blizzard",
-        "target": "point", "power": [240, 330, 420], "ratio": 0.8,
+        "target": "point", "power": [19, 26, 33], "ratio": 0.14,
         "cooldown": [100, 90, 80], "range": 7.0, "radius": 4.0,
         "effects": {"duration": 3.0, "interval": 0.25, "freeze_time": 1.0}}]}}},
 
@@ -78,7 +78,7 @@
      "base_stats": {"hp": 65, "attack": 110, "defense": 130, "sp_attack": 60, "sp_defense": 65, "speed": 95},
      "moves": {"R": {"upgrades": [
        {"id": "leafblade", "name": "Fendifoglia", "type": "Grass", "category": "physical", "shape": "dash",
-        "fx": "leafblade", "target": "direction", "power": [200, 290, 380], "ratio": 1.1,
+        "fx": "leafblade", "target": "direction", "power": [160, 230, 305], "ratio": 1.3,
         "cooldown": [70, 62, 54], "range": 6.0, "radius": 0.7,
         "effects": {"execute": 1.0}}]}}},
 
@@ -95,19 +95,19 @@
         "effects": {"missing_frac": [0.4, 0.4, 0.4]}}]}}},
 
     {"stage": 1, "level": 8, "name": "Sylveon", "dex": 700, "sprite_dir": "assets/pokemon/0700",
-     "types": ["Fairy"], "move_type": "Fairy", "passive": "incantevole", "role": "supporto",
+     "types": ["Fairy"], "move_type": "Fairy", "move_category": "special", "passive": "incantevole", "role": "supporto",
      "color": [245, 150, 200], "form_color": [245, 150, 200],
      "attack_fx": "orb", "attack_range": 3.6, "ranged": true, "radius": 0.44,
      "requires": {"choices": {"Q": 1, "W": 1, "E": 0}},
      "base_stats": {"hp": 95, "attack": 65, "defense": 65, "sp_attack": 110, "sp_defense": 130, "speed": 60},
      "moves": {"R": {"upgrades": [
        {"id": "dazzlinggleam", "name": "Magibrillio", "type": "Fairy", "category": "special", "shape": "gleam",
-        "target": "self", "power": [180, 260, 340], "ratio": 0.6,
+        "target": "self", "power": [145, 210, 270], "ratio": 1.15,
         "cooldown": [85, 75, 65], "range": 0, "radius": 3.6,
-        "effects": {"heal": [120, 180, 240]}}]}}},
+        "effects": {"heal": [120, 180, 240], "heal_scaling": 0.85}}]}}},
 
     {"stage": 1, "level": 8, "name": "Vaporeon", "dex": 134, "sprite_dir": "assets/pokemon/0134",
-     "types": ["Water"], "move_type": "Water", "passive": "idratazione", "role": "tank",
+     "types": ["Water"], "move_type": "Water", "move_category": "special", "passive": "idratazione", "role": "tank",
      "color": [40, 110, 200], "form_color": [40, 110, 200],
      "attack_fx": "orb", "attack_range": 3.4, "ranged": true, "radius": 0.46,
      "requires": {"choices": {"Q": 1, "W": 1, "E": 1}},
@@ -122,17 +122,18 @@
   "moves": {
     "Q": {
       "base": {"id": "tackle", "name": "Azione", "type": "Normal", "category": "physical", "shape": "cone",
-               "fx": "tackle", "target": "direction", "power": [50, 75, 100, 125], "ratio": 0.8,
+               "fx": "tackle", "target": "direction", "power": [40, 60, 80, 100], "ratio": 0.6,
                "cooldown": [4.5, 4, 3.5, 3], "range": 2.0, "angle": 35, "effects": {}},
       "upgrades": [
         {"id": "doubleedge", "name": "Sdoppiatore", "type": "Normal", "category": "physical", "shape": "cone",
-         "fx": "doubleedge", "target": "direction", "power": [95, 140, 185, 230], "ratio": 1.1,
+         "fx": "doubleedge", "target": "direction", "power": [75, 110, 150, 185], "ratio": 1.1,
          "cooldown": [7, 6.5, 6, 5.5], "range": 2.2, "angle": 40,
          "effects": {"recoil": 0.1}},
         {"id": "wish", "name": "Desiderio", "type": "Normal", "category": "none", "shape": "wish",
          "target": "point", "power": [0, 0, 0, 0],
          "cooldown": [12, 11, 10, 9], "range": 7.0, "radius": 0.8,
-         "effects": {"delay": 2.0, "heal": [80, 120, 160, 200], "heal_maxhp": 0.05, "pick": 2.0}}
+         "effects": {"delay": 2.0, "heal": [80, 120, 160, 200], "heal_maxhp": 0.05, "pick": 2.0,
+                     "heal_scaling": 0.7, "heal_stat": "best"}}
       ]
     },
     "W": {
@@ -142,11 +143,11 @@
                "effects": {"blind": {"duration": 1.5}}},
       "upgrades": [
         {"id": "bite", "name": "Morso", "type": "Dark", "category": "physical", "shape": "cone",
-         "fx": "jaws", "target": "direction", "power": [60, 90, 120, 150], "ratio": 0.9,
+         "fx": "jaws", "target": "direction", "power": [48, 70, 95, 120], "ratio": 0.7,
          "cooldown": [6, 5.5, 5, 4.5], "range": 2.3, "angle": 55,
          "effects": {"stun": {"duration": 0.45}}},
-        {"id": "swift", "name": "Comete", "type": "Normal", "category": "special", "shape": "swift",
-         "target": "point", "power": [35, 50, 65, 80], "ratio": 0.25,
+        {"id": "swift", "name": "Comete", "type": "Normal", "category": "physical", "shape": "swift",
+         "target": "point", "power": [26, 38, 49, 60], "ratio": 0.35,
          "cooldown": [7, 6.5, 6, 5.5], "range": 7.0, "speed": 11.0, "radius": 0.3,
          "effects": {"count": 3}}
       ]
@@ -158,7 +159,7 @@
                "effects": {"def_debuff": {"amount": 0, "mult": 0.8, "duration": 2.0}}},
       "upgrades": [
         {"id": "quickattack", "name": "Rapidattacco", "type": "Normal", "category": "physical", "shape": "dash",
-         "fx": "quickattack", "target": "direction", "power": [45, 70, 95, 120], "ratio": 0.6,
+         "fx": "quickattack", "target": "direction", "power": [36, 55, 75, 95], "ratio": 0.55,
          "cooldown": [6, 5.5, 5, 4.5], "range": 4.5, "radius": 0.6, "effects": {}},
         {"id": "endure", "name": "Resistenza", "type": "Normal", "category": "none", "shape": "endure",
          "target": "self", "power": [0, 0, 0, 0],

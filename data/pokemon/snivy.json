@@ -26,29 +26,29 @@
     "Q": {
       "base": {"id": "vinelash", "name": "Frustata", "type": "Grass", "category": "physical", "shape": "cone",
                "fx": "slash",
-               "target": "direction", "power": [55, 85, 115, 145], "ratio": 0.5,
+               "target": "direction", "power": [44, 70, 90, 115], "ratio": 0.7,
                "cooldown": [5, 4.5, 4, 3.5], "range": 4.0, "angle": 38},
       "upgrades": [
         {"id": "energyball", "name": "EnergiPalla", "type": "Grass", "category": "special", "shape": "projectile",
          "fx": "orb",
-         "target": "direction", "power": [90, 135, 180, 225], "ratio": 0.6,
+         "target": "direction", "power": [70, 110, 145, 180], "ratio": 1.1,
          "cooldown": [6, 5.5, 5, 4.5], "range": 8, "radius": 0.55, "speed": 15},
         {"id": "irontail", "name": "Codacciaio", "type": "Steel", "category": "physical", "shape": "cone",
          "fx": "slash",
-         "target": "direction", "power": [50, 80, 110, 140], "ratio": 0.5,
+         "target": "direction", "power": [40, 65, 90, 110], "ratio": 0.65,
          "cooldown": [6, 5.5, 5, 4.5], "range": 4.0, "angle": 38,
          "effects": {"def_debuff": {"mult": 0.8, "duration": 1.0}}}
       ]
     },
     "W": {
       "base": {"id": "trailblaze", "name": "Apripista", "type": "Grass", "category": "physical", "shape": "dash",
-               "target": "direction", "power": [60, 90, 120, 150], "ratio": 0.6,
+               "target": "direction", "power": [48, 70, 95, 120], "ratio": 0.7,
                "cooldown": [9, 8, 7, 6], "range": 4.5, "radius": 0.9},
       "upgrades": [
         {"id": "grassyglide", "name": "Erboscivolata", "type": "Grass", "category": "physical", "shape": "dash",
-         "target": "direction", "power": [50, 75, 100, 125], "ratio": 0.5,
+         "target": "direction", "power": [40, 60, 80, 100], "ratio": 0.6,
          "cooldown": [0.8, 0.8, 0.8, 0.8], "range": 4.5, "radius": 0.9,
-         "charges": 3, "charge_time": 5, "refund_on_hit": true},
+         "charges": 2, "charge_time": 5, "refund_on_hit": true},
         {"id": "grassyterrain", "name": "Campo Erboso", "type": "Grass", "category": "none", "shape": "buff",
          "target": "ally", "cooldown": [12, 11, 10, 9], "range": 0, "radius": 3.0,
          "effects": {"speed": {"mult": 1.25, "duration": 3.0}, "atk": {"mult": 1.2, "duration": 4.0}}}
@@ -57,18 +57,18 @@
     "E": {
       "base": {"id": "wrap", "name": "Avvolgibotta", "type": "Grass", "category": "special", "shape": "projectile",
                "fx": "leaf",
-               "target": "direction", "power": [40, 60, 80, 100], "ratio": 0.4,
+               "target": "direction", "power": [32, 48, 65, 80], "ratio": 0.5,
                "cooldown": [8, 7.5, 7, 6.5], "range": 7, "radius": 0.5, "speed": 13,
                "effects": {"slow": {"mult": 0.7, "duration": 2.0}, "poison": {"dps": 20, "duration": 2.0}}},
       "upgrades": [
         {"id": "grassknot", "name": "Laccioerboso", "type": "Grass", "category": "special", "shape": "projectile",
          "fx": "leaf",
-         "target": "direction", "power": [30, 45, 60, 75], "ratio": 0.3,
+         "target": "direction", "power": [24, 36, 48, 60], "ratio": 0.35,
          "cooldown": [9, 8.5, 8, 7.5], "range": 7, "radius": 0.5, "speed": 13,
          "effects": {"poison": {"dps": 15, "hp_frac": 0.025, "duration": 3.0}, "slow": {"mult": 0.8, "duration": 1.0}}},
         {"id": "grasspledge", "name": "Erbapatto", "type": "Grass", "category": "special", "shape": "projectile",
          "fx": "orb",
-         "target": "direction", "power": [70, 105, 140, 175], "ratio": 0.5,
+         "target": "direction", "power": [55, 85, 110, 140], "ratio": 0.85,
          "cooldown": [7, 6.5, 6, 5.5], "range": 9, "radius": 0.45, "speed": 16,
          "effects": {"bonus_if_ally_type": {"types": ["Water", "Fire"], "mult": 1.05}}}
       ]
@@ -76,11 +76,11 @@
     "R": {
       "upgrades": [
         {"id": "frenzyplant", "name": "VerdeBufera", "type": "Grass", "category": "special", "shape": "storm",
-         "target": "point", "power": [120, 180, 240], "ratio": 0.7,
+         "target": "point", "power": [40, 60, 80], "ratio": 0.35,
          "cooldown": [100, 90, 80], "range": 9, "radius": 3.0,
          "effects": {"duration": 3.0, "interval": 0.6, "overcharge": 5, "delay": 0.0}},
         {"id": "vastimpact", "name": "VastoImpatto", "type": "Dragon", "category": "physical", "shape": "leap",
-         "target": "point", "power": [240, 360, 480], "ratio": 0.9,
+         "target": "point", "power": [190, 290, 385], "ratio": 1.65,
          "cooldown": [110, 100, 90], "range": 7, "radius": 3.2,
          "effects": {"slow": {"mult": 0.7, "duration": 2.0}}}
       ]

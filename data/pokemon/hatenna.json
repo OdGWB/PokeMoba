@@ -38,18 +38,18 @@
     "Q": {
       "base": {"id": "confusion", "name": "Confusione", "type": "Psychic", "category": "special",
                "shape": "psyburst", "fx": "psyburst", "target": "point",
-               "power": [60, 95, 130, 165], "ratio": 0.55,
+               "power": [48, 75, 105, 130], "ratio": 0.8,
                "cooldown": [7, 6.5, 6, 5.5], "range": 8.0, "radius": 1.7,
                "effects": {"delay": 0.5, "confuse": {"duration": 1.5}}},
       "upgrades": [
         {"id": "psyshock", "name": "Psicoshock", "type": "Psychic", "category": "special",
          "shape": "psyburst", "fx": "psyburst", "target": "point", "vs_defense": true,
-         "power": [60, 95, 130, 165], "ratio": 0.55,
+         "power": [48, 75, 105, 130], "ratio": 0.8,
          "cooldown": [7, 6.5, 6, 5.5], "range": 8.0, "radius": 1.7,
          "effects": {"delay": 0.5, "confuse": {"duration": 1.5}}},
         {"id": "psybeam", "name": "Psicoraggio", "type": "Psychic", "category": "special",
          "shape": "psybeam", "fx": "psybeam", "target": "direction",
-         "power": [55, 88, 120, 152], "ratio": 0.5,
+         "power": [44, 70, 95, 120], "ratio": 0.7,
          "cooldown": [8, 7.5, 7, 6.5], "range": 10.0, "radius": 0.55,
          "effects": {"confuse": {"duration": 1.5}}}
       ]
@@ -57,18 +57,18 @@
     "W": {
       "base": {"id": "disarmingvoice", "name": "Incantavoce", "type": "Fairy", "category": "special",
                "shape": "hattvoice", "fx": "hattvoice", "target": "self",
-               "power": [45, 70, 95, 120], "ratio": 0.4,
+               "power": [36, 55, 75, 95], "ratio": 0.55,
                "cooldown": [11, 10.5, 10, 9.5], "range": 0, "radius": 3.0,
                "effects": {"push": 3.0}},
       "upgrades": [
         {"id": "magicpowder", "name": "Magipolvere", "type": "Psychic", "category": "special",
          "shape": "hattvoice", "fx": "magicpowder", "target": "self",
-         "power": [45, 70, 95, 120], "ratio": 0.4,
+         "power": [36, 55, 75, 95], "ratio": 0.55,
          "cooldown": [11, 10.5, 10, 9.5], "range": 0, "radius": 3.0,
          "effects": {"psychic_type": 4.0}},
         {"id": "drainingkiss", "name": "Assorbibacio", "type": "Fairy", "category": "special",
          "shape": "hattvoice", "fx": "drainingkiss", "target": "self",
-         "power": [45, 70, 95, 120], "ratio": 0.4,
+         "power": [36, 55, 75, 95], "ratio": 0.55,
          "cooldown": [11, 10.5, 10, 9.5], "range": 0, "radius": 3.0,
          "effects": {"push": 3.0, "heal_self_ratio": 0.5}}
       ]
@@ -76,19 +76,19 @@
     "E": {
       "base": {"id": "moonblast", "name": "Forza Lunare", "type": "Fairy", "category": "special",
                "shape": "moonorb", "fx": "moonorb", "target": "direction",
-               "power": [70, 110, 150, 190], "ratio": 0.6,
+               "power": [55, 90, 120, 150], "ratio": 0.9,
                "cooldown": [12, 11.5, 11, 10.5], "range": 11.0, "radius": 0.5,
                "effects": {"orb_speed": 7.0, "stun": {"duration": 1.0}}},
       "upgrades": [
         {"id": "mysticalfire", "name": "Magifiamma", "type": "Fire", "category": "special",
          "shape": "moonorb", "fx": "mysticalfire", "target": "direction",
-         "power": [70, 110, 150, 190], "ratio": 0.6,
+         "power": [55, 90, 120, 150], "ratio": 0.9,
          "cooldown": [12, 11.5, 11, 10.5], "range": 11.0, "radius": 0.5,
          "effects": {"orb_speed": 7.0, "stun": {"duration": 1.0},
                      "spa_down_target": {"mult": 0.75, "duration": 4.0}}},
         {"id": "moonblastplus", "name": "Forza Lunare +", "type": "Fairy", "category": "special",
          "shape": "moonorb", "fx": "moonorb", "target": "direction",
-         "power": [70, 110, 150, 190], "ratio": 0.6,
+         "power": [55, 90, 120, 150], "ratio": 0.9,
          "cooldown": [13, 12.5, 12, 11.5], "range": 11.0, "radius": 0.5,
          "effects": {"orb_speed": 7.0, "stun": {"duration": 1.0}, "burst": 2.0}}
       ]
@@ -102,7 +102,7 @@
          "effects": {"duration": 6.0}},
         {"id": "forestwitch", "name": "Strega della Foresta", "type": "Psychic", "category": "special",
          "shape": "witchwave", "fx": "witchwave", "target": "self",
-         "power": [170, 255, 340], "ratio": 0.85,
+         "power": [135, 205, 270], "ratio": 1.15,
          "cooldown": [100, 90, 80], "range": 0, "radius": 7.0,
          "effects": {"delay": 0.75, "agitated_bonus": 1.5, "agitated_stun": 1.5}}
       ]

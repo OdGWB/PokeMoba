@@ -312,7 +312,7 @@ class UrsaringMixin:
         self.quakes.append({"c": Vec2(origin.x, origin.y), "radius": mv.radius, "team": p.team,
                             "caster_id": p.id, "start": self.time, "end": self.time + dur,
                             "next": self.time, "interval": iv, "mv": mv, "rank": rank,
-                            "mult": iv / max(0.1, dur)})
+                            "mult": 1.0})   # danno in JSON PER COLPO (bilanciamento v2)
 
     def _update_quakes(self) -> None:
         now = self.time

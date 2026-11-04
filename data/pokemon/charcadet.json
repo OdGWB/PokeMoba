@@ -31,18 +31,18 @@
      "moves": {
        "Q": {"base": {"id": "armorcannon", "name": "Armor Cannon", "type": "Fire", "category": "special",
                       "shape": "armorcannon", "fx": "armorcannon", "target": "direction",
-                      "power": [140, 210, 280, 350], "ratio": 0.9,
+                      "power": [110, 170, 225, 280], "ratio": 1.7,
                       "cooldown": [10, 9.5, 9, 8.5], "range": 9.5, "radius": 0.55, "speed": 15,
                       "effects": {"charge": 0.5, "self_down": {"mult": 0.8, "duration": 4.0}}}},
        "R": {"upgrades": [
          {"id": "floatarmor", "name": "Armatura Fluttuante", "type": "Fire", "category": "special",
           "shape": "floatarmor", "fx": "floatarmor", "target": "self",
-          "power": [160, 240, 320], "ratio": 0.6,
+          "power": [130, 190, 255], "ratio": 1.1,
           "cooldown": [90, 80, 70], "range": 0, "radius": 2.6,
           "effects": {"duration": 5.0, "blocks": 3, "guard_radius": 1.7}},
          {"id": "psychic", "name": "Psichico", "type": "Psychic", "category": "special",
           "shape": "psychic", "fx": "psychic", "target": "point",
-          "power": [170, 250, 330], "ratio": 0.7,
+          "power": [135, 200, 265], "ratio": 1.15,
           "cooldown": [80, 70, 60], "range": 6.5, "radius": 2.3,
           "effects": {"delay": 0.5, "airborne": {"duration": 1.5, "peak": 1.1}}}
        ]}
@@ -56,13 +56,13 @@
      "moves": {
        "Q": {"base": {"id": "bitterblade", "name": "Bitter Blade", "type": "Ghost", "category": "physical",
                       "shape": "cone", "fx": "bitterblade", "target": "direction",
-                      "power": [80, 120, 160, 200], "ratio": 0.9,
+                      "power": [65, 95, 130, 160], "ratio": 0.95,
                       "cooldown": [7, 6.5, 6, 5.5], "range": 2.6, "angle": 65,
                       "effects": {"heal_self_ratio": 0.5}}},
        "R": {"upgrades": [
          {"id": "grudgeblade", "name": "Lama dei Rancori", "type": "Ghost", "category": "physical",
           "shape": "grudgeblade", "fx": "grudgeblade", "target": "point",
-          "power": [240, 340, 440], "ratio": 1.0,
+          "power": [36, 52, 67], "ratio": 0.3,
           "cooldown": [90, 80, 70], "range": 6.0, "radius": 1.2,
           "effects": {"duration": 1.5, "hits": 6, "heal_ratio": 0.2}},
          {"id": "shadowclaw", "name": "Ombrartigli", "type": "Dark", "category": "physical",
@@ -78,13 +78,13 @@
     "Q": {
       "base": {"id": "incinerate", "name": "Bruciatutto", "type": "Fire", "category": "special",
                "shape": "cone", "fx": "incinerate", "target": "direction",
-               "power": [60, 90, 120, 150], "ratio": 0.5,
+               "power": [48, 70, 95, 120], "ratio": 0.7,
                "cooldown": [6, 5.5, 5, 4.5], "range": 2.5, "angle": 45,
                "effects": {"shield_break": 0.2}},
       "upgrades": [
         {"id": "incinerateplus", "name": "Bruciatutto +", "type": "Fire", "category": "special",
          "shape": "cone", "fx": "incinerate", "target": "direction",
-         "power": [80, 120, 160, 200], "ratio": 0.6,
+         "power": [65, 95, 130, 160], "ratio": 0.95,
          "cooldown": [6, 5.5, 5, 4.5], "range": 2.7, "angle": 48,
          "effects": {"shield_break": 0.4}}
       ]
@@ -92,7 +92,7 @@
     "W": {
       "base": {"id": "lavaplume", "name": "Lavasbuffo", "type": "Fire", "category": "special",
                "shape": "area", "fx": "lavaplume", "target": "self",
-               "power": [55, 85, 115, 145], "ratio": 0.45,
+               "power": [44, 70, 90, 115], "ratio": 0.7,
                "cooldown": [9, 8.5, 8, 7.5], "range": 0, "radius": 2.2,
                "effects": {"burn": {"chance": 0.3, "duration": 3.0}}},
       "upgrades": [
@@ -111,7 +111,7 @@
     "E": {
       "base": {"id": "flamecharge", "name": "Nitrocarica", "type": "Fire", "category": "physical",
                "shape": "dash", "fx": "flamecharge", "target": "direction",
-               "power": [45, 70, 95, 120], "ratio": 0.5,
+               "power": [36, 55, 75, 95], "ratio": 0.55,
                "cooldown": [0.8, 0.8, 0.8, 0.8], "range": 4.5, "radius": 0.9,
                "charges": 2, "charge_time": 7, "refund_on_hit": false,
                "effects": {"speed_stack": {"per": 0.12, "max": 3, "duration": 4.0}}},

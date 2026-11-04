@@ -118,6 +118,16 @@ def check_evolution(p) -> bool:
             for mv in [ms.base, *ms.upgrades]:
                 if mv is not None:
                     mv.d["type"] = st["move_type"]
+    # Linea Eevee: le mosse di danno seguono la statistica offensiva migliore
+    # della forma (fisiche di base, speciali per Jolteon/Espeon/Glaceon/Sylveon/Vaporeon).
+    if "move_category" in st:
+        for slot in ("Q", "W", "E"):
+            ms = p.moveset.get(slot)
+            if ms is None:
+                continue
+            for mv in [ms.base, *ms.upgrades]:
+                if mv is not None and mv.d.get("category") in ("physical", "special"):
+                    mv.d["category"] = st["move_category"]
     # Statistiche base REALI proprie della forma evoluta (se definite nel JSON):
     # il Match ricalcola tutte le stat derivate da queste. La classe di gittata
     # puo' cambiare con la forma (aggiorna la penalita' AD ranged).

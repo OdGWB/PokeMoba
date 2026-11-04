@@ -15,7 +15,7 @@ from engine.world import World
 
 DT = 1 / 30
 NOI = load_pokemon_def(os.path.join(ROOT, "data", "pokemon", "noibat.json"))
-FOE = load_pokemon_def(os.path.join(ROOT, "data", "pokemon", "squirtle.json"))
+FOE = load_pokemon_def(os.path.join(ROOT, "tests", "fixtures", "dummy_foe.json"))
 
 
 def spawn(world, d, pos, team):

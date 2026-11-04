@@ -30,17 +30,17 @@
     "Q": {
       "base": {"id": "supersonic", "name": "Supersuono", "type": "Normal", "category": "special",
                "shape": "projectile", "fx": "supersonic", "target": "direction",
-               "power": [40, 65, 90, 115], "ratio": 0.4,
+               "power": [32, 50, 70, 90], "ratio": 0.55,
                "cooldown": [8, 7.5, 7, 6.5], "range": 7.5, "radius": 0.55, "speed": 12,
                "effects": {"confuse": {"duration": 1.5}}},
       "upgrades": [
         {"id": "dragonpulse", "name": "Dragopulsar", "type": "Dragon", "category": "special",
          "shape": "dragonpulse", "fx": "dragonpulse", "target": "direction",
-         "power": [100, 155, 210, 265], "ratio": 0.75,
+         "power": [80, 125, 170, 210], "ratio": 1.25,
          "cooldown": [9, 8.5, 8, 7.5], "range": 10, "radius": 0.6},
         {"id": "aircutter", "name": "Aerasoio", "type": "Flying", "category": "special",
          "shape": "fan", "fx": "aircutter", "target": "direction",
-         "power": [55, 85, 115, 145], "ratio": 0.4, "can_crit": true,
+         "power": [44, 70, 90, 115], "ratio": 0.7, "can_crit": true,
          "cooldown": [7, 6.5, 6, 5.5], "range": 7, "radius": 0.45, "speed": 14, "spread": 18}
       ]
     },
@@ -54,11 +54,11 @@
       "upgrades": [
         {"id": "boomburst_noivern", "name": "Granvoce", "type": "Normal", "category": "special",
          "shape": "cone", "fx": "boomburst", "target": "direction",
-         "power": [110, 170, 230, 290], "ratio": 0.8, "wall_pierce": true,
+         "power": [90, 135, 185, 230], "ratio": 1.4, "wall_pierce": true,
          "cooldown": [10, 9.5, 9, 8.5], "range": 5.5, "angle": 42},
         {"id": "whirlwind", "name": "Turbine", "type": "Flying", "category": "special",
          "shape": "whirlwind", "fx": "whirlwind", "target": "self",
-         "power": [40, 60, 80, 100], "ratio": 0.3,
+         "power": [32, 48, 65, 80], "ratio": 0.5,
          "cooldown": [14, 13, 12, 11], "range": 0, "radius": 2.6,
          "effects": {"push": 4.0}}
       ]
@@ -66,12 +66,12 @@
     "E": {
       "base": {"id": "acrobatics", "name": "Acrobazia", "type": "Flying", "category": "special",
                "shape": "dash", "fx": "acrobatics", "target": "direction",
-               "power": [50, 80, 110, 140], "ratio": 0.4,
+               "power": [40, 65, 90, 110], "ratio": 0.65,
                "cooldown": [10, 9.5, 9, 8.5], "range": 4.5, "radius": 0.7},
       "upgrades": [
         {"id": "acrobatics_plus", "name": "Acrobazia +", "type": "Flying", "category": "special",
          "shape": "dash", "fx": "acrobatics", "target": "direction",
-         "power": [60, 95, 130, 165], "ratio": 0.45,
+         "power": [48, 75, 105, 130], "ratio": 0.8,
          "charges": 2, "charge_time": 10, "refund_on_hit": false,
          "cooldown": [0.6, 0.6, 0.6, 0.6], "range": 4.5, "radius": 0.7},
         {"id": "agility", "name": "Agilità", "type": "Psychic", "category": "none",
@@ -84,13 +84,13 @@
       "upgrades": [
         {"id": "hurricane", "name": "Tifone", "type": "Dragon", "category": "special",
          "shape": "hurricane", "fx": "hurricane", "target": "direction",
-         "power": [260, 380, 500], "ratio": 0.9,
+         "power": [29, 42, 55], "ratio": 0.25,
          "cooldown": [100, 90, 80], "range": 8, "radius": 1.5,
          "effects": {"duration": 4.0, "interval": 0.5, "release_confuse": 1.0,
                      "rain_mult": 1.5}},
         {"id": "dracometeor", "name": "Dragobolide", "type": "Dragon", "category": "special",
          "shape": "dracometeor", "fx": "dracometeor", "target": "point",
-         "power": [300, 450, 600], "ratio": 1.1,
+         "power": [240, 360, 480], "ratio": 2.05,
          "cooldown": [90, 80, 70], "range": 11, "radius": 3.0,
          "effects": {"delay": 1.0, "spa_down": {"mult": 0.6, "duration": 6.0}}}
       ]

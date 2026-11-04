@@ -229,7 +229,7 @@ class NoivernMixin:
                 h["next"] += h["interval"]
                 caster = self.world.get(h["caster_id"])
                 if caster is not None:
-                    mult = h["interval"] / max(0.1, h["end"] - h["start"])
+                    mult = 1.0   # il danno in JSON e' PER COLPO (bilanciamento v2)
                     for eid in list(h["caught"]):
                         e = self.world.get(eid)
                         if e is not None and e.alive:

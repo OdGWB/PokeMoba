@@ -41,11 +41,12 @@
        "R": {
          "upgrades": [
            {"id": "bounce", "name": "Rimbalzo", "type": "Flying", "category": "physical", "shape": "bounce",
-            "target": "ally", "power": [180, 250, 320], "ratio": 0.7,
+            "target": "ally", "power": [145, 200, 255], "ratio": 1.1,
             "cooldown": [85, 75, 65], "range": 5.0, "radius": 2.6,
             "effects": {"air_time": 1.0, "heal": [120, 180, 240],
                         "shield": {"amount": [120, 180, 240], "duration": 3.0},
-                        "stun": {"duration": 1.2}}},
+                        "stun": {"duration": 1.2},
+                        "heal_scaling": 0.85, "shield_scaling": 0.85}},
            {"id": "perishsong", "name": "Ultimocanto", "type": "Normal", "category": "none", "shape": "perish",
             "target": "point", "power": [0, 0, 0],
             "cooldown": [100, 90, 80], "range": 5.5, "radius": 3.0,
@@ -58,16 +59,16 @@
   "moves": {
     "Q": {
       "base": {"id": "bubble", "name": "Bolla", "type": "Water", "category": "special", "shape": "arc",
-               "fx": "arcbubble", "target": "point", "power": [40, 60, 80, 100], "ratio": 0.45,
+               "fx": "arcbubble", "target": "point", "power": [32, 48, 65, 80], "ratio": 0.5,
                "cooldown": [5, 4.5, 4, 3.5], "range": 5.5, "radius": 1.6,
                "effects": {"delay": 0.55, "stun": {"duration": 0.5}}},
       "upgrades": [
         {"id": "bubblebeam", "name": "Bollaraggio", "type": "Water", "category": "special", "shape": "bubble",
-         "fx": "jet", "target": "direction", "power": [70, 100, 130, 160], "ratio": 0.55,
+         "fx": "jet", "target": "direction", "power": [55, 80, 105, 130], "ratio": 0.8,
          "cooldown": [4, 3.75, 3.5, 3.25], "range": 7.0, "speed": 12.0, "radius": 0.6,
          "effects": {"slow": {"mult": 0.85, "duration": 1.2}}},
         {"id": "mirrormove", "name": "Ripeti", "type": "Normal", "category": "special", "shape": "bolt",
-         "fx": "bolt", "target": "point", "power": [30, 45, 60, 75], "ratio": 0.3,
+         "fx": "bolt", "target": "point", "power": [24, 36, 48, 60], "ratio": 0.35,
          "cooldown": [9, 8.5, 8, 7.5], "range": 6.0,
          "effects": {"silence": {"duration": 2.0}}}
       ]
@@ -84,21 +85,22 @@
          "effects": {"hp_cost_frac": 0.4, "atk": {"mult": 1.6, "duration": 6.0}}},
         {"id": "aquaring", "name": "Acquanello", "type": "Water", "category": "none", "shape": "healzone",
          "target": "ally", "power": [0, 0, 0, 0], "cooldown": [13, 12, 11, 10], "radius": 3.0,
-         "effects": {"heal": [18, 30, 42, 54], "duration": 4.0, "interval": 1.0}}
+         "effects": {"heal": [18, 30, 42, 54], "duration": 4.0, "interval": 1.0,
+                     "heal_scaling": 0.19}}
       ]
     },
     "E": {
       "base": {"id": "mudshot", "name": "Colpo di fango", "type": "Ground", "category": "special", "shape": "projectile",
-               "fx": "shard", "target": "direction", "power": [55, 80, 105, 130], "ratio": 0.5,
+               "fx": "shard", "target": "direction", "power": [44, 65, 85, 105], "ratio": 0.65,
                "cooldown": [5, 4.5, 4, 3.5], "range": 7.0, "speed": 11.0, "radius": 0.5,
                "effects": {"slow": {"mult": 0.9, "duration": 1.2}}},
       "upgrades": [
         {"id": "vitalthrow", "name": "Ribaltiro", "type": "Fighting", "category": "physical", "shape": "throwback",
-         "fx": "slash", "target": "direction", "power": [70, 105, 140, 175], "ratio": 0.6,
+         "fx": "slash", "target": "direction", "power": [55, 85, 110, 140], "ratio": 0.85,
          "cooldown": [9, 8.5, 8, 7.5], "range": 2.4, "toss": 3.0,
          "effects": {"confuse": {"duration": 0.5}}},
         {"id": "whirlpool", "name": "Mulinello", "type": "Water", "category": "special", "shape": "whirlpool",
-         "fx": "vortex", "target": "point", "power": [60, 90, 120, 150], "ratio": 0.5,
+         "fx": "vortex", "target": "point", "power": [14, 20, 27, 34], "ratio": 0.2,
          "cooldown": [8, 7.5, 7, 6.5], "range": 5.5, "radius": 2.2,
          "effects": {"slow": {"mult": 0.4, "duration": 1.5}, "duration": 1.5, "interval": 0.3}}
       ]
@@ -106,11 +108,11 @@
     "R": {
       "upgrades": [
         {"id": "dynamicpunch", "name": "Dinamipugno", "type": "Fighting", "category": "physical", "shape": "cone",
-         "fx": "slash", "target": "direction", "power": [260, 360, 460], "ratio": 1.0,
+         "fx": "slash", "target": "direction", "power": [210, 290, 370], "ratio": 1.6,
          "cooldown": [80, 72, 64], "range": 2.6, "angle": 45,
          "effects": {"confuse": {"duration": 1.5}}},
         {"id": "closecombat", "name": "Zuffa", "type": "Fighting", "category": "physical", "shape": "area",
-         "fx": "flurry", "target": "self", "power": [320, 440, 560], "ratio": 1.1,
+         "fx": "flurry", "target": "self", "power": [255, 350, 450], "ratio": 1.95,
          "cooldown": [90, 80, 70], "radius": 2.4,
          "effects": {"self_debuff": {"def_debuff": {"mult": 0.6, "duration": 4.0},
                                      "spdef_debuff": {"amount": 35, "duration": 4.0}}}}

@@ -26,16 +26,16 @@
     "Q": {
       "base": {"id": "leafage", "name": "Fogliame", "type": "Grass", "category": "special", "shape": "projectile",
                "fx": "arrow",
-               "target": "direction", "power": [55, 85, 115, 145], "ratio": 0.5,
+               "target": "direction", "power": [44, 70, 90, 115], "ratio": 0.7,
                "cooldown": [4.5, 4, 3.5, 3], "range": 8, "radius": 0.5, "speed": 12},
       "upgrades": [
         {"id": "leafblade", "name": "Foglielama", "type": "Grass", "category": "special", "shape": "fan",
          "fx": "arrow",
-         "target": "direction", "power": [40, 65, 90, 115], "ratio": 0.35,
+         "target": "direction", "power": [32, 50, 70, 90], "ratio": 0.55,
          "cooldown": [6, 5.5, 5, 4.5], "range": 7, "radius": 0.5, "speed": 12, "spread": 16},
         {"id": "gigadrain", "name": "Gigassorbimento", "type": "Grass", "category": "special", "shape": "projectile",
          "fx": "drain",
-         "target": "direction", "power": [70, 110, 150, 190], "ratio": 0.55,
+         "target": "direction", "power": [55, 90, 120, 150], "ratio": 0.9,
          "cooldown": [7, 6.5, 6, 5.5], "range": 8, "radius": 0.6, "speed": 12,
          "effects": {"heal_self_ratio": 0.35}}
       ]
@@ -43,18 +43,19 @@
     "W": {
       "base": {"id": "astonish", "name": "Sgomento", "type": "Ghost", "category": "special", "shape": "projectile",
                "fx": "arrow",
-               "target": "direction", "power": [40, 65, 90, 115], "ratio": 0.4,
+               "target": "direction", "power": [32, 50, 70, 90], "ratio": 0.55,
                "cooldown": [8, 7.5, 7, 6.5], "range": 7, "radius": 0.5, "speed": 13,
                "effects": {"fear": {"duration": 1.0}}},
       "upgrades": [
         {"id": "phantomforce", "name": "Sbigoattacco", "type": "Ghost", "category": "special", "shape": "projectile",
          "fx": "arrow",
-         "target": "direction", "power": [70, 110, 150, 190], "ratio": 0.5,
+         "target": "direction", "power": [55, 90, 120, 150], "ratio": 0.9,
          "cooldown": [7, 6.5, 6, 5.5], "range": 7, "radius": 0.5, "speed": 13,
          "effects": {"bonus_vs_attacking": 1.8}},
         {"id": "synthesis", "name": "Sintesi", "type": "Grass", "category": "none", "shape": "buff",
          "target": "self", "cooldown": [16, 15, 14, 13],
-         "effects": {"heal": [120, 160, 200, 240], "weather_heal": true}}
+         "effects": {"heal": [120, 160, 200, 240], "weather_heal": true,
+                     "heal_scaling": 0.85}}
       ]
     },
     "E": {
@@ -64,7 +65,7 @@
                "effects": {"atk_debuff": {"amount": 25, "duration": 3.0}}},
       "upgrades": [
         {"id": "uturn", "name": "Retromarcia", "type": "Bug", "category": "physical", "shape": "dashback",
-         "target": "direction", "power": [60, 95, 130, 165], "ratio": 0.6,
+         "target": "direction", "power": [48, 75, 105, 130], "ratio": 0.8,
          "cooldown": [9, 8, 7, 6], "range": 4.5, "radius": 1.0, "recoil": 4.5},
         {"id": "boomburst", "name": "Granvoce", "type": "Normal", "category": "none", "shape": "buff",
          "target": "self", "cooldown": [14, 13, 12, 11],
@@ -76,12 +77,12 @@
       "upgrades": [
         {"id": "spiritshackle", "name": "Cucitombra", "type": "Ghost", "category": "special", "shape": "projectile",
          "fx": "arrow_big",
-         "target": "direction", "power": [220, 340, 460], "ratio": 0.6,
+         "target": "direction", "power": [175, 270, 370], "ratio": 1.6,
          "cooldown": [100, 90, 80], "range": 14, "radius": 0.5, "speed": 16,
          "effects": {"dashlock": {"stun": 0.8, "duration": 3.0}}},
         {"id": "arrowrain", "name": "Pioggia di Frecce", "type": "Grass", "category": "special", "shape": "rain",
          "fx": "arrow_rain",
-         "target": "point", "power": [60, 95, 130], "ratio": 0.3,
+         "target": "point", "power": [48, 75, 105], "ratio": 0.45,
          "cooldown": [90, 80, 70], "range": 12, "radius": 3.0,
          "effects": {"delay": 1.0, "duration": 3.0, "slow": {"mult": 0.6, "duration": 0.6}}}
       ]

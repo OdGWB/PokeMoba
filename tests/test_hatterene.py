@@ -16,7 +16,7 @@ from engine.world import World
 
 DT = 1 / 30
 HATT = load_pokemon_def(os.path.join(ROOT, "data", "pokemon", "hatenna.json"))
-FOE = load_pokemon_def(os.path.join(ROOT, "data", "pokemon", "squirtle.json"))
+FOE = load_pokemon_def(os.path.join(ROOT, "tests", "fixtures", "dummy_foe.json"))
 FAST = load_pokemon_def(os.path.join(ROOT, "data", "pokemon", "sneasel.json"))
 
 

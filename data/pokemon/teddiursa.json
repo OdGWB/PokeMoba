@@ -31,15 +31,15 @@
   "moves": {
     "Q": {
       "base": {"id": "scratch", "name": "Graffio", "type": "Normal", "category": "physical", "shape": "cone",
-               "fx": "slash", "target": "direction", "power": [50, 80, 110, 140], "ratio": 0.8,
+               "fx": "slash", "target": "direction", "power": [40, 65, 90, 110], "ratio": 0.65,
                "cooldown": [4, 3.5, 3, 2.5], "range": 2.3, "angle": 60},
       "upgrades": [
         {"id": "slash", "name": "Lacerazione", "type": "Normal", "category": "physical", "shape": "cone",
-         "fx": "ursaslash", "target": "direction", "power": [85, 125, 165, 205], "ratio": 1.0,
+         "fx": "ursaslash", "target": "direction", "power": [70, 100, 130, 165], "ratio": 1.0,
          "can_crit": true, "crit_bonus": 0.2,
          "cooldown": [5, 4.5, 4, 3.5], "range": 2.7, "angle": 85},
         {"id": "hammerarm", "name": "Martelpugno", "type": "Fighting", "category": "physical", "shape": "cone",
-         "fx": "hammerarm", "target": "direction", "power": [130, 195, 260, 325], "ratio": 1.2,
+         "fx": "hammerarm", "target": "direction", "power": [105, 155, 210, 260], "ratio": 1.55,
          "cooldown": [9, 8.5, 8, 7.5], "range": 2.3, "angle": 35,
          "effects": {"stun": {"duration": 1.0}, "self_slow": {"mult": 0.8, "duration": 3.0}}}
       ]
@@ -65,13 +65,13 @@
     "E": {
       "base": {"id": "bodyslam", "name": "Corposcontro", "type": "Normal", "category": "physical",
                "shape": "bodyslam", "fx": "bodyslam", "target": "direction",
-               "power": [60, 95, 130, 165], "ratio": 0.7,
+               "power": [48, 75, 105, 130], "ratio": 0.8,
                "cooldown": [10, 9.5, 9, 8.5], "range": 4.5, "radius": 0.75,
                "effects": {"root": {"duration": 1.5}}},
       "upgrades": [
         {"id": "bulldoze", "name": "Battiterra", "type": "Ground", "category": "physical",
          "shape": "bulldoze", "fx": "bulldoze", "target": "direction",
-         "power": [75, 110, 145, 180], "ratio": 0.75,
+         "power": [60, 90, 115, 145], "ratio": 0.85,
          "cooldown": [10, 9.5, 9, 8.5], "range": 4.5, "radius": 2.4,
          "effects": {"slow": {"mult": 0.6, "duration": 2.0}}},
         {"id": "honeclaws", "name": "Unghiaguzze", "type": "Dark", "category": "none",
@@ -84,13 +84,13 @@
       "upgrades": [
         {"id": "fullmoon", "name": "Luna Piena", "type": "Normal", "category": "physical",
          "shape": "fullmoon", "fx": "fullmoon", "target": "point",
-         "power": [180, 270, 360], "ratio": 1.0,
+         "power": [145, 215, 290], "ratio": 1.25,
          "cooldown": [90, 80, 70], "range": 8.0, "radius": 2.4,
          "effects": {"stun": {"duration": 1.0}, "leap_time": 0.55, "duration": 6.0,
                      "hp_mult": 1.25, "cleave_radius": 1.3}},
         {"id": "earthquake", "name": "Terremoto", "type": "Ground", "category": "physical",
          "shape": "earthquake", "fx": "earthquake", "target": "self",
-         "power": [220, 320, 420], "ratio": 1.3,
+         "power": [38, 56, 73], "ratio": 0.3,
          "cooldown": [80, 70, 60], "range": 0, "radius": 3.5,
          "effects": {"duration": 3.0, "interval": 0.5, "slow": {"mult": 0.65, "duration": 0.8}}}
       ]

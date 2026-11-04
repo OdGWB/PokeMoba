@@ -32,29 +32,29 @@
     "Q": {
       "base": {"id": "scratch", "name": "Graffio", "type": "Normal", "category": "physical", "shape": "cone",
                "fx": "slash",
-               "target": "direction", "power": [45, 70, 95, 120], "ratio": 0.55,
+               "target": "direction", "power": [36, 55, 75, 95], "ratio": 0.55,
                "cooldown": [4.5, 4, 3.5, 3], "range": 2.6, "angle": 55},
       "upgrades": [
         {"id": "furyswipes", "name": "Sfuriate", "type": "Normal", "category": "physical", "shape": "cone",
          "fx": "slash", "fury": true,
-         "target": "direction", "power": [26, 40, 54, 68], "ratio": 0.35,
+         "target": "direction", "power": [21, 32, 43, 55], "ratio": 0.35,
          "cooldown": [3.5, 3.25, 3, 2.75], "range": 2.6, "angle": 48},
         {"id": "xscissor", "name": "Forbice X", "type": "Bug", "category": "physical", "shape": "area",
          "fx": "xscissor", "high_crit": true,
-         "target": "self", "power": [70, 105, 140, 175], "ratio": 0.6,
+         "target": "self", "power": [55, 85, 110, 140], "ratio": 0.85,
          "cooldown": [6, 5.5, 5, 4.5], "range": 0, "radius": 2.0}
       ]
     },
     "W": {
       "base": {"id": "dig", "name": "Fossa", "type": "Ground", "category": "physical", "shape": "sub",
                "fx": "orb",
-               "target": "point", "power": [75, 110, 145, 180], "ratio": 0.6,
+               "target": "point", "power": [60, 90, 115, 145], "ratio": 0.85,
                "cooldown": [10, 9, 8, 7], "range": 4.5, "radius": 2.0,
                "effects": {"untargetable": {"duration": 1.0}}},
       "upgrades": [
-        {"id": "sandtomb", "name": "Sabbiotomba", "type": "Ground", "category": "special", "shape": "sub",
+        {"id": "sandtomb", "name": "Sabbiotomba", "type": "Ground", "category": "physical", "shape": "sub",
          "fx": "orb",
-         "target": "point", "power": [60, 90, 120, 150], "ratio": 0.5,
+         "target": "point", "power": [48, 70, 95, 120], "ratio": 0.7,
          "cooldown": [11, 10, 9, 8], "range": 4.5, "radius": 2.2,
          "effects": {"untargetable": {"duration": 1.0}, "root": {"duration": 1.5}}},
         {"id": "doubleteam", "name": "Doppioteam", "type": "Normal", "category": "none", "shape": "sub",
@@ -83,7 +83,7 @@
       "upgrades": [
         {"id": "aerialassault", "name": "Aeroassalto", "type": "Flying", "category": "physical", "shape": "chain",
          "fx": "slash",
-         "target": "direction", "power": [150, 220, 290], "ratio": 0.8,
+         "target": "direction", "power": [120, 175, 230], "ratio": 1,
          "cooldown": [90, 80, 70], "range": 5.0, "max_targets": 4,
          "effects": {"hop": 4.5}},
         {"id": "grudge", "name": "Rancore", "type": "Ghost", "category": "none", "shape": "rancore",

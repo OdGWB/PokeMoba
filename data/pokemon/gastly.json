@@ -22,32 +22,32 @@
   "moves": {
     "Q": {
       "base": {"id": "lick", "name": "Leccata", "type": "Ghost", "category": "physical", "shape": "cone",
-               "target": "direction", "power": [50, 80, 110, 140], "ratio": 0.6,
+               "target": "direction", "power": [40, 65, 90, 110], "ratio": 0.65,
                "cooldown": [5, 4.5, 4, 3.5], "range": 2.4, "angle": 50,
                "effects": {"root": {"duration": 1.0}}},
       "upgrades": [
         {"id": "shadowball", "name": "Palla Ombra", "type": "Ghost", "category": "special", "shape": "bubble",
-         "target": "direction", "power": [70, 110, 150, 190], "ratio": 0.5,
+         "target": "direction", "power": [55, 90, 120, 150], "ratio": 0.9,
          "cooldown": [6, 5.5, 5, 4.5], "range": 8, "radius": 0.6, "speed": 12,
          "effects": {"spdef_debuff": {"amount": 22, "duration": 2.0}}},
         {"id": "curse_hit", "name": "Sciagura", "type": "Ghost", "category": "special", "shape": "projectile",
-         "target": "direction", "power": [60, 95, 130, 165], "ratio": 0.5,
+         "target": "direction", "power": [48, 75, 105, 130], "ratio": 0.8,
          "cooldown": [7, 6.5, 6, 5.5], "range": 8, "radius": 0.6, "speed": 12,
          "effects": {"bonus_vs_status": 2.0}}
       ]
     },
     "W": {
       "base": {"id": "sludgewave", "name": "Velenoshock", "type": "Poison", "category": "special", "shape": "bolt",
-               "target": "point", "power": [25, 40, 55, 70], "ratio": 0.25,
+               "target": "point", "power": [20, 32, 44, 55], "ratio": 0.35,
                "cooldown": [4, 3.7, 3.4, 3.1], "range": 5,
                "effects": {"poison": {"dps": 22, "duration": 2.0}}},
       "upgrades": [
         {"id": "dreameater", "name": "Mangiasogni", "type": "Psychic", "category": "special", "shape": "bolt",
-         "target": "point", "power": [70, 110, 150, 190], "ratio": 0.6,
+         "target": "point", "power": [55, 90, 120, 150], "ratio": 0.9,
          "cooldown": [8, 7.5, 7, 6.5], "range": 5.5,
          "effects": {"requires_sleep": true, "bonus_vs_sleep": 2.0, "heal_self_ratio": 0.4}},
         {"id": "sludgebomb", "name": "Fangobomba", "type": "Poison", "category": "special", "shape": "area",
-         "target": "point", "power": [50, 80, 110, 140], "ratio": 0.4,
+         "target": "point", "power": [40, 65, 90, 110], "ratio": 0.65,
          "cooldown": [8, 7.5, 7, 6.5], "range": 7, "radius": 2.2,
          "effects": {"poison": {"dps": 26, "duration": 2.0}}}
       ]
@@ -71,7 +71,7 @@
     "R": {
       "upgrades": [
         {"id": "curse_ult", "name": "Maledizione", "type": "Ghost", "category": "special", "shape": "curse",
-         "target": "point", "power": [250, 400, 550], "ratio": 0.8,
+         "target": "point", "power": [200, 320, 440], "ratio": 1.9,
          "cooldown": [100, 90, 80], "range": 8,
          "effects": {"delay": 3.0, "charge_power": 3.0}},
         {"id": "phantomdive", "name": "Spettrotuffo", "type": "Ghost", "category": "none", "shape": "blink",

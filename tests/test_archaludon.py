@@ -16,7 +16,7 @@ from net import protocol as P
 
 DT = 1 / 30
 ARCH = load_pokemon_def(os.path.join(ROOT, "data", "pokemon", "duraludon.json"))
-FOE = load_pokemon_def(os.path.join(ROOT, "data", "pokemon", "squirtle.json"))
+FOE = load_pokemon_def(os.path.join(ROOT, "tests", "fixtures", "dummy_foe.json"))
 
 
 def spawn(world, d, pos, team):

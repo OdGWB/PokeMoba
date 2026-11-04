@@ -434,7 +434,8 @@ class SpiritombMixin:
         fx = mv.effects
         f = _frac(p)
         shield = (self._rank_val(fx.get("shield", [80]), rank)
-                  + float(fx.get("shield_per_charge", 3.0)) * p.spirit_charges) * p.heal_power
+                  + float(fx.get("shield_per_charge", 3.0)) * p.spirit_charges
+                  + float(fx.get("shield_scaling", 0.0)) * p.eff_sp_attack()) * p.heal_power
         fmin, fmax = fx.get("fear", [0.6, 2.5])
         self.legion_waves.append({
             "caster_id": p.id, "team": p.team, "c": Vec2(origin.x, origin.y),

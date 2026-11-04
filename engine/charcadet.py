@@ -388,7 +388,7 @@ class CharcadetMixin:
             while fl["done"] < fl["hits"] and now >= fl["start"] + span * (fl["done"] + 0.5) / fl["hits"]:
                 fl["done"] += 1
                 before = t.hp + (t.shield if getattr(t, "shield_until", -1.0) > now else 0.0)
-                self._hit(p, fl["mv"], fl["rank"], t, mult=1.0 / fl["hits"])
+                self._hit(p, fl["mv"], fl["rank"], t)   # danno in JSON PER COLPO
                 dealt = max(0.0, before - t.hp - (t.shield if getattr(t, "shield_until", -1.0) > now
                                                   else 0.0))
                 heal = dealt * float(fl["mv"].effects.get("heal_ratio", 0.2))

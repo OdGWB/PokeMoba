@@ -2114,7 +2114,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         chi la lancia)."""
         dur = float(mv.effects.get("duration", 4.0))
         rad = mv.radius if mv.radius > 0 else 3.0
-        amt = self._rank_val(mv.effects.get("heal", []), rank)
+        amt = (self._rank_val(mv.effects.get("heal", []), rank)
+               + float(mv.effects.get("heal_scaling", 0.0)) * p.eff_sp_attack())   # per tick
         interval = float(mv.effects.get("interval", 1.0))
         self.area_effects.append({
             "center": Vec2(origin.x, origin.y), "radius": rad,
@@ -3530,7 +3531,10 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         hp_power = caster.heal_power if isinstance(caster, Pokemon) else 1.0
         heal = eff.get("heal")
         if heal:
-            amt = self._rank_val(heal, rank) * hp_power
+            amt = self._rank_val(heal, rank)
+            if isinstance(caster, Pokemon):
+                amt += float(eff.get("heal_scaling", 0.0)) * caster.eff_sp_attack()
+            amt *= hp_power
             if eff.get("weather_heal"):   # Sintesi: x2 col Sole, dimezzata con la Pioggia
                 w = self.jungle.weather
                 amt *= 2.0 if w == "sun" else (0.5 if w == "rain" else 1.0)
@@ -3541,7 +3545,10 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
                             mv.power_at(rank) * float(eff["heal_self_ratio"]) * hp_power)
         sh = eff.get("shield")
         if sh:
-            amt = self._rank_val(sh.get("amount", []), rank) * hp_power
+            amt = self._rank_val(sh.get("amount", []), rank)
+            if isinstance(caster, Pokemon):
+                amt += float(eff.get("shield_scaling", 0.0)) * caster.eff_sp_attack()
+            amt *= hp_power
             dur = float(sh.get("duration", 3.0))
             for a in targets:
                 self._give_shield(caster, a, amt, dur)   # Creta Luce

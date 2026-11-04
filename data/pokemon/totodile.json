@@ -22,26 +22,26 @@
   "moves": {
     "Q": {
       "base": {"id": "watergun", "name": "Pistolacqua", "type": "Water", "category": "special", "shape": "projectile",
-               "target": "direction", "power": [55, 85, 115, 145], "ratio": 0.5,
+               "target": "direction", "power": [44, 70, 90, 115], "ratio": 0.7,
                "cooldown": [4.5, 4, 3.5, 3], "range": 7, "radius": 0.5, "speed": 11},
       "upgrades": [
         {"id": "hydropump", "name": "Idropompa", "type": "Water", "category": "special", "shape": "projectile",
-         "target": "direction", "power": [110, 160, 210, 260], "ratio": 0.75,
+         "target": "direction", "power": [90, 130, 170, 210], "ratio": 1.25,
          "cooldown": [7, 6.5, 6, 5.5], "range": 10, "radius": 0.6, "speed": 13},
         {"id": "hydropulse", "name": "Idropulsar", "type": "Water", "category": "special", "shape": "bubble",
-         "target": "direction", "power": [80, 120, 160, 200], "ratio": 0.6,
+         "target": "direction", "power": [65, 95, 130, 160], "ratio": 0.95,
          "cooldown": [7, 6.5, 6, 5.5], "range": 8, "radius": 0.7, "speed": 9,
          "effects": {"confuse": {"duration": 0.9}}}
       ]
     },
     "W": {
       "base": {"id": "bite", "name": "Morso", "type": "Dark", "category": "physical", "shape": "cone",
-               "target": "direction", "power": [55, 85, 115, 145], "ratio": 0.9,
+               "target": "direction", "power": [44, 70, 90, 115], "ratio": 0.7,
                "cooldown": [5, 4.5, 4, 3.5], "range": 2.3, "angle": 55,
                "effects": {"stun": {"duration": 0.45}}},
       "upgrades": [
         {"id": "crunch", "name": "Sgranocchio", "type": "Dark", "category": "physical", "shape": "cone",
-         "target": "direction", "power": [90, 135, 180, 225], "ratio": 1.0,
+         "target": "direction", "power": [70, 110, 145, 180], "ratio": 1.1,
          "cooldown": [6, 5.5, 5, 4.5], "range": 2.6, "angle": 55,
          "effects": {"def_debuff": {"amount": 25, "duration": 3.5}}},
         {"id": "icefang", "name": "Gelodenti", "type": "Ice", "category": "none", "shape": "cone",
@@ -67,7 +67,7 @@
     "R": {
       "upgrades": [
         {"id": "dig", "name": "SUB", "type": "Water", "category": "physical", "shape": "sub",
-         "target": "point", "power": [220, 330, 440], "ratio": 0.9,
+         "target": "point", "power": [175, 265, 350], "ratio": 1.5,
          "cooldown": [85, 75, 65], "range": 6.5, "radius": 2.3,
          "_comment": "SUB: ci si inabissa (intargetabili) e si resta liberi di muoversi per 'duration' secondi; si riemerge a tempo o ri-premendo R, facendo danno ad area attorno al punto raggiunto.",
          "effects": {"untargetable": {"duration": 3.0}}},
