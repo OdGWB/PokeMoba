@@ -55,6 +55,7 @@ ROSTER = [
     "data/pokemon/sneasel.json",
     "data/pokemon/mienfoo.json",
     "data/pokemon/duraludon.json",
+    "data/pokemon/hatenna.json",
 ]
 DEFAULT_MAP = "data/maps/map_3v3.json"
 # Mappe selezionabili dalla lobby (nome, percorso).

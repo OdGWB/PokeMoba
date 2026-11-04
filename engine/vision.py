@@ -9,7 +9,8 @@ Per ogni squadra calcola:
 Regole:
   - Raggio visivo per entità (campo `vision`): Pokémon 9, torri 12, minion 6.
   - Cespugli (TILE_BUSH): un nemico dentro un cespuglio è invisibile ai nemici
-    fuori, a meno che un alleato non sia vicino (ci "sbircia" dentro).
+    fuori, a meno che un alleato non sia vicino (ci "sbircia" dentro) o che sia
+    AGITATO (passiva Quiete della linea Hatenna: lo agitano solo i nemici).
   - Le strutture non vengono nascoste (sono elementi fissi noti della mappa);
     la nebbia nasconde solo le unità nemiche.
 
@@ -59,6 +60,11 @@ class VisionSystem:
         # visione nemica anche senza muoversi di tile.
         sig |= frozenset(("inv", e.id) for e in world.entities.values()
                          if getattr(e, "invisible", False) and getattr(e, "team", team) != team)
+        # Quiete (Hatenna): un nemico agitato in un cespuglio resta visibile, quindi
+        # chi si agita/calma (o si muove agitato) cambia la visione.
+        sig |= frozenset(("agi", u.id, int(u.pos.x), int(u.pos.y))
+                         for u in world.entities.values()
+                         if getattr(u, "agitated", False) and getattr(u, "team", team) != team)
         # Ping attivi: i nemici dentro si muovono senza cambiare la firma delle
         # fonti, quindi finché ce n'è uno si ricalcola a ogni aggiornamento.
         reveals = self.reveals.get(team) or ()
@@ -101,7 +107,7 @@ class VisionSystem:
                 continue
             if getattr(u, "invisible", False):   # Memento: invisibile ai nemici
                 continue
-            if self.grid.tile_at(tx, ty) == TILE_BUSH:
+            if self.grid.tile_at(tx, ty) == TILE_BUSH and not getattr(u, "agitated", False):
                 # Visibile solo se un alleato è vicino (ci sbircia dentro).
                 if not any(e.pos.dist(u.pos) <= BUSH_REVEAL for e in sources):
                     continue

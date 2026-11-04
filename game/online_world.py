@@ -27,7 +27,7 @@ from sim.simulation import _nearest_walkable
 
 from .networld import NetWorld
 
-MOVING = ("projectiles", "avalanches", "spirit_beams", "swift_stars")
+MOVING = ("projectiles", "avalanches", "spirit_beams", "swift_stars", "moon_orbs")
 _WILD_COLORS = {"camp": (170, 160, 120), "meteo": (220, 180, 80), "arceus": (230, 220, 240)}
 
 
@@ -79,7 +79,8 @@ class OnlineWorld(NetWorld):
         self._last_t = None
         # Stato visivo (vedi net/visual.py).
         self.fxs = SimpleNamespace(**{n: [] for n in (*LISTS, "pain_binds", "wishes", "taxi_flights",
-                                                       "bear_leaps", "beam_charges")})
+                                                       "bear_leaps", "beam_charges",
+                                                       "trick_rooms")})
         self.respawning: list = []
         self.dead: set = set()
         self.me_vis: dict = {}

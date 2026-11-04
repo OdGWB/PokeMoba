@@ -16,8 +16,8 @@ from engine.entities import Core, Pillar, Pokemon, Structure, Unit
 from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
                          TILE_PUDDLE, TILE_RIVER, TILE_WALL)
 from . import spirit_fx
-from . import (arch_fx, charcadet_fx, corvi_fx, eevee_fx, mien_fx, noivern_fx, sneasel_fx,
-               ursa_fx)
+from . import (arch_fx, charcadet_fx, corvi_fx, eevee_fx, hatt_fx, mien_fx, noivern_fx,
+               sneasel_fx, ursa_fx)
 from . import structure_gfx
 from .fx import EMBER, ROCK_HI, ROCK_MID, ROCK_OUT, ROCK_SH, type_color
 from .map_renderer import MapRenderer
@@ -627,6 +627,8 @@ class Renderer:
         shape = move.shape
         if arch_fx.draw_aim(surface, S, ts, ox, oy, nx, ny, dist, move, hold, rain):
             return   # linea Duraludon
+        if hatt_fx.draw_aim(surface, S, ts, ox, oy, nx, ny, dist, move):
+            return   # linea Hatenna
         if shape == "rockwave":   # Rocciotomba: corsia dell'onda + pilastro in fondo
             ex, ey = ox + nx * rng, oy + ny * rng
             pygame.draw.line(surface, col, S(ox, oy), S(ex, ey), max(2, int(move.radius * ts)))
@@ -878,6 +880,7 @@ class Renderer:
                     sneasel_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # cure ridotte, Arraffalesto
                     mien_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # oggetti spenti, Rigenergia
                     arch_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # Conduzione, Tuono
+                    hatt_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # agitato, Magipolvere
                 if in_bush:
                     self._draw_hidden_hint(surface, e, gx, gy, now)
                 self._draw_unit_hp(surface, e, gx, gy, grow)
@@ -1036,6 +1039,8 @@ class Renderer:
             pips.append((214, 64, 80))     # cure ridotte (rosso)
         if getattr(u, "itemlock_until", -1) > now:
             pips.append((110, 76, 160))    # oggetti disattivati (Privazione: viola)
+        if getattr(u, "powder_until", -1) > now:
+            pips.append((236, 104, 190))   # tipo Psico (Magipolvere: rosa)
         if not pips:
             return
         r = int(u.radius * self.tile_size)

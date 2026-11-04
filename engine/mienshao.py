@@ -37,7 +37,7 @@ CRIT_HOLD = 5.0               # Individua: il brutto colpo garantito resta pront
 JUMP_PEAK = 0.9               # altezza del balzo di Calcinvolo (tile, solo grafica)
 MELEE_COUNTER = 1.8           # Contrattacco: "corpo a corpo" = bordo entro questa distanza
 # Mosse che viaggiano verso il bersaglio (Guardia Rapida le blocca sugli alleati).
-PROJ_SHAPES = {"projectile", "bubble", "fan", "arc", "spiritbeam", "swift", "armorcannon",
+PROJ_SHAPES = {"projectile", "moonorb", "bubble", "fan", "arc", "spiritbeam", "swift", "armorcannon",
                "bolt", "dragonpulse", "flashcannon"}
 
 

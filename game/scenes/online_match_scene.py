@@ -22,7 +22,7 @@ import config
 from net import client as C
 from net.prediction import Predictor
 
-from .. import arch_fx, hud
+from .. import arch_fx, hatt_fx, hud
 from ..fx import FXSystem
 from ..hud_passives import PassiveCtx, draw_passive
 from ..online_world import MovementModel, OnlineWorld
@@ -252,7 +252,8 @@ class OnlineMatchScene(NetMatchScene):
         draw_passive(surface, hud.font(13), me, px, py, ph, PassiveCtx(
             now=self.world.match_time, portrait=self._portrait,
             in_rain=bool(mv.get("in_rain")),
-            weather=CODE_WEATHER.get(h.get("weather", 0), "clear")))
+            weather=CODE_WEATHER.get(h.get("weather", 0), "clear"),
+            agitated=hatt_fx.count_agitated(self.world, me, self.world.match_time)))
 
     def _draw_disconnected(self, surface, font):
         """Etichetta sopra i Pokémon dei giocatori caduti."""

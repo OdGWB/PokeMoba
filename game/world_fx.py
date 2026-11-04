@@ -19,8 +19,8 @@ import pygame
 
 import config
 
-from . import (arch_fx, charcadet_fx, corvi_fx, eevee_fx, mien_fx, noivern_fx, sneasel_fx,
-               spirit_fx, ursa_fx)
+from . import (arch_fx, charcadet_fx, corvi_fx, eevee_fx, hatt_fx, mien_fx, noivern_fx,
+               sneasel_fx, spirit_fx, ursa_fx)
 from .fx import draw_avalanche, draw_sandstorm, type_color
 
 
@@ -135,6 +135,19 @@ def draw_world_effects(surface, camera, world, m, team, vision, now, player_id,
             arch_fx.draw_thunder_mark(surface, camera, tm, now)
     for ch in getattr(m, "beam_charges", ()):
         arch_fx.draw_beam_charge(surface, camera, ch, now)
+    # Linea Hatenna: Distortozona (visibile a tutti), Confusione in arrivo,
+    # carica della Strega della Foresta, sfere di Forza Lunare in volo.
+    for z in getattr(m, "trick_rooms", ()):
+        hatt_fx.draw_trick_room(surface, camera, z, now)
+    for z in getattr(m, "hatt_marks", ()):
+        if seen(z["c"], z["team"]):
+            hatt_fx.draw_mark(surface, camera, z, now)
+    for w in getattr(m, "witch_waves", ()):
+        if seen(w["c"], w["team"]):
+            hatt_fx.draw_witch_charge(surface, camera, w, now)
+    for o in getattr(m, "moon_orbs", ()):
+        if seen(o["pos"], o["team"]):
+            hatt_fx.draw_moon_orb(surface, camera, o, now)
 
 
 def draw_projectiles(surface, camera, m, now=0.0) -> None:

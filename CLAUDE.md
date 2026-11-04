@@ -772,6 +772,38 @@ Passaggi completati:
   "Danza-dipiume", "Elettro-raggio"). Le etichette della passiva usano
   hud.font(13) per stare tra le caselle e la barra della vita.
   Screenshot: step_41_hud, _gioco, _eevee, _mienfoo, _online.
+- LINEA HATENNA > HATTREM > HATTERENE (step_42), grafica nuova in
+  game/hatt_fx.py (logica in engine/hatterene.py). Sprite PMD Sprite Collab in
+  assets/pokemon/0856/0857/0858. Forme nuove in _draw_shapes (hatt_fx.SHAPES):
+  increspatura psichica schiacciata in prospettiva con 5 lobi che ruotano
+  (psywave: Confusione, Incantavoce, impatti), raggio di Psicoraggio
+  (psyband: corpo rosa + tre fili SOTTILI rosa/viola/azzurro a onda lunga; la
+  prima versione a fili spessi e onda corta sembrava una catena di perline),
+  nota musicale (note: Incantavoce), cuoricino in volo (heartfly:
+  Assorbibacio cura), onda della Strega con le CIOCCHE a uncino sul bordo
+  (witchring, svanisce in fretta: con alfa lineare restavano ragnatele sulla
+  mappa), falce di luna (moonarc: Forza Lunare a segno, disegnata SUL colpito,
+  non sul punto di contatto della sfera). Riusa twinkle (Mienfoo), windline
+  (Noibat), energy/flash/ring (fx.py). Disegni PERSISTENTI (world_fx):
+  Confusione in arrivo (area che si riempie + spirale a tre bracci; viola-blu
+  con Psicoshock), sfera LENTA di Forza Lunare (globo rosa con ombra a falce,
+  scia, ombra a terra; Magifiamma = palla di fiamma magenta), Distortozona
+  VISIBILE A TUTTI (scacchiera deformata che si torce al centro, bordo
+  tratteggiato che gira, frecce, barra del tempo; a scacchi troppo tenui non si
+  vedeva), carica della Strega (anello che si allarga + ciocche che si
+  arricciano verso l'esterno; dritte sembravano una gabbia). Sulle unità
+  (visibili a tutti): VENA DI RABBIA pixel art (bitmap 9x9 in cache, sopra la
+  barra) sugli AGITATI, brillantini viola + pallino rosa di Magipolvere (tipo
+  Psico). HUD: Quiete = cappello della linea, cornice rossa e "N agitati"
+  quando ci sono nemici agitati entro 10 tile (PassiveCtx.agitated). VISIONE:
+  campo `agitated` dell'unità -> VisionSystem non applica la regola dei
+  cespugli (solo la squadra nemica dell'agitato, che è quella di Hatterene).
+  Online: hatt_marks/moon_orbs/witch_waves in net/visual.LISTS (moon_orbs anche
+  in online_world.MOVING: avanza tra i pacchetti), trick_rooms a entrambe le
+  squadre, agitated in UNIT_FLAGS. Screenshot: step_42_* (draft_hatenna,
+  confusione/_arrivo, psicoraggio, incantavoce, magipolvere/_dopo,
+  assorbibacio, forzalunare/_volo/_piu, magifiamma/_volo, distortozona,
+  agitato, strega/_carica/_stordito, hud).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

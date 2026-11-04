@@ -368,6 +368,12 @@ class Pokemon(Unit):
     thunder_left: int = 0              # Tuono: fulmini ancora da lanciare
     thunder_until: float = -1.0        # Tuono: finestra dei rilanci
     thunder_cd: float = 0.0
+    # Linea Hatenna: Quiete (agitato), Magipolvere (tipo Psico temporaneo).
+    agitated_until: float = -1.0       # agitato (Quiete) fino a qui: visibile nei cespugli
+    agitated: bool = False             # aggiornato dal Match (per la visione)
+    powder_until: float = -1.0         # Magipolvere: tipo Psico fino a qui
+    powder_types: list | None = None   # tipi da rimettere a fine Magipolvere
+    powder_dex: int = 0
 
     def _bonus(self, stat: str) -> float:
         return (self.passive_bonus.get(stat, 0.0) + self.item_bonus.get(stat, 0.0)

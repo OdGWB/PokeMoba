@@ -38,6 +38,7 @@ LISTS = {
     "honey_zones": ("c", "team"), "quakes": ("c", "team"),
     "claw_leaps": ("c", "team"), "beatups": ("pos", "team"), "sludge_lobs": ("c", "team"),
     "mien_leaps": ("c", "team"), "wave_zones": ("c", "team"), "thunder_marks": ("c", "team"),
+    "hatt_marks": ("c", "team"), "moon_orbs": ("pos", "team"), "witch_waves": ("c", "team"),
 }
 # Campi solo di logica (oggetti del motore, insiemi di bersagli già colpiti).
 SKIP = {"mv", "hit", "touched", "since", "rank", "explode", "first", "caught"}
@@ -46,7 +47,7 @@ UNIT_FLAGS = {"air_z": 0.0, "sand_radius": 0.0, "invisible": False, "submerged":
               "spirit_awaken": 0, "smoke_hidden": False, "armor_blocks": 0, "echo_count": 0,
               "honey": 0, "guts_active": False,
               "snatch_down": 0, "snatch_up": 0, "mien_regen": False,
-              "arch_rain": False, "thunder_left": 0}
+              "arch_rain": False, "thunder_left": 0, "agitated": False}
 # Il proprio Pokémon: passive e ricariche mostrate nell'interfaccia.
 ME_FIELDS = ("passive_id", "soul_charges", "inversion_stacks", "muta_cd_until", "muta_cd_max",
              "form_until", "sandstorm_boost_until", "sand_radius", "spirit_charges",
@@ -124,6 +125,10 @@ def capture_visual(match, team: int, player=None) -> dict:
     charges = [_clean(ch) for ch in getattr(match, "beam_charges", ())]
     if charges:
         out["beam_charges"] = charges
+    # Distortozona (Hatterene): l'area la vedono tutti (cambia la velocità di tutti).
+    tricks = [_clean(z) for z in getattr(match, "trick_rooms", ())]
+    if tricks:
+        out["trick_rooms"] = tricks
     # Balzi della linea Teddiursa: l'atterraggio di Luna Piena lo vedono tutti.
     leaps = [_clean(lp) for lp in getattr(match, "bear_leaps", ())
              if lp.get("fx") == "fullmoon" or seen(lp["c"], lp["team"])]

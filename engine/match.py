@@ -32,6 +32,7 @@ from .ursaring import URSA_PASSIVES, UrsaringMixin
 from .sneasel import SNEASEL_PASSIVES, SneaselMixin
 from .mienshao import MIEN_PASSIVES, PROJ_SHAPES, MienshaoMixin
 from .archaludon import ARCH_PASSIVES, ArchaludonMixin
+from .hatterene import HATT_PASSIVES, HattereneMixin
 from .corviknight import CORVI_PASSIVES, CorviknightMixin
 from .eevee import EEVEE_PASSIVES, EeveeMixin
 from .item_effects import ItemEffectsMixin, cdr_to_haste
@@ -118,7 +119,7 @@ _SYNC_STATUSES = ("slow", "stun", "freeze", "confuse", "silence", "root", "sleep
 
 class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, NoivernMixin,
             UrsaringMixin, SneaselMixin, MienshaoMixin, ArchaludonMixin,
-            ItemEffectsMixin):
+            HattereneMixin, ItemEffectsMixin):
     def __init__(self, world, map_data):
         self.world = world
         self.map = map_data
@@ -157,6 +158,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self._init_sneasel()     # linea Sneasel: scavalcamenti, Picchiaduro, Sporcolancio
         self._init_mien()        # linea Mienfoo: balzi di Calcinvolo, Guardia Rapida
         self._init_arch()        # linea Duraludon: Tuononda, Elettroraggio, Tuono
+        self._init_hatt()        # linea Hatenna: Confusione, Forza Lunare, Distortozona, Strega
         self.vision = VisionSystem(self.world.grid)
         self._build_structures()
         self.jungle = JungleSystem(self)
@@ -213,6 +215,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self._update_sneasel(dt)     # Arraffalesto, Notte Fonda, Scalaroccia... (linea Sneasel)
         self._update_mien(dt)        # Calcinvolo, Rigenergia, Individua, Danza (linea Mienfoo)
         self._update_arch(dt)        # Tuononda, Elettroraggio, Tuono (linea Duraludon)
+        self._update_hatt(dt)        # Confusione, Forza Lunare, Distortozona, Quiete (linea Hatenna)
         self._update_rock_moves(dt)  # Rocciotomba / Pesobomba / Frana / Abbattimento
         self._update_spiritomb(dt)   # spiriti, Stordiraggio, Malcomune, Legione, Memento
         self._update_eevee(dt)       # Desiderio, Comete, Tuono, Bora, Divinazione, Idratazione
@@ -886,7 +889,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
 
     def _mitigate_hit(self, caster, target, raw: float, *, magic: bool,
                       crit_bonus: float = 0.0, can_crit: bool = False,
-                      pierce_guard: bool = False) -> float:
+                      pierce_guard: bool = False, vs_defense: bool = False) -> float:
         """Critico -> penetrazione difesa -> mitigazione -> riduzione fissa.
 
         La penetrazione (percentuale poi fissa/letalita') non porta mai la difesa
@@ -899,7 +902,9 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
                 raw *= CRIT_MULT
         if not isinstance(target, Pokemon):
             return max(1.0, raw)
-        defense = target.eff_sp_defense() if magic else target.eff_defense()
+        # Psicoshock: danno speciale mitigato dalla Difesa invece che dalla Dif. Sp.
+        defense = (target.eff_sp_defense() if magic and not vs_defense
+                   else target.eff_defense())
         if pierce_guard and not magic and target.def_buff_active and target.def_buff_mult > 0:
             defense /= target.def_buff_mult   # Finta: la difesa potenziata non conta
         if isinstance(caster, Pokemon):
@@ -1662,6 +1667,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         if p.spite_until > self.time:   # Dispetto: ricariche allungate
             ms.cooldown_remaining *= p.spite_mult
         mv = self._item_on_cast(p, mv, slot)   # Scelta, Assorbisfera, Grandelente (+portata)
+        self._hatt_on_cast(p)   # Quiete (Hatenna): lanciare vicino alla linea agita
         origin = Vec2(p.pos.x, p.pos.y)
         tgt = Vec2(tx, ty)
         to = tgt - origin
@@ -1693,7 +1699,9 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
                 "sleevedance": "Twirl", "reversal": "Attack",
                 "flashcannon": "Shoot", "thunderwave": "Shoot", "dragontail": "Swing",
                 "metalsound": "Charge", "irondefense": "Charge", "electroshot": "Charge",
-                "thunderstorm": "Shoot"}.get(shape)
+                "thunderstorm": "Shoot",
+                "psyburst": "Shoot", "psybeam": "Shoot", "hattvoice": "Swing",
+                "moonorb": "Shoot", "trickroom": "Charge", "witchwave": "Charge"}.get(shape)
         if anim:
             self.fx_events.append({"eid": p.id, "anim": anim})
         # Gli eventi visivi aggiunti dai _cast_* qui sotto vengono "taggati" con lo
@@ -1784,6 +1792,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             pass   # linea Mienfoo (engine/mienshao.py)
         elif self._arch_cast(p, mv, rank, origin, tgt, dirv):
             pass   # linea Duraludon (engine/archaludon.py)
+        elif self._hatt_cast(p, mv, rank, origin, tgt, dirv):
+            pass   # linea Hatenna (engine/hatterene.py)
         elif shape == "buff":
             self._apply_support(p, mv, rank, origin)
             self.fx_events.append({"kind": "buff", "c": (origin.x, origin.y),
@@ -3376,6 +3386,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             if "execute" in fx and getattr(target, "max_hp", 0) > 0:
                 raw *= 1.0 + float(fx["execute"]) * (1.0 - target.hp / target.max_hp)
             raw *= mult
+            raw *= self._hatt_dmg_mult(caster, target, mv)   # Quiete / Strega della Foresta
             raw *= self._item_move_mult(caster, mv, target, eff)   # Scelta, Metronomo, ...
             crit_bonus = HIGH_CRIT_CHANCE if mv.d.get("high_crit") else 0.0
             crit_bonus += float(mv.d.get("crit_bonus", 0.0))   # Lacerazione: +20%
@@ -3384,7 +3395,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             self._shield_break(target, fx)   # Bruciatutto: brucia parte dello scudo
             dmg = self._mitigate_hit(caster, target, raw, magic=magic,
                                      crit_bonus=crit_bonus, pierce_guard=guard,
-                                     can_crit=bool(mv.d.get("can_crit")))   # Aerasoio
+                                     can_crit=bool(mv.d.get("can_crit")),   # Aerasoio
+                                     vs_defense=bool(mv.d.get("vs_defense")))   # Psicoshock
             self._deal_damage(caster, target, dmg, dmg_type=mv.type, ignore_shield=guard)
             self._vamp(caster, dmg, physical=not magic)
             self._item_after_move_hit(caster, mv, target, eff)   # Assorbisfera, Vulnerassicurazione
@@ -3492,6 +3504,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             self._steal_buff(caster, target)
         self._charcadet_hit_effects(caster, target, fx)   # Lavasbuffo: scottatura
         self._sneasel_hit_effects(caster, target, fx)   # Furto, Dire Claw, cure ridotte
+        self._hatt_hit_effects(caster, target, fx)   # Magifiamma: -Att. Sp.
 
     def _apply_support(self, caster, mv, rank, center) -> None:
         """Effetti su sé/alleati: cura, scudo, buff attacco/velocità."""
@@ -3818,6 +3831,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
                        * self.jungle.terrain_speed_mult(p))
             if p.passive_id == "nuotovelox" and self._in_rain(p):
                 p.speed *= NUOTOVELOX_SPEED   # +20% in acqua/pioggia
+            p.speed *= self._hatt_speed_mult(p)   # Distortozona (Hatterene)
             # Nitrocarica: cariche di velocità cumulabili (scadono insieme).
             if p.fc_until > self.time and p.fc_stacks > 0:
                 p.speed *= 1.0 + p.fc_per * p.fc_stacks
@@ -3894,6 +3908,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         if p.passive_id in MIEN_PASSIVES and self._bot_mien_cast(p, target):
             return
         if p.passive_id in ARCH_PASSIVES and self._bot_arch_cast(p, target):
+            return
+        if p.passive_id in HATT_PASSIVES and self._bot_hatt_cast(p, target):
             return
         for slot in ("R", "Q", "W", "E"):
             ms = p.moveset.get(slot)

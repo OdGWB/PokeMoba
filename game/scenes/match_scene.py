@@ -28,7 +28,7 @@ from ..camera import Camera
 from ..fx import FXSystem
 from ..input_controller import InputController
 from ..minimap import Minimap
-from .. import arch_fx, eevee_fx, spirit_fx
+from .. import arch_fx, eevee_fx, hatt_fx, spirit_fx
 from ..particles import ParticleSystem
 from ..renderer import Renderer
 from ..shop_ui import ShopUI
@@ -617,7 +617,10 @@ class MatchScene:
         px, py, ph = lay.passive_at
         draw_passive(surface, hud.font(13), p, px, py, ph, PassiveCtx(
             now=self.match.time, portrait=self._portrait, in_rain=self.match._in_rain(p),
-            weather=self.match.jungle.weather))
+            weather=self.match.jungle.weather,
+            agitated=hatt_fx.count_agitated(
+                self.world, p, self.match.time,
+                lambda e: self.match.vision.is_enemy_visible(p.team, e.id))))
         # Popup delle evoluzioni: in fila sopra la barra, mai sovrapposti.
         evo = [sl for sl in ("Q", "W", "E", "R")
                if sl in p.pending_choices and p.moveset.get(sl) and p.moveset[sl].upgrades]

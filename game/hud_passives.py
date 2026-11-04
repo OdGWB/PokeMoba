@@ -16,7 +16,7 @@ import pygame
 
 from engine.eevee import eevee_candidates, eevee_forms
 
-from . import arch_fx, eevee_fx, mien_fx, sneasel_fx, ursa_fx
+from . import arch_fx, eevee_fx, hatt_fx, mien_fx, sneasel_fx, ursa_fx
 
 
 @dataclass
@@ -25,6 +25,7 @@ class PassiveCtx:
     portrait: Callable           # (sprite_dir, lato) -> Surface o None
     in_rain: bool = False
     weather: str = "clear"
+    agitated: int = 0            # Quiete: nemici agitati visibili (linea Hatenna)
 
 
 def draw_passive(surface, font, p, bx, y0, bh, ctx) -> None:
@@ -145,6 +146,10 @@ def draw_passive(surface, font, p, bx, y0, bh, ctx) -> None:
     # Linea Duraludon: Conduzione (pioggia), fulmini di Tuono, carica di Elettroraggio.
     if p.passive_id == "conduzione":
         _draw_conduct(surface, font, p, bx, y0, bh, ctx)
+
+    # Linea Hatenna: Quiete (nemici agitati vicino).
+    if p.passive_id == "quiete":
+        _draw_quiet(surface, font, p, bx, y0, bh, ctx)
 
     # Linea Teddiursa: Miele (vasetti) e, da Ursaring, Dentistretti.
     if p.passive_id in ("miele", "dentistretti"):
@@ -513,5 +518,23 @@ def _draw_conduct(surface, font, p, bx, y0, bh, ctx) -> None:
         frame = arch_fx.ELEC_HI
         if not (left > 0 and t_left > 0):
             name = "Att. Sp. +30%"
+    pygame.draw.rect(surface, frame, box, 2)
+    surface.blit(font.render(name, True, frame), (bx - 4, y0 - 18))
+
+
+def _draw_quiet(surface, font, p, bx, y0, bh, ctx) -> None:
+    """Quiete (Hatenna/Hattrem/Hatterene): cappello della linea su fondo
+    viola; con nemici agitati entro 10 tile (ctx.agitated) la cornice diventa
+    rossa, compare il segno di rabbia e il numero."""
+    box = pygame.Rect(bx, y0, bh, bh)
+    cx, cy = box.center
+    n = int(getattr(ctx, "agitated", 0))
+    pygame.draw.rect(surface, (44, 24, 48) if n else (30, 24, 40), box)
+    hatt_fx.draw_hat_icon(surface, cx - 3, cy + 2, max(6, bh // 4))
+    frame = hatt_fx.ANGER if n else (200, 150, 210)
+    name = "Quiete"
+    if n:
+        hatt_fx.draw_anger(surface, box.right - 9, box.top + 9)
+        name = f"Quiete: {n} agitat{'o' if n == 1 else 'i'}"
     pygame.draw.rect(surface, frame, box, 2)
     surface.blit(font.render(name, True, frame), (bx - 4, y0 - 18))
