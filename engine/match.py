@@ -118,6 +118,38 @@ _SYNC_STATUSES = ("slow", "stun", "freeze", "confuse", "silence", "root", "sleep
                   "spdef_debuff", "blind")
 
 
+
+# Animazione dello sprite al lancio, per forma della mossa (modificabile per
+# Pokémon e mossa dall'editor delle animazioni: game/anim_tuning.py).
+CAST_ANIMS = {"projectile": "Shoot", "bubble": "Shoot",
+            "cone": "Attack", "dash": "Attack", "bolt": "Shoot",
+            "curse": "Shoot", "fan": "Shoot", "dashback": "Attack",
+            "rain": "Shoot", "storm": "Shoot", "leap": "Attack",
+            "arc": "Shoot", "throwback": "Attack", "raindance": "Charge",
+            "healzone": "Charge", "flamethrower": "Shoot", "smoke": "Charge",
+            "fly": "Charge", "rockwave": "Attack", "smackdown": "Attack",
+            "sandboost": "Charge", "spikes": "Shoot", "rockcharge": "Attack",
+            "avalanche": "Shoot", "explosion": "Charge",
+            "spiritbeam": "Shoot", "painsplit": "Charge", "legion": "Charge",
+            "memento": "Charge", "wish": "Charge", "endure": "Charge",
+            "thunder": "Shoot", "blizzard": "Shoot", "futuresight": "Charge",
+            "moonlight": "Charge", "gleam": "Charge",
+            "acidarmor": "Charge", "defog": "Shoot", "tailwind": "Shoot",
+            "roost": "Charge", "taxi": "Charge",
+            "nightshade": "Shoot", "clearsmog": "Shoot", "armorcannon": "Charge",
+            "floatarmor": "Charge", "psychic": "Shoot", "grudgeblade": "Attack",
+            "shadowclaw": "Charge", "dragonpulse": "Shoot", "whirlwind": "Charge",
+            "hurricane": "Shoot", "dracometeor": "Charge",
+            "honeyscent": "Shoot", "rest": "Sleep", "earthquake": "Rumble",
+            "nightslash": "Attack", "nightfall": "Charge", "beatup": "Attack",
+            "sludgelob": "Shoot", "detect": "Charge", "fakeout": "Strike",
+            "sleevedance": "Twirl", "reversal": "Attack",
+            "flashcannon": "Shoot", "thunderwave": "Shoot", "dragontail": "Swing",
+            "metalsound": "Charge", "irondefense": "Charge", "electroshot": "Charge",
+            "thunderstorm": "Shoot",
+            "psyburst": "Shoot", "psybeam": "Shoot", "hattvoice": "Swing",
+            "moonorb": "Shoot", "trickroom": "Charge", "witchwave": "Charge"}
+
 class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, NoivernMixin,
             UrsaringMixin, SneaselMixin, MienshaoMixin, ArchaludonMixin,
             HattereneMixin, BasicAttackMixin, ItemEffectsMixin):
@@ -1701,36 +1733,10 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         dirv = to.normalized() if to.length() > 1e-6 else Vec2(1.0, 0.0)
         p.facing = direction_index(dirv.x, dirv.y)
         shape = mv.shape
-        anim = {"projectile": "Shoot", "bubble": "Shoot",
-                "cone": "Attack", "dash": "Attack", "bolt": "Shoot",
-                "curse": "Shoot", "fan": "Shoot", "dashback": "Attack",
-                "rain": "Shoot", "storm": "Shoot", "leap": "Attack",
-                "arc": "Shoot", "throwback": "Attack", "raindance": "Charge",
-                "healzone": "Charge", "flamethrower": "Shoot", "smoke": "Charge",
-                "fly": "Charge", "rockwave": "Attack", "smackdown": "Attack",
-                "sandboost": "Charge", "spikes": "Shoot", "rockcharge": "Attack",
-                "avalanche": "Shoot", "explosion": "Charge",
-                "spiritbeam": "Shoot", "painsplit": "Charge", "legion": "Charge",
-                "memento": "Charge", "wish": "Charge", "endure": "Charge",
-                "thunder": "Shoot", "blizzard": "Shoot", "futuresight": "Charge",
-                "moonlight": "Charge", "gleam": "Charge",
-                "acidarmor": "Charge", "defog": "Shoot", "tailwind": "Shoot",
-                "roost": "Charge", "taxi": "Charge",
-                "nightshade": "Shoot", "clearsmog": "Shoot", "armorcannon": "Charge",
-                "floatarmor": "Charge", "psychic": "Shoot", "grudgeblade": "Attack",
-                "shadowclaw": "Charge", "dragonpulse": "Shoot", "whirlwind": "Charge",
-                "hurricane": "Shoot", "dracometeor": "Charge",
-                "honeyscent": "Shoot", "rest": "Sleep", "earthquake": "Rumble",
-                "nightslash": "Attack", "nightfall": "Charge", "beatup": "Attack",
-                "sludgelob": "Shoot", "detect": "Charge", "fakeout": "Strike",
-                "sleevedance": "Twirl", "reversal": "Attack",
-                "flashcannon": "Shoot", "thunderwave": "Shoot", "dragontail": "Swing",
-                "metalsound": "Charge", "irondefense": "Charge", "electroshot": "Charge",
-                "thunderstorm": "Shoot",
-                "psyburst": "Shoot", "psybeam": "Shoot", "hattvoice": "Swing",
-                "moonorb": "Shoot", "trickroom": "Charge", "witchwave": "Charge"}.get(shape)
-        if anim:
-            self.fx_events.append({"eid": p.id, "anim": anim})
+        anim = CAST_ANIMS.get(shape)
+        # Anche senza animazione di default: l'editor delle animazioni puo'
+        # assegnarne una alla mossa ("move" = id, tag solo cosmetico).
+        self.fx_events.append({"eid": p.id, "anim": anim or "", "move": mv.id})
         # Gli eventi visivi aggiunti dai _cast_* qui sotto vengono "taggati" con lo
         # stile FX della mossa (campo "fx" nel JSON), così il client può disegnare
         # una forma dedicata e ricolorata invece del raggio/cerchio generico.
@@ -1845,10 +1851,14 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             dur = float(sr.get("duration", 1.0))
             p.stop()
             p.stun_until = max(p.stun_until, self.time + dur)
-        if mv.fx:
-            for ev in self.fx_events[_fx0:]:
-                if "kind" in ev:
+        for ev in self.fx_events[_fx0:]:
+            if "kind" in ev:
+                if mv.fx:
                     ev.setdefault("fx", mv.fx)
+                # Chi l'ha lanciata e quale mossa: solo per le regolazioni VISIVE
+                # dell'editor delle animazioni (punto di partenza del proiettile).
+                ev.setdefault("src", p.id)
+                ev.setdefault("move", mv.id)
 
     def _cast_sub(self, p, mv, rank, origin, tgt, dirv):
         """SUB: si inabissa (non bersagliabile e inattaccabile) ma resta

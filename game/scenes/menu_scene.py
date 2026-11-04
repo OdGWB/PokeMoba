@@ -1,7 +1,8 @@
-"""Menu principale di PokéMoba: titolo e cinque voci.
+"""Menu principale di PokéMoba: titolo e sei voci.
 
 Gioca (mappa, offline / online / LAN: play_scene.py), Personalizzazione
-(nickname e immagine profilo), Crediti, Tier list ed Esci. Frecce + Invio o
+(nickname e immagine profilo), Crediti, Tier list, Animazioni (editor delle
+animazioni, anim_editor_scene.py) ed Esci. Frecce + Invio o
 clic. In alto a destra il profilo. Qui restano anche i colori e la miniatura
 delle mappe, usati dalla schermata Gioca.
 """
@@ -54,7 +55,7 @@ def map_thumbnail(path):
 
 
 ENTRIES = [("Gioca", "play"), ("Personalizzazione", "profile"), ("Crediti", "credits"),
-           ("Tier list", "tier"), ("Esci", "quit")]
+           ("Tier list", "tier"), ("Animazioni", "anims"), ("Esci", "quit")]
 
 
 class MenuScene:
@@ -101,6 +102,9 @@ class MenuScene:
         elif key == "tier":
             from .tier_scene import TierChoiceScene
             self.next_scene = TierChoiceScene(self.app)
+        elif key == "anims":
+            from .anim_editor_scene import AnimEditorScene
+            self.next_scene = AnimEditorScene(self.app, back=MenuScene(self.app))
         elif key == "quit":
             self.quit_app = True
 
@@ -149,9 +153,9 @@ class MenuScene:
         surface.blit(sub, (tx - sub.get_width() // 2, ty + sh.get_height() + 4))
 
         bf = self._font(max(22, H // 26), bold=True)
-        bw, bh = min(int(W * 0.34), 460), max(44, H // 12)
-        gap = max(10, H // 70)
-        y0 = int(H * 0.38)
+        bw, bh = min(int(W * 0.34), 460), max(40, H // 14)
+        gap = max(8, H // 80)
+        y0 = int(H * 0.33)
         self._rects = []
         for i, (label, key) in enumerate(ENTRIES):
             r = pygame.Rect(tx - bw // 2, y0 + i * (bh + gap), bw, bh)

@@ -804,6 +804,30 @@ Passaggi completati:
   confusione/_arrivo, psicoraggio, incantavoce, magipolvere/_dopo,
   assorbibacio, forzalunare/_volo/_piu, magifiamma/_volo, distortozona,
   agitato, strega/_carica/_stordito, hud).
+- EDITOR DELLE ANIMAZIONI (step_43), menu principale -> "Animazioni"
+  (game/scenes/anim_editor_scene.py). Si sceglie un Pokémon (tutte le cartelle
+  di assets/pokemon + i minion; ricerca scrivendo il nome) e un'azione: Fermo,
+  Camminata, Attacco base o una delle mosse della sua linea (prese dai JSON del
+  roster, slot Q/W/E/R). Per ognuna, SOLO VISIVO: animazione PMD da usare,
+  velocita' (x0,10..x5,00), taglio (primo/ultimo fotogramma), e per attacco base
+  e mosse il fotogramma del proiettile + il punto di partenza (clic
+  sull'anteprima, misurato rivolto a destra: [avanti, su] in px sprite, ruota con
+  la direzione). Anteprima ingrandita NEAREST con proiettile di prova, timeline
+  con miniature (tagliati scuri, proiettile in oro, durate). Salvataggio in
+  data/anim_overrides.json; formato e regole in game/anim_tuning.py. IN GIOCO:
+  AnimationSet.key = nome cartella; SpriteAnimator legge la tabella (cache per
+  versione) -> Idle/Walk con anim/velocita'/taglio, play_once(..., action=) per
+  "aa"/"move:<id>". Il motore tagga SOLO eventi cosmetici: evento anim del lancio
+  con "move" (emesso anche se la forma non ha animazione: l'editor puo'
+  assegnarla), eventi della mossa con "src"/"move", anim dell'attacco base con
+  "aa", rilascio "attack" con "src"; CAST_ANIMS (forma -> anim) e' ora una
+  costante di engine/match.py. anim_tuning.FxTuner (MatchScene e
+  OnlineMatchScene): sposta "a" al punto scelto, all'attacco base fa saltare
+  l'animazione al fotogramma del proiettile (snap_release), per le mosse
+  RITARDA l'effetto visivo fino a quel fotogramma (max 0,6 s; il danno resta
+  quello del motore). Velocita' di movimento/attacco e tempi invariati.
+  AnimData.xml: letto anche <HitFrame> (pulsante "colpo del file").
+  Screenshot: step_43_menu, step_43_editor_idle/_mossa/_aa/_rayquaza.
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

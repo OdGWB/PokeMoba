@@ -16,6 +16,7 @@ import pygame
 
 from engine.vec import DIR_VECTORS
 
+from .. import anim_tuning
 from .spritesheet import AnimationSet
 
 # Un'unità di durata PMD vale circa 1/30 di secondo (ritmo d'animazione).
@@ -36,14 +37,51 @@ class SpriteAnimator:
         self.oneshot_speed = 1.0          # moltiplicatore di velocità (es. Hop veloce)
         self.frozen = False               # True = resta fermo sul frame corrente (morte)
         self.pose: str | None = None      # posa continua al posto di Idle/Walk (es. Sleep)
+        # Regolazioni dell'editor delle animazioni (anim_tuning): solo visive.
+        self._cfg = None            # voce dell'azione in corso (o None)
+        self._action = None         # "idle" | "walk" | "aa" | "move:<id>" | None
+        self._lo, self._hi = 0, None   # fotogrammi tenuti dopo il taglio
+        self._tv = -1               # versione della tabella in cache
+        self._tune: dict = {}
 
-    def play_once(self, name: str, speed: float = 1.0) -> None:
-        """Riproduce un'animazione una sola volta (a `speed`x), poi torna a Idle/Walk."""
-        if self.anim_set.has(name) and self.oneshot != name:
+    def _tuning(self, action):
+        if not action:
+            return None
+        if self._tv != anim_tuning.version:
+            self._tv = anim_tuning.version
+            self._tune = anim_tuning.table(getattr(self.anim_set, "key", None))
+        return self._tune.get(action)
+
+    def _set_range(self, cfg, anim) -> None:
+        n = anim.frame_count if anim is not None else 0
+        self._lo, self._hi = anim_tuning.frame_range(cfg, n)
+
+    def play_once(self, name: str, speed: float = 1.0, action: str | None = None) -> None:
+        """Riproduce un'animazione una sola volta (a `speed`x), poi torna a Idle/Walk.
+        `action` ("aa" o "move:<id>") applica le regolazioni dell'editor."""
+        cfg = self._tuning(action)
+        if cfg:
+            if cfg.get("anim") and self.anim_set.has(cfg["anim"]):
+                name = cfg["anim"]
+            speed *= anim_tuning.speed_of(cfg)
+        if name and self.anim_set.has(name) and self.oneshot != name:
             self.oneshot = name
-            self.oneshot_speed = max(0.1, speed)
+            self.oneshot_speed = max(0.05, speed)
             self.state = name
-            self.frame = 0
+            self._cfg, self._action = cfg, action
+            self._set_range(cfg, self.anim_set.get(name))
+            self.frame = self._lo
+            self.timer = 0.0
+
+    def snap_release(self) -> None:
+        """Il colpo e' partito: se l'animazione non e' ancora al fotogramma del
+        proiettile (regolato nell'editor), ci salta subito."""
+        if not self.oneshot or not self._cfg:
+            return
+        anim = self.anim_set.get(self.state)
+        r = anim_tuning.release_frame(self._cfg, anim.frame_count if anim else 0)
+        if r is not None and self.frame < r:
+            self.frame = r
             self.timer = 0.0
 
     def freeze(self, name: str) -> None:
@@ -54,6 +92,8 @@ class SpriteAnimator:
             self.oneshot = None
             self.frozen = True
             anim = self.anim_set.get(name)
+            self._cfg, self._action = None, None
+            self._set_range(None, anim)
             self.frame = max(0, anim.frame_count - 1)
 
     def _frame_surface(self, state, direction, idx, frame):
@@ -85,17 +125,30 @@ class SpriteAnimator:
         self.facing = facing
         if self.frozen:            # morte: nessun avanzamento, resta sulla posa Hurt
             return
-        target = self.oneshot if self.oneshot else self._resolve_state(moving)
-        if target != self.state:
+        if self.oneshot:
+            target, action, cfg = self.oneshot, self._action, self._cfg
+        else:
+            target = self._resolve_state(moving)
+            posed = bool(self.pose) and target == self.pose
+            action = None if posed else ("walk" if moving else "idle")
+            cfg = self._tuning(action)
+            if cfg and cfg.get("anim") and self.anim_set.has(cfg["anim"]):
+                target = cfg["anim"]
+        if target != self.state or action != self._action:
             self.state = target
-            self.frame = 0
+            self._cfg, self._action = cfg, action
+            self._set_range(cfg, self.anim_set.get(target))
+            self.frame = self._lo
             self.timer = 0.0
 
         anim = self.anim_set.get(self.state)
         if anim is None or anim.frame_count == 0:
             self.oneshot = None
             return
-        self.timer += dt * (self.oneshot_speed if self.oneshot else 1.0)
+        lo = min(self._lo, anim.frame_count - 1)
+        hi = anim.frame_count - 1 if self._hi is None else min(self._hi, anim.frame_count - 1)
+        speed = self.oneshot_speed if self.oneshot else anim_tuning.speed_of(self._cfg)
+        self.timer += dt * speed
         # Avanza finché il tempo accumulato copre la durata del frame corrente.
         while True:
             cur_dur = max(1, anim.durations[self.frame % anim.frame_count]) * DURATION_UNIT
@@ -103,13 +156,13 @@ class SpriteAnimator:
                 break
             self.timer -= cur_dur
             self.frame += 1
-            if self.frame >= anim.frame_count:
+            if self.frame > hi:
                 if self.oneshot:              # una tantum finita: torna a Idle/Walk
                     self.oneshot = None
-                    self.frame = anim.frame_count - 1
+                    self.frame = hi
                     self.timer = 0.0
                     break
-                self.frame = 0                # animazione normale: in loop
+                self.frame = lo               # animazione normale: in loop
         self.frame %= anim.frame_count
 
     def draw(self, surface: pygame.Surface, sx: int, sy: int, alpha: int = 255,
@@ -164,10 +217,10 @@ class GroupAnimator(SpriteAnimator):
         super().__init__(anim_set, scale)
         self.companions = list(companions)   # [(SpriteAnimator, dx, dy)]
 
-    def play_once(self, name, speed=1.0):
-        super().play_once(name, speed)
+    def play_once(self, name, speed=1.0, action=None):
+        super().play_once(name, speed, action)
         for c, _, _ in self.companions:
-            c.play_once(name, speed)
+            c.play_once(name, speed, action)
 
     def update(self, dt, moving, facing):
         super().update(dt, moving, facing)
@@ -192,7 +245,10 @@ class FallbackAnimator:
         self.radius = max(4, radius_px)
         self.facing = 0
 
-    def play_once(self, name: str) -> None:
+    def play_once(self, name: str, speed: float = 1.0, action=None) -> None:
+        pass
+
+    def snap_release(self) -> None:
         pass
 
     def update(self, dt: float, moving: bool, facing: int) -> None:

@@ -163,7 +163,7 @@ class BasicAttackMixin:
         u.aa_until = self.time + windup * self._item_aa_windup(u)   # Rapidartigli: 0
         u.attack_timer = cycle            # il ciclo parte dall'inizio dell'attacco
         self._face(u, t)
-        self.fx_events.append({"eid": u.id, "anim": "Attack"})   # avvia l'anim
+        self.fx_events.append({"eid": u.id, "anim": "Attack", "aa": True})   # avvia l'anim
 
     def _aa_release(self, u, tgt) -> None:
         """Fine del caricamento: colpo (corpo a corpo) o proiettile (distanza)."""
@@ -181,7 +181,7 @@ class BasicAttackMixin:
         mt = u.types[0] if u.types else "Normal"
         self.fx_events.append({"kind": "attack", "a": (u.pos.x, u.pos.y),
                                "b": (tgt.pos.x, tgt.pos.y), "mtype": mt,
-                               "melee": melee,
+                               "melee": melee, "src": u.id,
                                "fx": "shadowclawhit" if snap["claws"] else u.attack_fx})
         if melee:
             self._aa_land(u, tgt, snap)

@@ -43,6 +43,7 @@ class AnimInfo:
     frame_height: int = 0
     durations: list[int] = field(default_factory=list)  # durata di ogni frame (in tick)
     copy_of: str | None = None
+    hit_frame: int = -1     # <HitFrame> del file (fotogramma del colpo), -1 = assente
 
     @property
     def frame_count(self) -> int:
@@ -91,6 +92,7 @@ def parse_anim_data(path: str | Path) -> dict[str, AnimInfo]:
             frame_height=_text_int(anim, "FrameHeight", 0),
             durations=durations,
             copy_of=copy_of,
+            hit_frame=_text_int(anim, "HitFrame", -1),
         )
 
     # Risolvi i CopyOf (anche a catena, con protezione dai cicli).
@@ -113,5 +115,7 @@ def _resolve_copy(info: AnimInfo, table: dict[str, AnimInfo], seen: set[str]) ->
         info.frame_height = src.frame_height
     if not info.durations:
         info.durations = list(src.durations)
+    if info.hit_frame < 0:
+        info.hit_frame = src.hit_frame
     # Il foglio da cui tagliare resta quello dell'anim sorgente.
     info.copy_of = src.name

@@ -22,6 +22,7 @@ NUM_DIRECTIONS = 8
 class LoadedAnim:
     frames: list[list[pygame.Surface]]  # frames[direction][frame_idx]
     durations: list[int]                # durata (in unità) di ogni frame
+    hit_frame: int = -1                 # <HitFrame> di AnimData.xml (-1 = assente)
 
     @property
     def frame_count(self) -> int:
@@ -31,8 +32,11 @@ class LoadedAnim:
 class AnimationSet:
     """Tutte le animazioni di un Pokémon, pronte per il rendering."""
 
-    def __init__(self, anims: dict[str, LoadedAnim]):
+    def __init__(self, anims: dict[str, LoadedAnim], key: str | None = None):
         self.anims = anims
+        # Nome della cartella sprite (es. "0856"): chiave delle regolazioni
+        # dell'editor delle animazioni (game/anim_tuning.py).
+        self.key = key
 
     def has(self, name: str) -> bool:
         return name in self.anims
@@ -81,11 +85,12 @@ def load_pokemon_animations(sprite_dir: str | Path) -> AnimationSet | None:
         sheet = sheet_cache[sheet_name]
         frames = _cut_frames(sheet, info.frame_width, info.frame_height, info.frame_count)
         if frames:
-            loaded[info.name] = LoadedAnim(frames=frames, durations=list(info.durations))
+            loaded[info.name] = LoadedAnim(frames=frames, durations=list(info.durations),
+                                         hit_frame=info.hit_frame)
 
     if not loaded:
         return None
-    return AnimationSet(loaded)
+    return AnimationSet(loaded, key=d.name)
 
 
 def _cut_frames(sheet: pygame.Surface, fw: int, fh: int, frame_count: int) -> list[list[pygame.Surface]]:

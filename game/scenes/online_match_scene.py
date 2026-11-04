@@ -22,7 +22,7 @@ import config
 from net import client as C
 from net.prediction import Predictor
 
-from .. import arch_fx, hatt_fx, hud
+from .. import anim_tuning, arch_fx, hatt_fx, hud
 from ..fx import FXSystem
 from ..hud_passives import PassiveCtx, draw_passive
 from ..online_world import MovementModel, OnlineWorld
@@ -49,6 +49,8 @@ class OnlineMatchScene(NetMatchScene):
         session.on_frame = self.world.push_frame
         session.on_command = self._on_command
         self.fx = FXSystem()
+        # Regolazioni visive dell'editor delle animazioni (partenza proiettili).
+        self._fx_tuner = anim_tuning.FxTuner(config.TILE_SIZE)
         self.show_debug = True
         self.slot_panel = None
         self._acc = 0.0
@@ -98,6 +100,10 @@ class OnlineMatchScene(NetMatchScene):
         from .menu_scene import MenuScene
         self.next_scene = MenuScene(self.app)
 
+    def _unit_pos(self, uid):
+        u = self.world.get(int(uid))
+        return (u.pos.x, u.pos.y) if u is not None else None
+
     # --- aggiornamento --------------------------------------------------------------------
     def update(self, dt):
         # Predizione a tick fissi, come l'host (1/30 s), prima di ricevere gli
@@ -110,14 +116,21 @@ class OnlineMatchScene(NetMatchScene):
         if self.session.fx_queue:
             events, self.session.fx_queue = self.session.fx_queue, []
             for e in events:
-                eid, name = e.get("eid"), e.get("anim")
-                if eid is not None and name:
+                eid = e.get("eid")
+                if eid is not None and "anim" in e:
                     anim = self.animators.get(int(eid))
                     if isinstance(anim, SpriteAnimator):
-                        anim.play_once(name, float(e.get("anim_speed", 1.0)))
+                        anim_tuning.trigger_anim(anim, e)
             try:
-                self.fx.spawn_events(events)
+                self.fx.spawn_events(self._fx_tuner.process(
+                    events, self.animators, self._unit_pos))
             except Exception:       # evento cosmetico incompleto: si salta
+                pass
+        late = self._fx_tuner.due(dt)   # proiettili in attesa del loro fotogramma
+        if late:
+            try:
+                self.fx.spawn_events(late)
+            except Exception:
                 pass
         update_world_fx(self.fx, self.world.fxs, self.world.match_time)
         self._update_deaths(dt)

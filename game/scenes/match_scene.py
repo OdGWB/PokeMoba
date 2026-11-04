@@ -28,7 +28,7 @@ from ..camera import Camera
 from ..fx import FXSystem
 from ..input_controller import InputController
 from ..minimap import Minimap
-from .. import arch_fx, eevee_fx, hatt_fx, spirit_fx
+from .. import anim_tuning, arch_fx, eevee_fx, hatt_fx, spirit_fx
 from ..particles import ParticleSystem
 from ..renderer import Renderer
 from ..shop_ui import ShopUI
@@ -108,6 +108,8 @@ class MatchScene:
         self.renderer = Renderer()
         self.renderer.map.set_camps(map_data.camps)   # sentieri di terra verso le lane
         self.fx = FXSystem()
+        # Regolazioni visive dell'editor delle animazioni (partenza proiettili).
+        self._fx_tuner = anim_tuning.FxTuner(config.TILE_SIZE)
         # Particelle d'atmosfera (lucciole/polline/foglie): cosmetiche, aggiornate
         # solo dentro la camera, al massimo ~60 a schermo.
         self.particles = ParticleSystem()
@@ -411,8 +413,13 @@ class MatchScene:
         # Effetti visivi delle mosse (cosmetici): consuma gli eventi della sim.
         if self.match is not None and self.match.fx_events:
             self._trigger_anims(self.match.fx_events)
-            self.fx.spawn_events(self.match.fx_events)
+            self.fx.spawn_events(self._fx_tuner.process(
+                self.match.fx_events, self.animators, self._unit_pos))
             self.match.fx_events.clear()
+        # Proiettili che aspettano il loro fotogramma (editor delle animazioni).
+        late = self._fx_tuner.due(dt)
+        if late:
+            self.fx.spawn_events(late)
         # Polvere delle valanghe e nube della Palla Fumo (anche online, world_fx).
         if self.match is not None:
             update_world_fx(self.fx, self.match, self.match.time)
@@ -432,11 +439,14 @@ class MatchScene:
         """Avvia le animazioni una-tantum (Attack/Shoot) dagli eventi FX."""
         for e in events:
             eid = e.get("eid")
-            name = e.get("anim")
-            if eid is not None and name:
+            if eid is not None and "anim" in e:
                 anim = self.animators.get(eid)
                 if isinstance(anim, SpriteAnimator):
-                    anim.play_once(name, float(e.get("anim_speed", 1.0)))
+                    anim_tuning.trigger_anim(anim, e)
+
+    def _unit_pos(self, uid):
+        u = self.world.get(uid)
+        return (u.pos.x, u.pos.y) if u is not None else None
 
     def draw(self, surface) -> None:
         path_pts = [self.player.pos] + self.player.path if self.player.alive else []
