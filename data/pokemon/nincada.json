@@ -1,5 +1,5 @@
 {
-  "_comment": "Nincada->Ninjask: jungler assassino, danno fisico. Unica evoluzione a livello 8 (Nincada fino all'8, poi Ninjask). Shedinja e' una FORMA temporanea (non uno stadio) gestita dalla passiva Muta e dalla R Rancore: vedi engine/match.py (SHEDINJA_FORM). Statistiche = valori base reali, come gli altri Pokemon (la derivazione le scala). Tipi: Nincada Coleottero/Terra, Ninjask Coleottero/Volante, Shedinja Coleottero/Spettro.",
+  "_comment": "Nincada->Ninjask: jungler assassino, danno fisico. Unica evoluzione a livello 8 (Nincada fino all'8, poi Ninjask). Shedinja e' una FORMA temporanea (non uno stadio) gestita dalla passiva Muta e dalla R Rancore (la passiva da' anche +30% di danno ai Pokemon neutrali, come Miele e Scalaroccia): vedi engine/match.py (SHEDINJA_FORM). Statistiche = valori base reali, come gli altri Pokemon (la derivazione le scala). Tipi: Nincada Coleottero/Terra, Ninjask Coleottero/Volante, Shedinja Coleottero/Spettro.",
   "dex": 290,
   "name": "Nincada",
   "types": ["Bug", "Ground"],

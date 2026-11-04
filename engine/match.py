@@ -82,7 +82,8 @@ SHEDINJA_TYPES = ["Bug", "Ghost"]
 SHEDINJA_DEX = 292
 # Tipi superefficaci contro Coleottero/Spettro: bucano la Magidifesa (letali).
 _SHEDINJA_WEAK = {"Fire", "Flying", "Rock", "Ghost", "Dark"}
-MUTA_DURATION = 5.0        # s in forma Shedinja
+MUTA_WILD_MULT = 1.30     # danno ai Pokémon neutrali (come Miele/Scalaroccia)
+MUTA_DURATION = 5.0       # s in forma Shedinja
 MUTA_COOLDOWN = 150.0      # ricarica condivisa Muta/Rancore
 MUTA_REVERT_HP = 0.30      # Muta: torna Ninjask col 30% degli HP max
 RANCORE_REVIVE_HP = 0.10   # Rancore: rivive Ninjask col 10% degli HP max
@@ -1002,6 +1003,9 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             return
         amount *= self._honey_wild_mult(attacker, target)   # Miele: +30% ai neutrali
         amount *= self._sneasel_wild_mult(attacker, target)   # Scalaroccia: +30% ai neutrali
+        if (isinstance(target, Wild) and isinstance(attacker, Pokemon)
+                and attacker.passive_id == "muta"):
+            amount *= MUTA_WILD_MULT   # Muta (linea Nincada): +30% ai neutrali
         # Clone esca (Doppioteam): qualunque danno lo dissolve, senza ricompense.
         if isinstance(target, Pokemon) and target.is_decoy:
             if amount > 0.0:
