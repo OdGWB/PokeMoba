@@ -717,26 +717,32 @@ Passaggi completati:
   nulla) e "Personale" (la TierListScene trascina-e-rilascia salvata). Esc/
   Indietro dalla tier personale torna alla scelta, poi al menu.
   Screenshot: step_37_tier_scelta.png.
-- TIER LIST DEVELOPER dai bot (step_38/39). tools/tier_sim.py gioca partite 3v3
-  headless (Match + bot, squadre casuali bilanciate, 18 min di gioco; se nessuno
-  vince decidono torri, uccisioni, danno; FastVision = visione nemici identica ma
-  ~3x piu veloce, solo nello script) -> tools/tier_matches.jsonl (255 partite,
-  ~3.5h su 7 processi). Con 10 min i bot arrivavano al liv.8 di rado e Nincada
-  (Ninjask al liv.8) risultava ultimo per questo; a 18 min evolve nel 94% dei casi.
-  Metriche per unita' (wrapper sull'istanza Match, nessuna logica toccata): uccisioni,
-  morti, danno, danno subito, ASSIST (colpi entro 10s dalla morte), CC in secondi
-  (attribuito a chi lancia la mossa o all'ultimo che ha colpito, slow x0.4),
-  cure/scudi dati ad alleati, tempo al liv.8. tools/tier_build.py: punteggio PER
-  RUOLO (vittorie 40% + livello 5% + pesi del ruolo: tank = danno assorbito/CC/assist/
-  poche morti; supporto = assist/CC/cure; mago-tiratore = danno+K/D; assassino =
-  K/D+danno; combattente misto) con z-score, meno una piccola correzione per la
-  "fortuna di tipo" degli avversari incontrati (types.json). Tier S/A/B/C/D da
-  3/4/4/3/3. Scrive data/tier_developer.json con anche classifica delle forme
-  (linee con rami), tipi (superefficace/debole/resiste) e scontri diretti con
-  l'effetto dei tipi. game/scenes/tier_scene.py: DeveloperTierScene (sola lettura,
-  a sinistra = meglio, numero = posizione) e DeveloperDetailScene (due colonne:
-  motivi | forme, tipi, scontri). Screenshot: step_38_dev.png, step_38_dev_detail.png,
-  step_39_*.png.
+- TIER LIST DEVELOPER dai bot (step_38/39/51). tools/tier_sim.py gioca partite
+  headless (Match + bot) sulla mappa 5v5, 18 min di gioco; se nessuno distrugge il
+  nucleo decidono torri, uccisioni, danno. Ogni squadra: 1 jungler (Nincada, Sneasel,
+  Teddiursa, Swinub, Totodile) + 4 giocatori casuali, 2 in bot lane; il supporto
+  (puro, o chi ha una forma support se non ce n'e') va in bot e prende la forma
+  support (Politoad, Sylveon), gli altri una forma non support; Sneasel jungler ->
+  Sneasler, in lane -> Weavile. FastVision = visione identica ma piu veloce (solo nel
+  tool). Squadre bilanciate (pesca i meno usati). Risultati in
+  tools/tier_matches_5v5.jsonl (98 partite: il torneo da 160 e' stato fermato per
+  tempo; una partita richiede ~14 min reali, 7 processi). Metriche per unita':
+  uccisioni, morti, assist, danno, subito, CC (rising edge degli stati *_until),
+  cure/scudi, campi, leggendari, minion, torri, Smite, livelli. tools/tier_build.py:
+  punteggio PER RUOLO con vittorie 30% + partecipazione alle uccisioni + CC per tutti
+  (un Totodile con CC/assist sale) + pesi del ruolo; correzione "fortuna di tipo";
+  tier 3/5/7/6/4. data/tier_developer.json con forme, tipi, scontri, contesto
+  (jungler/lane, con/senza supporto, corsie) e match_data. Scene (tier_scene.py):
+  DeveloperTierScene, DeveloperDetailScene (due colonne), DeveloperMatchDataScene
+  ("Dati partite"). Screenshot: step_51_*.png.
+- SMITE e IA PIU PRUDENTE (engine/smite.py, SmiteMixin in Match). Smite come in LoL:
+  danno vero ai soli neutrali, 2 cariche, 90 s per carica, 15 s tra due usi, gittata
+  4 tile, 600->1200 col livello; SmiteCommand + tasto F (solo locale, niente HUD/rete).
+  I jungler bot lo usano per finire un mostro (una sola carica = solo grandi/leggendari).
+  Bot: niente inseguimento di campioni sotto torre senza buone possibilita' di kill,
+  leash dalla lane (7 tile nei primi 150 s, poi 14), jungler che gankano solo da 2:30,
+  liv.3, bersaglio sotto il 60% e senza troppi rinforzi. engine/grid.line_of_sight
+  inlineata (stesso risultato).
 - HUD DI PARTITA rifatto (step_40), nuovo game/hud.py condiviso da MatchScene e
   NetMatchScene/OnlineMatchScene (le scene costruiscono PlayerView/SlotView/
   MatchView, hud.py disegna: nessuna logica). Prima: righe di testo in alto e

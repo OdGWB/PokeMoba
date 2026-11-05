@@ -79,6 +79,9 @@ class Pokemon(Unit):
     attack_fx: str = ""              # stile effetto dell'auto-attacco (vedi game/fx.py)
     is_bot: bool = False
     is_jungler: bool = False
+    smite_charges: int = 2           # Smite (engine/smite.py): cariche, blocco e ricarica
+    smite_ready_at: float = 0.0
+    smite_regen_at: float = -1.0
     assigned_lane: str = "mid"
     spawn_pos: Vec2 = field(default_factory=lambda: Vec2(0, 0))
     respawn_timer: float = 0.0       # >0 = morto, in attesa di respawn

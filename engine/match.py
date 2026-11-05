@@ -43,6 +43,7 @@ from .incineroar import INCIN_PASSIVES, IncineroarMixin
 from .corviknight import CORVI_PASSIVES, CorviknightMixin
 from .eevee import EEVEE_PASSIVES, EeveeMixin
 from .item_effects import ItemEffectsMixin, cdr_to_haste
+from .smite import (GANK_COOLDOWN, GANK_DURATION, SmiteMixin, smite_damage)
 from .basic_attack import (ACQUIRE_EXTRA, AMOVE_DROP_EXTRA, AMOVE_EXTRA, AS_CAP,
                            IDLE_CHASE_LEASH, BasicAttackMixin)
 from .spiritomb import PASSIVE_ID as SPIRITOMB_PASSIVE, SpiritombMixin
@@ -177,7 +178,7 @@ CAST_ANIMS = {"projectile": "Shoot", "bubble": "Shoot",
 
 class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, NoivernMixin,
             UrsaringMixin, SneaselMixin, MienshaoMixin, ArchaludonMixin,
-            HattereneMixin, MagnezoneMixin, MamoswineMixin, VenomothMixin, OctilleryMixin, FlorgesMixin, ScizorMixin, IncineroarMixin, BasicAttackMixin, ItemEffectsMixin):
+            HattereneMixin, MagnezoneMixin, MamoswineMixin, VenomothMixin, OctilleryMixin, FlorgesMixin, ScizorMixin, IncineroarMixin, BasicAttackMixin, SmiteMixin, ItemEffectsMixin):
     def __init__(self, world, map_data):
         self.world = world
         self.map = map_data
@@ -308,6 +309,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self._update_mag_drags(dt)   # Magnetismo: trascinamenti e spinte (dopo le collisioni)
         self._update_swine_shoves(dt)  # Riduttore: respinta (dopo le collisioni)
         self._update_regen(dt)
+        self._update_smite(dt)       # Smite: ricarica delle cariche
         self._update_plates(dt)      # placche delle torri (oro ai vicini)
         self._update_gold(dt)
         self._update_bot_shop(dt)
@@ -633,6 +635,9 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         if (isinstance(target, Structure)
                 and not self._has_allied_minion_near(p, target.pos, 4.5)):
             target = None
+        # Prudenza: niente inseguimenti sotto torre senza buone possibilita' di kill
+        # e niente allontanamenti dalla lane (engine/smite.py).
+        target = self._bot_filter_target(p, target)
         p.target_id = target.id if target is not None else None
         if target is not None:
             self._bot_try_cast(p, target)
@@ -4095,10 +4100,30 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             return
         if p.hp < p.max_hp * BOT_RETREAT_HP:
             p.target_id = None
+            self._ai.setdefault(p.id, {})["gank_id"] = None
             self._move_towards(p, p.spawn_pos, dt, use_astar=True)
             return
-        # Minaccia nemica (campione/minion) vicina: ingaggia.
-        enemy = self._acquire_enemy_unit(p, BOT_AGGRO)
+        st = self._ai.setdefault(p.id, {})
+        # Gank in corso: lo si porta avanti finche' il bersaglio e' visibile e vivo.
+        gid = st.get("gank_id")
+        if gid is not None:
+            t = self.world.get(gid)
+            if (t is None or not t.alive or self.time > st.get("gank_until", 0.0)
+                    or not self.vision.is_enemy_visible(p.team, t.id)
+                    or (self._under_enemy_tower(p, t.pos) and not self._good_kill_chance(p, t))):
+                st["gank_id"] = None
+                st["gank_cd"] = self.time + GANK_COOLDOWN
+            else:
+                p.target_id = t.id
+                self._bot_try_cast(p, t)
+                if self._within_attack(p, t):
+                    p.stop(); self._face(p, t)
+                else:
+                    self._chase(p, t, dt)
+                return
+        # Minaccia: un CAMPIONE nemico vicino (i minion non si inseguono in giungla),
+        # ma non sotto una torre senza buone possibilita'.
+        enemy = self._bot_filter_target(p, self._acquire_enemy_champ(p, BOT_AGGRO))
         if enemy is not None:
             p.target_id = enemy.id
             self._bot_try_cast(p, enemy)
@@ -4107,10 +4132,18 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             else:
                 self._chase(p, enemy, dt)
             return
+        # Gank mirato: solo se probabilmente fruttuoso.
+        g = self._jungler_gank_target(p, st)
+        if g is not None:
+            st["gank_id"] = g.id
+            st["gank_until"] = self.time + GANK_DURATION
+            self._move_towards(p, g.pos, dt, use_astar=True)
+            return
         # Farming: campo neutrale (o leggendario, se abbastanza forte) più vicino.
         wild = self._nearest_wild_for(p)
         if wild is not None:
             p.target_id = wild.id
+            self._bot_smite(p, wild)
             self._bot_try_cast(p, wild)
             if self._within_attack(p, wild):
                 p.stop(); self._face(p, wild)
@@ -4121,6 +4154,19 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         p.target_id = None
         self._move_towards(p, Vec2(self.world.grid.width * 0.5,
                                    self.world.grid.height * 0.5), dt, use_astar=True)
+
+    def _acquire_enemy_champ(self, p, radius):
+        """Campione nemico visibile piu' vicino entro il raggio."""
+        best, bd = None, 1e9
+        for e in self._combat_hash.query_radius(p.pos.x, p.pos.y, radius):
+            if not isinstance(e, Pokemon) or not e.alive or e.team == p.team:
+                continue
+            if not self.vision.is_enemy_visible(p.team, e.id):
+                continue
+            d = p.pos.dist(e.pos)
+            if d <= radius and d < bd:
+                best, bd = e, d
+        return best
 
     def _acquire_enemy_unit(self, p, radius):
         """Nemico (campione/minion della squadra avversaria, non neutrale) più

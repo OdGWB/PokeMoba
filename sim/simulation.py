@@ -14,7 +14,7 @@ from engine import evolution, skills
 
 from .commands import (AttackCommand, AttackMoveCommand, BuyItemCommand,
                        ChooseUpgradeCommand, Command, CastMoveCommand, MoveCommand,
-                       RankMoveCommand, RecallCommand, SellItemCommand, StopCommand,
+                       RankMoveCommand, RecallCommand, SellItemCommand, SmiteCommand, StopCommand,
                        UseItemCommand)
 
 
@@ -92,6 +92,9 @@ class Simulation:
                     unit.recall_until = self.match.time + config.RECALL_TIME
                     unit.order = "stop"
                     unit.stop()
+        elif isinstance(cmd, SmiteCommand):
+            if self.match is not None:
+                self.match.use_smite(unit)
         elif isinstance(cmd, StopCommand):
             self._set_order(unit, "stop")
             unit.stop()

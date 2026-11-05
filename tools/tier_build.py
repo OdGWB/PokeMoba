@@ -24,33 +24,48 @@ sys.path.insert(0, str(ROOT))
 import config  # noqa: E402
 from engine.content import load_pokemon_def  # noqa: E402
 
-# Quanti Pokemon in ogni tier, dal piu' forte (S) al piu' scarso (D): 17 in tutto.
-TIER_SIZES = [("S", 3), ("A", 4), ("B", 4), ("C", 3), ("D", 3)]
+# Quanti Pokemon in ogni tier, dal piu' forte (S) al piu' scarso (D): 
+TIER_SIZES = [("S", 3), ("A", 5), ("B", 7), ("C", 6), ("D", 4)]   # 25 in tutto
 MIN_DUEL = 6        # partite minime contro un avversario per citarlo
 MIN_FORM = 3        # partite minime per classificare una forma
 TYPE_WEIGHT = 0.08  # correzione per la "fortuna di tipo" degli avversari affrontati
 
-_BASE = {"winrate": 0.40, "level": 0.05}
+# Tutti i ruoli contano anche CC, danno assorbito e assist (un combattente con tanti CC
+# sale, un tank col danno inflitto basso non scende): cambia solo quanto pesano.
 ROLE_WEIGHTS = {
-    "tank": {**_BASE, "taken": 0.20, "cc": 0.10, "assists": 0.10, "deaths_inv": 0.10, "dmg": 0.05},
-    "supporto": {**_BASE, "assists": 0.20, "cc": 0.15, "support": 0.10, "deaths_inv": 0.10},
-    "mago": {**_BASE, "dmg": 0.25, "kda": 0.20, "assists": 0.10},
-    "tiratore": {**_BASE, "dmg": 0.25, "kda": 0.20, "assists": 0.10},
-    "assassino": {**_BASE, "kda": 0.25, "dmg": 0.20, "assists": 0.10},
-    "combattente": {**_BASE, "dmg": 0.20, "kda": 0.15, "taken": 0.10, "assists": 0.10},
+    "tank": {"winrate": .30, "kp": .10, "taken": .16, "cc": .14, "assists": .05, "deaths_inv": .08,
+             "dmg": .05, "level": .04, "sdmg": .04, "cs": .04},
+    "supporto": {"winrate": .30, "kp": .14, "assists": .14, "cc": .12, "support": .10,
+                 "deaths_inv": .08, "taken": .04, "level": .04, "dmg": .04},
+    "mago": {"winrate": .30, "kp": .12, "dmg": .20, "kda": .10, "cc": .08, "assists": .04,
+             "taken": .03, "deaths_inv": .05, "level": .04, "sdmg": .02, "cs": .02},
+    "tiratore": {"winrate": .30, "kp": .12, "dmg": .20, "kda": .10, "cc": .08, "assists": .04,
+                 "taken": .03, "deaths_inv": .05, "level": .04, "sdmg": .02, "cs": .02},
+    "assassino": {"winrate": .30, "kp": .16, "kda": .14, "dmg": .14, "cc": .08, "assists": .05,
+                  "deaths_inv": .04, "taken": .02, "level": .04, "sdmg": .02, "cs": .01},
+    "combattente": {"winrate": .30, "kp": .14, "dmg": .12, "kda": .10, "cc": .12, "taken": .08,
+                    "assists": .05, "deaths_inv": .03, "level": .04, "sdmg": .02},
 }
 METRIC_NAME = {"winrate": "Vittorie", "level": "Livello", "taken": "Danno assorbito",
                "cc": "Controllo (CC)", "assists": "Assist", "deaths_inv": "Poche morti",
-               "dmg": "Danno inflitto", "support": "Cure/scudi", "kda": "K/D (con assist)"}
+               "dmg": "Danno inflitto", "support": "Cure/scudi", "kda": "K/D (con assist)",
+               "kp": "Partecipazione alle uccisioni", "sdmg": "Danno alle torri", "cs": "Minion"}
 # Statistiche mostrate nella scheda, per ruolo (oltre a Vittorie e Livello).
 ROLE_STATS = {
-    "tank": ["taken", "cc", "assists", "deaths"],
-    "supporto": ["assists", "cc", "support", "deaths"],
-    "mago": ["kda", "dmg", "kills", "deaths"],
-    "tiratore": ["kda", "dmg", "kills", "deaths"],
-    "assassino": ["kda", "dmg", "kills", "deaths"],
-    "combattente": ["kda", "dmg", "taken", "deaths"],
+    "tank": ["taken", "cc", "kp", "deaths"],
+    "supporto": ["assists", "cc", "support", "kp"],
+    "mago": ["kda", "dmg", "cc", "kp"],
+    "tiratore": ["kda", "dmg", "cc", "kp"],
+    "assassino": ["kda", "dmg", "cc", "kp"],
+    "combattente": ["kda", "dmg", "cc", "kp"],
 }
+JUNGLERS = ["Nincada", "Sneasel", "Teddiursa", "Swinub", "Totodile"]
+SUPPORT_NAMES = {"Spiritomb", "Duraludon", "Rookidee", "Flabébé"}
+FORM_RULE = {"Sneasler": "se è il jungler della squadra", "Weavile": "se gioca in lane",
+             "Poliwrath": "se in squadra c'è già un supporto",
+             "Politoad": "se è lui il supporto della squadra",
+             "Sylveon": "se è lui il supporto della squadra"}
+FORM_RULE_DEFAULT = {"Eevee": "se in squadra c'è già un supporto"}
 
 
 def fmt_time(sec: float) -> str:
@@ -89,16 +104,22 @@ def aggregate(units: list) -> dict:
     t8 = [u["t8"] for u in units if u.get("t8") is not None]
     return {
         "games": len(units),
-        "kills": s("kills") / n, "deaths": s("deaths") / n, "assists": s("assists") / n,
-        "dmg": s("dmg") / n, "taken": s("taken") / n, "level": s("level") / n,
-        "cc": s("cc") / n, "support": s("support") / n,
+        "camps": s("camps") / n, "kills": s("kills") / n, "deaths": s("deaths") / n,
+        "assists": s("assists") / n, "dmg": s("dmg") / n, "taken": s("taken") / n,
+        "level": s("level") / n, "cc": s("cc") / n, "support": s("support") / n,
+        "kp": s("kp") / n, "sdmg": s("sdmg") / n, "cs": s("cs") / n, "towers": s("towers") / n,
+        "legend": s("legend") / n, "smites": s("smites") / n,
         "kda": (s("kills") + s("assists")) / max(1.0, s("deaths")),
         "reach8": len(t8) / n, "t8": (sum(t8) / len(t8)) if t8 else None,
     }
 
 
+def winrate_of(units: list) -> float:
+    return sum(1 for u in units if u["won"]) / max(1, len(units))
+
+
 def main():
-    src = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "tools" / "tier_matches.jsonl"
+    src = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "tools" / "tier_matches_5v5.jsonl"
     matches = [json.loads(l) for l in src.read_text(encoding="utf-8").splitlines() if l.strip()]
     chart = json.loads((ROOT / "data" / "types.json").read_text(encoding="utf-8"))
     chart = {k: v for k, v in chart.items() if not k.startswith("_")}
@@ -111,8 +132,10 @@ def main():
     rows = defaultdict(list)                                    # nome -> righe-unita'
     duel = defaultdict(lambda: defaultdict(lambda: [0, 0]))     # a -> b -> [vittorie, partite]
     for m in matches:
+        tk = {t: max(1, sum(u["kills"] for u in m["units"] if u["team"] == t)) for t in (0, 1)}
         for u in m["units"]:
-            u = dict(u, won=(u["team"] == m["winner"]))
+            u = dict(u, won=(u["team"] == m["winner"]),
+                     kp=(u["kills"] + u["assists"]) / tk[u["team"]])
             rows[u["name"]].append(u)
         for a in m["units"]:
             for b in m["units"]:
@@ -124,7 +147,7 @@ def main():
     per = {}
     for n in names:
         a = aggregate(rows[n])
-        a["winrate"] = sum(1 for u in rows[n] if u["won"]) / max(1, len(rows[n]))
+        a["winrate"] = winrate_of(rows[n])
         a["deaths_inv"] = -a["deaths"]
         per[n] = a
 
@@ -174,7 +197,7 @@ def main():
 
     avg = {k: sum(per[n][k] for n in names) / len(names)
            for k in ("kills", "deaths", "dmg", "taken", "level", "kda", "assists", "cc",
-                     "support", "winrate", "reach8")}
+                     "support", "winrate", "reach8", "kp", "sdmg", "cs")}
     t8s = [per[n]["t8"] for n in names if per[n]["t8"]]
     avg["t8"] = sum(t8s) / len(t8s) if t8s else None
 
@@ -191,6 +214,7 @@ def main():
             "cc": ("CC (s)", f"{p['cc']:.0f}", f"{a['cc']:.0f}"),
             "support": ("Cure/scudi", f"{p['support']:.0f}", f"{a['support']:.0f}"),
             "level": ("Livello", f"{p['level']:.1f}", f"{a['level']:.1f}"),
+            "kp": ("Partec. kill", f"{p['kp'] * 100:.0f}%", f"{a['kp'] * 100:.0f}%"),
         }[key]
 
     out = []
@@ -217,6 +241,12 @@ def main():
                     f"infligge poco danno: {p['dmg']:.0f} a partita (media {avg['dmg']:.0f})"),
             "support": (f"cura/protegge molto gli alleati: {p['support']:.0f} a partita",
                         f"cura/protegge poco gli alleati: {p['support']:.0f} a partita"),
+            "kp": (f"è dentro a molte uccisioni della squadra: {p['kp'] * 100:.0f}% (media {avg['kp'] * 100:.0f}%)",
+                   f"partecipa a poche uccisioni della squadra: {p['kp'] * 100:.0f}% (media {avg['kp'] * 100:.0f}%)"),
+            "sdmg": (f"butta giù le torri: {p['sdmg']:.0f} danno a partita (media {avg['sdmg']:.0f})",
+                     f"fa poco danno alle torri: {p['sdmg']:.0f} a partita (media {avg['sdmg']:.0f})"),
+            "cs": (f"fa molti minion: {p['cs']:.0f} a partita (media {avg['cs']:.0f})",
+                   f"fa pochi minion: {p['cs']:.0f} a partita (media {avg['cs']:.0f})"),
             "kda": (f"uccide e assiste molto più di quanto muoia (K/D+assist {p['kda']:.2f}, media {avg['kda']:.2f})",
                     f"muore più di quanto uccida o assista (K/D+assist {p['kda']:.2f}, media {avg['kda']:.2f})"),
         }
@@ -225,10 +255,10 @@ def main():
             r = rk[k]
             if k == "support" and avg["support"] < 1:
                 continue
-            tag = f" ({r}º su 17)"
-            if r <= 5:
+            tag = f" ({r}º su {len(names)})"
+            if r <= round(len(names) * 0.25):
                 pros.append(phrase[k][0] + tag)
-            elif r >= 13:
+            elif r > len(names) - round(len(names) * 0.25):
                 cons.append(phrase[k][1] + tag)
         if p["t8"] is not None:
             msg = (f"arriva al liv. 8 nel {p['reach8'] * 100:.0f}% delle partite "
@@ -293,10 +323,40 @@ def main():
                               "winrate": round(a["winrate"], 3), "kda": round(a["kda"], 2),
                               "dmg": round(a["dmg"]), "assists": round(a["assists"], 1),
                               "cc": round(a["cc"]), "types": ftypes,
+                              "rule": FORM_RULE.get(f, FORM_RULE_DEFAULT.get(d.name, "")),
                               "share": round(len(us) / max(1, evolved), 3)})
             forms.sort(key=lambda f: (f["score"] is None, -(f["score"] or 0)))
             for k, f in enumerate(forms, 1):
                 f["rank"] = k
+
+        def ctx(units):
+            a = aggregate(units)
+            return {"games": len(units), "winrate": round(winrate_of(units), 3),
+                    "kda": round(a["kda"], 2), "camps": round(a["camps"], 1),
+                    "smites": round(a["smites"], 1), "legend": round(a["legend"], 2)}
+        rs = rows[n]
+        context = {}
+        jg = [u for u in rs if u["jungle"]]
+        ln = [u for u in rs if not u["jungle"]]
+        if jg:
+            context["jungler"] = ctx(jg)
+        if ln:
+            context["laner"] = ctx(ln)
+        if n not in SUPPORT_NAMES:
+            ws = [u for u in rs if u["with_support"]]
+            ns = [u for u in rs if not u["with_support"]]
+            if ws:
+                context["with_support"] = ctx(ws)
+            if ns:
+                context["no_support"] = ctx(ns)
+        sp = [u for u in rs if u.get("is_support")]
+        if sp:
+            context["as_support"] = ctx(sp)
+        lanes = {}
+        for u in rs:
+            lanes.setdefault(u["lane"], []).append(u)
+        context["lanes"] = {k: {"games": len(v), "winrate": round(winrate_of(v), 3)}
+                            for k, v in sorted(lanes.items())}
 
         head = {"S": "È tra i più forti del roster", "A": "È sopra la media",
                 "B": "È nella fascia di mezzo", "C": "È sotto la media",
@@ -307,16 +367,59 @@ def main():
             "role": d.role, "types": list(d.types), "passive": d.passive,
             "games": p["games"], "winrate": round(p["winrate"], 4),
             "stats": [{"label": a, "value": b, "avg": c} for a, b, c in stats],
-            "ranks": rk, "summary": f"{head} (posizione {pos} su 17, tier {tiers[n]}).",
+            "ranks": rk, "summary": f"{head} (posizione {pos} su {len(names)}, tier {tiers[n]}).",
             "weights": {METRIC_NAME[k]: v for k, v in weights.items()},
             "pros": pros, "cons": cons, "best": best, "worst": worst,
-            "types_info": types_info, "forms": forms,
+            "types_info": types_info, "forms": forms, "context": context,
         })
+
+    # Dati sull'insieme delle partite (pagina "Dati partite").
+    def team_rows(flag):
+        out_, tot_, win_ = 0, 0, 0
+        for m in matches:
+            for t in (0, 1):
+                if m["support"][t] == flag:
+                    tot_ += 1
+                    win_ += 1 if m["winner"] == t else 0
+        return {"games": tot_, "winrate": round(win_ / max(1, tot_), 3)}
+    jung = {}
+    for n in JUNGLERS:
+        js = [u for u in rows[n] if u["jungle"]]
+        if js:
+            a = aggregate(js)
+            jung[n] = {"games": len(js), "winrate": round(winrate_of(js), 3),
+                       "camps": round(a["camps"], 1), "legend": round(a["legend"], 2),
+                       "smites": round(a["smites"], 1), "kills": round(a["kills"], 1),
+                       "assists": round(a["assists"], 1), "level": round(a["level"], 1),
+                       "t5": round(sum(u["t5"] for u in js if u.get("t5")) /
+                                   max(1, sum(1 for u in js if u.get("t5"))), 0)}
+    forms_all = {}
+    finals_all = set()
+    for d_ in defs.values():
+        top = max((e.get("stage", 0) for e in d_.evolutions), default=0)
+        finals_all |= {e["name"] for e in d_.evolutions if e.get("stage", 0) == top}
+    for n in names:
+        for u in rows[n]:
+            if u.get("plan") and u["final_name"] in finals_all:
+                rec = forms_all.setdefault(u["final_name"], [0, 0])
+                rec[0] += 1 if u["won"] else 0
+                rec[1] += 1
+    match_data = {
+        "matches": len(matches),
+        "minutes": round(sum(m["time"] for m in matches) / len(matches) / 60, 1),
+        "decided_by_core": sum(1 for m in matches if not m["timeout"]),
+        "blue_wins": round(sum(1 for m in matches if m["winner"] == 0) / len(matches), 3),
+        "teams_with_support": team_rows(True), "teams_without_support": team_rows(False),
+        "junglers": jung,
+        "forced_forms": {k: {"games": v[1], "winrate": round(v[0] / max(1, v[1]), 3)}
+                         for k, v in sorted(forms_all.items())},
+        "smites": round(sum(u.get("smites", 0) for m in matches for u in m["units"]) / len(matches), 1),
+    }
 
     dst = ROOT / "data" / "tier_developer.json"
     dst.write_text(json.dumps({
         "matches": len(matches), "minutes": round(sum(m["time"] for m in matches) / len(matches) / 60, 1),
-        "avg_winrate": round(avg["winrate"], 4), "reach8": round(avg["reach8"], 3),
+        "match_data": match_data, "map": "5v5", "avg_winrate": round(avg["winrate"], 4), "reach8": round(avg["reach8"], 3),
         "list": out}, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"{len(matches)} partite -> {dst}")
     for e in out:

@@ -86,3 +86,8 @@ class UseItemCommand(Command):
 @dataclass
 class RecallCommand(Command):
     """Avvia (o annulla) il richiamo verso la base."""
+
+
+@dataclass
+class SmiteCommand(Command):
+    """Usa lo Smite sul neutrale piu' vicino a portata (tasto F, solo partita locale)."""

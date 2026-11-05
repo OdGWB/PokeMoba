@@ -23,9 +23,11 @@ sys.path.insert(0, str(ROOT))
 
 import config  # noqa: E402
 from engine.content import load_map, load_pokemon_def  # noqa: E402
-from engine.entities import Pokemon  # noqa: E402
+from engine import evolution  # noqa: E402
+from engine.entities import Minion, Pokemon, Wild  # noqa: E402
 from engine.match import Match  # noqa: E402
 from engine.vec import Vec2  # noqa: E402
+from engine.stats import respawn_time  # noqa: E402
 from engine.world import World  # noqa: E402
 
 from engine.entities import Structure, Unit  # noqa: E402
@@ -33,8 +35,35 @@ from engine.grid import TILE_BUSH  # noqa: E402
 from engine.vision import BUSH_REVEAL, VisionSystem  # noqa: E402
 
 LANES = ["top", "mid", "bot"]
+MAP_5V5 = "data/maps/map_5v5.json"
 MAX_TIME = 18 * 60.0        # secondi di gioco: oltre, si decide per torri/uccisioni/danno
 ASSIST_WINDOW = 10.0     # secondi: chi ha colpito la vittima entro questo tempo e' assistente
+JUNGLERS = ["Nincada", "Sneasel", "Teddiursa", "Swinub", "Totodile"]   # chi puo' fare il jungler
+SUPPORTS = {"Rookidee"}         # oltre ai ruoli "supporto": conta come supporto per la bot lane
+# Scelte Q/W/E (indice del potenziamento) che portano Eevee alla forma voluta.
+EEVEE_CHOICES = {"jolteon": {"Q": 0, "W": 0, "E": 0}, "flareon": {"Q": 0, "W": 0, "E": 1},
+                 "espeon": {"Q": 0, "W": 1, "E": 0}, "glaceon": {"Q": 0, "W": 1, "E": 1},
+                 "leafeon": {"Q": 1, "W": 0, "E": 0}, "umbreon": {"Q": 1, "W": 0, "E": 1},
+                 "sylveon": {"Q": 1, "W": 1, "E": 0}, "vaporeon": {"Q": 1, "W": 1, "E": 1}}
+# Stati di controllo (campo "_until" dell'unita', peso): contano i secondi di CC inflitti.
+CC_FIELDS = (("stun_until", 1.0), ("root_until", 1.0), ("sleep_until", 1.0), ("fear_until", 1.0),
+             ("charm_until", 1.0), ("airborne_until", 1.0), ("taunt_until", 0.7),
+             ("confuse_until", 0.6), ("silence_until", 0.5), ("slow_until", 0.4))
+FORCED = {}     # id Pokemon -> {slot: indice}: scelte forzate per i rami (vedi _force_choice)
+
+_orig_apply_choice = evolution.apply_choice
+
+
+def _force_choice(p, slot, index):
+    plan = FORCED.get(p.id)
+    if plan and slot in plan:
+        index = plan[slot]
+    return _orig_apply_choice(p, slot, index)
+
+
+evolution.apply_choice = _force_choice
+
+
 SLOT_OFFSET = {"top": Vec2(-1.2, 0.0), "mid": Vec2(0.0, 0.0), "bot": Vec2(0.0, 1.2)}
 
 
@@ -48,6 +77,9 @@ class FastVision(VisionSystem):
                         for e in sources)
         sig |= frozenset(("inv", e.id) for e in world.entities.values()
                          if getattr(e, "invisible", False) and getattr(e, "team", team) != team)
+        sig |= frozenset(("agi", u.id, int(u.pos.x), int(u.pos.y))
+                         for u in world.entities.values()
+                         if getattr(u, "agitated", False) and getattr(u, "team", team) != team)
         reveals = self.reveals.get(team) or ()
         if reveals:
             sig |= frozenset(("ping", round(x, 1), round(y, 1), r) for x, y, r in reveals)
@@ -72,7 +104,7 @@ class FastVision(VisionSystem):
                 continue
             if getattr(u, "invisible", False):
                 continue
-            if self.grid.tile_at(tx, ty) == TILE_BUSH:
+            if self.grid.tile_at(tx, ty) == TILE_BUSH and not getattr(u, "agitated", False):
                 if not any(e.pos.dist(u.pos) <= BUSH_REVEAL for e in sources):
                     continue
             enemies.add(u.id)
@@ -80,10 +112,18 @@ class FastVision(VisionSystem):
         return True
 
 
-def _spawn(world, map_data, team, lane, pdef):
+_SLOT_N = {}
+
+
+def _spawn(world, map_data, team, lane, pdef, is_jg=False, name=""):
     base = Vec2(*map_data.spawns[f"team{team}"]) + Vec2(0.5, 0.5)
+    k = _SLOT_N.get((team, lane), 0)
+    _SLOT_N[(team, lane)] = k + 1
+    off = SLOT_OFFSET[lane] + (Vec2(0.7 * k, 0.0) if lane == "bot" else Vec2(0, 0))
+    if is_jg:
+        off = Vec2(0.5, -0.9)
     p = world.spawn_pokemon(
-        pos=base + SLOT_OFFSET[lane], team=team, dex=pdef.dex, name=pdef.name,
+        pos=base + off, team=team, dex=pdef.dex, name=pdef.name,
         color=config.TEAM_COLORS[team], speed=pdef.base_speed, is_bot=True,
         assigned_lane=lane, types=pdef.types, base_stats=pdef.base_stats,
         growth=pdef.growth, moves=pdef.moves, evolutions=pdef.evolutions,
@@ -94,27 +134,88 @@ def _spawn(world, map_data, team, lane, pdef):
     return p
 
 
+def compose_team(rng, defs, jungler, others, support_pure, support_forms):
+    """Ruoli e rami di una squadra da 5: 1 jungler + 4 giocatori, due dei quali in bot lane.
+
+    Il supporto va in bot: un supporto puro (a caso se piu' di uno); se non ce ne sono,
+    un Pokemon con una forma support la prende (a caso se piu' di uno); gli altri con
+    forma support scelgono una forma NON support. Ritorna [(idx, lane, plan, e_supporto)]."""
+    pure = [i for i in others if defs[i].name in support_pure]
+    cand = [i for i in others if defs[i].name in support_forms]
+    support = None
+    if pure:
+        support = rng.choice(pure)
+    elif cand:
+        support = rng.choice(cand)
+    rest = [i for i in others if i != support]
+    rng.shuffle(rest)
+    if support is not None:
+        bot = [support, rest.pop()]
+    else:
+        bot = [rest.pop(), rest.pop()]
+    lanes = {"top": [rest[0]], "mid": [rest[1]], "bot": bot}
+    out = [(jungler, "jungle", None, False)]
+    for lane, idxs in lanes.items():
+        for i in idxs:
+            out.append((i, lane, None, i == support))
+    return out
+
+
+def branch_plan(rng, name, is_jungler, is_support):
+    """Ramo forzato per i Pokemon con evoluzioni ramificate comandate dal ruolo."""
+    if name == "Sneasel":
+        return "sneasler" if is_jungler else "weavile"
+    if name == "Poliwag":
+        return "politoad" if is_support else "poliwrath"
+    if name == "Eevee":
+        return "sylveon" if is_support else rng.choice(
+            [k for k in EEVEE_CHOICES if k != "sylveon"])
+    return None
+
+
 def play(job):
-    """Una partita. job = (seed, roster_idx_team0, roster_idx_team1)."""
-    seed, t0, t1 = job
+    """Una partita 5v5. job = (seed, jungler0, altri0, jungler1, altri1) (indici del roster)."""
+    seed, j0, o0, j1, o1 = job
     random.seed(seed)
+    rng = random.Random(seed)
     defs = [load_pokemon_def(str(ROOT / rel)) for rel in config.ROSTER]
-    map_data = load_map(str(ROOT / config.DEFAULT_MAP))
+    map_data = load_map(str(ROOT / MAP_5V5))
     world = World(map_data.grid)
     match = Match(world, map_data)
     match.vision = FastVision(world.grid)
 
     stat = {}                       # id -> dict
     units = []
-    for team, picks in ((0, t0), (1, t1)):
-        lanes = LANES[:]
-        random.shuffle(lanes)
-        for lane, idx in zip(lanes, picks):
-            p = _spawn(world, map_data, team, lane, defs[idx])
-            stat[p.id] = {"name": defs[idx].name, "team": team, "idx": idx, "lane": lane,
-                          "kills": 0, "deaths": 0, "dmg": 0.0, "taken": 0.0}
+    FORCED.clear()
+    _SLOT_N.clear()
+    plans = {}                      # id -> ramo forzato
+    support_pure = SUPPORTS | {d.name for d in defs if d.role == "supporto"}
+    support_forms = {d.name for d in defs if d.role != "supporto" and any(
+        e.get("role") == "supporto" for e in d.evolutions)}
+    team_info = {}
+    for team, (jg, others) in ((0, (j0, o0)), (1, (j1, o1))):
+        roster = compose_team(rng, defs, jg, others, support_pure, support_forms)
+        names = [defs[i].name for i, *_ in roster]
+        team_info[team] = {"jungler": True, "support": any(sup for *_, sup in roster)}
+        for idx, lane, _plan, is_sup in roster:
+            name = defs[idx].name
+            is_jg = lane == "jungle"
+            spawn_lane = "mid" if is_jg else lane
+            p = _spawn(world, map_data, team, spawn_lane, defs[idx], is_jg, name)
+            plan = branch_plan(rng, name, is_jg, is_sup)
+            if name == "Eevee":
+                FORCED[p.id] = EEVEE_CHOICES[plan]
+            if plan:
+                plans[p.id] = plan
+            p.is_jungler = is_jg
+            others_n = [n for n in names if n != name]
+            stat[p.id] = {"name": name, "team": team, "idx": idx, "lane": lane,
+                          "kills": 0, "deaths": 0, "dmg": 0.0, "taken": 0.0, "camps": 0,
+                          "jungle": is_jg, "plan": plan, "is_support": is_sup,
+                          "with_support": (any(n in support_pure for n in others_n)
+                                           or (any(sup for *_, sup in roster) and not is_sup)),
+                          "camps_clear": 0}
             units.append(p)
-    match.assign_junglers()
     match.vision.update(world, 0)
     match.vision.update(world, 1)
 
@@ -123,14 +224,22 @@ def play(job):
     orig_dmg = match._deal_damage
 
     last_hit = {}                   # id vittima -> {id attaccante: tempo ultimo colpo}
-    ctx = {"caster": None}          # chi sta lanciando una mossa in questo momento
 
     for s in stat.values():
-        s.update(assists=0, cc=0.0, support=0.0, t8=None)
+        s.update(assists=0, cc=0.0, support=0.0, t8=None, t5=None)
 
     def on_death(victim, killer):
+        if isinstance(victim, Wild) and isinstance(killer, Pokemon) and killer.id in stat:
+            stat[killer.id]["camps"] += 1
+            if victim.kind != "camp":
+                stat[killer.id]["legend"] = stat[killer.id].get("legend", 0) + 1
+        elif isinstance(victim, Minion) and isinstance(killer, Pokemon) and killer.id in stat:
+            stat[killer.id]["cs"] = stat[killer.id].get("cs", 0) + 1
+        elif isinstance(victim, Structure) and isinstance(killer, Pokemon) and killer.id in stat                 and victim.kind == "tower":
+            stat[killer.id]["towers"] = stat[killer.id].get("towers", 0) + 1
         if isinstance(victim, Pokemon) and victim.id in stat:
             stat[victim.id]["deaths"] += 1
+            stat[victim.id]["dead_time"] = stat[victim.id].get("dead_time", 0.0) +                 respawn_time(victim.level)
             if isinstance(killer, Pokemon) and killer.id in stat and killer.team != victim.team:
                 stat[killer.id]["kills"] += 1
             kid = killer.id if killer is not None else None
@@ -148,14 +257,17 @@ def play(job):
             if isinstance(attacker, Pokemon) and attacker.id in stat and attacker.team != target.team:
                 stat[attacker.id]["dmg"] += lost
                 last_hit.setdefault(target.id, {})[attacker.id] = match.time
+            scan_cc(attacker if isinstance(attacker, Pokemon) else None)
+            return r
+        if isinstance(target, Structure) and isinstance(attacker, Pokemon) and attacker.id in stat:
+            hp0 = target.hp
+            r = orig_dmg(attacker, target, amount, *a, **kw)
+            stat[attacker.id]["sdmg"] = stat[attacker.id].get("sdmg", 0.0) + max(0.0, hp0 - target.hp)
             return r
         return orig_dmg(attacker, target, amount, *a, **kw)
 
     def source_of(target):
-        """Chi ha causato un controllo: chi sta lanciando, altrimenti chi ha colpito per ultimo."""
-        c = ctx["caster"]
-        if c is not None and c.team != target.team:
-            return c
+        """Chi ha colpito per ultimo il bersaglio (entro 3 s)."""
         hits = last_hit.get(target.id)
         if hits:
             aid, t = max(hits.items(), key=lambda kv: kv[1])
@@ -163,36 +275,36 @@ def play(job):
                 return next((u for u in units if u.id == aid), None)
         return None
 
-    def wrap_cc(name, weight, dur_index):
-        orig = getattr(match, name)
+    seen = {}                       # (id, campo) -> ultima scadenza vista
 
-        def f(p, *args, **kw):
-            if isinstance(p, Pokemon) and p.id in stat:
-                src = source_of(p)
-                if src is not None and src.id in stat:
-                    try:
-                        stat[src.id]["cc"] += weight * float(args[dur_index])
-                    except (IndexError, TypeError, ValueError):
-                        pass
-            return orig(p, *args, **kw)
-        setattr(match, name, f)
-
-    # (nome, peso, posizione della durata negli argomenti dopo `p`)
-    for name, w, di in (("_apply_stun", 1.0, 0), ("_apply_root", 1.0, 0),
-                        ("_apply_sleep", 1.0, 0), ("_apply_fear", 1.0, 1),
-                        ("_apply_airborne", 1.0, 0), ("_apply_confuse", 0.6, 0),
-                        ("_apply_slow", 0.4, 1)):
-        if hasattr(match, name):
-            wrap_cc(name, w, di)
+    def scan_cc(hint=None):
+        """Conta i secondi di CC appena inflitti: confronta le scadenze degli stati di
+        controllo con quelle viste prima e li attribuisce a `hint` (chi sta colpendo o
+        lanciando) se e' un nemico, altrimenti a chi ha colpito per ultimo."""
+        now = match.time
+        for v in units:
+            for f, w in CC_FIELDS:
+                cur = getattr(v, f, -1.0)
+                key = (v.id, f)
+                prev = seen.get(key, -1.0)
+                if cur <= prev:
+                    continue
+                seen[key] = cur
+                if cur <= now:
+                    continue
+                gain = cur - max(prev, now)
+                src = hint if (hint is not None and hint.team != v.team) else source_of(v)
+                if src is not None and src.id in stat and src.team != v.team:
+                    stat[src.id]["cc"] += w * gain
+                    if w >= 0.7:
+                        stat[src.id]["cc_n"] = stat[src.id].get("cc_n", 0) + 1
 
     orig_cast = match._cast
 
     def cast(p, *a, **kw):
-        prev, ctx["caster"] = ctx["caster"], p
-        try:
-            return orig_cast(p, *a, **kw)
-        finally:
-            ctx["caster"] = prev
+        r = orig_cast(p, *a, **kw)
+        scan_cc(p if isinstance(p, Pokemon) else None)
+        return r
 
     orig_heal = match._give_heal
     orig_shield = match._give_shield
@@ -211,6 +323,29 @@ def play(job):
             stat[caster.id]["support"] += max(0.0, amt)
         return orig_shield(caster, target, amt, dur)
 
+    def prepare_branch(p, plan):
+        """Prima del livello 8 porta il Pokemon sulla condizione del ramo voluto
+        (stessi campi che il gioco gia' usa: oggetto, oro dei neutrali/minion)."""
+        if plan == "politoad" and "king_rock" not in p.items:
+            p.items.append("king_rock")
+            match._apply_items(p)
+        elif plan == "poliwrath" and "king_rock" in p.items:
+            p.items.remove("king_rock")
+            match._apply_items(p)
+        elif plan == "sneasler" and not p.gold_wild > p.gold_minion:
+            p.gold_wild = p.gold_minion + 1.0
+        elif plan == "weavile" and p.gold_wild > p.gold_minion:
+            p.gold_minion = p.gold_wild
+
+    orig_smite = match.use_smite
+
+    def smite(p, target=None):
+        ok = orig_smite(p, target)
+        if ok and p.id in stat:
+            stat[p.id]["smites"] = stat[p.id].get("smites", 0) + 1
+        return ok
+
+    match.use_smite = smite
     match._on_death = on_death
     match._deal_damage = deal
     match._cast = cast
@@ -222,10 +357,17 @@ def play(job):
     while match.winner is None and match.time < MAX_TIME:
         match.update(dt, tick)
         tick += 1
+        scan_cc()
         if tick % 30 == 0:
             for p in units:
                 if p.level >= 8 and stat[p.id]["t8"] is None:
                     stat[p.id]["t8"] = round(match.time, 1)
+                if p.level >= 5 and stat[p.id].get("t5") is None:
+                    stat[p.id]["t5"] = round(match.time, 1)
+                if match.time >= 600.0 and "lvl10" not in stat[p.id]:
+                    stat[p.id]["lvl10"] = p.level
+                if p.level >= 7 and p.id in plans and p.stage < 2:
+                    prepare_branch(p, plans[p.id])
 
     timeout = match.winner is None
     if timeout:
@@ -248,36 +390,42 @@ def play(job):
         s["support"] = round(s["support"])
         s["gold"] = round(float(getattr(p, "gold", 0)))
     return {"seed": seed, "winner": winner, "timeout": timeout, "time": round(match.time, 1),
+            "jungler": [team_info[0]["jungler"], team_info[1]["jungler"]],
+            "support": [team_info[0]["support"], team_info[1]["support"]],
             "units": list(stat.values())}
 
 
-def make_jobs(n, start_seed, per_pokemon_balanced=True):
-    """Squadre casuali ma BILANCIATE: ogni Pokemon compare lo stesso numero di volte."""
+def make_jobs(n, start_seed):
+    """Squadre casuali ma BILANCIATE. Ogni squadra ha UN jungler (scelto tra quelli
+    che possono farlo) e 4 giocatori diversi tra loro. Si pesca sempre tra i meno
+    usati finora (a parita' a caso), cosi ogni Pokemon gioca quasi lo stesso numero
+    di partite; le prime n partite sono le stesse anche se si chiede un n maggiore."""
     rng = random.Random(start_seed)
-    size = len(config.ROSTER)
-    jobs, bag = [], []
+    names = [load_pokemon_def(str(ROOT / rel)).name for rel in config.ROSTER]
+    jg_idx = [names.index(n) for n in JUNGLERS]
+    used = [0] * len(names)
+    jused = [0] * len(names)
+    jobs = []
     for i in range(n):
-        picks = []
-        while len(picks) < 6:
-            if not bag:
-                bag = list(range(size))
-                rng.shuffle(bag)
-            x = bag.pop()
-            if x not in picks:
-                picks.append(x)
-            else:
-                bag.insert(0, x)
-                rng.shuffle(bag)
-        jobs.append((start_seed * 100000 + i, picks[:3], picks[3:]))
+        jungs = sorted(jg_idx, key=lambda x: (jused[x], rng.random()))[:2]
+        for x in jungs:
+            jused[x] += 1
+            used[x] += 1
+        pool = [x for x in range(len(names)) if x not in jungs]
+        picks = sorted(pool, key=lambda x: (used[x], rng.random()))[:8]
+        for x in picks:
+            used[x] += 1
+        rng.shuffle(picks)
+        jobs.append((start_seed * 100000 + i, jungs[0], picks[:4], jungs[1], picks[4:]))
     return jobs
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--matches", type=int, default=255)
+    ap.add_argument("--matches", type=int, default=160)
     ap.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 2))
     ap.add_argument("--seed", type=int, default=1)
-    ap.add_argument("--out", default=str(ROOT / "tools" / "tier_matches.jsonl"))
+    ap.add_argument("--out", default=str(ROOT / "tools" / "tier_matches_5v5.jsonl"))
     a = ap.parse_args()
     out = Path(a.out)
     done = set()

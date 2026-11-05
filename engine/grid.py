@@ -84,8 +84,16 @@ class Grid:
         if dist < 1e-9:
             return self.is_walkable_point(ax, ay, block_bush)
         steps = int(dist * 4) + 1  # ~4 campioni per tile
+        # Stessa logica di is_walkable_point, inlineata: e' il punto piu' caldo della
+        # simulazione (migliaia di chiamate lunghe per tick con i minion in lane).
+        tiles, w, h, blocking, floor = self.tiles, self.width, self.height, BLOCKING, math.floor
         for i in range(steps + 1):
             t = i / steps
-            if not self.is_walkable_point(ax + dx * t, ay + dy * t, block_bush):
+            x = floor(ax + dx * t)
+            y = floor(ay + dy * t)
+            if not (0 <= x < w and 0 <= y < h):
+                return False
+            tt = tiles[y][x]
+            if tt in blocking or (block_bush and tt == TILE_BUSH):
                 return False
         return True

@@ -21,7 +21,8 @@ from engine.vec import Vec2
 from engine.eevee import CHOICE_SLOTS, chosen_index, eevee_candidates, eevee_forms
 from engine.world import World
 from sim.commands import (BuyItemCommand, ChooseUpgradeCommand, MoveCommand,
-                          RankMoveCommand, RecallCommand, SellItemCommand, UseItemCommand)
+                          RankMoveCommand, RecallCommand, SellItemCommand, SmiteCommand,
+                          UseItemCommand)
 from sim.simulation import Simulation
 
 from ..camera import Camera
@@ -292,6 +293,11 @@ class MatchScene:
                   and self.match is not None):
                 # Test (solo locale): entra subito nella forma Shedinja.
                 self.match.force_shedinja(self.player)
+            elif ev.type == pygame.KEYDOWN and ev.key == pygame.K_f:
+                # Smite (come in LoL): danno vero al neutrale piu' vicino a portata.
+                self._menu_seq += 1
+                self.sim.queue_command(SmiteCommand(seq=50_000 + self._menu_seq,
+                                                    entity_id=self.player.id))
             elif ev.type == pygame.KEYDOWN and ev.key == pygame.K_b:
                 self._menu_seq += 1
                 self.sim.queue_command(RecallCommand(seq=50_000 + self._menu_seq,

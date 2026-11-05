@@ -204,7 +204,7 @@ class DeveloperTierScene(_DevBase):
             self.buttons.draw(surface, (x0, H - bh - 10, 200, bh), "Indietro  (Esc)",
                               self._back, mid)
             return
-        sub = small.render(f"Dalle partite dei bot ({self.data['matches']} partite 3v3).  "
+        sub = small.render(f"Dalle partite dei bot ({self.data['matches']} partite 5v5 da {self.data['minutes']:.0f} min).  "
                            "Più a sinistra = più forte.  Clic su un Pokémon per il perché.",
                            True, DIM)
         surface.blit(sub, (W // 2 - sub.get_width() // 2, int(H * 0.025) + t.get_height() + 2))
@@ -248,6 +248,79 @@ class DeveloperTierScene(_DevBase):
                              True, TEXT)
             surface.blit(txt, (W // 2 - txt.get_width() // 2,
                                H - bh - 10 + (bh - txt.get_height()) // 2))
+        self.buttons.draw(surface, (x0, H - bh - 10, 200, bh), "Indietro  (Esc)", self._back, mid)
+        self.buttons.draw(surface, (x0 + 214, H - bh - 10, 200, bh), "Dati partite",
+                          self._match_data, mid)
+
+    def _match_data(self):
+        self.next_scene = DeveloperMatchDataScene(self.app, self.data)
+
+
+class DeveloperMatchDataScene(_DevBase):
+    """Dati sull'insieme delle partite: jungler, Smite, supporti e rami forzati."""
+
+    def __init__(self, app, data):
+        self.app = app
+        self.next_scene = None
+        self.data = data
+        self.buttons = Buttons()
+        self._fonts = {}
+
+    def _back(self):
+        self.next_scene = DeveloperTierScene(self.app)
+
+    def handle_events(self, events):
+        for ev in events:
+            if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
+                self._back()
+            elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+                self.buttons.click(ev.pos)
+
+    def draw_fullres(self, surface, font):
+        W, H = surface.get_size()
+        surface.fill(BG)
+        self.buttons.clear()
+        md = self.data["match_data"]
+        title_f = self._font(max(28, H // 18), bold=True)
+        mid = self._font(max(14, H // 44))
+        small = self._font(max(12, H // 56))
+        t = title_f.render("Dati sulle partite", True, GOLD)
+        surface.blit(t, (W // 2 - t.get_width() // 2, int(H * 0.03)))
+        x0, y = int(W * 0.06), int(H * 0.03) + t.get_height() + 14
+        GREEN = (130, 200, 100)
+
+        def head(txt):
+            nonlocal y
+            surface.blit(mid.render(txt, True, GOLD), (x0, y))
+            y += mid.get_height() + 4
+
+        def row(txt, color=TEXT):
+            nonlocal y
+            for ln in _wrap(small, txt, W - 2 * x0 - 20):
+                surface.blit(small.render(ln, True, color), (x0 + 16, y))
+                y += small.get_height() + 2
+
+        head("Generale")
+        row(f"{md['matches']} partite 5v5 da {md['minutes']:.0f} minuti in media; "
+            f"{md['decided_by_core']} finite con il nucleo distrutto, le altre decise a 18 minuti "
+            f"da torri, uccisioni e danno. Vittorie squadra blu: {md['blue_wins'] * 100:.0f}%.")
+        row(f"Ogni squadra ha sempre un jungler. Smite usati a partita: {md['smites']}.")
+        y += 6
+        head("Squadre con e senza supporto in bot lane")
+        a, b = md["teams_with_support"], md["teams_without_support"]
+        row(f"Con un supporto: {a['games']} squadre, vittorie {a['winrate'] * 100:.0f}%.", GREEN)
+        row(f"Senza supporto: {b['games']} squadre, vittorie {b['winrate'] * 100:.0f}%.")
+        y += 6
+        head("Jungler")
+        for n, j in sorted(md["junglers"].items(), key=lambda kv: -kv[1]["winrate"]):
+            row(f"{n}: {j['games']} partite, vittorie {j['winrate'] * 100:.0f}%, "
+                f"{j['camps']:.0f} campi, {j['smites']:.1f} Smite, {j['legend']:.1f} leggendari, "
+                f"K {j['kills']:.1f} / A {j['assists']:.1f}, liv.5 a {int(j['t5'] // 60)}:{int(j['t5'] % 60):02d}")
+        y += 6
+        head("Forme scelte dalle regole di squadra")
+        row(", ".join(f"{k} {v['winrate'] * 100:.0f}% ({v['games']})"
+                      for k, v in md["forced_forms"].items()))
+        bh = mid.get_height() + 14
         self.buttons.draw(surface, (x0, H - bh - 10, 200, bh), "Indietro  (Esc)", self._back, mid)
 
 
@@ -305,7 +378,7 @@ class DeveloperDetailScene(_DevBase):
         tt = title_f.render(f"Tier {e['tier']}", True, (20, 24, 22))
         surface.blit(tt, (tb.centerx - tt.get_width() // 2, tb.centery - tt.get_height() // 2))
         y = tb.bottom + 10
-        for line in (f"Posizione {e['pos']} su 17", f"Ruolo: {e['role']}",
+        for line in (f"Posizione {e['pos']} su {len(self.data['list'])}", f"Ruolo: {e['role']}",
                      "Tipo: " + "/".join(e["types"]), f"{e['games']} partite giocate"):
             surface.blit(mid.render(line, True, TEXT), (pad, y))
             y += mid.get_height() + 4
@@ -357,17 +430,42 @@ class DeveloperDetailScene(_DevBase):
         title("Punti deboli", RED)
         for it in e["cons"]:
             line(it, bullet=RED)
+        cur["y"] += 6
+        c = e.get("context", {})
+        if c:
+            title("Giungla e squadra", GOLD)
+
+            def ctxline(label, d):
+                extra = ""
+                if d.get("camps"):
+                    extra = f", {d['camps']:.0f} campi, {d['smites']:.1f} Smite"
+                line(f"{label}: {d['winrate'] * 100:.0f}% ({d['games']} partite){extra}")
+            if "jungler" in c:
+                ctxline("Da jungler", c["jungler"])
+            if "laner" in c:
+                ctxline("In lane", c["laner"])
+            if "as_support" in c:
+                ctxline("Da supporto", c["as_support"])
+            if "with_support" in c:
+                ctxline("Con un supporto alleato", c["with_support"])
+            if "no_support" in c:
+                ctxline("Senza supporto", c["no_support"])
+            lanes = c.get("lanes", {})
+            if len(lanes) > 1:
+                line("Corsie: " + ", ".join(f"{k} {v['winrate'] * 100:.0f}% ({v['games']})"
+                                            for k, v in lanes.items()), DIM)
 
         cur.update(x=x + colw + gap, y=y)
         if e["forms"]:
             title("Classifica delle forme", GOLD)
             for f in e["forms"]:
                 if f["score"] is None:
-                    line(f"{f['name']}: troppo poche partite ({f['games']})", DIM, indent=14)
+                    line(f"{f['name']}: poche partite ({f['games']})", DIM, indent=14)
                     continue
-                line(f"{f['rank']}º {f['name']}  vitt. {f['winrate'] * 100:.0f}%  K/D {f['kda']:.2f}  "
-                     f"danno {f['dmg']}  ({f['share'] * 100:.0f}% delle volte)",
-                     GOLD if f["rank"] == 1 else TEXT, indent=14)
+                line(f"{f['rank']}º {f['name']}  {f['winrate'] * 100:.0f}%  K/D {f['kda']:.1f}  "
+                     f"({f['share'] * 100:.0f}%)", GOLD if f["rank"] == 1 else TEXT, indent=14)
+                if f.get("rule") and len(e["forms"]) <= 3:
+                    line(f["rule"], DIM, indent=26)
             cur["y"] += 6
         ti = e["types_info"]
         title("Tipi: " + "/".join(ti["types"]), GOLD)
