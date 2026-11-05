@@ -271,7 +271,8 @@ class OnlineMatchScene(NetMatchScene):
             charged=mag_fx.count_charged(self.world, me, self.world.match_time),
             frost_ready=swine_fx.count_frozen_ready(self.world, me, self.world.match_time),
             poisoned=moth_fx.count_poisoned(self.world, me, self.world.match_time),
-            flowers=tuple(f for f in self.world.fxs.flowers if f.get("owner") == me.id)))
+            flowers=tuple(f for f in self.world.fxs.flowers if f.get("owner") == me.id),
+            level=int(h.get("level", 1))))
 
     def _draw_disconnected(self, surface, font):
         """Etichetta sopra i Pokémon dei giocatori caduti."""

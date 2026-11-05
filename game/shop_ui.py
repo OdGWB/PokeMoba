@@ -120,8 +120,10 @@ class ShopUI:
 
     # --- disegno --------------------------------------------------------------
     def draw(self, surface, font, catalog, gold, owned, recommended, near_base,
-             cooldowns=None, now=0.0):
-        """`recommended` = lista di id (o un ruolo: si usano i consigliati del ruolo)."""
+             cooldowns=None, now=0.0, evo=None):
+        """`recommended` = lista di id (o un ruolo: si usano i consigliati del ruolo).
+        `evo` = oggetti evolutivi da evidenziare (id -> forma che danno; Scyther)."""
+        self._evo = dict(evo or {})
         if isinstance(recommended, str):
             recommended = catalog.recommended_for(recommended)
         self._buy_rects.clear()
@@ -252,4 +254,9 @@ class ShopUI:
                          (r.x + 54, r.y + 7))
             col = (120, 220, 120) if afford else (200, 180, 120)
             surface.blit(font.render(f"{price}", True, col), (r.x + 54, r.bottom - 22))
+            form = getattr(self, "_evo", {}).get(iid)
+            if form:   # oggetto evolutivo (Scyther): cornice d'oro e forma che dà
+                pygame.draw.rect(surface, (240, 200, 90), r, 2)
+                t = font.render(f"-> {form}", True, (255, 220, 120))
+                surface.blit(t, (r.right - t.get_width() - 5, r.bottom - 22))
             self._buy_rects.append((r, iid))

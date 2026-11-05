@@ -89,6 +89,7 @@ RUST_ATK = 0.03            # Spada Arrugginita: +3% Attacco per carica (in Pokem
 RUST_MAX = 5               # ...fino a 5 cariche...
 RUST_DUR = 4.0             # ...per 4s dall'ultimo colpo...
 RUST_SPEED = 1.10          # ...a 5 cariche +10% velocità di movimento
+AUGURITE_TOWER = 1.20     # Augite Nera: +20% danno alle torri
 ICE_SLOW = 0.8             # Gelomai: chi lo colpisce con un attacco base ha -20% vel. d'attacco...
 ICE_DUR = 2.0              # ...per 2s
 AURA_RADIUS = 6.0          # Acqua Mistica: alleati entro 6 tile...
@@ -242,6 +243,14 @@ class ItemEffectsMixin:
         u.aa_quick = ("quick_claw" in self._fx_items(u)
                       and self.time - u.last_aa_at >= QUICKCLAW_IDLE)
         return 0.0 if u.aa_quick else 1.0
+
+    def _item_struct_mult(self, attacker, target) -> float:
+        """Augite Nera: +20% di danno alle torri (attacchi base e mosse)."""
+        if (isinstance(attacker, Pokemon) and isinstance(target, Structure)
+                and getattr(target, "kind", "") == "tower" and attacker.items
+                and "black_augurite" in self._fx_items(attacker)):
+            return AUGURITE_TOWER
+        return 1.0
 
     def _item_aa_mult(self, u, tgt) -> float:
         m = QUICKCLAW_MULT if u.aa_quick else 1.0

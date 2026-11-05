@@ -96,9 +96,10 @@ class BasicAttackMixin:
         base = u.as_base if u.as_base > 0.0 else u.attack_speed
         bonus = u.as_bonus + self._moth_as_bonus(u)   # Eledanza: +30%
         bonus += self._octi_as_bonus(u)                # Presa a Ventosa: +50%
+        bonus += self._scy_as_bonus(u)                 # Chele d'Acciaio: +25%
         if u.rampage_until > self.time:
             bonus += 1.0                      # Oltraggio: +100% (si somma agli altri)
-        aps = min(AS_CAP, base * (1.0 + bonus))
+        aps = min(AS_CAP, base * (1.0 + bonus) * self._scy_as_mult(u))   # Asce di Pietra: -20%
         aps /= self._item_aa_cd_mult(u)       # Gelomai: rallentamento, dopo il tetto
         return max(0.2, aps)
 
@@ -198,6 +199,7 @@ class BasicAttackMixin:
         self._mien_before_aa(u, tgt)   # Maniche a Frusta: punto dolce (distanza al rilascio)
         claws = self._claws_on(u)      # Ombrartigli: Spettro, sempre brutto colpo
         mult = self._item_aa_mult(u, tgt) * self._mien_aa_mult(u)
+        mult *= self._scy_aa_mult(u)   # Asce di Pietra (Kleavor): +40%
         if u.aa_stealth:               # Distacco: primo colpo furtivo potenziato
             mult *= config.DISTACCO_BONUS_MULT
             u.stealth_shot_ready = False
@@ -242,6 +244,7 @@ class BasicAttackMixin:
         self._swine_after_aa(u, tgt)     # Gelo (Mamoswine): accumuli e congelamento
         self._moth_after_aa(u, tgt)      # Scaglie Velenose: accumuli di veleno
         self._octi_after_aa(u, tgt, snap, dmg)   # munizioni: Ghiaccio, Fuoco, Erba
+        self._scy_after_aa(u, tgt)    # Doppiocolpo, Chele d'Acciaio, Asce di Pietra, Spaccaroccia
         self._spirit_wander(u, tgt)   # Spirito Vagante (Spiritomb)
         self._cute_charm(u, tgt)      # Incantevole (Sylveon)
 

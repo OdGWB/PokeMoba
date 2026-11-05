@@ -28,7 +28,7 @@ from ..camera import Camera
 from ..fx import FXSystem
 from ..input_controller import InputController
 from ..minimap import Minimap
-from .. import anim_tuning, arch_fx, eevee_fx, hatt_fx, mag_fx, moth_fx, spirit_fx, swine_fx
+from .. import anim_tuning, arch_fx, eevee_fx, hatt_fx, mag_fx, moth_fx, scy_fx, spirit_fx, swine_fx
 from ..particles import ParticleSystem
 from ..renderer import Renderer
 from ..shop_ui import ShopUI
@@ -647,7 +647,8 @@ class MatchScene:
             poisoned=moth_fx.count_poisoned(
                 self.world, p, self.match.time,
                 lambda e: self.match.vision.is_enemy_visible(p.team, e.id)),
-            flowers=tuple(f for f in self.match.flowers if f["owner"] == p.id)))
+            flowers=tuple(f for f in self.match.flowers if f["owner"] == p.id),
+            level=p.level))
         # Popup delle evoluzioni: in fila sopra la barra, mai sovrapposti.
         evo = [sl for sl in ("Q", "W", "E", "R")
                if sl in p.pending_choices and p.moveset.get(sl) and p.moveset[sl].upgrades]
@@ -678,7 +679,8 @@ class MatchScene:
 
         if self.shop.open:
             self.shop.draw(surface, font, self.match.item_catalog, p.gold, p.items,
-                           p.rec_items or self.pdef.role, near_base, p.item_cd, self.match.time)
+                           p.rec_items or self.pdef.role, near_base, p.item_cd, self.match.time,
+                           evo=scy_fx.evo_hint(p))   # Scyther: oggetti evolutivi in evidenza
 
     def _choice_size(self, sl) -> tuple:
         if self.player.passive_id == "adattabilita" and sl in CHOICE_SLOTS:

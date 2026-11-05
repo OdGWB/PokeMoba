@@ -1,0 +1,133 @@
+{
+  "_comment": "Scyther -> Scizor OPPURE Kleavor: combattente da top lane, UNICA evoluzione ramificata TRAMITE OGGETTO (engine/scizor.py). Al liv.4 solo i potenziamenti; dal liv.8 evolve appena possiede Metalcoperta (-> Scizor) o Augite Nera (-> Kleavor), anche nel negozio; con entrambi vale quella comprata per prima (ordine dell'inventario). Senza oggetto resta Scyther e la R resta chiusa ('Evolvi'). Vendere l'oggetto dopo non cambia nulla. All'evoluzione la Q diventa la mossa della forma (grado conservato), W ed E restano col potenziamento scelto, la passiva Cuordeciso diventa quella della forma (Tecnico / Asce di Pietra) e arrivano le due R della forma. Statistiche = valori base reali (la derivazione le scala). Mosse con id propri (scyther_*/scizor_*/kleavor_*).",
+  "dex": 123,
+  "name": "Scyther",
+  "types": ["Bug", "Flying"],
+  "role": "combattente",
+  "recommended_items": ["metal_coat", "black_augurite", "rusted_sword", "focus_band", "weakness_policy", "dragon_fang", "black_sludge"],
+  "color": [96, 168, 72],
+  "radius": 0.42,
+  "base_speed": 3.7,
+  "attack_range": 1.6,
+  "attack_cooldown": 0.8,
+  "sprite_dir": "assets/pokemon/0123",
+  "passive": "cuordeciso",
+  "attack_fx": "scyslash",
+
+  "base_stats": {"hp": 70, "attack": 110, "defense": 80, "sp_attack": 55, "sp_defense": 80, "speed": 105},
+
+  "evolutions": [
+    {"stage": 0, "level": 1, "name": "Scyther", "dex": 123, "sprite_dir": "assets/pokemon/0123",
+     "types": ["Bug", "Flying"], "passive": "cuordeciso", "role": "combattente", "color": [96, 168, 72],
+     "attack_fx": "scyslash", "attack_range": 1.6, "ranged": false, "radius": 0.42,
+     "base_stats": {"hp": 70, "attack": 110, "defense": 80, "sp_attack": 55, "sp_defense": 80, "speed": 105}},
+
+    {"stage": 1, "level": 8, "name": "Scizor", "dex": 212, "sprite_dir": "assets/pokemon/0212",
+     "types": ["Bug", "Steel"], "passive": "tecnico", "role": "combattente", "color": [196, 52, 52],
+     "form_color": [214, 60, 60],
+     "attack_fx": "scypinch", "attack_range": 1.6, "ranged": false, "radius": 0.45,
+     "requires": {"evo_item": "metal_coat", "among": ["metal_coat", "black_augurite"]},
+     "base_stats": {"hp": 70, "attack": 130, "defense": 100, "sp_attack": 55, "sp_defense": 80, "speed": 65},
+     "moves": {
+       "Q": {"base": {"id": "scizor_bulletpunch", "name": "Pugnoscarica", "type": "Steel", "category": "physical",
+                      "shape": "scybullet", "fx": "scybullet", "target": "direction",
+                      "power": [55, 80, 105, 130], "ratio": 0.75,
+                      "cooldown": [3, 3, 3, 3], "range": 2.0, "radius": 0.6,
+                      "effects": {"interrupt": true, "unstoppable": 0.3}}},
+       "R": {"upgrades": [
+         {"id": "scizor_superpower", "name": "Troppoforte", "type": "Fighting", "category": "physical",
+          "shape": "scysuperpower", "fx": "scysuperpower", "target": "direction",
+          "power": [220, 330, 440], "ratio": 1.6,
+          "cooldown": [70, 60, 50], "range": 2.2, "angle": 40,
+          "effects": {"self_down": {"atk": 0.8, "def": 0.8, "duration": 4.0}}},
+         {"id": "scizor_steelclaws", "name": "Chele d'Acciaio", "type": "Steel", "category": "none",
+          "shape": "scyclaws", "fx": "scyclaws", "target": "self",
+          "power": [0, 0, 0],
+          "cooldown": [80, 70, 60], "range": 0,
+          "effects": {"duration": 6.0, "second_mult": 0.6, "attack_speed": 0.25, "heal_frac": 0.10}}
+       ]}
+     }},
+
+    {"stage": 1, "level": 8, "name": "Kleavor", "dex": 900, "sprite_dir": "assets/pokemon/0900",
+     "types": ["Bug", "Rock"], "passive": "ascedipietra", "role": "combattente", "color": [150, 120, 84],
+     "form_color": [176, 140, 96],
+     "attack_fx": "kleacleave", "attack_range": 1.7, "ranged": false, "radius": 0.5,
+     "requires": {"evo_item": "black_augurite", "among": ["metal_coat", "black_augurite"]},
+     "base_stats": {"hp": 70, "attack": 135, "defense": 95, "sp_attack": 45, "sp_defense": 70, "speed": 85},
+     "moves": {
+       "Q": {"base": {"id": "kleavor_stoneaxe", "name": "Asciapietra", "type": "Rock", "category": "physical",
+                      "shape": "kleaaxe", "fx": "kleaaxe", "target": "direction",
+                      "power": [70, 105, 140, 175], "ratio": 0.9,
+                      "cooldown": [7, 6.5, 6, 5.5], "range": 2.4, "angle": 55,
+                      "effects": {"field": {"radius": 2.0, "duration": 6.0, "tick": 1.0, "tick_mult": 0.2,
+                                            "slow": 0.8, "self_def": 1.2}}}},
+       "R": {"upgrades": [
+         {"id": "kleavor_treecut", "name": "Taglio d'Albero", "type": "Rock", "category": "physical",
+          "shape": "kleachop", "fx": "kleachop", "target": "direction",
+          "power": [200, 300, 400], "ratio": 1.4,
+          "cooldown": [80, 70, 60], "range": 5.0, "angle": 30,
+          "effects": {"delay": 0.5, "airborne": {"duration": 1.0, "peak": 1.1},
+                      "field": {"duration": 6.0, "tick": 1.0, "tick_mult": 0.1, "slow": 0.8, "self_def": 1.2}}},
+         {"id": "kleavor_rocksmash", "name": "Spaccaroccia", "type": "Fighting", "category": "none",
+          "shape": "kleasmash", "fx": "kleasmash", "target": "self",
+          "power": [0, 0, 0],
+          "cooldown": [60, 50, 40], "range": 0,
+          "effects": {"duration": 6.0, "per_hit": 0.08, "max": 0.40, "shred_dur": 4.0}}
+       ]}
+     }}
+  ],
+
+  "moves": {
+    "Q": {
+      "base": {"id": "scyther_furycutter", "name": "Tagliofuria", "type": "Bug", "category": "physical",
+               "shape": "scyfury", "fx": "scyfury", "target": "direction",
+               "power": [40, 60, 80, 100], "ratio": 0.6,
+               "cooldown": [2.5, 2.25, 2.0, 1.75], "range": 2.2, "angle": 60,
+               "effects": {"window": 3.0, "per_stack": 1.25, "max_stacks": 4}},
+      "upgrades": [
+        {"id": "scyther_furycutter2", "name": "Tagliofuria +", "type": "Bug", "category": "physical",
+         "shape": "scyfury", "fx": "scyfury", "target": "direction",
+         "power": [55, 80, 105, 130], "ratio": 0.75,
+         "cooldown": [2.5, 2.25, 2.0, 1.75], "range": 2.3, "angle": 60,
+         "effects": {"window": 3.0, "per_stack": 1.25, "max_stacks": 4}}
+      ]
+    },
+    "W": {
+      "base": {"id": "scyther_focusenergy", "name": "Focalenergia", "type": "Normal", "category": "none",
+               "shape": "scyfocus", "fx": "scyfocus", "target": "self",
+               "power": [0, 0, 0, 0],
+               "cooldown": [12, 11, 10, 9], "range": 0,
+               "effects": {"crit": 0.4, "duration": 4.0}},
+      "upgrades": [
+        {"id": "scyther_swordsdance", "name": "Danzaspada", "type": "Normal", "category": "none",
+         "shape": "buff", "fx": "swordsdance", "target": "self",
+         "cooldown": [14, 13, 12, 11],
+         "passive": {"stat": "attack", "amount": [6, 12, 18, 24]},
+         "effects": {"atk": {"mult": 1.25, "duration": 5.0}}},
+        {"id": "scyther_doublehit", "name": "Doppiocolpo", "type": "Normal", "category": "none",
+         "shape": "scyfocus", "fx": "scyfocus", "target": "self",
+         "power": [0, 0, 0, 0],
+         "cooldown": [12, 11, 10, 9], "range": 0,
+         "effects": {"crit": 0.4, "duration": 4.0, "double": true}}
+      ]
+    },
+    "E": {
+      "base": {"id": "scyther_wingattack", "name": "Attacco d'Ala", "type": "Flying", "category": "physical",
+               "shape": "scywing", "fx": "scywing", "target": "direction",
+               "power": [50, 80, 110, 140], "ratio": 0.7,
+               "cooldown": [9, 8.5, 8, 7.5], "range": 4.0, "radius": 0.6},
+      "upgrades": [
+        {"id": "scyther_uturn", "name": "Retromarcia", "type": "Bug", "category": "physical",
+         "shape": "scywing", "fx": "scyuturn", "target": "direction",
+         "power": [50, 80, 110, 140], "ratio": 0.7,
+         "cooldown": [9, 8.5, 8, 7.5], "range": 4.0, "radius": 0.6,
+         "effects": {"back": 3.0}},
+        {"id": "scyther_doubledash", "name": "Doppio scatto", "type": "Flying", "category": "physical",
+         "shape": "scywing", "fx": "scywing", "target": "direction",
+         "power": [50, 80, 110, 140], "ratio": 0.7,
+         "charges": 2, "charge_time": 8.5, "refund_on_hit": false,
+         "cooldown": [0.6, 0.6, 0.6, 0.6], "range": 4.0, "radius": 0.6}
+      ]
+    }
+  }
+}

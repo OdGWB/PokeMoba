@@ -40,6 +40,15 @@ def _requires_met(p, st) -> bool:
         return False
     if gold == "minion" and p.gold_wild > p.gold_minion:
         return False
+    # Linea Scyther: {"evo_item": "metal_coat", "among": [...]} -> vera se, tra
+    # gli oggetti evolutivi `among` posseduti, il PRIMO comprato (l'inventario è
+    # in ordine d'acquisto) è `evo_item`. Senza nessuno dei due: falsa.
+    evo = req.get("evo_item")
+    if evo is not None:
+        among = req.get("among") or [evo]
+        first = next((i for i in getattr(p, "items", []) if i in among), None)
+        if first != evo:
+            return False
     choices = req.get("choices")
     if choices:
         for slot, idx in choices.items():

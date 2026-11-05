@@ -84,7 +84,8 @@ class OnlineWorld(NetWorld):
                                                        "trick_rooms", "mag_walls",
                                                        "mag_pillars", "mag_fields",
                                                        "swine_tracks", "flowers",
-                                                       "flor_roots", "flor_mists")})
+                                                       "flor_roots", "flor_mists",
+                                                       "scy_fields", "scy_chops")})
         self.respawning: list = []
         self.dead: set = set()
         self.me_vis: dict = {}

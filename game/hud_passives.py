@@ -16,7 +16,7 @@ import pygame
 
 from engine.eevee import eevee_candidates, eevee_forms
 
-from . import (arch_fx, eevee_fx, flor_fx, hatt_fx, mag_fx, mien_fx, moth_fx, octi_fx, sneasel_fx,
+from . import (arch_fx, eevee_fx, flor_fx, hatt_fx, mag_fx, mien_fx, moth_fx, octi_fx, scy_fx, sneasel_fx,
                swine_fx, ursa_fx)
 
 
@@ -31,6 +31,7 @@ class PassiveCtx:
     frost_ready: int = 0         # Gelo: nemici con 4 accumuli pronti (linea Swinub)
     poisoned: int = 0            # Scaglie Velenose: nemici con 6 accumuli (linea Venonat)
     flowers: tuple = ()          # Giardino: i propri fiori piantati (linea Flabébé)
+    level: int = 0               # livello (Scyther: avviso dell'evoluzione dal liv.8)
 
 
 def draw_passive(surface, font, p, bx, y0, bh, ctx) -> None:
@@ -169,6 +170,10 @@ def draw_passive(surface, font, p, bx, y0, bh, ctx) -> None:
     # Linea Flabébé: colore dei fiori e fiori piantati (pieni = sbocciati).
     if p.passive_id == "giardino":
         flor_fx.draw_hud(surface, font, p, bx, y0, bh, ctx.flowers, ctx.now)
+    # Linea Scyther: Cuordeciso (+ avviso dell'evoluzione), Tecnico, Asce di Pietra.
+    if p.passive_id in scy_fx.PASSIVE_NAMES:
+        scy_fx.draw_hud(surface, font, p, bx, y0, bh, ctx.now, ctx.level,
+                        getattr(p, "scy_fury_stacks", 0))
 
     # Linea Teddiursa: Miele (vasetti) e, da Ursaring, Dentistretti.
     if p.passive_id in ("miele", "dentistretti"):

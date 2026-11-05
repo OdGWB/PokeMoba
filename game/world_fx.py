@@ -20,7 +20,7 @@ import pygame
 import config
 
 from . import (arch_fx, charcadet_fx, corvi_fx, eevee_fx, hatt_fx, mag_fx, mien_fx, noivern_fx,
-               flor_fx, moth_fx, octi_fx, sneasel_fx, spirit_fx, swine_fx, ursa_fx)
+               flor_fx, moth_fx, octi_fx, scy_fx, sneasel_fx, spirit_fx, swine_fx, ursa_fx)
 from .fx import draw_avalanche, draw_sandstorm, type_color
 
 
@@ -186,6 +186,11 @@ def draw_world_effects(surface, camera, world, m, team, vision, now, player_id,
         flor_fx.draw_roots(surface, camera, z, now)
     for z in getattr(m, "flor_mists", ()):
         flor_fx.draw_mist(surface, camera, z, now)
+    # Linea Scyther: campi di schegge e Taglio d'Albero in carica (visibili a tutti).
+    for fl in getattr(m, "scy_fields", ()):
+        scy_fx.draw_field(surface, camera, fl, now)
+    for ch in getattr(m, "scy_chops", ()):
+        scy_fx.draw_chop(surface, camera, ch, now)
     # Linea Remoraid: proiettili di Pistolacqua / Raffica / Colpo Perforante.
     for o in getattr(m, "octi_shots", ()):
         if seen(o["pos"], o["team"]):

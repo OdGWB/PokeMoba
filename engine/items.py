@@ -33,6 +33,7 @@ class ItemDef:
     group: str = ""
     icon: str = ""
     active: bool = False
+    evo: str = ""        # oggetto evolutivo: forma che dà a Scyther (Scizor/Kleavor)
 
 
 class ItemCatalog:
@@ -58,7 +59,8 @@ class ItemCatalog:
                                          is_base=(tier == 1), tier=tier,
                                          category=d.get("category", key),
                                          group=d.get("group", ""), icon=d.get("icon", ""),
-                                         active=bool(d.get("active", False)))
+                                         active=bool(d.get("active", False)),
+                                         evo=d.get("evo", ""))
                 lists[key].append(d["id"])
         cats = [tuple(c) for c in data.get("categories", [])]
         return cls(items, lists["base"], lists["completed"],

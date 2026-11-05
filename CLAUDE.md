@@ -996,6 +996,36 @@ Passaggi completati:
   semina, bocciolo, sbocciato, raccolta, giallo, hud, florocura/_mira,
   petalbufera/_mira, petalodanza, camponebbioso, radici, giardinoreale/_mira/
   _dopo, solarraggio/_mira, selezione, draft_flabebe).
+- LINEA SCYTHER > SCIZOR / KLEAVOR (step_49), grafica nuova in game/scy_fx.py
+  (logica in engine/scizor.py; evoluzione TRAMITE OGGETTO, condizione
+  "evo_item" in engine/evolution.py). Sprite PMD Sprite Collab in
+  assets/pokemon/0123/0212/0900. Icone nuove assets/items/metal-coat.png e
+  black-augurite.png (la seconda su PokeAPI e' 160x160: ridotta a mano a 30x30
+  con alfa netto, come le altre). Forme nuove in _draw_shapes (scy_fx.SHAPES):
+  lama curva affusolata che corre lungo l'arco (scyblade: falce verde di
+  Scyther, ascia di pietra di Kleavor, scia doppia con gli accumuli di
+  Tagliofuria), chela che si chiude (scypincer: attacco base di Scizor),
+  pugno pixel art con le linee di velocita' (scyfist: Pugnoscarica, enorme e
+  arancione per Troppoforte), scheggia che vola a parabola (scyshard),
+  fiammella rossa che sale (scyflame: Focalenergia), ascia gigante sul cono
+  (scychop: Taglio d'Albero a segno). Riusa windline, impactstar,
+  groundcrack, groundring, pebble, flash, ring. Disegni PERSISTENTI
+  (world_fx, VISIBILI A TUTTI): campo di schegge (terreno scurito + bordo
+  tratteggiato + schegge di pietra scura piantate, sprite in cache per
+  variante, posizioni stabili per campo; cerchio per Asciapietra, cono per
+  Taglio d'Albero), carica di Taglio d'Albero (cono che si riempie dal
+  lanciatore + ascia alzata). Sulle unita': fiammelle di Focalenergia, due
+  falci sopra la testa con Doppiocolpo pronto, riflessi d'acciaio di Chele,
+  frecce blu di Troppoforte, linee di vento di Cuordeciso, pugni arancioni
+  di Spaccaroccia, schegge che girano attorno a Kleavor nel suo campo; sotto
+  la barra della vita 5 tacche d'armatura incrinata (Spaccaroccia subita,
+  a tutti). HUD: falce/chela/ascia della passiva + tacche di Tagliofuria;
+  dal liv.8 Scyther mostra "Evolvi: Metalcoperta/Augite" lampeggiante. Nel
+  NEGOZIO (ShopUI.draw evo=) per Scyther i due oggetti hanno la cornice d'oro
+  e "-> Scizor"/"-> Kleavor". Online: scy_fields/scy_chops a entrambe le
+  squadre (net/visual), scy_fury_stacks/scy_double_ready/scy_shred/
+  scy_infield in UNIT_FLAGS, i timer scy_*_until passano da soli.
+  Screenshot: step_49_* (forme, ogni mossa, mirini, hud_*, negozio, draft).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

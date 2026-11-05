@@ -438,6 +438,23 @@ class Pokemon(Unit):
     flor_mist_until: float = -1.0      # dentro Campo Nebbioso (immune ai nuovi stati)
     flor_pick_at: float = -1.0         # ultimo fiore raccolto (solo grafica)
     flor_pick_color: str = ""
+    # Linea Scyther (engine/scizor.py)
+    scy_was_cc: bool = False           # Cuordeciso: era sotto controllo al tick prima
+    scy_heart_until: float = -1.0      # Cuordeciso: +30% velocità
+    scy_fury_stacks: int = 0           # Tagliofuria: usi a segno consecutivi
+    scy_fury_last: float = -1e9
+    scy_fury_until: float = -1.0       # fine della finestra di Tagliofuria (solo grafica/HUD)
+    scy_focus_until: float = -1.0      # Focalenergia: +40% brutto colpo
+    scy_double_ready: bool = False     # Doppiocolpo: il prossimo attacco base colpisce due volte
+    scy_claws_until: float = -1.0      # Chele d'Acciaio
+    scy_down_until: float = -1.0       # Troppoforte: -20% Attacco e Difesa
+    scy_smash_until: float = -1.0      # Spaccaroccia attiva (su Kleavor)
+    scy_shred: int = 0                 # Spaccaroccia subita: accumuli (-8% Difesa l'uno)
+    scy_shred_until: float = -1.0
+    scy_infield: bool = False          # Kleavor dentro un suo campo di schegge
+    scy_atk_mult: float = 1.0          # moltiplicatori ricalcolati a ogni tick
+    scy_def_mult: float = 1.0
+    scy_spdef_mult: float = 1.0
 
     def _bonus(self, stat: str) -> float:
         return (self.passive_bonus.get(stat, 0.0) + self.item_bonus.get(stat, 0.0)
@@ -468,7 +485,7 @@ class Pokemon(Unit):
             atk *= self.ancient_mult    # Forzantica (Mamoswine): tutte le statistiche
         if self.silver_active:
             atk *= self.silver_mult     # Ventargenteo (Venomoth): tutte le statistiche
-        return atk
+        return atk * self.scy_atk_mult   # Troppoforte (Scizor): -20%
 
     def eff_sp_attack(self) -> float:
         # Nel modello MOBA la statistica speciale per livello e' sparita: le
@@ -511,7 +528,7 @@ class Pokemon(Unit):
             d *= self.ancient_mult      # Forzantica
         if self.silver_active:
             d *= self.silver_mult       # Ventargenteo
-        return max(0.0, d)
+        return max(0.0, d * self.scy_def_mult)   # Troppoforte, Spaccaroccia, campo di schegge
 
     def eff_sp_defense(self) -> float:
         d = (self.stats.sp_defense + self._bonus("sp_defense") + self._soul()
@@ -528,7 +545,7 @@ class Pokemon(Unit):
             d *= self.silver_mult       # Ventargenteo
         if self.quiver_active:
             d *= self.quiver_spd        # Eledanza: +30% Dif. Sp.
-        return max(0.0, d)
+        return max(0.0, d * self.scy_spdef_mult)   # campo di schegge (Kleavor)
     # Ordine corrente impartito dal giocatore (o dal controllo): guida l'IA.
     #   "idle" | "move" | "attack" | "attackmove" | "stop" (stop = tieni la posizione)
     order: str = "idle"

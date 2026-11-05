@@ -44,7 +44,8 @@ LISTS = {
     "powder_clouds": ("c", "team"), "octi_shots": ("pos", "team"),
 }
 # Campi solo di logica (oggetti del motore, insiemi di bersagli già colpiti).
-SKIP = {"mv", "hit", "touched", "since", "rank", "explode", "first", "caught", "slept", "freed", "rel"}
+SKIP = {"mv", "hit", "touched", "since", "rank", "explode", "first", "caught", "slept", "freed", "rel",
+        "_pts"}
 # Stati sulle unità che non sono timer *_until (valore "spento" a destra).
 UNIT_FLAGS = {"air_z": 0.0, "sand_radius": 0.0, "invisible": False, "submerged": False,
               "spirit_awaken": 0, "smoke_hidden": False, "armor_blocks": 0, "echo_count": 0,
@@ -52,7 +53,8 @@ UNIT_FLAGS = {"air_z": 0.0, "sand_radius": 0.0, "invisible": False, "submerged":
               "snatch_down": 0, "snatch_up": 0, "mien_regen": False,
               "arch_rain": False, "thunder_left": 0, "agitated": False, "mag_sign": 0,
               "frost_stacks": 0, "fat_shield": 0.0, "venom_stacks": 0, "octi_lock_by": -1,
-              "flower_color": "red"}
+              "flower_color": "red", "scy_fury_stacks": 0, "scy_double_ready": False,
+              "scy_shred": 0, "scy_infield": False}
 # Il proprio Pokémon: passive e ricariche mostrate nell'interfaccia.
 ME_FIELDS = ("passive_id", "soul_charges", "inversion_stacks", "muta_cd_until", "muta_cd_max",
              "form_until", "sandstorm_boost_until", "sand_radius", "spirit_charges",
@@ -138,7 +140,8 @@ def capture_visual(match, team: int, player=None) -> dict:
     # Linea Magnemite: cariche sui muri, pilastro di Bombagnete (un ostacolo) e
     # Campo Elettrico li vedono tutti.
     for name in ("mag_walls", "mag_pillars", "mag_fields",
-                 "flowers", "flor_roots", "flor_mists"):   # + Giardino (Flabébé)
+                 "flowers", "flor_roots", "flor_mists",   # + Giardino (Flabébé)
+                 "scy_fields", "scy_chops"):   # + schegge e Taglio d'Albero (Kleavor)
         items = [_clean(d) for d in getattr(match, name, ())]
         if items:
             out[name] = items

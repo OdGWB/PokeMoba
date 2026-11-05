@@ -19,7 +19,7 @@ from engine.jungle import CODE_WEATHER, WEATHER_NAMES, apply_weather, ring_tiles
 from engine.vec import Vec2
 from engine.vision import VisionSystem
 
-from .. import hud, mag_fx
+from .. import hud, mag_fx, scy_fx
 from ..camera import Camera
 from ..fx import type_color
 from ..input_controller import champs_only_held
@@ -484,4 +484,5 @@ class NetMatchScene:
             near = me is not None and me.pos.dist(self.base) <= config.SHOP_RANGE
             self.shop.draw(surface, font, self.item_catalog, h.get("gold", 0),
                            h.get("items", []), self.pdef.recommended_items or self.pdef.role,
-                           near, self._me_vis().get("item_cd", {}), self.world.match_time)
+                           near, self._me_vis().get("item_cd", {}), self.world.match_time,
+                           evo=scy_fx.evo_hint(self.world.get(self.your_id)))   # Scyther

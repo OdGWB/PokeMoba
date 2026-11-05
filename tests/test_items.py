@@ -22,7 +22,7 @@ class TestItems(unittest.TestCase):
 
     def test_catalog_shape(self):
         self.assertEqual(len(self.cat.base_ids), 7)
-        self.assertEqual(len(self.cat.intermediate_ids), 13)
+        self.assertEqual(len(self.cat.intermediate_ids), 15)   # + Metalcoperta, Augite Nera
         self.assertEqual(len(self.cat.completed_ids), 36)
         for it in self.cat.items.values():
             self.assertTrue(it.icon, it.id)

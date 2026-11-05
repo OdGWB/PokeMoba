@@ -19,7 +19,7 @@ from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
                          TILE_PUDDLE, TILE_RIVER, TILE_WALL)
 from . import spirit_fx
 from . import (arch_fx, charcadet_fx, corvi_fx, eevee_fx, hatt_fx, mag_fx, mien_fx, noivern_fx,
-               flor_fx, moth_fx, octi_fx, swine_fx,
+               flor_fx, moth_fx, octi_fx, scy_fx, swine_fx,
                sneasel_fx, ursa_fx)
 from . import structure_gfx
 from .fx import EMBER, ROCK_HI, ROCK_MID, ROCK_OUT, ROCK_SH, type_color
@@ -644,6 +644,8 @@ class Renderer:
             return   # linea Flabébé
         if octi_fx.draw_aim(surface, S, ts, ox, oy, nx, ny, dist, move, ammo):
             return   # linea Remoraid (colore della munizione attiva)
+        if scy_fx.draw_aim(surface, S, ts, ox, oy, nx, ny, dist, move):
+            return   # linea Scyther
         if shape == "rockwave":   # Rocciotomba: corsia dell'onda + pilastro in fondo
             ex, ey = ox + nx * rng, oy + ny * rng
             pygame.draw.line(surface, col, S(ox, oy), S(ex, ey), max(2, int(move.radius * ts)))
@@ -909,6 +911,7 @@ class Renderer:
                     moth_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # Eledanza, Polvoscudo
                     octi_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # Presa, Iper Raggio
                     flor_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # Petalodanza, fiori
+                    scy_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # Focalenergia, Chele...
                 if in_bush:
                     self._draw_hidden_hint(surface, e, gx, gy, now)
                 self._draw_unit_hp(surface, e, gx, gy, grow)
@@ -1099,6 +1102,9 @@ class Renderer:
             if getattr(u, "frost_stacks", 0) > 0:
                 row += 1
         moth_fx.draw_venom_pips(surface, u, gx, top, w, row)   # veleno (anche minion e neutrali)
+        if getattr(u, "venom_stacks", 0) > 0:
+            row += 1
+        scy_fx.draw_hp_extras(surface, u, gx, top, w, row)   # Spaccaroccia: armatura incrinata
         octi_fx.draw_lock(surface, u, gx, top, self._now)   # mirino di Prendimira (a tutti)
 
     def _hp_bar(self, surface, cx, top_y, frac, team_col, width):

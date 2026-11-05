@@ -55,6 +55,8 @@ ICONS = {
     "charcoal": "charcoal", "spell_tag": "spell-tag", "focus_band": "focus-band",
     "rusted_sword": "rusted-sword", "never_melt_ice": "never-melt-ice",
     "mystic_water": "mystic-water", "poke_flute": "poke-flute",
+    # oggetti evolutivi della linea Scyther (black-augurite ridotta a 30x30 a mano)
+    "metal_coat": "metal-coat", "black_augurite": "black-augurite",
     # consumabili / visione (non ancora in items.json)
     "potion": "potion", "full_heal": "full-heal", "escape_rope": "escape-rope",
     "poke_ball": "poke-ball", "silph_scope": "silph-scope",

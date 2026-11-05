@@ -26,7 +26,9 @@
     {"id": "miracle_seed", "name": "Miracolseme", "icon": "miracle-seed", "category": "intermediate", "price": 1000, "build_from": ["calcium", "hp_up"], "stats": {"sp_attack": 25, "hp": 150}, "note": "Rigenera lo 0,3% degli HP max al secondo."},
     {"id": "thick_club", "name": "Ossospesso", "icon": "thick-club", "category": "intermediate", "price": 950, "build_from": ["hp_up", "hp_up"], "stats": {"hp": 350}},
     {"id": "bicycle", "name": "Bicicletta", "icon": "bicycle", "category": "intermediate", "price": 1000, "build_from": ["running_shoes"], "stats": {"move_speed_pct": 0.18}, "group": "boots", "note": "+12% velocita' extra se non infligge ne' subisce danni da 5 secondi. Scarpe: al massimo un paio."},
-    {"id": "eviolite", "name": "Evolcondensa", "icon": "eviolite", "category": "intermediate", "price": 1200, "build_from": ["iron", "zinc"], "stats": {"defense": 45, "sp_defense": 45}, "note": "Funziona solo se il Pokemon NON e' alla forma finale: dopo l'evoluzione finale non da' nulla."}
+    {"id": "eviolite", "name": "Evolcondensa", "icon": "eviolite", "category": "intermediate", "price": 1200, "build_from": ["iron", "zinc"], "stats": {"defense": 45, "sp_defense": 45}, "note": "Funziona solo se il Pokemon NON e' alla forma finale: dopo l'evoluzione finale non da' nulla."},
+    {"id": "metal_coat", "name": "Metalcoperta", "icon": "metal-coat", "category": "intermediate", "price": 1000, "build_from": ["iron", "carbos"], "stats": {"attack": 10, "defense": 20, "attack_speed": 0.10}, "evo": "Scizor", "note": "Oggetto evolutivo: Scyther dal liv.8 si evolve in Scizor."},
+    {"id": "black_augurite", "name": "Augite Nera", "icon": "black-augurite", "category": "intermediate", "price": 1000, "build_from": ["protein", "hp_up"], "stats": {"attack": 15, "hp": 150}, "evo": "Kleavor", "note": "+20% danno alle torri. Oggetto evolutivo: Scyther dal liv.8 si evolve in Kleavor."}
   ],
 
   "completed": [
