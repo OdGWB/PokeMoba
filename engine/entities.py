@@ -426,6 +426,18 @@ class Pokemon(Unit):
     octi_grab_as: float = 0.0
     octi_grab_root: float = -1.0       # fine del proprio blocco della Presa
     octi_recharge_until: float = -1.0  # Iper Raggio: ricarica (solo grafica)
+    # Linea Flabébé (engine/florges.py): colore dei fiori scelto nella selezione
+    # e bonus dei fiori raccolti (valgono su chiunque raccolga).
+    flower_color: str = "red"          # red | yellow | orange | blue | white
+    flor_red_until: float = -1.0       # Rosso: +15% danno inflitto
+    flor_yellow_until: float = -1.0    # Giallo: +25% velocità
+    flor_sym_until: float = -1.0       # Simbiosi: 30% dei bonus oggetti di Florges
+    flor_sym_bonus: dict = field(default_factory=dict)
+    flor_dance_until: float = -1.0     # Petalodanza in corso
+    flor_dance_next: float = -1.0
+    flor_mist_until: float = -1.0      # dentro Campo Nebbioso (immune ai nuovi stati)
+    flor_pick_at: float = -1.0         # ultimo fiore raccolto (solo grafica)
+    flor_pick_color: str = ""
 
     def _bonus(self, stat: str) -> float:
         return (self.passive_bonus.get(stat, 0.0) + self.item_bonus.get(stat, 0.0)

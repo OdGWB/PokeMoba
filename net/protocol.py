@@ -747,13 +747,16 @@ def dec_draft(data) -> dict:
             "time_left": time_left, "done": done}
 
 
-def enc_pick(pokemon, lock) -> bytes:
-    return Writer().u8(R_PICK).u8(pokemon).u8(1 if lock else 0).bytes()
+def enc_pick(pokemon, lock, color=0) -> bytes:
+    # bit 0 = scelta definitiva; bit 1-3 = colore dei fiori (Flabébé, 0-4)
+    return Writer().u8(R_PICK).u8(pokemon).u8((1 if lock else 0) | ((color & 7) << 1)).bytes()
 
 
 def dec_pick(data) -> dict:
     r = Reader(data); r.u8()
-    return {"pokemon": r.u8(), "lock": bool(r.u8())}
+    poke = r.u8()
+    fl = r.u8()
+    return {"pokemon": poke, "lock": bool(fl & 1), "color": (fl >> 1) & 7}
 
 
 def enc_start(map_path, your_entity_id, players) -> bytes:

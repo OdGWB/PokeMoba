@@ -34,7 +34,7 @@ def _set_app_icon() -> None:
 
 class App:
     def __init__(self, initial="menu", map_path=None, pokemon_path=None, start_level=1,
-                 start_items=None, start_armature=None):
+                 start_items=None, start_armature=None, flower_color=None):
         pygame.init()
         _set_app_icon()
         self.windowed_size = (config.WINDOW_WIDTH, config.WINDOW_HEIGHT)
@@ -55,7 +55,8 @@ class App:
         if initial == "match":
             from .scenes.match_scene import MatchScene
             self.scene = MatchScene(map_path, pokemon_path, start_level=start_level,
-                                    start_items=start_items, start_armature=start_armature)
+                                    start_items=start_items, start_armature=start_armature,
+                                    flower_color=flower_color)
         else:
             from .avatars import load_profile
             self.profile = load_profile()       # nickname + immagine profilo salvati

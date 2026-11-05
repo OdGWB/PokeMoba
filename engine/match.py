@@ -37,6 +37,7 @@ from .magnezone import MAG_PASSIVES, MagnezoneMixin
 from .mamoswine import MamoswineMixin
 from .venomoth import MOTH_PASSIVES, VenomothMixin
 from .octillery import OCTI_PASSIVES, OctilleryMixin
+from .florges import FLOR_PASSIVES, FlorgesMixin, has_garden
 from .corviknight import CORVI_PASSIVES, CorviknightMixin
 from .eevee import EEVEE_PASSIVES, EeveeMixin
 from .item_effects import ItemEffectsMixin, cdr_to_haste
@@ -162,11 +163,13 @@ CAST_ANIMS = {"projectile": "Shoot", "bubble": "Shoot",
             "mothbeam": "Shoot", "powdercloud": "Shoot", "mothgust": "Swing",
             "quiverdance": "Rotate", "powderstorm": "Charge",
             "octishot": "Shoot", "ammoswap": "Rotate", "octazooka": "Shoot",
-            "octibeam": "Charge", "octigrab": "Strike"}
+            "octibeam": "Charge", "octigrab": "Strike",
+            "florseed": "Rotate", "florheal": "Charge", "florstorm": "Rotate",
+            "florgarden": "Charge", "florsolar": "Charge"}
 
 class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, NoivernMixin,
             UrsaringMixin, SneaselMixin, MienshaoMixin, ArchaludonMixin,
-            HattereneMixin, MagnezoneMixin, MamoswineMixin, VenomothMixin, OctilleryMixin, BasicAttackMixin, ItemEffectsMixin):
+            HattereneMixin, MagnezoneMixin, MamoswineMixin, VenomothMixin, OctilleryMixin, FlorgesMixin, BasicAttackMixin, ItemEffectsMixin):
     def __init__(self, world, map_data):
         self.world = world
         self.map = map_data
@@ -210,6 +213,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self._init_swine()       # linea Swinub: impronte, Scia Ghiacciata, Era Glaciale
         self._init_moth()        # linea Venonat: nubi di polvere, accumuli di veleno
         self._init_octi()        # linea Remoraid: proiettili di Pistolacqua
+        self._init_flor()        # linea Flabébé: fiori, Radici, Campo Nebbioso
         self._init_basic_attack()   # attacco base: proiettili a ricerca
         self.vision = VisionSystem(self.world.grid)
         self._build_structures()
@@ -272,6 +276,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self._update_swine(dt)       # Fiuto, Grassospesso, Gelo, Era Glaciale (linea Swinub)
         self._update_moth(dt)        # nubi, veleno, Eledanza (linea Venonat)
         self._update_octi(dt)        # Pistolacqua, Raffica (linea Remoraid)
+        self._update_flor(dt)        # fiori, Radici, Campo Nebbioso, Petalodanza (linea Flabébé)
         self._update_rock_moves(dt)  # Rocciotomba / Pesobomba / Frana / Abbattimento
         self._update_spiritomb(dt)   # spiriti, Stordiraggio, Malcomune, Legione, Memento
         self._update_eevee(dt)       # Desiderio, Comete, Tuono, Bora, Divinazione, Idratazione
@@ -373,6 +378,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
                 continue
             if p.octi_grab_until > self.time and self._octi_grabbing(p, dt):
                 continue              # Presa a Ventosa: attacca solo l'afferrato
+            if p.is_bot and self._flor_bot_seek(p, dt):
+                continue              # Giardino: un bot ferito raccoglie un fiore vicino
             if p.is_bot and p.is_jungler:
                 self._ai_jungler(p, dt)
             elif p.is_bot:
@@ -1035,6 +1042,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         amount *= self._sneasel_wild_mult(attacker, target)   # Scalaroccia: +30% ai neutrali
         amount *= self._swine_wild_mult(attacker, target)   # Fiuto: +30% ai neutrali
         amount *= self._swine_type_mult(target, dmg_type)   # Grassospesso: -50% Fuoco/Ghiaccio
+        amount *= self._flor_dmg_mult(attacker)   # fiore Rosso (Giardino): +15%
         if (isinstance(target, Wild) and isinstance(attacker, Pokemon)
                 and attacker.passive_id == "muta"):
             amount *= MUTA_WILD_MULT   # Muta (linea Nincada): +30% ai neutrali
@@ -1361,6 +1369,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         old_hp = p.hp
         # Bonus degli oggetti ricalcolati qui: l'Evolcondensa si spegne alla forma finale.
         p.item_bonus = self._item_bonus_for(p)
+        for k, v in self._flor_sym_bonus(p).items():   # Simbiosi (Florges): 30% dei suoi bonus
+            p.item_bonus[k] = p.item_bonus.get(k, 0.0) + v
         self._echo_convert(p)   # Ecolocalizzazione: Attacco degli oggetti -> Att. Sp.
         self._moth_convert(p)   # Scaglie Velenose: idem
         self._octi_convert(p)   # linea Remoraid: Att. Sp. degli oggetti -> Attacco
@@ -1759,6 +1769,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             return
         if not self._octi_precheck(p, mv, Vec2(tx, ty)):   # Presa a Ventosa senza bersaglio
             return
+        if not self._flor_precheck(p, mv, Vec2(tx, ty)):   # Solarraggio senza fiori
+            return
         self._sneasel_on_cast(p, mv)   # Notte Fonda: lanciare una mossa toglie l'invisibilità
         # Lanciare annulla un attacco base in CARICAMENTO (il ciclo non si consuma);
         # se il colpo è già uscito il recupero continua da dove era (niente punizione).
@@ -1883,6 +1895,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             pass   # linea Venonat (engine/venomoth.py)
         elif self._octi_cast(p, mv, rank, origin, tgt, dirv):
             pass   # linea Remoraid (engine/octillery.py)
+        elif self._flor_cast(p, mv, rank, origin, tgt, dirv):
+            pass   # linea Flabébé (engine/florges.py)
         elif shape == "buff":
             self._apply_support(p, mv, rank, origin)
             self.fx_events.append({"kind": "buff", "c": (origin.x, origin.y),
@@ -3735,6 +3749,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             p.sleep_until = max(p.sleep_until, self.time + dur)
 
     def _apply_poison(self, p, src, dps, dur):
+        if self._flor_status_immune(p):   # Campo Nebbioso
+            return
         p.poison_dps = max(p.poison_dps, dps)
         p.poison_until = max(p.poison_until, self.time + dur)
         p.poison_src = src.id if src is not None else None
@@ -3938,6 +3954,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             p.speed *= self._hatt_speed_mult(p)   # Distortozona (Hatterene)
             p.speed *= self._swine_speed_mult(p)   # Scia Ghiacciata, Forzantica
             p.speed *= self._moth_speed_mult(p)    # Eledanza, Ventargenteo
+            p.speed *= self._flor_speed_mult(p)    # fiore Giallo, Petalodanza
             # Nitrocarica: cariche di velocità cumulabili (scadono insieme).
             if p.fc_until > self.time and p.fc_stacks > 0:
                 p.speed *= 1.0 + p.fc_per * p.fc_stacks
@@ -4022,6 +4039,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         if p.passive_id in MOTH_PASSIVES and self._bot_moth_cast(p, target):
             return
         if p.passive_id in OCTI_PASSIVES and self._bot_octi_cast(p, target):
+            return
+        if p.passive_id in FLOR_PASSIVES and self._bot_flor_cast(p, target):
             return
         for slot in ("R", "Q", "W", "E"):
             ms = p.moveset.get(slot)

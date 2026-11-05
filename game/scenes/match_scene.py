@@ -52,7 +52,7 @@ DEATH_FADE = 1.5   # s: posa Hurt tenuta mentre l'unità si dissolve alla morte
 
 class MatchScene:
     def __init__(self, map_path: str, pokemon_path: str, start_level: int = 1,
-                 start_items=None, bot_paths=None, start_armature=None):
+                 start_items=None, bot_paths=None, start_armature=None, flower_color=None):
         map_data = load_map(map_path)
         self.map_data = map_data
         self.world = World(map_data.grid)
@@ -92,6 +92,10 @@ class MatchScene:
         if start_armature and self.player is not None:
             setattr(self.player, start_armature, 1.0)
 
+        # Flabébé: colore dei fiori scelto nella selezione (resta per tutta la partita).
+        if flower_color and self.player is not None:
+            self.player.flower_color = flower_color
+
         # Livello di partenza (test): porta il giocatore al livello richiesto.
         if start_level > 1 and self.match is not None and self.player is not None:
             from engine.stats import CUMULATIVE_XP
@@ -106,6 +110,8 @@ class MatchScene:
                               self.player.pos.y * config.TILE_SIZE)
         self.input = InputController(self.player.id)
         self.renderer = Renderer()
+        if self.match is not None:   # fiori della linea Flabébé (a terra, visibili a tutti)
+            self.renderer.flower_source = lambda: self.match.flowers
         self.renderer.map.set_camps(map_data.camps)   # sentieri di terra verso le lane
         self.fx = FXSystem()
         # Regolazioni visive dell'editor delle animazioni (partenza proiettili).
@@ -640,7 +646,8 @@ class MatchScene:
                 lambda e: self.match.vision.is_enemy_visible(p.team, e.id)),
             poisoned=moth_fx.count_poisoned(
                 self.world, p, self.match.time,
-                lambda e: self.match.vision.is_enemy_visible(p.team, e.id))))
+                lambda e: self.match.vision.is_enemy_visible(p.team, e.id)),
+            flowers=tuple(f for f in self.match.flowers if f["owner"] == p.id)))
         # Popup delle evoluzioni: in fila sopra la barra, mai sovrapposti.
         evo = [sl for sl in ("Q", "W", "E", "R")
                if sl in p.pending_choices and p.moveset.get(sl) and p.moveset[sl].upgrades]

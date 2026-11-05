@@ -20,7 +20,7 @@ import pygame
 import config
 
 from . import (arch_fx, charcadet_fx, corvi_fx, eevee_fx, hatt_fx, mag_fx, mien_fx, noivern_fx,
-               moth_fx, octi_fx, sneasel_fx, spirit_fx, swine_fx, ursa_fx)
+               flor_fx, moth_fx, octi_fx, sneasel_fx, spirit_fx, swine_fx, ursa_fx)
 from .fx import draw_avalanche, draw_sandstorm, type_color
 
 
@@ -180,6 +180,12 @@ def draw_world_effects(surface, camera, world, m, team, vision, now, player_id,
     for cl in getattr(m, "powder_clouds", ()):
         if seen(cl["c"], cl["team"]):
             moth_fx.draw_powder_cloud(surface, camera, cl, now)
+    # Linea Flabébé: Radici e Campo Nebbioso (visibili a tutti; i fiori li
+    # disegna il renderer a terra, ordinati con le unità).
+    for z in getattr(m, "flor_roots", ()):
+        flor_fx.draw_roots(surface, camera, z, now)
+    for z in getattr(m, "flor_mists", ()):
+        flor_fx.draw_mist(surface, camera, z, now)
     # Linea Remoraid: proiettili di Pistolacqua / Raffica / Colpo Perforante.
     for o in getattr(m, "octi_shots", ()):
         if seen(o["pos"], o["team"]):

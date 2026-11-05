@@ -280,7 +280,9 @@ class TestDraft(unittest.TestCase):
         self.assertEqual((d["map_index"], d["turn"], d["hover"], d["done"]), (1, 1, None, False))
         self.assertAlmostEqual(d["time_left"], 12.5)
         self.assertEqual(d["entries"], e)
-        self.assertEqual(P.dec_pick(P.enc_pick(4, True)), {"pokemon": 4, "lock": True})
+        self.assertEqual(P.dec_pick(P.enc_pick(4, True)), {"pokemon": 4, "lock": True, "color": 0})
+        self.assertEqual(P.dec_pick(P.enc_pick(9, True, 4)), {"pokemon": 9, "lock": True, "color": 4})
+        self.assertEqual(P.dec_pick(P.enc_pick(9, False, 3))["lock"], False)
 
 
 class TestHostClientLoopback(unittest.TestCase):

@@ -484,6 +484,8 @@ class HostSession:
             if self.phase == "draft" and d is not None and d.current_slot() == s.index:
                 ok = (d.lock(s.index, pk["pokemon"], now) if pk["lock"]
                       else d.hover_pick(s.index, pk["pokemon"]))
+                if ok and pk["lock"]:
+                    s.flower_color = pk.get("color", 0)   # Flabébé: colore dei fiori
                 if ok:
                     self._broadcast_draft(now)
         elif t == P.R_LOADED:
@@ -696,7 +698,10 @@ class HostSession:
             s = self.slots[e["slot"]] if e["slot"] is not None else None
             if s is not None and s.joined:
                 s.team, s.pokemon = e["team"], e["poke"]
-                s.entity_id = self._spawn(map_data, e["team"], lane, e["poke"], False).id
+                p = self._spawn(map_data, e["team"], lane, e["poke"], False)
+                s.entity_id = p.id
+                from engine.florges import COLORS as _FCOL
+                p.flower_color = _FCOL[min(len(_FCOL) - 1, getattr(s, "flower_color", 0))]
             else:
                 self._spawn(map_data, e["team"], lane, e["poke"], True)
         self.match.assign_junglers()

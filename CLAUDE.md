@@ -967,6 +967,35 @@ Passaggi completati:
   pistolacqua_mira/_/_colpo, raffica, perforante, cambio, erba_schegge,
   octazooka_mira/_/_dopo, iperraggio_mira/_/_ricarica, presa_mira/_/_dopo,
   draft_remoraid).
+- LINEA FLABEBE > FLOETTE > FLORGES (step_48), grafica nuova in
+  game/flor_fx.py (logica in engine/florges.py). Sprite PMD Sprite Collab in
+  assets/pokemon/0669/0670/0671. FIORI (flower_sprite, pixel art nativa in
+  cache): germoglio = stelo con due foglioline, bocciolo = goccia chiusa del
+  colore con i sepali, sbocciato = 5 petali a goccia (contorno, scuro, colore,
+  luce in alto a sinistra) col centro; 5 palette (FLOWER_COLS). Disegnati dal
+  RENDERER a terra prima delle unita' (Renderer.flower_source, impostato dalle
+  scene), visibili a TUTTI anche nella nebbia: ombra, anello della squadra
+  (azzurro alleato, rosso nemico), alone del colore che pulsa da sbocciato,
+  barra della crescita sotto germoglio/bocciolo, lampeggio negli ultimi 3 s,
+  scintille dorate sui fiori del Giardino Reale. Forme nuove in _draw_shapes
+  (flor_fx.SHAPES): petalo che rotea in volo (florpetal: attacco base,
+  Florocura, Simbiosi), vortice di petali (florswirl: Petalbufera, sui fiori
+  al 50%), raggio di Solarraggio (florsolar, a 3 strati, sottile: largo
+  sembrava una banda piatta), seme ad arco (florseedarc: Semina), croce di cura
+  che sale (florplus). Disegni PERSISTENTI (world_fx): Radici (area verde con
+  radici che si allargano + croci) e Campo Nebbioso (velo rosa con chiazze e
+  bordo tratteggiato che gira). Sulle unita': petali che girano (Petalodanza),
+  petali rossi/gialli ai piedi (bonus dei fiori raccolti), anello verde
+  (Simbiosi), scintille rosa (dentro il Campo Nebbioso). HUD: fiore del colore
+  scelto + pallini dei fiori piantati (pieni = sbocciati) + effetto del colore.
+  SCELTA DEL COLORE: tavolozza a 5 caselle (draw_color_picker, tasti 1-5) nel
+  pannello della selezione offline e sotto le carte del draft online; online il
+  colore viaggia nei bit 1-3 del byte "lock" di R_PICK (formato invariato).
+  Online: flowers/flor_roots/flor_mists a entrambe le squadre (net/visual),
+  flower_color in UNIT_FLAGS e ME_FIELDS. Screenshot: step_48_* (fiori,
+  semina, bocciolo, sbocciato, raccolta, giallo, hud, florocura/_mira,
+  petalbufera/_mira, petalodanza, camponebbioso, radici, giardinoreale/_mira/
+  _dopo, solarraggio/_mira, selezione, draft_flabebe).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

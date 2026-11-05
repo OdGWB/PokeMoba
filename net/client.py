@@ -215,9 +215,10 @@ class ClientSession:
         self.transport.send_reliable(P.enc_choice(team, pokemon, ready))
 
     # --- draft ----------------------------------------------------------------------------------
-    def send_pick(self, pokemon, lock=False) -> None:
-        """Anteprima (lock=False, la vedono tutti) o scelta definitiva del Pokémon."""
-        self.transport.send_reliable(P.enc_pick(pokemon, lock))
+    def send_pick(self, pokemon, lock=False, color=0) -> None:
+        """Anteprima (lock=False, la vedono tutti) o scelta definitiva del Pokémon
+        (con il colore dei fiori di Flabébé, indice 0-4)."""
+        self.transport.send_reliable(P.enc_pick(pokemon, lock, color))
 
     def draft_my_turn(self) -> bool:
         d = self.draft

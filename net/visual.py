@@ -51,13 +51,15 @@ UNIT_FLAGS = {"air_z": 0.0, "sand_radius": 0.0, "invisible": False, "submerged":
               "honey": 0, "guts_active": False,
               "snatch_down": 0, "snatch_up": 0, "mien_regen": False,
               "arch_rain": False, "thunder_left": 0, "agitated": False, "mag_sign": 0,
-              "frost_stacks": 0, "fat_shield": 0.0, "venom_stacks": 0, "octi_lock_by": -1}
+              "frost_stacks": 0, "fat_shield": 0.0, "venom_stacks": 0, "octi_lock_by": -1,
+              "flower_color": "red"}
 # Il proprio Pokémon: passive e ricariche mostrate nell'interfaccia.
 ME_FIELDS = ("passive_id", "soul_charges", "inversion_stacks", "muta_cd_until", "muta_cd_max",
              "form_until", "sandstorm_boost_until", "sand_radius", "spirit_charges",
              "wander_ready_at", "voltabsorb_ready_at", "flashfire_until", "recalling",
              "recall_until", "respawn_timer", "guard_ready_at", "climb_ready_at",
-             "fakeout_ready", "dance_seq", "mien_calm_at", "ammo", "ammo_boost")
+             "fakeout_ready", "dance_seq", "mien_calm_at", "ammo", "ammo_boost",
+             "flower_color")
 
 _timer_fields: dict = {}
 
@@ -135,7 +137,8 @@ def capture_visual(match, team: int, player=None) -> dict:
         out["trick_rooms"] = tricks
     # Linea Magnemite: cariche sui muri, pilastro di Bombagnete (un ostacolo) e
     # Campo Elettrico li vedono tutti.
-    for name in ("mag_walls", "mag_pillars", "mag_fields"):
+    for name in ("mag_walls", "mag_pillars", "mag_fields",
+                 "flowers", "flor_roots", "flor_mists"):   # + Giardino (Flabébé)
         items = [_clean(d) for d in getattr(match, name, ())]
         if items:
             out[name] = items

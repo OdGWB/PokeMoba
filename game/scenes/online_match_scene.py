@@ -172,6 +172,7 @@ class OnlineMatchScene(NetMatchScene):
 
     def _draw_world_extras(self, surface):
         me = self.world.get(self.your_id)
+        self.renderer.flower_source = lambda: self.world.fxs.flowers
         draw_world_effects(surface, self.camera, self.world, self.world.fxs, self.team,
                            self.vision, self.world.match_time,
                            me.id if me is not None else self.your_id)
@@ -269,7 +270,8 @@ class OnlineMatchScene(NetMatchScene):
             agitated=hatt_fx.count_agitated(self.world, me, self.world.match_time),
             charged=mag_fx.count_charged(self.world, me, self.world.match_time),
             frost_ready=swine_fx.count_frozen_ready(self.world, me, self.world.match_time),
-            poisoned=moth_fx.count_poisoned(self.world, me, self.world.match_time)))
+            poisoned=moth_fx.count_poisoned(self.world, me, self.world.match_time),
+            flowers=tuple(f for f in self.world.fxs.flowers if f.get("owner") == me.id)))
 
     def _draw_disconnected(self, surface, font):
         """Etichetta sopra i Pokémon dei giocatori caduti."""

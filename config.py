@@ -60,6 +60,7 @@ ROSTER = [
     "data/pokemon/swinub.json",
     "data/pokemon/venonat.json",
     "data/pokemon/remoraid.json",
+    "data/pokemon/flabebe.json",
 ]
 DEFAULT_MAP = "data/maps/map_3v3.json"
 # Mappe selezionabili dalla lobby (nome, percorso).

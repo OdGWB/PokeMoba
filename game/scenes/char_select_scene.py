@@ -14,6 +14,7 @@ import pygame
 import config
 from engine.content import load_pokemon_def
 from .. import avatars as A
+from .. import flor_fx
 from ..sprites.animdata import parse_anim_data
 
 COLS = 5
@@ -95,6 +96,8 @@ class CharSelectScene:
         self._cards: list = []       # (rect, indice) dell'ultimo frame disegnato
         self._play_rect = None
         self._back_rect = None
+        self.flower_color = "red"    # Flabébé: colore dei fiori
+        self._color_rects: list = []
         self._fonts = {}
 
     # --- input ---------------------------------------------------------------
@@ -119,11 +122,17 @@ class CharSelectScene:
                     self.sel = max(0, self.sel - COLS)
                 elif ev.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_SPACE):
                     self._start()
+                elif ev.key in flor_fx.COLOR_KEYS and self._has_colors():
+                    self.flower_color = flor_fx.COLORS[flor_fx.COLOR_KEYS[ev.key]]
             elif ev.type == pygame.MOUSEMOTION:
                 for r, i in self._cards:
                     if r.collidepoint(ev.pos):
                         self.sel = i
             elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+                hit = next((c for r, c in self._color_rects if r.collidepoint(ev.pos)), None)
+                if hit is not None and self._has_colors():
+                    self.flower_color = hit
+                    continue
                 if self._play_rect and self._play_rect.collidepoint(ev.pos):
                     self._start()
                 elif self._back_rect and self._back_rect.collidepoint(ev.pos):
@@ -136,6 +145,9 @@ class CharSelectScene:
                         if i == self.sel and getattr(ev, "clicks", 1) >= 2:
                             self._start()
                         self.sel = i
+
+    def _has_colors(self) -> bool:
+        return self.defs[self.sel].passive == "giardino"
 
     def _start(self):
         # La costruzione della partita richiede qualche secondo (mappa
@@ -152,7 +164,8 @@ class CharSelectScene:
             from .match_scene import MatchScene
             self.next_scene = MatchScene(
                 str(self.app.root / config.MAPS[self.map_index][1]),
-                str(self.app.root / config.ROSTER[self.sel]))
+                str(self.app.root / config.ROSTER[self.sel]),
+                flower_color=self.flower_color if self._has_colors() else None)
 
     # --- disegno -------------------------------------------------------------
     def draw(self, surface):
@@ -295,6 +308,12 @@ class CharSelectScene:
                     x = panel.x + 14
                     y += side + 4
             y += side + 6
+
+        # Flabébé: scelta del colore dei fiori (resta per tutta la partita).
+        self._color_rects = []
+        if d.passive == "giardino":
+            self._color_rects = flor_fx.draw_color_picker(
+                surface, panel.x + 14, y, pw - 28, self.flower_color, small, small)
 
         # Pulsanti.
         bh = max(40, H // 14)

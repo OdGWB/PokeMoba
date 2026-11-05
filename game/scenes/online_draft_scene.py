@@ -21,6 +21,7 @@ from engine.content import load_pokemon_def
 from net import client as C
 
 from .. import avatars as A
+from .. import flor_fx
 from .char_select_scene import PANEL, PANEL_HI, TYPE_COLORS, load_idle, scale_nearest
 from .online_lobby_scene import BG, BORDER, DIM, GOLD, RED, TEXT, Buttons, font
 
@@ -43,12 +44,17 @@ class OnlineDraftScene:
         self._sent_hover = None
         self._was_turn = False
         self._loading_drawn = False
+        self.flower_color = "red"    # Flabébé: colore dei fiori
+        self._color_rects: list = []
 
     # --- input ------------------------------------------------------------------------
     def handle_events(self, events):
         n = len(self.defs)
         for ev in events:
             if ev.type == pygame.KEYDOWN:
+                if ev.key in flor_fx.COLOR_KEYS and self.defs[self.sel].passive == "giardino":
+                    self.flower_color = flor_fx.COLORS[flor_fx.COLOR_KEYS[ev.key]]
+                    continue
                 if ev.key == pygame.K_ESCAPE:
                     self._leave()
                 elif ev.key in (pygame.K_RIGHT, pygame.K_d):
@@ -64,6 +70,10 @@ class OnlineDraftScene:
             elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
                 if self.buttons.click(ev.pos):
                     continue
+                hit = next((c for r, c in self._color_rects if r.collidepoint(ev.pos)), None)
+                if hit is not None:
+                    self.flower_color = hit
+                    continue
                 for r, i in self._cards:
                     if r.collidepoint(ev.pos):
                         if i == self.sel and getattr(ev, "clicks", 1) >= 2:
@@ -76,7 +86,8 @@ class OnlineDraftScene:
 
     def _lock(self):
         if self._can_lock():
-            self.session.send_pick(self.sel, lock=True)
+            self.session.send_pick(self.sel, lock=True,
+                                   color=flor_fx.COLORS.index(self.flower_color))
 
     def _leave(self):
         if self.host is not None:
@@ -302,6 +313,12 @@ class OnlineDraftScene:
             surface.blit(p, (pr.x + 7, pr.y + 2))
             x = pr.right + 6
         surface.blit(sm.render(f"Ruolo: {pd.role}", True, DIM), (x + 8, y + 3))
+        self._color_rects = []
+        if pd.passive == "giardino":   # Flabébé: colore dei fiori (tasti 1-5)
+            pw = 5 * 32 + 4 * 6
+            self._color_rects = flor_fx.draw_color_picker(
+                surface, rect.right - pw, y - 6, pw, self.flower_color, sm, None, label=False)
+            y += 34
         y += mid.get_height() + 12
         bh = mid.get_height() + 16
         if self.session.draft_my_turn() and not d["done"]:

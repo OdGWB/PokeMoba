@@ -195,7 +195,7 @@ class CharcadetMixin:
                                    "radius": 0.8, "mtype": "Fire", "fx": "shieldbreak"})
 
     def _apply_burn(self, caster, target, dur) -> None:
-        if self._cc_immune(target):
+        if self._cc_immune(target) or self._flor_status_immune(target):
             return
         target.burn_until = max(target.burn_until, self.time + dur)
         target.burn_dps = max(target.burn_dps, BURN_HP_FRAC * target.max_hp)

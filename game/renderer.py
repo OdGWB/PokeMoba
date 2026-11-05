@@ -6,6 +6,8 @@ visuale 3/4 è corretta.
 """
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pygame
 
 import math
@@ -17,7 +19,7 @@ from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
                          TILE_PUDDLE, TILE_RIVER, TILE_WALL)
 from . import spirit_fx
 from . import (arch_fx, charcadet_fx, corvi_fx, eevee_fx, hatt_fx, mag_fx, mien_fx, noivern_fx,
-               moth_fx, octi_fx, swine_fx,
+               flor_fx, moth_fx, octi_fx, swine_fx,
                sneasel_fx, ursa_fx)
 from . import structure_gfx
 from .fx import EMBER, ROCK_HI, ROCK_MID, ROCK_OUT, ROCK_SH, type_color
@@ -638,6 +640,8 @@ class Renderer:
             return   # linea Swinub
         if moth_fx.draw_aim(surface, S, ts, ox, oy, nx, ny, dist, move):
             return   # linea Venonat
+        if flor_fx.draw_aim(surface, S, ts, ox, oy, nx, ny, dist, move):
+            return   # linea Flabébé
         if octi_fx.draw_aim(surface, S, ts, ox, oy, nx, ny, dist, move, ammo):
             return   # linea Remoraid (colore della munizione attiva)
         if shape == "rockwave":   # Rocciotomba: corsia dell'onda + pilastro in fondo
@@ -829,6 +833,13 @@ class Renderer:
                     and not vision.is_enemy_visible(player_team, u.id)):
                 continue
             drawables.append(u)
+        # Fiori della linea Flabébé: a terra, visibili a TUTTI (anche nella
+        # nebbia), sotto le unità che ci passano sopra.
+        src = getattr(self, "flower_source", None)
+        if src is not None:
+            fls = [fl for fl in src() if x0 - 2 <= fl["pos"].x <= x1 + 2
+                   and y0 - 2 <= fl["pos"].y <= y1 + 2]
+            flor_fx.draw_flowers(surface, camera, SimpleNamespace(flowers=fls), now, player_team)
         # Pilastri di roccia temporanei (Rocciotomba): ordinati in profondità con
         # le unità, così chi passa dietro viene coperto e chi sta davanti no.
         for pl in getattr(world, "pillars", ()):
@@ -897,6 +908,7 @@ class Renderer:
                     swine_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # Forzantica
                     moth_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # Eledanza, Polvoscudo
                     octi_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # Presa, Iper Raggio
+                    flor_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # Petalodanza, fiori
                 if in_bush:
                     self._draw_hidden_hint(surface, e, gx, gy, now)
                 self._draw_unit_hp(surface, e, gx, gy, grow)

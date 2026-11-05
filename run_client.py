@@ -26,7 +26,11 @@ def main() -> None:
                         help="Charcadet: barra di Armature in vantaggio (test: forma al liv.8)")
     parser.add_argument("--oro", choices=("minion", "neutrali"), default=None,
                         help="Sneasel: oro in vantaggio (test: forma al liv.8)")
+    parser.add_argument("--colore", choices=("rosso", "giallo", "arancione", "blu", "bianco"),
+                        default=None, help="Flabébé: colore dei fiori")
     args = parser.parse_args()
+    colore = {"rosso": "red", "giallo": "yellow", "arancione": "orange", "blu": "blue",
+              "bianco": "white"}.get(args.colore)
     if args.oro:   # stesso meccanismo di --armature: un contatore in vantaggio
         args.armature = "gold_wild" if args.oro == "neutrali" else "gold_minion"
 
@@ -34,7 +38,8 @@ def main() -> None:
     if args.single:
         app = App(initial="match", map_path=str(ROOT / args.map),
                   pokemon_path=str(ROOT / args.pokemon), start_level=args.level,
-                  start_items=args.items, start_armature=args.armature)
+                  start_items=args.items, start_armature=args.armature,
+                  flower_color=colore)
     else:
         app = App(initial="menu")
     app.run()

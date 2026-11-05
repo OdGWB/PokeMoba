@@ -1,0 +1,116 @@
+{
+  "_comment": "Flabebe -> Floette (liv.4) -> Florges (liv.8). Supporto guaritore 'giardiniera': cura soprattutto coi FIORI che pianta sulla mappa e che gli alleati raccolgono. Folletto. Statistiche = valori base reali (la derivazione le scala). Passiva Giardino (engine/florges.py, tutte e tre le forme): fiori visibili a tutti, germoglio 0-2 s / bocciolo 2-4 s / sbocciato da 4 s, durano 60 s, max 2/3/4 per forma (il piu' vecchio sparisce); un alleato che passa su un fiore sbocciato si cura (Att. Sp. di Florges) e ottiene per 4 s l'effetto del COLORE scelto nella selezione (Rosso +15% danno, Giallo +25% velocita', Arancione scudo 10% HP max, Blu ricariche -1,5 s, Bianco toglie gli stati alterati); un nemico che ci passa sopra lo distrugge. Cure e scudi scalano con l'Att. Sp., danno basso. Mosse con id propri (florges_*).",
+  "dex": 669,
+  "name": "Flabébé",
+  "types": ["Fairy"],
+  "role": "supporto",
+  "recommended_items": ["soothe_bell", "light_clay", "king_rock", "poke_flute", "mental_herb"],
+  "color": [236, 120, 140],
+  "radius": 0.32,
+  "base_speed": 3.4,
+  "attack_range": 4.6,
+  "attack_cooldown": 1.0,
+  "ranged": true,
+  "sprite_dir": "assets/pokemon/0669",
+  "passive": "giardino",
+  "attack_fx": "florshot",
+
+  "base_stats": {"hp": 44, "attack": 38, "defense": 39, "sp_attack": 61, "sp_defense": 79, "speed": 42},
+
+  "evolutions": [
+    {"stage": 0, "level": 1, "name": "Flabébé", "dex": 669, "sprite_dir": "assets/pokemon/0669",
+     "types": ["Fairy"], "passive": "giardino", "role": "supporto", "color": [236, 120, 140],
+     "attack_fx": "florshot", "attack_range": 4.6, "ranged": true, "radius": 0.32,
+     "base_stats": {"hp": 44, "attack": 38, "defense": 39, "sp_attack": 61, "sp_defense": 79, "speed": 42}},
+    {"stage": 1, "level": 4, "name": "Floette", "dex": 670, "sprite_dir": "assets/pokemon/0670",
+     "types": ["Fairy"], "passive": "giardino", "role": "supporto", "color": [240, 130, 150],
+     "attack_fx": "florshot", "attack_range": 4.8, "ranged": true, "radius": 0.38,
+     "base_stats": {"hp": 54, "attack": 45, "defense": 47, "sp_attack": 75, "sp_defense": 98, "speed": 52}},
+    {"stage": 2, "level": 8, "name": "Florges", "dex": 671, "sprite_dir": "assets/pokemon/0671",
+     "types": ["Fairy"], "passive": "giardino", "role": "supporto", "color": [246, 150, 170],
+     "attack_fx": "florshot", "attack_range": 5.0, "ranged": true, "radius": 0.5,
+     "base_stats": {"hp": 78, "attack": 65, "defense": 68, "sp_attack": 112, "sp_defense": 154, "speed": 75}}
+  ],
+
+  "moves": {
+    "Q": {
+      "base": {"id": "florges_seed", "name": "Semina", "type": "Grass", "category": "none",
+               "shape": "florseed", "fx": "florseed", "target": "point",
+               "power": [0, 0, 0, 0],
+               "cooldown": [4, 3.5, 3, 2.5], "range": 7.0,
+               "effects": {"heal": [45, 65, 85, 105], "heal_scaling": 0.35}},
+      "upgrades": [
+        {"id": "florges_quickbloom", "name": "Fioritura Rapida", "type": "Grass", "category": "none",
+         "shape": "florseed", "fx": "florseed", "target": "point",
+         "power": [0, 0, 0, 0],
+         "cooldown": [4, 3.5, 3, 2.5], "range": 7.0,
+         "effects": {"heal": [45, 65, 85, 105], "heal_scaling": 0.35, "bloom": 2.0}},
+        {"id": "florges_roots", "name": "Radici", "type": "Grass", "category": "none",
+         "shape": "florseed", "fx": "florseed", "target": "point",
+         "power": [0, 0, 0, 0],
+         "cooldown": [4, 3.5, 3, 2.5], "range": 7.0,
+         "effects": {"heal": [45, 65, 85, 105], "heal_scaling": 0.35,
+                     "roots": {"radius": 2.0, "duration": 3.0, "frac": 0.45}}}
+      ]
+    },
+    "W": {
+      "base": {"id": "florges_floralhealing", "name": "Florocura", "type": "Fairy", "category": "none",
+               "shape": "florheal", "fx": "florheal", "target": "point",
+               "power": [0, 0, 0, 0],
+               "cooldown": [10, 9.5, 9, 8.5], "range": 7.0,
+               "effects": {"heal": [60, 90, 120, 150], "heal_scaling": 0.45,
+                           "flower_radius": 3.0, "flower_mult": 2.0}},
+      "upgrades": [
+        {"id": "florges_aromatherapy", "name": "Aromaterapia", "type": "Fairy", "category": "none",
+         "shape": "florheal", "fx": "florheal", "target": "point",
+         "power": [0, 0, 0, 0],
+         "cooldown": [10, 9.5, 9, 8.5], "range": 7.0,
+         "effects": {"heal": [60, 90, 120, 150], "heal_scaling": 0.45,
+                     "flower_radius": 3.0, "flower_mult": 2.0, "cleanse_radius": 3.0}},
+        {"id": "florges_symbiosis", "name": "Simbiosi", "type": "Fairy", "category": "none",
+         "shape": "florheal", "fx": "florheal", "target": "point",
+         "power": [0, 0, 0, 0],
+         "cooldown": [10, 9.5, 9, 8.5], "range": 7.0,
+         "effects": {"heal": [60, 90, 120, 150], "heal_scaling": 0.45,
+                     "flower_radius": 3.0, "flower_mult": 2.0,
+                     "symbiosis": {"frac": 0.3, "duration": 4.0}}}
+      ]
+    },
+    "E": {
+      "base": {"id": "florges_petalblizzard", "name": "Petalbufera", "type": "Grass", "category": "special",
+               "shape": "florstorm", "fx": "florstorm", "target": "self",
+               "power": [40, 60, 80, 100], "ratio": 0.35,
+               "cooldown": [12, 11.5, 11, 10.5], "range": 0, "radius": 3.0,
+               "effects": {"push": 2.0, "flower_range": 8.0, "flower_mult": 0.5}},
+      "upgrades": [
+        {"id": "florges_petaldance", "name": "Petalodanza", "type": "Grass", "category": "special",
+         "shape": "florstorm", "fx": "florstorm", "target": "self",
+         "power": [40, 60, 80, 100], "ratio": 0.35,
+         "cooldown": [12, 11.5, 11, 10.5], "range": 0, "radius": 3.0,
+         "effects": {"push": 2.0, "flower_range": 8.0, "flower_mult": 0.5,
+                     "dance": {"duration": 3.0, "speed": 1.3, "radius": 2.0, "tick": 0.5,
+                               "tick_mult": 0.25, "confuse": 1.0}}},
+        {"id": "florges_mistyterrain", "name": "Campo Nebbioso", "type": "Fairy", "category": "none",
+         "shape": "florstorm", "fx": "florstorm", "target": "self",
+         "power": [40, 60, 80, 100], "ratio": 0.35,
+         "cooldown": [12, 11.5, 11, 10.5], "range": 0, "radius": 3.0,
+         "effects": {"push": 2.0, "flower_range": 8.0, "flower_mult": 0.5,
+                     "mist": {"radius": 4.0, "duration": 5.0}}}
+      ]
+    },
+    "R": {
+      "upgrades": [
+        {"id": "florges_royalgarden", "name": "Giardino Reale", "type": "Fairy", "category": "none",
+         "shape": "florgarden", "fx": "florgarden", "target": "point",
+         "power": [0, 0, 0],
+         "cooldown": [90, 80, 70], "range": 7.0, "radius": 3.0,
+         "effects": {"flowers": 6, "duration": 20.0, "heal_mult": 2.0, "heal_dur": 6.0}},
+        {"id": "florges_solarbeam", "name": "Solarraggio", "type": "Grass", "category": "special",
+         "shape": "florsolar", "fx": "florsolar", "target": "self",
+         "power": [110, 160, 210], "ratio": 0.5,
+         "cooldown": [90, 80, 70], "range": 8.0,
+         "effects": {"heal_radius": 3.0, "heal_frac": 0.6}}
+      ]
+    }
+  }
+}
