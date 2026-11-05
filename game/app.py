@@ -28,11 +28,6 @@ def _set_app_icon() -> None:
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("PokeMoba.Game")
         except Exception:
             pass
-        try:    # DPI-aware: con scala 125%+ lo schermo intero copre davvero il monitor
-            import ctypes
-            ctypes.windll.user32.SetProcessDPIAware()
-        except Exception:
-            pass
     try:
         pygame.display.set_icon(pygame.image.load(str(ROOT / "assets" / "ui" / "icon.png")))
     except (pygame.error, FileNotFoundError):
