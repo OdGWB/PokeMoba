@@ -94,7 +94,7 @@ class BasicAttackMixin:
     # --- velocità d'attacco -----------------------------------------------------
     def _eff_attack_speed(self, u) -> float:
         base = u.as_base if u.as_base > 0.0 else u.attack_speed
-        bonus = u.as_bonus
+        bonus = u.as_bonus + self._moth_as_bonus(u)   # Eledanza: +30%
         if u.rampage_until > self.time:
             bonus += 1.0                      # Oltraggio: +100% (si somma agli altri)
         aps = min(AS_CAP, base * (1.0 + bonus))
@@ -235,6 +235,7 @@ class BasicAttackMixin:
         self._sneasel_after_aa(u, tgt)   # Arraffalesto, colpo d'agguato
         self._mien_after_aa(u, tgt)      # punto dolce, brutto colpo di Individua
         self._swine_after_aa(u, tgt)     # Gelo (Mamoswine): accumuli e congelamento
+        self._moth_after_aa(u, tgt)      # Scaglie Velenose: accumuli di veleno
         self._spirit_wander(u, tgt)   # Spirito Vagante (Spiritomb)
         self._cute_charm(u, tgt)      # Incantevole (Sylveon)
 

@@ -22,7 +22,7 @@ import config
 from net import client as C
 from net.prediction import Predictor
 
-from .. import anim_tuning, arch_fx, hatt_fx, hud, mag_fx, swine_fx
+from .. import anim_tuning, arch_fx, hatt_fx, hud, mag_fx, moth_fx, swine_fx
 from ..fx import FXSystem
 from ..hud_passives import PassiveCtx, draw_passive
 from ..online_world import MovementModel, OnlineWorld
@@ -268,7 +268,8 @@ class OnlineMatchScene(NetMatchScene):
             weather=CODE_WEATHER.get(h.get("weather", 0), "clear"),
             agitated=hatt_fx.count_agitated(self.world, me, self.world.match_time),
             charged=mag_fx.count_charged(self.world, me, self.world.match_time),
-            frost_ready=swine_fx.count_frozen_ready(self.world, me, self.world.match_time)))
+            frost_ready=swine_fx.count_frozen_ready(self.world, me, self.world.match_time),
+            poisoned=moth_fx.count_poisoned(self.world, me, self.world.match_time)))
 
     def _draw_disconnected(self, surface, font):
         """Etichetta sopra i Pokémon dei giocatori caduti."""

@@ -35,6 +35,7 @@ from .archaludon import ARCH_PASSIVES, ArchaludonMixin
 from .hatterene import HATT_PASSIVES, HattereneMixin
 from .magnezone import MAG_PASSIVES, MagnezoneMixin
 from .mamoswine import MamoswineMixin
+from .venomoth import MOTH_PASSIVES, VenomothMixin, is_steel
 from .corviknight import CORVI_PASSIVES, CorviknightMixin
 from .eevee import EEVEE_PASSIVES, EeveeMixin
 from .item_effects import ItemEffectsMixin, cdr_to_haste
@@ -156,11 +157,13 @@ CAST_ANIMS = {"projectile": "Shoot", "bubble": "Shoot",
             "magbolt": "Shoot", "magfield": "SpAttack", "voltdash": "Charge",
             "magpillar": "SpAttack", "magterrain": "Charge",
             "icetrail": "Charge", "takedown": "Attack", "icefang": "Attack",
-            "ancientpower": "Shoot", "iceage": "Shoot"}
+            "ancientpower": "Shoot", "iceage": "Shoot",
+            "mothbeam": "Shoot", "powdercloud": "Shoot", "mothgust": "Swing",
+            "quiverdance": "Rotate", "powderstorm": "Charge"}
 
 class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, NoivernMixin,
             UrsaringMixin, SneaselMixin, MienshaoMixin, ArchaludonMixin,
-            HattereneMixin, MagnezoneMixin, MamoswineMixin, BasicAttackMixin, ItemEffectsMixin):
+            HattereneMixin, MagnezoneMixin, MamoswineMixin, VenomothMixin, BasicAttackMixin, ItemEffectsMixin):
     def __init__(self, world, map_data):
         self.world = world
         self.map = map_data
@@ -202,6 +205,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self._init_hatt()        # linea Hatenna: Confusione, Forza Lunare, Distortozona, Strega
         self._init_mag()         # linea Magnemite: cariche magnetiche, Bombagnete, Campo Elettrico
         self._init_swine()       # linea Swinub: impronte, Scia Ghiacciata, Era Glaciale
+        self._init_moth()        # linea Venonat: nubi di polvere, accumuli di veleno
         self._init_basic_attack()   # attacco base: proiettili a ricerca
         self.vision = VisionSystem(self.world.grid)
         self._build_structures()
@@ -262,6 +266,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self._update_hatt(dt)        # Confusione, Forza Lunare, Distortozona, Quiete (linea Hatenna)
         self._update_mag(dt)         # cariche magnetiche, Tuonoshock, Bombagnete... (linea Magnemite)
         self._update_swine(dt)       # Fiuto, Grassospesso, Gelo, Era Glaciale (linea Swinub)
+        self._update_moth(dt)        # nubi, veleno, Eledanza (linea Venonat)
         self._update_rock_moves(dt)  # Rocciotomba / Pesobomba / Frana / Abbattimento
         self._update_spiritomb(dt)   # spiriti, Stordiraggio, Malcomune, Legione, Memento
         self._update_eevee(dt)       # Desiderio, Comete, Tuono, Bora, Divinazione, Idratazione
@@ -915,6 +920,9 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         if attacker.passive_id == ECHO_ID:
             # Ecolocalizzazione (Noibat/Noivern): onda sonora, danno speciale.
             return self._echo_power(attacker), True
+        if attacker.passive_id in MOTH_PASSIVES:
+            # Scaglie Velenose (Venonat/Venomoth): scaglie a distanza, danno speciale.
+            return self._moth_aa_power(attacker), True
         power = attacker.eff_attack()
         if attacker.rampage_until > self.time:
             power *= 1.4   # Oltraggio: attacchi base più forti
@@ -1345,6 +1353,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         # Bonus degli oggetti ricalcolati qui: l'Evolcondensa si spegne alla forma finale.
         p.item_bonus = self._item_bonus_for(p)
         self._echo_convert(p)   # Ecolocalizzazione: Attacco degli oggetti -> Att. Sp.
+        self._moth_convert(p)   # Scaglie Velenose: idem
         d = derive(p.base_stats, p.level, ranged=p.ranged)
         # M (moltiplicatore d'evoluzione, punto 8) si applica a HP, AD, armatura,
         # RM, mana e rigenerazione; NON a MS/AS, gittata, AP e moltiplicatore
@@ -1858,6 +1867,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             pass   # linea Magnemite (engine/magnezone.py)
         elif self._swine_cast(p, mv, rank, origin, tgt, dirv):
             pass   # linea Swinub (engine/mamoswine.py)
+        elif self._moth_cast(p, mv, rank, origin, tgt, dirv):
+            pass   # linea Venonat (engine/venomoth.py)
         elif shape == "buff":
             self._apply_support(p, mv, rank, origin)
             self.fx_events.append({"kind": "buff", "c": (origin.x, origin.y),
@@ -3396,6 +3407,10 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             return
         if self._mien_parry(caster, target, mv.shape in PROJ_SHAPES):   # Individua
             return
+        # Regola globale: i Pokemon Acciaio sono immuni alle mosse Veleno nemiche.
+        if (mv.type == "Poison" and is_steel(target)
+                and getattr(caster, "team", -1) != target.team):
+            return
         fx = mv.effects
         power = mv.power_at(rank)
         if power > 0:
@@ -3418,6 +3433,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
                     raw *= self._spa_down_mult(caster)   # Dragobolide: Att. Sp. ridotta
             eff = (self.types.moba_multiplier(mv.type, target.types)
                    if isinstance(target, Pokemon) else 1.0)
+            eff = self._moth_eff(caster, eff)   # Lentifume' (Venomoth): mai poco efficace
             has_plate = (isinstance(caster, Pokemon) and caster.judgment_until > self.time
                          and mv.type == caster.judgment_plate)
             stab = STAB_MULT if (mv.type in caster.types or has_plate) else 1.0
@@ -3709,6 +3725,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             p.sleep_until = max(p.sleep_until, self.time + dur)
 
     def _apply_poison(self, p, src, dps, dur):
+        if is_steel(p):   # regola globale: gli Acciaio non si avvelenano
+            return
         p.poison_dps = max(p.poison_dps, dps)
         p.poison_until = max(p.poison_until, self.time + dur)
         p.poison_src = src.id if src is not None else None
@@ -3910,6 +3928,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
                 p.speed *= NUOTOVELOX_SPEED   # +20% in acqua/pioggia
             p.speed *= self._hatt_speed_mult(p)   # Distortozona (Hatterene)
             p.speed *= self._swine_speed_mult(p)   # Scia Ghiacciata, Forzantica
+            p.speed *= self._moth_speed_mult(p)    # Eledanza, Ventargenteo
             # Nitrocarica: cariche di velocità cumulabili (scadono insieme).
             if p.fc_until > self.time and p.fc_stacks > 0:
                 p.speed *= 1.0 + p.fc_per * p.fc_stacks
@@ -3990,6 +4009,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         if p.passive_id in HATT_PASSIVES and self._bot_hatt_cast(p, target):
             return
         if p.passive_id in MAG_PASSIVES and self._bot_mag_cast(p, target):
+            return
+        if p.passive_id in MOTH_PASSIVES and self._bot_moth_cast(p, target):
             return
         for slot in ("R", "Q", "W", "E"):
             ms = p.moveset.get(slot)

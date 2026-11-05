@@ -900,6 +900,36 @@ Passaggi completati:
   impronte, hud_swinub, grassospesso, hud_piloswine, valanga, bora,
   gelodenti, gelo_accumuli, gelo_congelato, hud, scia/_dopo, riduttore/_mira,
   forzantica/_volo, frana/_dopo, eraglaciale_mira/_volo/_colpo/_bufera).
+- LINEA VENONAT > VENOMOTH (step_46), grafica nuova in game/moth_fx.py
+  (logica in engine/venomoth.py). Sprite PMD Sprite Collab in
+  assets/pokemon/0048/0049. Forme nuove in _draw_shapes (moth_fx.SHAPES):
+  scaglia in volo che rotea (mothscale: attacco base), raggio ondulato
+  (mothbeam: Psicoraggio con anelli rosa che scorrono; Ventargenteo
+  TRASLUCIDO, piu' stretto e con scaglie argentate: pieno e largo sembrava un
+  tubo bianco), stelline della confusione (dizzy), ali di falena che battono
+  (wingflap: scia di Raffica, semitrasparente; tolte da Eledanza perche'
+  coprivano lo sprite), granelli che salgono (dustrise). Riusa soundarc
+  verde (Noibat: Ronzio), windline (raffiche di Raffica CORTE a distanze
+  diverse: lunghe da un capo all'altro sembravano fili tesi), ziglink (Magnemite:
+  scintille della paralisi), zzz (Teddiursa), hexshell/flash/ring (fx.py).
+  Disegni PERSISTENTI (world_fx): nubi di Velenpolvere/Paralizzante/Sonnifero
+  (viola/giallo/azzurro: chiazze tenui che respirano, bordo a trattini che
+  gira, granelli che salgono) e Tempesta di Polveri (tre colori che
+  vorticano; trattini del bordo in numero proporzionale alla circonferenza:
+  a 28 fissi, sul raggio di 5 tile, sembravano bastoncini sparsi). Sotto la
+  barra della vita (visibili a tutti, anche su minion e neutrali): accumuli
+  di veleno = gocce 5x6 viola, VERDI TOSSICO a 6 (la prima versione con
+  contorno a 4 vicini sembrava una fila di frecce); vanno sotto ping/miele/
+  Gelo se presenti. Sulle unita': scaglie che girano (Eledanza), scintille
+  argentate (Ventargenteo), velo di polvere (Polvoscudo). Mirino: corsia del
+  raggio, ellisse della nube, cono di respinta + freccia dello scatto
+  all'indietro (Raffica). HUD: falena + "Veleno: N al massimo" (nemici visibili
+  a 6 accumuli). Online: powder_clouds in net/visual.LISTS, venom_stacks in
+  UNIT_FLAGS; Eledanza/Ventargenteo/Polvoscudo passano dai timer *_until.
+  Screenshot: step_46_* (attacco, hud_venonat, psicoraggio/_mira, confuso,
+  ronzio, ventargenteo/_buff, velenpolvere/_dopo, paralizzante/_dopo,
+  sonnifero/_dopo, raffica/_mira, polvoscudo, eledanza/_dopo, hud,
+  tempesta/_mira/_dopo, draft_venonat).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

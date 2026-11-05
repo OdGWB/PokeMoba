@@ -1,0 +1,105 @@
+{
+  "_comment": "Venonat -> Venomoth (liv.8, unica evoluzione; prima solo i potenziamenti delle mosse Q5/W6/E7). Tiratore di LOGORAMENTO a distanza, danno speciale, veleno che si accumula. Coleottero/Veleno. Statistiche = valori base reali (la derivazione le scala). Passive (engine/venomoth.py): Scaglie Velenose (Venonat e Venomoth) = attacchi base a distanza con danno SPECIALE (come Noivern), l'Attacco bonus degli oggetti diventa Att. Sp., ogni attacco base da' 1 accumulo di veleno (max 6, 4 s, si rinnovano; danno nel tempo di tipo Veleno; non sugli Acciaio); Lentifume' (Venomoth) = mosse poco efficaci fanno danno normale. Regola GLOBALE: i Pokemon Acciaio sono immuni allo stato avvelenamento e alle mosse Veleno. Le mosse hanno id propri (venomoth_*) anche quando il nome coincide con quello di altre linee.",
+  "dex": 48,
+  "name": "Venonat",
+  "types": ["Bug", "Poison"],
+  "role": "tiratore",
+  "recommended_items": ["poison_barb", "quick_claw", "zoom_lens", "charcoal", "spell_tag"],
+  "color": [128, 84, 170],
+  "radius": 0.4,
+  "base_speed": 3.5,
+  "attack_range": 5.0,
+  "attack_cooldown": 1.0,
+  "ranged": true,
+  "sprite_dir": "assets/pokemon/0048",
+  "passive": "scaglievelenose",
+  "attack_fx": "venomshot",
+
+  "base_stats": {"hp": 60, "attack": 55, "defense": 50, "sp_attack": 40, "sp_defense": 55, "speed": 45},
+
+  "evolutions": [
+    {"stage": 0, "level": 1, "name": "Venonat", "dex": 48, "sprite_dir": "assets/pokemon/0048",
+     "types": ["Bug", "Poison"], "passive": "scaglievelenose", "radius": 0.4, "ranged": true,
+     "base_stats": {"hp": 60, "attack": 55, "defense": 50, "sp_attack": 40, "sp_defense": 55, "speed": 45}},
+    {"stage": 1, "level": 8, "name": "Venomoth", "dex": 49, "sprite_dir": "assets/pokemon/0049",
+     "types": ["Bug", "Poison"], "passive": "lentifume", "radius": 0.5, "ranged": true,
+     "base_stats": {"hp": 70, "attack": 65, "defense": 60, "sp_attack": 90, "sp_defense": 75, "speed": 90}}
+  ],
+
+  "moves": {
+    "Q": {
+      "base": {"id": "venomoth_psybeam", "name": "Psicoraggio", "type": "Psychic", "category": "special",
+               "shape": "mothbeam", "fx": "mothpsybeam", "target": "direction",
+               "power": [50, 80, 110, 140], "ratio": 0.7,
+               "cooldown": [8, 7.5, 7, 6.5], "range": 8.0, "radius": 0.45,
+               "effects": {"confuse_chance": {"chance": 0.3, "duration": 1.0}}},
+      "upgrades": [
+        {"id": "venomoth_bugbuzz", "name": "Ronzio", "type": "Bug", "category": "special",
+         "shape": "cone", "fx": "mothbuzz", "target": "direction",
+         "power": [65, 100, 135, 170], "ratio": 0.85,
+         "cooldown": [8, 7.5, 7, 6.5], "range": 4.5, "angle": 35,
+         "effects": {"spdef_debuff": {"amount": 0, "mult": 0.8, "duration": 4.0}}},
+        {"id": "venomoth_silverwind", "name": "Ventargenteo", "type": "Bug", "category": "special",
+         "shape": "mothbeam", "fx": "mothsilver", "target": "direction",
+         "power": [60, 95, 130, 165], "ratio": 0.8,
+         "cooldown": [8, 7.5, 7, 6.5], "range": 8.0, "radius": 0.6,
+         "effects": {"silver_stats": {"mult": 1.1, "duration": 2.5}}}
+      ]
+    },
+    "W": {
+      "base": {"id": "venomoth_poisonpowder", "name": "Velenpolvere", "type": "Poison", "category": "none",
+               "shape": "powdercloud", "fx": "mothpowder", "target": "point",
+               "power": [0, 0, 0, 0],
+               "cooldown": [12, 11, 10, 9], "range": 6.0, "radius": 3.0,
+               "effects": {"duration": 3.0, "stacks": 1, "powder": "poison"}},
+      "upgrades": [
+        {"id": "venomoth_stunspore", "name": "Paralizzante", "type": "Grass", "category": "none",
+         "shape": "powdercloud", "fx": "mothpowder", "target": "point",
+         "power": [0, 0, 0, 0],
+         "cooldown": [12, 11, 10, 9], "range": 6.0, "radius": 3.0,
+         "effects": {"duration": 3.0, "stacks": 1, "powder": "stun", "para": 1.0}},
+        {"id": "venomoth_sleeppowder", "name": "Sonnifero", "type": "Grass", "category": "none",
+         "shape": "powdercloud", "fx": "mothpowder", "target": "point",
+         "power": [0, 0, 0, 0],
+         "cooldown": [12, 11, 10, 9], "range": 6.0, "radius": 3.0,
+         "effects": {"duration": 3.0, "stacks": 1, "powder": "sleep",
+                     "sleep_after": 1.0, "sleep": 1.5}}
+      ]
+    },
+    "E": {
+      "base": {"id": "venomoth_gust", "name": "Raffica", "type": "Flying", "category": "special",
+               "shape": "mothgust", "fx": "mothgust", "target": "direction",
+               "power": [30, 45, 60, 75], "ratio": 0.4,
+               "cooldown": [12, 11, 10, 9], "range": 4.0, "radius": 2.0,
+               "effects": {"push": 2.0}},
+      "upgrades": [
+        {"id": "venomoth_doublegust", "name": "Doppio battito", "type": "Flying", "category": "special",
+         "shape": "mothgust", "fx": "mothgust", "target": "direction",
+         "power": [30, 45, 60, 75], "ratio": 0.4,
+         "charges": 2, "charge_time": 11, "refund_on_hit": false,
+         "cooldown": [0.6, 0.6, 0.6, 0.6], "range": 4.0, "radius": 2.0,
+         "effects": {"push": 2.0}},
+        {"id": "venomoth_powdershield", "name": "Polvoscudo", "type": "Flying", "category": "special",
+         "shape": "mothgust", "fx": "mothgust", "target": "direction",
+         "power": [30, 45, 60, 75], "ratio": 0.4,
+         "cooldown": [12, 11, 10, 9], "range": 4.0, "radius": 2.0,
+         "effects": {"push": 2.0, "powder_shield": {"frac": 0.15, "duration": 1.5}}}
+      ]
+    },
+    "R": {
+      "upgrades": [
+        {"id": "venomoth_quiverdance", "name": "Eledanza", "type": "Bug", "category": "none",
+         "shape": "quiverdance", "fx": "mothquiver", "target": "self",
+         "power": [0, 0, 0],
+         "cooldown": [80, 70, 60], "range": 0,
+         "effects": {"duration": 6.0, "spa": 1.3, "spd": 1.3, "speed": 1.2, "attack_speed": 0.3,
+                     "aa_stacks": 2}},
+        {"id": "venomoth_powderstorm", "name": "Tempesta di Polveri", "type": "Bug", "category": "none",
+         "shape": "powderstorm", "fx": "mothstorm", "target": "point",
+         "power": [0, 0, 0],
+         "cooldown": [100, 90, 80], "range": 7.0, "radius": 5.0,
+         "effects": {"duration": 5.0, "stacks": 2, "para": 0.75, "sleep": 1.0}}
+      ]
+    }
+  }
+}

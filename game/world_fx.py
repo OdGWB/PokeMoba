@@ -20,7 +20,7 @@ import pygame
 import config
 
 from . import (arch_fx, charcadet_fx, corvi_fx, eevee_fx, hatt_fx, mag_fx, mien_fx, noivern_fx,
-               sneasel_fx, spirit_fx, swine_fx, ursa_fx)
+               moth_fx, sneasel_fx, spirit_fx, swine_fx, ursa_fx)
 from .fx import draw_avalanche, draw_sandstorm, type_color
 
 
@@ -176,6 +176,10 @@ def draw_world_effects(surface, camera, world, m, team, vision, now, player_id,
     for o in getattr(m, "glacial_blocks", ()):
         if seen(o["pos"], o["team"]):
             swine_fx.draw_glacial_block(surface, camera, o, now)
+    # Linea Venonat: nubi di polvere e Tempesta di Polveri.
+    for cl in getattr(m, "powder_clouds", ()):
+        if seen(cl["c"], cl["team"]):
+            moth_fx.draw_powder_cloud(surface, camera, cl, now)
     tracks = getattr(m, "swine_tracks", ())
     if tracks:
         swine_fx.draw_tracks(surface, camera, tracks, team, now)

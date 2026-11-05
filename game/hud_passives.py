@@ -16,7 +16,7 @@ import pygame
 
 from engine.eevee import eevee_candidates, eevee_forms
 
-from . import arch_fx, eevee_fx, hatt_fx, mag_fx, mien_fx, sneasel_fx, swine_fx, ursa_fx
+from . import arch_fx, eevee_fx, hatt_fx, mag_fx, mien_fx, moth_fx, sneasel_fx, swine_fx, ursa_fx
 
 
 @dataclass
@@ -28,6 +28,7 @@ class PassiveCtx:
     agitated: int = 0            # Quiete: nemici agitati visibili (linea Hatenna)
     charged: int = 0             # Magnetismo: nemici con una carica (linea Magnemite)
     frost_ready: int = 0         # Gelo: nemici con 4 accumuli pronti (linea Swinub)
+    poisoned: int = 0            # Scaglie Velenose: nemici con 6 accumuli (linea Venonat)
 
 
 def draw_passive(surface, font, p, bx, y0, bh, ctx) -> None:
@@ -157,6 +158,9 @@ def draw_passive(surface, font, p, bx, y0, bh, ctx) -> None:
     # Linea Swinub: Fiuto, Grassospesso (scudo), Gelo (nemici pronti al congelamento).
     if p.passive_id in ("fiuto", "grassospesso", "gelo"):
         _draw_swine(surface, font, p, bx, y0, bh, ctx)
+    # Linea Venonat: Scaglie Velenose (+ Lentifume' da Venomoth).
+    if p.passive_id in ("scaglievelenose", "lentifume"):
+        _draw_moth(surface, font, p, bx, y0, bh, ctx)
 
     # Linea Teddiursa: Miele (vasetti) e, da Ursaring, Dentistretti.
     if p.passive_id in ("miele", "dentistretti"):
@@ -575,6 +579,23 @@ def _draw_swine(surface, font, p, bx, y0, bh, ctx) -> None:
         name = "Fiuto + Grassospesso"
     else:
         name = "Fiuto"
+    pygame.draw.rect(surface, frame, box, 2)
+    surface.blit(font.render(name, True, frame), (bx - 4, y0 - 18))
+
+
+def _draw_moth(surface, font, p, bx, y0, bh, ctx) -> None:
+    """Venonat/Venomoth: falena su fondo viola scuro; con nemici visibili a 6
+    accumuli di veleno la cornice diventa verde tossico e ne mostra il numero."""
+    tinted = p.passive_id == "lentifume"
+    box = pygame.Rect(bx, y0, bh, bh)
+    n = int(getattr(ctx, "poisoned", 0))
+    pygame.draw.rect(surface, (40, 26, 52) if not n else (34, 48, 30), box)
+    moth_fx.draw_moth_icon(surface, box.centerx, box.centery - 2, max(6, bh // 3), tinted)
+    frame = moth_fx.TOX if n else moth_fx.VEN_HI
+    if n:
+        name = "Veleno: %d al massimo" % n
+    else:
+        name = "Scaglie + Lentifume'" if tinted else "Scaglie Velenose"
     pygame.draw.rect(surface, frame, box, 2)
     surface.blit(font.render(name, True, frame), (bx - 4, y0 - 18))
 

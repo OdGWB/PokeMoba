@@ -41,16 +41,17 @@ LISTS = {
     "hatt_marks": ("c", "team"), "moon_orbs": ("pos", "team"), "witch_waves": ("c", "team"),
     "mag_bolts": ("pos", "team"), "ion_trails": ("c", "team"), "mag_links": ("c", "team"),
     "ice_trails": ("c", "team"), "glacial_blocks": ("pos", "team"), "ice_storms": ("c", "team"),
+    "powder_clouds": ("c", "team"),
 }
 # Campi solo di logica (oggetti del motore, insiemi di bersagli già colpiti).
-SKIP = {"mv", "hit", "touched", "since", "rank", "explode", "first", "caught"}
+SKIP = {"mv", "hit", "touched", "since", "rank", "explode", "first", "caught", "slept"}
 # Stati sulle unità che non sono timer *_until (valore "spento" a destra).
 UNIT_FLAGS = {"air_z": 0.0, "sand_radius": 0.0, "invisible": False, "submerged": False,
               "spirit_awaken": 0, "smoke_hidden": False, "armor_blocks": 0, "echo_count": 0,
               "honey": 0, "guts_active": False,
               "snatch_down": 0, "snatch_up": 0, "mien_regen": False,
               "arch_rain": False, "thunder_left": 0, "agitated": False, "mag_sign": 0,
-              "frost_stacks": 0, "fat_shield": 0.0}
+              "frost_stacks": 0, "fat_shield": 0.0, "venom_stacks": 0}
 # Il proprio Pokémon: passive e ricariche mostrate nell'interfaccia.
 ME_FIELDS = ("passive_id", "soul_charges", "inversion_stacks", "muta_cd_until", "muta_cd_max",
              "form_until", "sandstorm_boost_until", "sand_radius", "spirit_charges",

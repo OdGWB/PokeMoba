@@ -56,6 +56,7 @@ class Unit(Entity, Combatant):
     moving: bool = False
     facing: int = 0                  # indice direzione 0..7 (vedi vec.DIR_NAMES)
     bush_blocks: bool = False        # True = non può entrare nei cespugli (minion)
+    venom_stacks: int = 0            # accumuli di veleno di Scaglie Velenose (visibili a tutti)
 
     def set_path(self, points: list) -> None:
         self.path = list(points)
@@ -402,6 +403,17 @@ class Pokemon(Unit):
     ancient_until: float = -1.0        # Forzantica: statistiche +10% fino a qui
     ancient_mult: float = 1.0
     ancient_active: bool = False       # aggiornato dal Match
+    # Linea Venonat: Eledanza, Ventargenteo, Polvoscudo (accumuli di veleno in Unit).
+    quiver_until: float = -1.0         # Eledanza: fino a qui
+    quiver_spa: float = 1.0
+    quiver_spd: float = 1.0
+    quiver_speed: float = 1.0
+    quiver_as: float = 0.0
+    quiver_active: bool = False        # aggiornato dal Match
+    silver_until: float = -1.0         # Ventargenteo: tutte le statistiche +10%
+    silver_mult: float = 1.0
+    silver_active: bool = False
+    powdershield_until: float = -1.0   # Polvoscudo (solo grafica)
 
     def _bonus(self, stat: str) -> float:
         return (self.passive_bonus.get(stat, 0.0) + self.item_bonus.get(stat, 0.0)
@@ -430,6 +442,8 @@ class Pokemon(Unit):
             atk *= self.snatch_mult()   # Arraffalesto (Weavile): Attacco rubato
         if self.ancient_active:
             atk *= self.ancient_mult    # Forzantica (Mamoswine): tutte le statistiche
+        if self.silver_active:
+            atk *= self.silver_mult     # Ventargenteo (Venomoth): tutte le statistiche
         return atk
 
     def eff_sp_attack(self) -> float:
@@ -449,6 +463,10 @@ class Pokemon(Unit):
             ap *= self.snatch_mult()   # Arraffalesto (Weavile): Att. Sp. rubato
         if self.ancient_active:
             ap *= self.ancient_mult    # Forzantica
+        if self.silver_active:
+            ap *= self.silver_mult     # Ventargenteo
+        if self.quiver_active:
+            ap *= self.quiver_spa      # Eledanza: +30% Att. Sp.
         return ap
 
     def snatch_mult(self) -> float:
@@ -467,6 +485,8 @@ class Pokemon(Unit):
             d *= self.def_buff_mult
         if self.ancient_active:
             d *= self.ancient_mult      # Forzantica
+        if self.silver_active:
+            d *= self.silver_mult       # Ventargenteo
         return max(0.0, d)
 
     def eff_sp_defense(self) -> float:
@@ -480,6 +500,10 @@ class Pokemon(Unit):
             d *= 1.3   # Sabbiafiume (Gigalith): +30% Dif. Sp.
         if self.ancient_active:
             d *= self.ancient_mult      # Forzantica
+        if self.silver_active:
+            d *= self.silver_mult       # Ventargenteo
+        if self.quiver_active:
+            d *= self.quiver_spd        # Eledanza: +30% Dif. Sp.
         return max(0.0, d)
     # Ordine corrente impartito dal giocatore (o dal controllo): guida l'IA.
     #   "idle" | "move" | "attack" | "attackmove" | "stop" (stop = tieni la posizione)
