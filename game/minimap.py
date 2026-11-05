@@ -6,6 +6,7 @@ sinistro = sposta lì la camera; clic destro = ordina al Pokémon di andare lì.
 """
 from __future__ import annotations
 
+import numpy as np
 import pygame
 
 import config
@@ -18,6 +19,8 @@ MARGIN = 12
 _TILE_COL = {0: (52, 80, 56), TILE_LANE: (150, 134, 92), TILE_RIVER: (64, 110, 160),
              TILE_BUSH: (34, 70, 44), TILE_WALL: (40, 42, 48),
              TILE_JUNGLE_WALL: (52, 60, 50), TILE_PUDDLE: (70, 120, 150)}
+_FOG_UNSEEN = (5, 6, 11, 240)     # tile mai visto
+_FOG_SEEN = (8, 10, 16, 150)      # tile esplorato ma non visibile ora
 DEN_COL = {"low": (240, 150, 60), "high": (180, 120, 230)}
 
 
@@ -31,6 +34,8 @@ class Minimap:
         self.mh = int(h * self.scale)
         self.base = self._render_base()
         self._fog = None
+        self._exp_mask = None
+        self._exp_len = -1
         self.rect = pygame.Rect(0, 0, self.mw, self.mh)  # aggiornato al draw
 
     def _render_base(self):
@@ -46,19 +51,31 @@ class Minimap:
         return surf
 
     def rebuild_fog(self, vision, team):
-        """Ricostruisce l'overlay di nebbia (solo quando la visione cambia)."""
-        fog = pygame.Surface((self.mw, self.mh), pygame.SRCALPHA)
-        vis = vision.visible_tiles.get(team, set())
-        exp = vision.explored.get(team, set())
-        s = self.scale
-        cell = max(1, int(s + 0.999))
-        for ty in range(self.grid.height):
-            for tx in range(self.grid.width):
-                if (tx, ty) in vis:
-                    continue
-                c = (8, 10, 16, 150) if (tx, ty) in exp else (5, 6, 11, 240)
-                fog.fill(c, pygame.Rect(int(tx * s), int(ty * s), cell, cell))
-        self._fog = fog
+        """Ricostruisce l'overlay di nebbia (solo quando la visione cambia).
+
+        Una immagine RGBA a risoluzione di TILE costruita con numpy (visibile =
+        trasparente, esplorato = velo leggero, mai visto = velo scuro) e poi scalata
+        NEAREST alla dimensione della minimappa: un'operazione sola invece di un
+        `fill` per ogni tile (prima ~40 ms a chiamata, ora ~1 ms)."""
+        w, h = self.grid.width, self.grid.height
+        exp = vision.explored.get(team) or ()
+        if len(exp) != self._exp_len or self._exp_mask is None:
+            # L'esplorato cresce soltanto: la maschera si rifa solo quando cambia.
+            self._exp_len = len(exp)
+            m = np.zeros((h, w), dtype=bool)
+            if exp:
+                pts = np.array(list(exp), dtype=np.intp)
+                m[pts[:, 1], pts[:, 0]] = True
+            self._exp_mask = m
+        img = np.empty((h, w, 4), dtype=np.uint8)
+        img[:] = _FOG_UNSEEN
+        img[self._exp_mask] = _FOG_SEEN
+        vis = vision.visible_tiles.get(team)
+        if vis:
+            pts = np.array(list(vis), dtype=np.intp)
+            img[pts[:, 1], pts[:, 0]] = 0
+        small = pygame.image.frombuffer(img.tobytes(), (w, h), "RGBA")
+        self._fog = pygame.transform.scale(small, (self.mw, self.mh))
 
     # --- conversioni ---------------------------------------------------------
     def _m(self, wx, wy):

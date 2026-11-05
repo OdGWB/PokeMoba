@@ -1059,6 +1059,15 @@ Passaggi completati:
   resto passa dai timer e dagli eventi fx. Screenshot: step_50_* (linea, ogni
   mossa, corsa_trascina/_schianto/_rimbalzo/_potenziato, presa_volo/_muro,
   lariat, prepotenza, mira_*, hud_litten, hud).
+- PRESTAZIONI, nebbia della minimappa (step_52). Profilo di una partita 5v5 (150 s
+  di gioco, headless, PC i5-10210U 4 core/1,6 GHz): frame medio ~37 ms (<30 FPS).
+  Minimap.rebuild_fog costava il 34% del tempo (865 chiamate in 80 s, ~42 ms l'una:
+  un Surface.fill per ognuno dei 22.500 tile). Ora immagine RGBA a risoluzione di tile
+  con numpy (maschera dell'esplorato in cache, visto -> trasparente), un solo
+  transform.scale NEAREST. Misura A/B interlacciata nella stessa partita: frame medio
+  46,9 -> 33,3 ms, p95 107 -> 69, p99 181 -> 92, max 825 -> 338; la mediana resta
+  ~26 ms. Il resto: engine/vision.update (12%, insiemi di tile in Python; il
+  _draw_fog 8%) e tick di logica fino a 90 ms (line_of_sight/pathfinding).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul
