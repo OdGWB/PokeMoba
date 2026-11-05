@@ -455,6 +455,16 @@ class Pokemon(Unit):
     scy_atk_mult: float = 1.0          # moltiplicatori ricalcolati a ogni tick
     scy_def_mult: float = 1.0
     scy_spdef_mult: float = 1.0
+    # Linea Litten (engine/incineroar.py)
+    incin_last_dealt: float = -1e9     # Prepotenza: ultimo danno inflitto
+    incin_calm_at: float = -1e9        #   ultimo danno inflitto o subito (HUD)
+    incin_intim_until: float = -1.0    # Prepotenza subita: -20% Attacco
+    incin_bully_until: float = -1.0    # Bullo: +10% Attacco (provocati e Incineroar)
+    incin_rope_until: float = -1.0     # Corsa alle Corde: prossimo attacco base o Q potenziato
+    incin_lariat_until: float = -1.0   # Darkest Lariat in corso
+    incin_lariat_next: float = -1.0
+    incin_ring_n: int = 0              # Cattivo del Ring: nemici entro 5 tile (max 3)
+    incin_atk_mult: float = 1.0        # ricalcolato a ogni tick
 
     def _bonus(self, stat: str) -> float:
         return (self.passive_bonus.get(stat, 0.0) + self.item_bonus.get(stat, 0.0)
@@ -485,7 +495,7 @@ class Pokemon(Unit):
             atk *= self.ancient_mult    # Forzantica (Mamoswine): tutte le statistiche
         if self.silver_active:
             atk *= self.silver_mult     # Ventargenteo (Venomoth): tutte le statistiche
-        return atk * self.scy_atk_mult   # Troppoforte (Scizor): -20%
+        return atk * self.scy_atk_mult * self.incin_atk_mult   # Troppoforte; Prepotenza/Bullo
 
     def eff_sp_attack(self) -> float:
         # Nel modello MOBA la statistica speciale per livello e' sparita: le

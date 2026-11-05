@@ -200,6 +200,7 @@ class BasicAttackMixin:
         claws = self._claws_on(u)      # Ombrartigli: Spettro, sempre brutto colpo
         mult = self._item_aa_mult(u, tgt) * self._mien_aa_mult(u)
         mult *= self._scy_aa_mult(u)   # Asce di Pietra (Kleavor): +40%
+        mult *= self._incin_aa_mult(u)   # Corsa alle Corde: colpo potenziato dal rimbalzo
         if u.aa_stealth:               # Distacco: primo colpo furtivo potenziato
             mult *= config.DISTACCO_BONUS_MULT
             u.stealth_shot_ready = False
@@ -245,6 +246,7 @@ class BasicAttackMixin:
         self._moth_after_aa(u, tgt)      # Scaglie Velenose: accumuli di veleno
         self._octi_after_aa(u, tgt, snap, dmg)   # munizioni: Ghiaccio, Fuoco, Erba
         self._scy_after_aa(u, tgt)    # Doppiocolpo, Chele d'Acciaio, Asce di Pietra, Spaccaroccia
+        self._incin_after_aa(u, tgt)  # Corsa alle Corde: stordimento del colpo potenziato
         self._spirit_wander(u, tgt)   # Spirito Vagante (Spiritomb)
         self._cute_charm(u, tgt)      # Incantevole (Sylveon)
 

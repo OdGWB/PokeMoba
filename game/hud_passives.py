@@ -16,7 +16,7 @@ import pygame
 
 from engine.eevee import eevee_candidates, eevee_forms
 
-from . import (arch_fx, eevee_fx, flor_fx, hatt_fx, mag_fx, mien_fx, moth_fx, octi_fx, scy_fx, sneasel_fx,
+from . import (arch_fx, eevee_fx, flor_fx, hatt_fx, incin_fx, mag_fx, mien_fx, moth_fx, octi_fx, scy_fx, sneasel_fx,
                swine_fx, ursa_fx)
 
 
@@ -174,6 +174,10 @@ def draw_passive(surface, font, p, bx, y0, bh, ctx) -> None:
     if p.passive_id in scy_fx.PASSIVE_NAMES:
         scy_fx.draw_hud(surface, font, p, bx, y0, bh, ctx.now, ctx.level,
                         getattr(p, "scy_fury_stacks", 0))
+
+    # Linea Litten: Prepotenza (cintura accesa = pronta) e Cattivo del Ring.
+    if p.passive_id in incin_fx.PASSIVE_NAMES:
+        incin_fx.draw_hud(surface, font, p, bx, y0, bh, ctx.now)
 
     # Linea Teddiursa: Miele (vasetti) e, da Ursaring, Dentistretti.
     if p.passive_id in ("miele", "dentistretti"):

@@ -61,7 +61,7 @@ ME_FIELDS = ("passive_id", "soul_charges", "inversion_stacks", "muta_cd_until", 
              "wander_ready_at", "voltabsorb_ready_at", "flashfire_until", "recalling",
              "recall_until", "respawn_timer", "guard_ready_at", "climb_ready_at",
              "fakeout_ready", "dance_seq", "mien_calm_at", "ammo", "ammo_boost",
-             "flower_color")
+             "flower_color", "incin_calm_at", "incin_ring_n")
 
 _timer_fields: dict = {}
 

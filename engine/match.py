@@ -39,6 +39,7 @@ from .venomoth import MOTH_PASSIVES, VenomothMixin
 from .octillery import OCTI_PASSIVES, OctilleryMixin
 from .florges import FLOR_PASSIVES, FlorgesMixin, has_garden
 from .scizor import SCY_PASSIVES, ScizorMixin
+from .incineroar import INCIN_PASSIVES, IncineroarMixin
 from .corviknight import CORVI_PASSIVES, CorviknightMixin
 from .eevee import EEVEE_PASSIVES, EeveeMixin
 from .item_effects import ItemEffectsMixin, cdr_to_haste
@@ -169,11 +170,14 @@ CAST_ANIMS = {"projectile": "Shoot", "bubble": "Shoot",
             "florgarden": "Charge", "florsolar": "Charge",
             "scyfury": "Attack", "scyfocus": "Charge", "scywing": "Attack",
             "scybullet": "Attack", "scysuperpower": "Attack", "scyclaws": "Charge",
-            "kleaaxe": "Attack", "kleachop": "Charge", "kleasmash": "Charge"}
+            "kleaaxe": "Attack", "kleachop": "Charge", "kleasmash": "Charge",
+            "incinkick": "Double", "incinfang": "Attack", "incincross": "Swing",
+            "incinbully": "Charge", "incinropes": "Hop", "incinlariat": "Rotate",
+            "incingrab": "Swing"}
 
 class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, NoivernMixin,
             UrsaringMixin, SneaselMixin, MienshaoMixin, ArchaludonMixin,
-            HattereneMixin, MagnezoneMixin, MamoswineMixin, VenomothMixin, OctilleryMixin, FlorgesMixin, ScizorMixin, BasicAttackMixin, ItemEffectsMixin):
+            HattereneMixin, MagnezoneMixin, MamoswineMixin, VenomothMixin, OctilleryMixin, FlorgesMixin, ScizorMixin, IncineroarMixin, BasicAttackMixin, ItemEffectsMixin):
     def __init__(self, world, map_data):
         self.world = world
         self.map = map_data
@@ -219,6 +223,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self._init_octi()        # linea Remoraid: proiettili di Pistolacqua
         self._init_flor()        # linea Flabébé: fiori, Radici, Campo Nebbioso
         self._init_scy()         # linea Scyther: campi di schegge, Taglio d'Albero
+        self._init_incin()       # linea Litten: Corsa alle Corde, Presa del Campione
         self._init_basic_attack()   # attacco base: proiettili a ricerca
         self.vision = VisionSystem(self.world.grid)
         self._build_structures()
@@ -283,6 +288,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self._update_octi(dt)        # Pistolacqua, Raffica (linea Remoraid)
         self._update_flor(dt)        # fiori, Radici, Campo Nebbioso, Petalodanza (linea Flabébé)
         self._update_scy(dt)         # Cuordeciso, campi di schegge, secondi colpi (linea Scyther)
+        self._update_incin(dt)       # Corsa alle Corde, Presa, Lariat, Prepotenza (linea Litten)
         self._update_rock_moves(dt)  # Rocciotomba / Pesobomba / Frana / Abbattimento
         self._update_spiritomb(dt)   # spiriti, Stordiraggio, Malcomune, Legione, Memento
         self._update_eevee(dt)       # Desiderio, Comete, Tuono, Bora, Divinazione, Idratazione
@@ -1051,6 +1057,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         amount *= self._swine_type_mult(target, dmg_type)   # Grassospesso: -50% Fuoco/Ghiaccio
         amount *= self._flor_dmg_mult(attacker)   # fiore Rosso (Giardino): +15%
         amount *= self._item_struct_mult(attacker, target)   # Augite Nera: +20% alle torri
+        amount *= self._incin_dmg_mult(attacker)   # Cattivo del Ring: +5% per nemico vicino
         if (isinstance(target, Wild) and isinstance(attacker, Pokemon)
                 and attacker.passive_id == "muta"):
             amount *= MUTA_WILD_MULT   # Muta (linea Nincada): +30% ai neutrali
@@ -1086,6 +1093,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         if isinstance(target, Core) and self._alive_towers(target.team) > config.CORE_EXPOSE_TOWERS_LEFT:
             return
         self._armature_track(attacker, target, amount)   # Armature (Charcadet)
+        self._incin_on_dealt(attacker, target, amount)   # Prepotenza (linea Litten)
         # Scudo (solo Pokémon): assorbe prima degli HP.
         if (isinstance(target, Pokemon) and target.shield > 0.0
                 and target.shield_until > self.time and not ignore_shield):
@@ -1780,6 +1788,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             return
         if not self._flor_precheck(p, mv, Vec2(tx, ty)):   # Solarraggio senza fiori
             return
+        if not self._incin_precheck(p, mv, Vec2(tx, ty)):   # Presa del Campione senza bersaglio
+            return
         self._sneasel_on_cast(p, mv)   # Notte Fonda: lanciare una mossa toglie l'invisibilità
         # Lanciare annulla un attacco base in CARICAMENTO (il ciclo non si consuma);
         # se il colpo è già uscito il recupero continua da dove era (niente punizione).
@@ -1908,6 +1918,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             pass   # linea Flabébé (engine/florges.py)
         elif self._scy_cast(p, mv, rank, origin, tgt, dirv):
             pass   # linea Scyther (engine/scizor.py)
+        elif self._incin_cast(p, mv, rank, origin, tgt, dirv):
+            pass   # linea Litten (engine/incineroar.py)
         elif shape == "buff":
             self._apply_support(p, mv, rank, origin)
             self.fx_events.append({"kind": "buff", "c": (origin.x, origin.y),
@@ -3516,7 +3528,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             guard = bool(fx.get("pierce_guard"))
             self._shield_break(target, fx)   # Bruciatutto: brucia parte dello scudo
             dmg = self._mitigate_hit(caster, target, raw, magic=magic,
-                                     crit_bonus=crit_bonus, pierce_guard=guard,
+                                     crit_bonus=crit_bonus,
+                                     pierce_guard=guard or bool(fx.get("ignore_def_buffs")),
                                      can_crit=bool(mv.d.get("can_crit")),   # Aerasoio
                                      vs_defense=bool(mv.d.get("vs_defense")))   # Psicoshock
             self._deal_damage(caster, target, dmg, dmg_type=mv.type, ignore_shield=guard)
@@ -3968,6 +3981,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             p.speed *= self._moth_speed_mult(p)    # Eledanza, Ventargenteo
             p.speed *= self._flor_speed_mult(p)    # fiore Giallo, Petalodanza
             p.speed *= self._scy_speed_mult(p)     # Cuordeciso: +30%
+            p.speed *= self._incin_speed_mult(p)   # Darkest Lariat: 70%
             # Nitrocarica: cariche di velocità cumulabili (scadono insieme).
             if p.fc_until > self.time and p.fc_stacks > 0:
                 p.speed *= 1.0 + p.fc_per * p.fc_stacks
@@ -4056,6 +4070,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         if p.passive_id in FLOR_PASSIVES and self._bot_flor_cast(p, target):
             return
         if p.passive_id in SCY_PASSIVES and self._bot_scy_cast(p, target):
+            return
+        if p.passive_id in INCIN_PASSIVES and self._bot_incin_cast(p, target):
             return
         for slot in ("R", "Q", "W", "E"):
             ms = p.moveset.get(slot)

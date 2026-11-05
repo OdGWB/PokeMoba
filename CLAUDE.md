@@ -1026,6 +1026,33 @@ Passaggi completati:
   squadre (net/visual), scy_fury_stacks/scy_double_ready/scy_shred/
   scy_infield in UNIT_FLAGS, i timer scy_*_until passano da soli.
   Screenshot: step_49_* (forme, ogni mossa, mirini, hud_*, negozio, draft).
+- LINEA LITTEN > TORRACAT > INCINEROAR (step_50), grafica nuova in
+  game/incin_fx.py (logica in engine/incineroar.py). Sprite PMD Sprite Collab
+  in assets/pokemon/0725/0726/0727. Forme nuove in _draw_shapes
+  (incin_fx.SHAPES): fauci di fuoco che si chiudono (incinjaw: Fuocodenti),
+  due tagli affusolati che si incrociano uno dopo l'altro (incinx:
+  Incrocolpo), tre archi spessi che escono nel cono (incinroar: Bullo rosso,
+  Granfisico arancio, Provocazione viola), CORDE DEL RING (incinropes: tre
+  corde rossa/bianca/rossa con i paletti d'oro che si tendono contro il muro
+  e vibrano: il rimbalzo di Corsa alle Corde), scia di fuoco della corsa e
+  del nemico scagliato (incinstreak, sollevata con air_z), anello schiacciato
+  del Darkest Lariat con fiammate che girano (incinspin). Riusa scyblade e
+  scyfist (Scyther: calci e pugno di Incineroar), claw3/groundring/
+  groundcrack/pebble (Teddiursa), impactstar (Sneasel), flametongue
+  (Charcadet). Schianto contro il muro = stella d'impatto + crepe + sassi +
+  schermo che trema. Sulle unita' (visibili a tutti, anche online dai timer
+  *_until): braccia tese che girano con le fiamme scure (Lariat), pugni
+  accesi (colpo potenziato dal rimbalzo), freccine pixel art accanto alla
+  barra della vita: ROSSA in su = +Attacco di Bullo, AZZURRA in giu' =
+  Prepotenza subita. HUD: cintura di fuoco con la fibbia d'oro (accesa e
+  "Prepotenza pronta" dopo 5 s di calma, barra della calma sotto), con
+  Incineroar 3 tacche di Cattivo del Ring + "+N%". Mirini: cono (Doppiocalcio,
+  Bullo), cerchio del morso, X di Incrocolpo, corsia di 5 tile con le corde in
+  punta e le frecce dei rimbalzi, cerchio del Lariat, cerchio di presa +
+  freccia del lancio. Online: incin_calm_at/incin_ring_n in ME_FIELDS, il
+  resto passa dai timer e dagli eventi fx. Screenshot: step_50_* (linea, ogni
+  mossa, corsa_trascina/_schianto/_rimbalzo/_potenziato, presa_volo/_muro,
+  lariat, prepotenza, mira_*, hud_litten, hud).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

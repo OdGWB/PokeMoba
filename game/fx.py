@@ -19,7 +19,7 @@ import pygame
 import config
 
 from . import (arch_fx, charcadet_fx, corvi_fx, eevee_fx, hatt_fx, mag_fx, mien_fx, noivern_fx,
-               flor_fx, moth_fx, octi_fx, scy_fx, sneasel_fx, swine_fx, ursa_fx)
+               flor_fx, incin_fx, moth_fx, octi_fx, scy_fx, sneasel_fx, swine_fx, ursa_fx)
 from . import structure_gfx
 
 # Colore per tipo (per le particelle).
@@ -1492,6 +1492,8 @@ class FXSystem:
                 flor_fx.draw_shape(overlay, s, S, ts, f, a)
             elif kind in scy_fx.SHAPES:   # linea Scyther: falci, chele, pugni, asce, schegge
                 scy_fx.draw_shape(overlay, s, S, ts, f, a)
+            elif kind in incin_fx.SHAPES:   # linea Litten: fauci, croce, corde, Lariat
+                incin_fx.draw_shape(overlay, s, S, ts, f, a)
         surface.blit(overlay, (0, 0))
 
     # Registro degli stili d'attacco: nome ("fx" nel JSON / "attack_fx") -> handler.
@@ -1569,4 +1571,5 @@ class FXSystem:
         **octi_fx.STYLES,
         **flor_fx.STYLES,
         **scy_fx.STYLES,
+        **incin_fx.STYLES,
     }
