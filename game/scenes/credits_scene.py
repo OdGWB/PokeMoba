@@ -6,6 +6,8 @@ Rotellina / frecce / PagSu-PagGiu per scorrere, ESC o INVIO per tornare.
 """
 from __future__ import annotations
 
+import json
+
 import pygame
 
 from .. import avatars as A
@@ -22,7 +24,9 @@ INTRO = [
     ("h", "Sprite dei Pokémon in partita"),
     ("t", "PMD Sprite Collab - https://sprites.pmdcollab.org/"),
     ("d", "Repository: github.com/PMDCollab/SpriteCollab - licenza CC BY-NC 4.0"),
-    ("d", "Opera degli artisti della community PMD Sprite Collab."),
+    ("d", "Autori elencati separatamente per ogni sprite (CHUNSOFT = sprite originali PMD)."),
+]
+SPRITES_END = [
     ("", ""),
     ("h", "Immagini profilo (ritratti \"Normal\" dei leggendari)"),
     ("t", "PMD Sprite Collab - https://sprites.pmdcollab.org/ - licenza CC BY-NC 4.0"),
@@ -46,8 +50,20 @@ OUTRO = [
 ]
 
 
+def sprite_credits() -> dict:
+    """Autori per sprite (assets/pokemon/credits.json, da tools/fetch_sprite_credits.py)."""
+    try:
+        return json.loads((A.ROOT / "assets" / "pokemon" / "credits.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError, AttributeError):
+        return {}
+
+
 def credit_lines():
     lines = list(INTRO)
+    for dex, c in sorted(sprite_credits().items()):
+        lines.append(("t", f"  #{int(dex):<4} {c['name']:<12} {', '.join(c['authors'])}"
+                      + (f"  [{c['role']}]" if c.get("role") else "")))
+    lines += SPRITES_END
     credits = A.load_credits()
     for dex, name in A.AVATARS:
         c = credits.get(f"{dex:04d}")

@@ -1,0 +1,603 @@
+{
+ "0004": {
+  "name": "Charmander",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0005": {
+  "name": "Charmeleon",
+  "authors": [
+   "CHUNSOFT",
+   "utente Discord 199989579682414592",
+   "bwappi",
+   "Grimlin"
+  ]
+ },
+ "0006": {
+  "name": "Charizard",
+  "authors": [
+   "CHUNSOFT",
+   "Emboarger"
+  ]
+ },
+ "0010": {
+  "name": "Caterpie",
+  "authors": [
+   "CHUNSOFT"
+  ],
+  "role": "minion blu mischia"
+ },
+ "0016": {
+  "name": "Pidgey",
+  "authors": [
+   "CHUNSOFT",
+   "JFain"
+  ],
+  "role": "minion blu a distanza"
+ },
+ "0021": {
+  "name": "Spearow",
+  "authors": [
+   "CHUNSOFT"
+  ],
+  "role": "minion blu cannone"
+ },
+ "0048": {
+  "name": "Venonat",
+  "authors": [
+   "CHUNSOFT",
+   "anomalocaris"
+  ]
+ },
+ "0049": {
+  "name": "Venomoth",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0060": {
+  "name": "Poliwag",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0061": {
+  "name": "Poliwhirl",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0062": {
+  "name": "Poliwrath",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0080": {
+  "name": "Slowbro",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0081": {
+  "name": "Magnemite",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0082": {
+  "name": "Magneton",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0092": {
+  "name": "Gastly",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0093": {
+  "name": "Haunter",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0094": {
+  "name": "Gengar",
+  "authors": [
+   "CHUNSOFT",
+   "Emboarger"
+  ]
+ },
+ "0114": {
+  "name": "Tangela",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0123": {
+  "name": "Scyther",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0133": {
+  "name": "Eevee",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0134": {
+  "name": "Vaporeon",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0135": {
+  "name": "Jolteon",
+  "authors": [
+   "CHUNSOFT",
+   "dmDash"
+  ]
+ },
+ "0136": {
+  "name": "Flareon",
+  "authors": [
+   "CHUNSOFT",
+   "Ginnie",
+   "JFain"
+  ]
+ },
+ "0158": {
+  "name": "Totodile",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0159": {
+  "name": "Croconaw",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0160": {
+  "name": "Feraligatr",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0167": {
+  "name": "Spinarak",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0168": {
+  "name": "Ariados",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0186": {
+  "name": "Politoed",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0187": {
+  "name": "Hoppip",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0196": {
+  "name": "Espeon",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0197": {
+  "name": "Umbreon",
+  "authors": [
+   "CHUNSOFT",
+   "JFain",
+   "Emmuffin"
+  ]
+ },
+ "0212": {
+  "name": "Scizor",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0215": {
+  "name": "Sneasel",
+  "authors": [
+   "CHUNSOFT",
+   "JFain",
+   "Grimlin"
+  ]
+ },
+ "0216": {
+  "name": "Teddiursa",
+  "authors": [
+   "CHUNSOFT",
+   "Emmuffin"
+  ]
+ },
+ "0217": {
+  "name": "Ursaring",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0220": {
+  "name": "Swinub",
+  "authors": [
+   "CHUNSOFT",
+   "Caitemis"
+  ]
+ },
+ "0221": {
+  "name": "Piloswine",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0223": {
+  "name": "Remoraid",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0224": {
+  "name": "Octillery",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0290": {
+  "name": "Nincada",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0291": {
+  "name": "Ninjask",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0292": {
+  "name": "Shedinja",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0382": {
+  "name": "Kyogre",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0383": {
+  "name": "Groudon",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0384": {
+  "name": "Rayquaza",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0396": {
+  "name": "Starly",
+  "authors": [
+   "CHUNSOFT",
+   "Emboarger",
+   "JFain"
+  ],
+  "role": "minion rosso a distanza"
+ },
+ "0399": {
+  "name": "Bidoof",
+  "authors": [
+   "CHUNSOFT",
+   "Emmuffin"
+  ],
+  "role": "minion rosso mischia"
+ },
+ "0415": {
+  "name": "Combee",
+  "authors": [
+   "CHUNSOFT"
+  ],
+  "role": "minion rosso cannone"
+ },
+ "0442": {
+  "name": "Spiritomb",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0455": {
+  "name": "Carnivine",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0461": {
+  "name": "Weavile",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0462": {
+  "name": "Magnezone",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0467": {
+  "name": "Magmortar",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0470": {
+  "name": "Leafeon",
+  "authors": [
+   "CHUNSOFT",
+   "baronessfaron"
+  ]
+ },
+ "0471": {
+  "name": "Glaceon",
+  "authors": [
+   "CHUNSOFT",
+   "JFain",
+   "baronessfaron"
+  ]
+ },
+ "0473": {
+  "name": "Mamoswine",
+  "authors": [
+   "CHUNSOFT"
+  ]
+ },
+ "0493": {
+  "name": "Arceus",
+  "authors": [
+   "JFain",
+   "baronessfaron",
+   "Emboarger"
+  ]
+ },
+ "0495": {
+  "name": "Snivy",
+  "authors": [
+   "NeroIntruder",
+   "G〜"
+  ]
+ },
+ "0496": {
+  "name": "Servine",
+  "authors": [
+   "NeroIntruder"
+  ]
+ },
+ "0497": {
+  "name": "Serperior",
+  "authors": [
+   "NeroIntruder"
+  ]
+ },
+ "0524": {
+  "name": "Roggenrola",
+  "authors": [
+   "powercristal"
+  ]
+ },
+ "0525": {
+  "name": "Boldore",
+  "authors": [
+   "Soulja"
+  ]
+ },
+ "0526": {
+  "name": "Gigalith",
+  "authors": [
+   "Soulja"
+  ]
+ },
+ "0619": {
+  "name": "Mienfoo",
+  "authors": [
+   "JFain"
+  ]
+ },
+ "0620": {
+  "name": "Mienshao",
+  "authors": [
+   "baronessfaron"
+  ]
+ },
+ "0669": {
+  "name": "Flabebe",
+  "authors": [
+   "baronessfaron"
+  ]
+ },
+ "0670": {
+  "name": "Floette",
+  "authors": [
+   "baronessfaron"
+  ]
+ },
+ "0671": {
+  "name": "Florges",
+  "authors": [
+   "baronessfaron"
+  ]
+ },
+ "0700": {
+  "name": "Sylveon",
+  "authors": [
+   "baronessfaron"
+  ]
+ },
+ "0714": {
+  "name": "Noibat",
+  "authors": [
+   "JFain",
+   "Emboarger",
+   "G〜",
+   "baronessfaron"
+  ]
+ },
+ "0715": {
+  "name": "Noivern",
+  "authors": [
+   "Soulja",
+   "Top_Kec"
+  ]
+ },
+ "0722": {
+  "name": "Rowlet",
+  "authors": [
+   "Reimu\\_needs\\_$$$",
+   "Emmuffin"
+  ]
+ },
+ "0723": {
+  "name": "Dartrix",
+  "authors": [
+   "Reimu\\_needs\\_$$$"
+  ]
+ },
+ "0724": {
+  "name": "Decidueye",
+  "authors": [
+   "Reimu\\_needs\\_$$$",
+   "Audino"
+  ]
+ },
+ "0725": {
+  "name": "Litten",
+  "authors": [
+   "Top_Kec"
+  ]
+ },
+ "0726": {
+  "name": "Torracat",
+  "authors": [
+   "baronessfaron",
+   "◥θ┴θ◤",
+   "Kawaiitron"
+  ]
+ },
+ "0727": {
+  "name": "Incineroar",
+  "authors": [
+   "avalancheman",
+   "G〜",
+   "mixy:3"
+  ]
+ },
+ "0821": {
+  "name": "Rookidee",
+  "authors": [
+   "Michael12",
+   "Soulja",
+   "Caitemis"
+  ]
+ },
+ "0822": {
+  "name": "Corvisquire",
+  "authors": [
+   "Emmuffin"
+  ]
+ },
+ "0823": {
+  "name": "Corviknight",
+  "authors": [
+   "nataniel-sama",
+   "◥θ┴θ◤",
+   "G〜",
+   "Soulja"
+  ]
+ },
+ "0856": {
+  "name": "Hatenna",
+  "authors": [
+   "baronessfaron"
+  ]
+ },
+ "0857": {
+  "name": "Hattrem",
+  "authors": [
+   "baronessfaron"
+  ]
+ },
+ "0858": {
+  "name": "Hatterene",
+  "authors": [
+   "JFain",
+   "baronessfaron"
+  ]
+ },
+ "0884": {
+  "name": "Duraludon",
+  "authors": [
+   "Soulja"
+  ]
+ },
+ "0900": {
+  "name": "Kleavor",
+  "authors": [
+   "JFain",
+   "Soulja"
+  ]
+ },
+ "0901": {
+  "name": "Ursaluna",
+  "authors": [
+   "Emmuffin",
+   "baronessfaron"
+  ]
+ },
+ "0903": {
+  "name": "Sneasler",
+  "authors": [
+   "Soulja"
+  ]
+ },
+ "0935": {
+  "name": "Charcadet",
+  "authors": [
+   "Emmuffin"
+  ]
+ },
+ "0936": {
+  "name": "Armarouge",
+  "authors": [
+   "Soulja"
+  ]
+ },
+ "0937": {
+  "name": "Ceruledge",
+  "authors": [
+   "baronessfaron"
+  ]
+ },
+ "1018": {
+  "name": "Archaludon",
+  "authors": [
+   "Soulja"
+  ]
+ }
+}

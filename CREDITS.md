@@ -18,6 +18,110 @@ in conformità con i termini della licenza CC BY-NC 4.0.
 > Nota: gli sprite non sono inclusi in questo repository; vanno scaricati dalle
 > fonti ufficiali e collocati in `assets/pokemon/{numero_dex}/`.
 
+<!-- SPRITE-CREDITS:BEGIN -->
+
+Gli autori di ciascuno sprite sono elencati separatamente, come richiesto dal
+"Proper Crediting" di PMD Sprite Collab (fonte: `sprite/<dex>/credits.txt`
+del repository, generato con `python tools/fetch_sprite_credits.py`).
+CHUNSOFT = sprite originali di Pokémon Mystery Dungeon (Spike Chunsoft).
+
+| N. | Pokémon | Autori dello sprite |
+|---|---|---|
+| 4 | Charmander | CHUNSOFT |
+| 5 | Charmeleon | CHUNSOFT, utente Discord 199989579682414592, bwappi, Grimlin |
+| 6 | Charizard | CHUNSOFT, Emboarger |
+| 10 | Caterpie (minion blu mischia) | CHUNSOFT |
+| 16 | Pidgey (minion blu a distanza) | CHUNSOFT, JFain |
+| 21 | Spearow (minion blu cannone) | CHUNSOFT |
+| 48 | Venonat | CHUNSOFT, anomalocaris |
+| 49 | Venomoth | CHUNSOFT |
+| 60 | Poliwag | CHUNSOFT |
+| 61 | Poliwhirl | CHUNSOFT |
+| 62 | Poliwrath | CHUNSOFT |
+| 80 | Slowbro | CHUNSOFT |
+| 81 | Magnemite | CHUNSOFT |
+| 82 | Magneton | CHUNSOFT |
+| 92 | Gastly | CHUNSOFT |
+| 93 | Haunter | CHUNSOFT |
+| 94 | Gengar | CHUNSOFT, Emboarger |
+| 114 | Tangela | CHUNSOFT |
+| 123 | Scyther | CHUNSOFT |
+| 133 | Eevee | CHUNSOFT |
+| 134 | Vaporeon | CHUNSOFT |
+| 135 | Jolteon | CHUNSOFT, dmDash |
+| 136 | Flareon | CHUNSOFT, Ginnie, JFain |
+| 158 | Totodile | CHUNSOFT |
+| 159 | Croconaw | CHUNSOFT |
+| 160 | Feraligatr | CHUNSOFT |
+| 167 | Spinarak | CHUNSOFT |
+| 168 | Ariados | CHUNSOFT |
+| 186 | Politoed | CHUNSOFT |
+| 187 | Hoppip | CHUNSOFT |
+| 196 | Espeon | CHUNSOFT |
+| 197 | Umbreon | CHUNSOFT, JFain, Emmuffin |
+| 212 | Scizor | CHUNSOFT |
+| 215 | Sneasel | CHUNSOFT, JFain, Grimlin |
+| 216 | Teddiursa | CHUNSOFT, Emmuffin |
+| 217 | Ursaring | CHUNSOFT |
+| 220 | Swinub | CHUNSOFT, Caitemis |
+| 221 | Piloswine | CHUNSOFT |
+| 223 | Remoraid | CHUNSOFT |
+| 224 | Octillery | CHUNSOFT |
+| 290 | Nincada | CHUNSOFT |
+| 291 | Ninjask | CHUNSOFT |
+| 292 | Shedinja | CHUNSOFT |
+| 382 | Kyogre | CHUNSOFT |
+| 383 | Groudon | CHUNSOFT |
+| 384 | Rayquaza | CHUNSOFT |
+| 396 | Starly (minion rosso a distanza) | CHUNSOFT, Emboarger, JFain |
+| 399 | Bidoof (minion rosso mischia) | CHUNSOFT, Emmuffin |
+| 415 | Combee (minion rosso cannone) | CHUNSOFT |
+| 442 | Spiritomb | CHUNSOFT |
+| 455 | Carnivine | CHUNSOFT |
+| 461 | Weavile | CHUNSOFT |
+| 462 | Magnezone | CHUNSOFT |
+| 467 | Magmortar | CHUNSOFT |
+| 470 | Leafeon | CHUNSOFT, baronessfaron |
+| 471 | Glaceon | CHUNSOFT, JFain, baronessfaron |
+| 473 | Mamoswine | CHUNSOFT |
+| 493 | Arceus | JFain, baronessfaron, Emboarger |
+| 495 | Snivy | NeroIntruder, G〜 |
+| 496 | Servine | NeroIntruder |
+| 497 | Serperior | NeroIntruder |
+| 524 | Roggenrola | powercristal |
+| 525 | Boldore | Soulja |
+| 526 | Gigalith | Soulja |
+| 619 | Mienfoo | JFain |
+| 620 | Mienshao | baronessfaron |
+| 669 | Flabebe | baronessfaron |
+| 670 | Floette | baronessfaron |
+| 671 | Florges | baronessfaron |
+| 700 | Sylveon | baronessfaron |
+| 714 | Noibat | JFain, Emboarger, G〜, baronessfaron |
+| 715 | Noivern | Soulja, Top_Kec |
+| 722 | Rowlet | Reimu\_needs\_$$$, Emmuffin |
+| 723 | Dartrix | Reimu\_needs\_$$$ |
+| 724 | Decidueye | Reimu\_needs\_$$$, Audino |
+| 725 | Litten | Top_Kec |
+| 726 | Torracat | baronessfaron, ◥θ┴θ◤, Kawaiitron |
+| 727 | Incineroar | avalancheman, G〜, mixy:3 |
+| 821 | Rookidee | Michael12, Soulja, Caitemis |
+| 822 | Corvisquire | Emmuffin |
+| 823 | Corviknight | nataniel-sama, ◥θ┴θ◤, G〜, Soulja |
+| 856 | Hatenna | baronessfaron |
+| 857 | Hattrem | baronessfaron |
+| 858 | Hatterene | JFain, baronessfaron |
+| 884 | Duraludon | Soulja |
+| 900 | Kleavor | JFain, Soulja |
+| 901 | Ursaluna | Emmuffin, baronessfaron |
+| 903 | Sneasler | Soulja |
+| 935 | Charcadet | Emmuffin |
+| 936 | Armarouge | Soulja |
+| 937 | Ceruledge | baronessfaron |
+| 1018 | Archaludon | Soulja |
+
+<!-- SPRITE-CREDITS:END -->
+
 ## Immagini profilo — PMD Sprite Collab
 
 Le immagini profilo (scelte al primo avvio e da **Personalizzazione** nel menu) sono i
