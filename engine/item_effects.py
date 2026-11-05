@@ -171,6 +171,8 @@ class ItemEffectsMixin:
             dirv = Vec2(1.0, 0.0)
         if knockback and isinstance(u, Pokemon) and "iron_ball" in self._fx_items(u):
             dist *= IRONBALL_MULT
+        if knockback:
+            dist *= self._octi_disp_mult(u)   # Ventose (Octillery): -50%
         origin = Vec2(u.pos.x, u.pos.y)
         dest = self._clamp_to_wall(origin, origin + dirv.normalized() * dist)
         u.pos = dest

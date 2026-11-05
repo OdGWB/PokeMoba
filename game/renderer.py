@@ -17,7 +17,7 @@ from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
                          TILE_PUDDLE, TILE_RIVER, TILE_WALL)
 from . import spirit_fx
 from . import (arch_fx, charcadet_fx, corvi_fx, eevee_fx, hatt_fx, mag_fx, mien_fx, noivern_fx,
-               moth_fx, swine_fx,
+               moth_fx, octi_fx, swine_fx,
                sneasel_fx, ursa_fx)
 from . import structure_gfx
 from .fx import EMBER, ROCK_HI, ROCK_MID, ROCK_OUT, ROCK_SH, type_color
@@ -125,6 +125,7 @@ DEN_COLORS = {"low": (240, 150, 60), "high": (180, 120, 230)}
 
 class Renderer:
     def __init__(self, tile_size: int = config.TILE_SIZE):
+        self._now = 0.0
         self.tile_size = tile_size
         self._tile_cache: dict = {}   # (ts, tile_type, variant) -> Surface
         # Mappa statica in layer pre-renderizzati (costruiti al primo draw).
@@ -595,7 +596,8 @@ class Renderer:
             surface.blit(overlay, (0, 0))
 
     # --- percorso di debug ---------------------------------------------------
-    def draw_aim(self, surface, camera, origin, mouse_tile, move, hold=0.0, rain=False):
+    def draw_aim(self, surface, camera, origin, mouse_tile, move, hold=0.0, rain=False,
+                 ammo="Water"):
         """Indicatore di mira mentre si tiene premuto il tasto mossa.
 
         Mostra la gittata e l'area reale di colpo (linea/cono/cerchio/scatto).
@@ -636,6 +638,8 @@ class Renderer:
             return   # linea Swinub
         if moth_fx.draw_aim(surface, S, ts, ox, oy, nx, ny, dist, move):
             return   # linea Venonat
+        if octi_fx.draw_aim(surface, S, ts, ox, oy, nx, ny, dist, move, ammo):
+            return   # linea Remoraid (colore della munizione attiva)
         if shape == "rockwave":   # Rocciotomba: corsia dell'onda + pilastro in fondo
             ex, ey = ox + nx * rng, oy + ny * rng
             pygame.draw.line(surface, col, S(ox, oy), S(ex, ey), max(2, int(move.radius * ts)))
@@ -798,6 +802,7 @@ class Renderer:
     def _draw_entities(self, surface, camera, world, animators, selected_id,
                        vision=None, player_team=0, now=1e9):
         ts = self.tile_size
+        self._now = now   # per le barre della vita (mirino di Prendimira)
         # Culling: solo ciò che è nel riquadro visibile (con margine).
         x0, y0, x1, y1 = camera.visible_tile_bounds(ts, world.grid.width, world.grid.height)
 
@@ -891,6 +896,7 @@ class Renderer:
                     mag_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # carica + / -
                     swine_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # Forzantica
                     moth_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # Eledanza, Polvoscudo
+                    octi_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # Presa, Iper Raggio
                 if in_bush:
                     self._draw_hidden_hint(surface, e, gx, gy, now)
                 self._draw_unit_hp(surface, e, gx, gy, grow)
@@ -1081,6 +1087,7 @@ class Renderer:
             if getattr(u, "frost_stacks", 0) > 0:
                 row += 1
         moth_fx.draw_venom_pips(surface, u, gx, top, w, row)   # veleno (anche minion e neutrali)
+        octi_fx.draw_lock(surface, u, gx, top, self._now)   # mirino di Prendimira (a tutti)
 
     def _hp_bar(self, surface, cx, top_y, frac, team_col, width):
         h = 3

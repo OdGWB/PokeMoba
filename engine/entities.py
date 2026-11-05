@@ -57,6 +57,9 @@ class Unit(Entity, Combatant):
     facing: int = 0                  # indice direzione 0..7 (vedi vec.DIR_NAMES)
     bush_blocks: bool = False        # True = non può entrare nei cespugli (minion)
     venom_stacks: int = 0            # accumuli di veleno di Scaglie Velenose (visibili a tutti)
+    octi_lock_until: float = -1.0    # Prendimira (linea Remoraid): agganciato fino a qui
+    octi_lock_by: int = -1           #   da questo Octillery/Remoraid
+    octi_held_until: float = -1.0    # Presa a Ventosa: afferrato (solo grafica)
 
     def set_path(self, points: list) -> None:
         self.path = list(points)
@@ -414,6 +417,15 @@ class Pokemon(Unit):
     silver_mult: float = 1.0
     silver_active: bool = False
     powdershield_until: float = -1.0   # Polvoscudo (solo grafica)
+    # Linea Remoraid: munizioni, Prendimira, Presa a Ventosa, Iper Raggio.
+    ammo: str = "Water"                # munizione attiva (tipo di attacchi base e Q)
+    ammo_boost: bool = False           # Octillery: primo colpo dopo il cambio +30%
+    octi_lock_ready_at: float = 0.0    # Prendimira: pronta da qui
+    octi_grab_until: float = -1.0      # Presa a Ventosa: sta afferrando fino a qui
+    octi_grab_id: int | None = None
+    octi_grab_as: float = 0.0
+    octi_grab_root: float = -1.0       # fine del proprio blocco della Presa
+    octi_recharge_until: float = -1.0  # Iper Raggio: ricarica (solo grafica)
 
     def _bonus(self, stat: str) -> float:
         return (self.passive_bonus.get(stat, 0.0) + self.item_bonus.get(stat, 0.0)

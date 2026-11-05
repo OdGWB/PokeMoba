@@ -200,8 +200,12 @@ class NoivernMixin:
             for e in self._combat_hash.query_radius(c.x, c.y, r + 1.0):
                 if e.id in h["caught"] or not self._catchable(h, e):
                     continue
+                if e.id in h.get("freed", ()):
+                    continue   # Ventose: già liberato, non si riprende
                 if c.dist(e.pos) <= r + getattr(e, "radius", 0.0):
                     h["caught"][e.id] = math.atan2(e.pos.y - c.y, e.pos.x - c.x)
+                    if self._octi_disp_mult(e) < 1.0:   # Ventose: trascinato la metà
+                        h.setdefault("rel", {})[e.id] = now + (h["end"] - now) * 0.5
                     if isinstance(e, Pokemon):
                         e.aa_active = False
                         e.recalling = False
@@ -213,6 +217,11 @@ class NoivernMixin:
                 e = self.world.get(eid)
                 if e is None or not e.alive:
                     h["caught"].pop(eid, None)
+                    continue
+                if now >= h.get("rel", {}).get(eid, 1e18):   # Ventose: liberato a metà
+                    h["caught"].pop(eid, None)
+                    h.setdefault("freed", set()).add(eid)
+                    self._release_one(h, e)
                     continue
                 ang += 5.0 * dt
                 h["caught"][eid] = ang
@@ -237,16 +246,18 @@ class NoivernMixin:
             keep.append(h)
         self.hurricanes = keep
 
-    def _release_hurricane(self, h) -> None:
+    def _release_one(self, h, e) -> None:
+        if e is None or not e.alive or not isinstance(e, Pokemon):
+            return
         conf = float(h["mv"].effects.get("release_confuse", 1.0))
+        if e.stun_until <= self.time + 0.16:   # torna subito normale (stordimenti
+            e.stun_until = self.time           # di altre mosse restano)
+        if conf > 0:
+            self._apply_confuse(e, conf)
+
+    def _release_hurricane(self, h) -> None:
         for eid in h["caught"]:
-            e = self.world.get(eid)
-            if e is None or not e.alive or not isinstance(e, Pokemon):
-                continue
-            if e.stun_until <= self.time + 0.16:   # torna subito normale (stordimenti
-                e.stun_until = self.time           # di altre mosse restano)
-            if conf > 0:
-                self._apply_confuse(e, conf)
+            self._release_one(h, self.world.get(eid))
         self.fx_events.append({"kind": "area", "c": (h["c"].x, h["c"].y),
                                "radius": h["radius"], "mtype": h["mtype"],
                                "fx": "hurricaneend"})

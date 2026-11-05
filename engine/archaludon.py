@@ -199,6 +199,7 @@ class ArchaludonMixin:
         if isinstance(best, Pokemon) and "iron_ball" in self._fx_items(best):
             from .item_effects import IRONBALL_MULT
             push *= IRONBALL_MULT
+        push *= self._octi_disp_mult(best)   # Ventose
         dest = self._clamp_to_wall(a, a + away.normalized() * push)
         best.pos = dest
         best.stop()

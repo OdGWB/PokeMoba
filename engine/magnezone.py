@@ -593,10 +593,18 @@ class MagnezoneMixin:
     def _mag_can_move(self, e) -> bool:
         return e.alive and not self._cc_immune(e)
 
+    def _drag_end(self, units, dist, speed) -> float:
+        """Fine di un trascinamento: con Ventose (Octillery) dura la metà
+        (poi l'urto scatta comunque)."""
+        if min(self._octi_disp_mult(u) for u in units) < 1.0:
+            return self.time + min(DRAG_MAX, max(0.0, dist) / speed) * 0.5
+        return self.time + DRAG_MAX
+
     def _mag_clash(self, a, b, src) -> None:
         self.mag_links.append({"kind": "clash", "ids": (a.id, b.id), "a_id": a.id, "b_id": b.id,
                                "src": src.id if src is not None else 0,
-                               "start": self.time, "end": self.time + DRAG_MAX,
+                               "start": self.time,
+                               "end": self._drag_end((a, b), a.pos.dist(b.pos), 2 * PULL_SPEED),
                                "a": Vec2(a.pos.x, a.pos.y), "b": Vec2(b.pos.x, b.pos.y),
                                "c": Vec2(a.pos.x, a.pos.y), "team": a.team})
 
@@ -606,8 +614,9 @@ class MagnezoneMixin:
                                "ally_id": ally.id if ally is not None else 0,
                                "anchor": anchor, "impact": impact, "contact": contact,
                                "src": src.id if src is not None else 0,
-                               "mv": mv, "rank": rank,
-                               "start": self.time, "end": self.time + DRAG_MAX,
+                               "mv": mv, "rank": rank, "start": self.time,
+                               "end": self._drag_end((e,), e.pos.dist(anchor) - contact,
+                                                     PULL_SPEED),
                                "a": Vec2(e.pos.x, e.pos.y), "b": anchor,
                                "c": Vec2(e.pos.x, e.pos.y), "team": e.team})
 
@@ -617,6 +626,7 @@ class MagnezoneMixin:
         if isinstance(e, Pokemon) and "iron_ball" in self._fx_items(e):
             from .item_effects import IRONBALL_MULT
             dist *= IRONBALL_MULT
+        dist *= self._octi_disp_mult(e)   # Ventose
         dur = dist / PUSH_SPEED
         self.mag_links.append({"kind": "push", "ids": (e.id,), "a_id": e.id,
                                "dir": away.normalized(), "left": dist,

@@ -930,6 +930,43 @@ Passaggi completati:
   ronzio, ventargenteo/_buff, velenpolvere/_dopo, paralizzante/_dopo,
   sonnifero/_dopo, raffica/_mira, polvoscudo, eledanza/_dopo, hud,
   tempesta/_mira/_dopo, draft_venonat).
+- LINEA REMORAID > OCTILLERY (step_47), grafica nuova in game/octi_fx.py
+  (logica in engine/octillery.py). Sprite PMD Sprite Collab in
+  assets/pokemon/0223/0224. MUNIZIONI = colore + sagoma (AMMO_COLS):
+  Acqua goccia blu, Ghiaccio scheggia azzurra a rombo, Fuoco palla di brace
+  con fiammella, Erba seme verde con fogliolina (draw_pellet). L'attacco
+  base porta mtype = munizione (evento "attack", stile "octishot"). Forme
+  nuove in _draw_shapes (octi_fx.SHAPES): pallottola in volo con spruzzo
+  all'arrivo (octipellet), macchia d'inchiostro ad arco che si spiaccica
+  (inksplat: Octazooka), Iper Raggio (octibeam: tre fasce arancio/bianco,
+  anelli che scorrono, crepitio ai bordi, si assottiglia sparendo; schermo
+  che trema 250 ms), tentacolo affusolato con ventose (octitentacle: Presa),
+  mirino che si chiude (octireticle: aggancio). Disegni PERSISTENTI
+  (world_fx): proiettili di Pistolacqua/Raffica/Colpo Perforante in volo
+  (octi_shots: scia del colore della munizione + ombra; il Perforante più
+  grosso). MIRINO di Prendimira (draw_reticle): PIXEL ART a quattro angolari
+  che pulsano + croce col punto, ombra scura in basso a destra (la prima
+  versione ad archi a raggio 7 px era una macchia rossa piena); sopra la
+  barra della vita dell'agganciato, visibile a tutti, lampeggia
+  nell'ultimo secondo (renderer._draw_unit_hp, che ora conosce il tempo da
+  self._now). Sulle unità: l'afferrato è AVVOLTO da due fasce di tentacolo
+  davanti allo sprite (contorno scuro, ventose, punta arricciata; i
+  tentacoli sottili attorno non si vedevano), vapore e scintille durante la
+  ricarica dell'Iper Raggio. Mirino: corsia della Q del colore della
+  munizione con la pallottola in punta (Renderer.draw_aim ha il parametro
+  ammo), cono d'inchiostro + freccia della spinta all'indietro, corsia di
+  15 tile dell'Iper Raggio, cerchio di 3 tile della Presa. HUD: riquadro
+  col mirino (acceso = il prossimo attacco base aggancia, altrimenti i
+  secondi), a destra la colonna delle munizioni disponibili (attiva grande,
+  le altre spente), sopra il nome della munizione (+30% dopo il cambio con
+  Octillery). W con grado gratuito dal liv.1 ("start_rank" nel JSON,
+  engine/moves.build_moveset). Online: octi_shots in net/visual.LISTS e
+  online_world.MOVING, octi_lock_by in UNIT_FLAGS (i timer octi_* passano da
+  soli), ammo/ammo_boost in ME_FIELDS. Screenshot: step_47_* (attacco_water/
+  _ice/_fire/_grass, hud, hud_remoraid, hud_erba, prendimira/_dopo,
+  pistolacqua_mira/_/_colpo, raffica, perforante, cambio, erba_schegge,
+  octazooka_mira/_/_dopo, iperraggio_mira/_/_ricarica, presa_mira/_/_dopo,
+  draft_remoraid).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

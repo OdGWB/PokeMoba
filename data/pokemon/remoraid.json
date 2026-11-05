@@ -1,0 +1,113 @@
+{
+  "_comment": "Remoraid -> Octillery (liv.8, unica evoluzione; prima solo i potenziamenti delle mosse Q5/W6/E7). Tiratore da DUELLO a distanza, danno FISICO (anche le mosse 'speciali' dei giochi). Acqua. Statistiche = valori base reali (la derivazione le scala). Passive (engine/octillery.py): Cecchino (brutti colpi +125% invece di +75%) e Prendimira (ogni 10 s il prossimo attacco base aggancia il bersaglio per 4 s: su di lui attacchi base e mosse sono sempre brutti colpi e ignorano Luminpolvere/Mantelneve) da Remoraid; Ventose (Octillery) = respinte, trascinamenti e lanci in aria subiti -50%. L'Att. Sp. degli oggetti diventa Attacco. MUNIZIONI: attacchi base e Q hanno il tipo della munizione attiva (STAB solo per l'Acqua); W le cambia (Acqua/Ghiaccio dal liv.1, +Fuoco o +Erba al liv.6). Le mosse hanno id propri (octillery_*) anche quando il nome coincide con quello di altre linee.",
+  "dex": 223,
+  "name": "Remoraid",
+  "types": ["Water"],
+  "role": "tiratore",
+  "recommended_items": ["choice_band", "zoom_lens", "quick_claw", "dragon_fang", "poison_barb"],
+  "color": [120, 168, 200],
+  "radius": 0.4,
+  "base_speed": 3.5,
+  "attack_range": 5.0,
+  "attack_cooldown": 1.0,
+  "ranged": true,
+  "sprite_dir": "assets/pokemon/0223",
+  "passive": "cecchino",
+  "attack_fx": "octishot",
+
+  "base_stats": {"hp": 35, "attack": 65, "defense": 35, "sp_attack": 65, "sp_defense": 35, "speed": 65},
+
+  "evolutions": [
+    {"stage": 0, "level": 1, "name": "Remoraid", "dex": 223, "sprite_dir": "assets/pokemon/0223",
+     "types": ["Water"], "passive": "cecchino", "radius": 0.4, "ranged": true,
+     "base_stats": {"hp": 35, "attack": 65, "defense": 35, "sp_attack": 65, "sp_defense": 35, "speed": 65}},
+    {"stage": 1, "level": 8, "name": "Octillery", "dex": 224, "sprite_dir": "assets/pokemon/0224",
+     "types": ["Water"], "passive": "ventose", "radius": 0.5, "ranged": true,
+     "base_stats": {"hp": 75, "attack": 105, "defense": 75, "sp_attack": 105, "sp_defense": 75, "speed": 45}}
+  ],
+
+  "moves": {
+    "Q": {
+      "base": {"id": "octillery_watergun", "name": "Pistolacqua", "type": "Water", "category": "physical",
+               "shape": "octishot", "fx": "octishot", "target": "direction",
+               "power": [50, 80, 110, 140], "ratio": 0.8,
+               "cooldown": [6, 5.5, 5, 4.5], "range": 8.0, "radius": 0.4, "speed": 24,
+               "effects": {"mode": "single"}},
+      "upgrades": [
+        {"id": "octillery_burst", "name": "Raffica", "type": "Water", "category": "physical",
+         "shape": "octishot", "fx": "octishot", "target": "direction",
+         "power": [50, 80, 110, 140], "ratio": 0.8,
+         "cooldown": [6, 5.5, 5, 4.5], "range": 8.0, "radius": 0.4, "speed": 24,
+         "effects": {"mode": "burst", "shots": 3, "gap": 0.15, "mult": 0.45}},
+        {"id": "octillery_pierce", "name": "Colpo Perforante", "type": "Water", "category": "physical",
+         "shape": "octishot", "fx": "octishot", "target": "direction",
+         "power": [50, 80, 110, 140], "ratio": 0.8,
+         "cooldown": [6, 5.5, 5, 4.5], "range": 9.0, "radius": 0.5, "speed": 12,
+         "effects": {"mode": "pierce", "mult": 1.3}}
+      ]
+    },
+    "W": {
+      "base": {"id": "octillery_ammoswap", "name": "Cambio Munizioni", "type": "Water", "category": "none",
+               "shape": "ammoswap", "fx": "ammoswap", "target": "self", "start_rank": 1,
+               "power": [0, 0, 0, 0],
+               "cooldown": [2, 1.75, 1.5, 1.25], "range": 0,
+               "effects": {"ammo": ["Water", "Ice"],
+                           "ice_slow": [0.20, 0.25, 0.30, 0.35], "ice_dur": 1.0, "ice_dmg": 0.9,
+                           "fire_chance": [0.25, 0.30, 0.35, 0.40], "fire_dur": 3.0,
+                           "grass_splash": [0.40, 0.45, 0.50, 0.55], "grass_radius": 1.5}},
+      "upgrades": [
+        {"id": "octillery_fireammo", "name": "Munizioni Fuoco", "type": "Fire", "category": "none",
+         "shape": "ammoswap", "fx": "ammoswap", "target": "self",
+         "power": [0, 0, 0, 0],
+         "cooldown": [2, 1.75, 1.5, 1.25], "range": 0,
+         "effects": {"ammo": ["Water", "Ice", "Fire"],
+                     "ice_slow": [0.20, 0.25, 0.30, 0.35], "ice_dur": 1.0, "ice_dmg": 0.9,
+                     "fire_chance": [0.25, 0.30, 0.35, 0.40], "fire_dur": 3.0,
+                     "grass_splash": [0.40, 0.45, 0.50, 0.55], "grass_radius": 1.5}},
+        {"id": "octillery_grassammo", "name": "Munizioni Erba", "type": "Grass", "category": "none",
+         "shape": "ammoswap", "fx": "ammoswap", "target": "self",
+         "power": [0, 0, 0, 0],
+         "cooldown": [2, 1.75, 1.5, 1.25], "range": 0,
+         "effects": {"ammo": ["Water", "Ice", "Grass"],
+                     "ice_slow": [0.20, 0.25, 0.30, 0.35], "ice_dur": 1.0, "ice_dmg": 0.9,
+                     "fire_chance": [0.25, 0.30, 0.35, 0.40], "fire_dur": 3.0,
+                     "grass_splash": [0.40, 0.45, 0.50, 0.55], "grass_radius": 1.5}}
+      ]
+    },
+    "E": {
+      "base": {"id": "octillery_octazooka", "name": "Octazooka", "type": "Water", "category": "physical",
+               "shape": "octazooka", "fx": "octazooka", "target": "direction",
+               "power": [40, 65, 90, 115], "ratio": 0.5,
+               "cooldown": [12, 11, 10, 9], "range": 4.0, "angle": 35,
+               "effects": {"blind": {"duration": 2.0}, "backjet": 3.0}},
+      "upgrades": [
+        {"id": "octillery_denseink", "name": "Inchiostro Denso", "type": "Water", "category": "physical",
+         "shape": "octazooka", "fx": "octazooka", "target": "direction",
+         "power": [40, 65, 90, 115], "ratio": 0.5,
+         "cooldown": [12, 11, 10, 9], "range": 4.0, "angle": 35,
+         "effects": {"blind": {"duration": 3.0}, "slow": {"mult": 0.7, "duration": 3.0},
+                     "backjet": 3.0}},
+        {"id": "octillery_jetpropel", "name": "Getto Propulsore", "type": "Water", "category": "physical",
+         "shape": "octazooka", "fx": "octazooka", "target": "direction",
+         "power": [40, 65, 90, 115], "ratio": 0.5,
+         "charges": 2, "charge_time": 11, "refund_on_hit": false,
+         "cooldown": [0.6, 0.6, 0.6, 0.6], "range": 4.0, "angle": 35,
+         "effects": {"blind": {"duration": 2.0}, "backjet": 5.0}}
+      ]
+    },
+    "R": {
+      "upgrades": [
+        {"id": "octillery_hyperbeam", "name": "Iper Raggio", "type": "Normal", "category": "physical",
+         "shape": "octibeam", "fx": "octibeam", "target": "direction",
+         "power": [220, 330, 440], "ratio": 1.6,
+         "cooldown": [90, 80, 70], "range": 15.0, "radius": 0.6,
+         "effects": {"recharge": 1.5}},
+        {"id": "octillery_octolock", "name": "Presa a Ventosa", "type": "Water", "category": "none",
+         "shape": "octigrab", "fx": "octigrab", "target": "point",
+         "power": [0, 0, 0],
+         "cooldown": [70, 60, 50], "range": 3.0,
+         "effects": {"duration": 2.0, "attack_speed": 0.5}}
+      ]
+    }
+  }
+}

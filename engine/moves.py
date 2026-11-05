@@ -129,4 +129,8 @@ def build_moveset(moves_json: dict) -> dict:
         chosen = base if base is not None else None
         out[slot] = MoveSlot(slot=slot, base=base, upgrades=upgrades, chosen=chosen,
                              max_rank=max_rank, unlocked=(slot != "R"))
+        # "start_rank": la mossa parte già imparata (grado gratuito, senza punti):
+        # Cambio Munizioni della linea Remoraid si usa dal livello 1.
+        if base is not None and base.d.get("start_rank"):
+            out[slot].rank = int(base.d["start_rank"])
     return out

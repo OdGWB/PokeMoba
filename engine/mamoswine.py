@@ -292,6 +292,7 @@ class MamoswineMixin:
             if isinstance(first, Pokemon) and "iron_ball" in self._fx_items(first):
                 from .item_effects import IRONBALL_MULT
                 kb *= IRONBALL_MULT
+            kb *= self._octi_disp_mult(first)   # Ventose
             self.swine_shoves.append({"id": first.id, "dir": Vec2(dirv.x, dirv.y), "left": kb,
                                       "a": Vec2(first.pos.x, first.pos.y),
                                       "c": Vec2(first.pos.x, first.pos.y),

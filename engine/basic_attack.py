@@ -95,6 +95,7 @@ class BasicAttackMixin:
     def _eff_attack_speed(self, u) -> float:
         base = u.as_base if u.as_base > 0.0 else u.attack_speed
         bonus = u.as_bonus + self._moth_as_bonus(u)   # Eledanza: +30%
+        bonus += self._octi_as_bonus(u)                # Presa a Ventosa: +50%
         if u.rampage_until > self.time:
             bonus += 1.0                      # Oltraggio: +100% (si somma agli altri)
         aps = min(AS_CAP, base * (1.0 + bonus))
@@ -178,7 +179,8 @@ class BasicAttackMixin:
                                    "mtype": "Ground", "fx": "miss"})
             return
         snap = self._aa_snapshot(u, tgt)
-        mt = u.types[0] if u.types else "Normal"
+        self._octi_snap(u, tgt, snap)   # linea Remoraid: munizione e bonus del cambio
+        mt = snap.get("ammo") or (u.types[0] if u.types else "Normal")
         self.fx_events.append({"kind": "attack", "a": (u.pos.x, u.pos.y),
                                "b": (tgt.pos.x, tgt.pos.y), "mtype": mt,
                                "melee": melee, "src": u.id,
@@ -213,7 +215,8 @@ class BasicAttackMixin:
             return
         if isinstance(tgt, Pokemon) and tgt.untargetable_until > self.time:
             return
-        if self._item_dodge(u, tgt):        # Luminpolvere: schivato
+        self._octi_before_land(u, tgt)      # Prendimira: aggancia il bersaglio
+        if not self._octi_ignores_dodge(u, tgt) and self._item_dodge(u, tgt):   # Luminpolvere
             return
         if self._mien_parry_aa(u, tgt):     # Individua (Mienshao): parato
             return
@@ -222,9 +225,11 @@ class BasicAttackMixin:
         else:
             dmg = self._basic_damage(u, tgt, power=snap["power"], magic=snap["magic"])
         dmg *= snap["mult"]
+        dmg = self._octi_aa_land(u, tgt, snap, dmg)   # munizione: efficacia del tipo + STAB
         if snap["melee"] and isinstance(tgt, Minion):
             dmg *= MELEE_MINION_MULT
-        self._deal_damage(u, tgt, dmg, dmg_type="Ghost" if snap["claws"] else None)
+        self._deal_damage(u, tgt, dmg,
+                          dmg_type="Ghost" if snap["claws"] else snap.get("ammo"))
         if not u.alive:
             return   # il proiettile colpisce lo stesso, ma niente effetti su chi è caduto
         self._vamp(u, dmg, physical=True)
@@ -236,6 +241,7 @@ class BasicAttackMixin:
         self._mien_after_aa(u, tgt)      # punto dolce, brutto colpo di Individua
         self._swine_after_aa(u, tgt)     # Gelo (Mamoswine): accumuli e congelamento
         self._moth_after_aa(u, tgt)      # Scaglie Velenose: accumuli di veleno
+        self._octi_after_aa(u, tgt, snap, dmg)   # munizioni: Ghiaccio, Fuoco, Erba
         self._spirit_wander(u, tgt)   # Spirito Vagante (Spiritomb)
         self._cute_charm(u, tgt)      # Incantevole (Sylveon)
 

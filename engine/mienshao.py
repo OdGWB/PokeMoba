@@ -180,6 +180,7 @@ class MienshaoMixin:
             dirv = d.normalized() if d.length() > 1e-6 else Vec2(1.0, 0.0)
             if "iron_ball" in self._fx_items(attacker):
                 push *= 0.4   # Ferropalla: respinte subite ridotte
+            push *= self._octi_disp_mult(attacker)   # Ventose
             a = Vec2(attacker.pos.x, attacker.pos.y)
             attacker.pos = self._clamp_to_wall(a, a + dirv * push)
             attacker.stop()

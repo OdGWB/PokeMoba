@@ -36,6 +36,7 @@ from .hatterene import HATT_PASSIVES, HattereneMixin
 from .magnezone import MAG_PASSIVES, MagnezoneMixin
 from .mamoswine import MamoswineMixin
 from .venomoth import MOTH_PASSIVES, VenomothMixin
+from .octillery import OCTI_PASSIVES, OctilleryMixin
 from .corviknight import CORVI_PASSIVES, CorviknightMixin
 from .eevee import EEVEE_PASSIVES, EeveeMixin
 from .item_effects import ItemEffectsMixin, cdr_to_haste
@@ -159,11 +160,13 @@ CAST_ANIMS = {"projectile": "Shoot", "bubble": "Shoot",
             "icetrail": "Charge", "takedown": "Attack", "icefang": "Attack",
             "ancientpower": "Shoot", "iceage": "Shoot",
             "mothbeam": "Shoot", "powdercloud": "Shoot", "mothgust": "Swing",
-            "quiverdance": "Rotate", "powderstorm": "Charge"}
+            "quiverdance": "Rotate", "powderstorm": "Charge",
+            "octishot": "Shoot", "ammoswap": "Rotate", "octazooka": "Shoot",
+            "octibeam": "Charge", "octigrab": "Strike"}
 
 class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, NoivernMixin,
             UrsaringMixin, SneaselMixin, MienshaoMixin, ArchaludonMixin,
-            HattereneMixin, MagnezoneMixin, MamoswineMixin, VenomothMixin, BasicAttackMixin, ItemEffectsMixin):
+            HattereneMixin, MagnezoneMixin, MamoswineMixin, VenomothMixin, OctilleryMixin, BasicAttackMixin, ItemEffectsMixin):
     def __init__(self, world, map_data):
         self.world = world
         self.map = map_data
@@ -206,6 +209,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self._init_mag()         # linea Magnemite: cariche magnetiche, Bombagnete, Campo Elettrico
         self._init_swine()       # linea Swinub: impronte, Scia Ghiacciata, Era Glaciale
         self._init_moth()        # linea Venonat: nubi di polvere, accumuli di veleno
+        self._init_octi()        # linea Remoraid: proiettili di Pistolacqua
         self._init_basic_attack()   # attacco base: proiettili a ricerca
         self.vision = VisionSystem(self.world.grid)
         self._build_structures()
@@ -267,6 +271,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self._update_mag(dt)         # cariche magnetiche, Tuonoshock, Bombagnete... (linea Magnemite)
         self._update_swine(dt)       # Fiuto, Grassospesso, Gelo, Era Glaciale (linea Swinub)
         self._update_moth(dt)        # nubi, veleno, Eledanza (linea Venonat)
+        self._update_octi(dt)        # Pistolacqua, Raffica (linea Remoraid)
         self._update_rock_moves(dt)  # Rocciotomba / Pesobomba / Frana / Abbattimento
         self._update_spiritomb(dt)   # spiriti, Stordiraggio, Malcomune, Legione, Memento
         self._update_eevee(dt)       # Desiderio, Comete, Tuono, Bora, Divinazione, Idratazione
@@ -366,6 +371,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             if p.taunt_until > self.time:
                 self._taunted(p, dt)  # provocato (Provocazione): attacca chi l'ha provocato
                 continue
+            if p.octi_grab_until > self.time and self._octi_grabbing(p, dt):
+                continue              # Presa a Ventosa: attacca solo l'afferrato
             if p.is_bot and p.is_jungler:
                 self._ai_jungler(p, dt)
             elif p.is_bot:
@@ -953,7 +960,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
                 if isinstance(attacker, Minion) and self.jungle.team_has_judgment(attacker.team):
                     power *= 2.0
         if isinstance(target, Pokemon):
-            if target.passive_id == "mantelneve":
+            if (target.passive_id == "mantelneve"
+                    and not self._octi_ignores_dodge(attacker, target)):   # Prendimira
                 power *= 0.9   # Mantelneve (Glaceon): attacchi base nemici -10%
             # Gli auto-attacchi sono fisici e senza tipo (niente STAB/efficacia);
             # possono fare critico e beneficiano di penetrazione armatura.
@@ -972,8 +980,9 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         if isinstance(caster, Pokemon):
             chance = (caster.crit if can_crit else 0.0) + crit_bonus
             chance += self._sneasel_crit_bonus(caster)   # Nottesferza, Notte Fonda
+            chance += self._octi_crit_bonus(caster, target)   # Prendimira, Presa a Ventosa
             if chance > 0.0 and random.random() < chance:
-                raw *= CRIT_MULT
+                raw *= self._crit_mult(caster, CRIT_MULT)   # Cecchino: +125%
         if not isinstance(target, Pokemon):
             return max(1.0, raw)
         # Psicoshock: danno speciale mitigato dalla Difesa invece che dalla Dif. Sp.
@@ -1354,6 +1363,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         p.item_bonus = self._item_bonus_for(p)
         self._echo_convert(p)   # Ecolocalizzazione: Attacco degli oggetti -> Att. Sp.
         self._moth_convert(p)   # Scaglie Velenose: idem
+        self._octi_convert(p)   # linea Remoraid: Att. Sp. degli oggetti -> Attacco
         d = derive(p.base_stats, p.level, ranged=p.ranged)
         # M (moltiplicatore d'evoluzione, punto 8) si applica a HP, AD, armatura,
         # RM, mana e rigenerazione; NON a MS/AS, gittata, AP e moltiplicatore
@@ -1747,6 +1757,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             return
         if not self._mag_precheck(p, mv, Vec2(tx, ty)):   # Campo Magnetico senza bersaglio
             return
+        if not self._octi_precheck(p, mv, Vec2(tx, ty)):   # Presa a Ventosa senza bersaglio
+            return
         self._sneasel_on_cast(p, mv)   # Notte Fonda: lanciare una mossa toglie l'invisibilità
         # Lanciare annulla un attacco base in CARICAMENTO (il ciclo non si consuma);
         # se il colpo è già uscito il recupero continua da dove era (niente punizione).
@@ -1869,6 +1881,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             pass   # linea Swinub (engine/mamoswine.py)
         elif self._moth_cast(p, mv, rank, origin, tgt, dirv):
             pass   # linea Venonat (engine/venomoth.py)
+        elif self._octi_cast(p, mv, rank, origin, tgt, dirv):
+            pass   # linea Remoraid (engine/octillery.py)
         elif shape == "buff":
             self._apply_support(p, mv, rank, origin)
             self.fx_events.append({"kind": "buff", "c": (origin.x, origin.y),
@@ -3746,6 +3760,7 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             return
         if "iron_ball" in self._fx_items(p):
             dur *= 0.4   # Ferropalla: lanci in aria subiti -60%
+        dur *= self._octi_disp_mult(p)   # Ventose (Octillery): -50%
         now = self.time
         end = now + dur
         if p.airborne_until > now and end <= p.airborne_until:
@@ -4005,6 +4020,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         if p.passive_id in MAG_PASSIVES and self._bot_mag_cast(p, target):
             return
         if p.passive_id in MOTH_PASSIVES and self._bot_moth_cast(p, target):
+            return
+        if p.passive_id in OCTI_PASSIVES and self._bot_octi_cast(p, target):
             return
         for slot in ("R", "Q", "W", "E"):
             ms = p.moveset.get(slot)

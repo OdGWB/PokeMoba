@@ -28,7 +28,7 @@ from sim.simulation import _nearest_walkable
 from .networld import NetWorld
 
 MOVING = ("projectiles", "avalanches", "spirit_beams", "swift_stars", "moon_orbs", "mag_bolts",
-          "glacial_blocks")
+          "glacial_blocks", "octi_shots")
 _WILD_COLORS = {"camp": (170, 160, 120), "meteo": (220, 180, 80), "arceus": (230, 220, 240)}
 
 

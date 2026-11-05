@@ -494,7 +494,8 @@ class MatchScene:
                 self.renderer.draw_aim(surface, self.camera, self.player.pos,
                                        (wx / config.TILE_SIZE, wy / config.TILE_SIZE),
                                        ms.chosen, hold=hold,
-                                       rain=getattr(self.player, "arch_rain", False))
+                                       rain=getattr(self.player, "arch_rain", False),
+                                       ammo=getattr(self.player, "ammo", "Water"))
         # Particelle degli effetti.
         self.fx.draw(surface, self.camera)
         arch_fx.draw_shake(surface, self.fx)   # Elettroraggio: lo schermo trema

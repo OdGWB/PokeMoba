@@ -16,7 +16,8 @@ import pygame
 
 from engine.eevee import eevee_candidates, eevee_forms
 
-from . import arch_fx, eevee_fx, hatt_fx, mag_fx, mien_fx, moth_fx, sneasel_fx, swine_fx, ursa_fx
+from . import (arch_fx, eevee_fx, hatt_fx, mag_fx, mien_fx, moth_fx, octi_fx, sneasel_fx,
+               swine_fx, ursa_fx)
 
 
 @dataclass
@@ -161,6 +162,9 @@ def draw_passive(surface, font, p, bx, y0, bh, ctx) -> None:
     # Linea Venonat: Scaglie Velenose (+ Lentifume' da Venomoth).
     if p.passive_id in ("scaglievelenose", "lentifume"):
         _draw_moth(surface, font, p, bx, y0, bh, ctx)
+    # Linea Remoraid: Prendimira (mirino + ricarica) e munizioni disponibili.
+    if p.passive_id in ("cecchino", "ventose"):
+        _draw_octi(surface, font, p, bx, y0, bh, ctx)
 
     # Linea Teddiursa: Miele (vasetti) e, da Ursaring, Dentistretti.
     if p.passive_id in ("miele", "dentistretti"):
@@ -581,6 +585,34 @@ def _draw_swine(surface, font, p, bx, y0, bh, ctx) -> None:
         name = "Fiuto"
     pygame.draw.rect(surface, frame, box, 2)
     surface.blit(font.render(name, True, frame), (bx - 4, y0 - 18))
+
+
+def _draw_octi(surface, font, p, bx, y0, bh, ctx) -> None:
+    """Remoraid/Octillery: a sinistra il mirino di Prendimira (acceso quando il
+    prossimo attacco base aggancia, altrimenti i secondi che mancano); a
+    destra le munizioni disponibili, quella attiva grande e cerchiata."""
+    now = ctx.now
+    box = pygame.Rect(bx, y0, bh, bh)
+    left = max(0.0, getattr(p, "octi_lock_ready_at", 0.0) - now)
+    ready = left <= 0.0
+    pygame.draw.rect(surface, (44, 22, 24) if ready else (26, 26, 32), box)
+    octi_fx.draw_reticle(surface, box.centerx, box.centery, bh * 0.3, now,
+                         255 if ready else 110)
+    if not ready:
+        t = font.render("%d" % math.ceil(left), True, (220, 220, 230))
+        surface.blit(t, t.get_rect(center=box.center))
+    ammo = getattr(p, "ammo", "Water")
+    cols = octi_fx.ammo_cols(ammo)
+    pygame.draw.rect(surface, octi_fx.LOCK if ready else (120, 110, 110), box, 2)
+    lst = octi_fx.ammo_list(p)
+    step = bh // max(3, len(lst))
+    x = box.right + 9
+    for k, a in enumerate(lst):
+        y = y0 + step // 2 + k * step
+        octi_fx.draw_ammo_icon(surface, x, y, 7 if a == ammo else 5, a, a == ammo)
+    boost = " +30%" if getattr(p, "ammo_boost", False) else ""
+    surface.blit(font.render(octi_fx.AMMO_NAMES.get(ammo, ammo) + boost, True, cols[2]),
+                 (bx - 4, y0 - 18))
 
 
 def _draw_moth(surface, font, p, bx, y0, bh, ctx) -> None:

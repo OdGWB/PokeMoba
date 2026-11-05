@@ -138,6 +138,7 @@ class HattereneMixin:
         if isinstance(e, Pokemon) and "iron_ball" in self._fx_items(e):
             from .item_effects import IRONBALL_MULT
             dist *= IRONBALL_MULT
+        dist *= self._octi_disp_mult(e)   # Ventose
         a = Vec2(e.pos.x, e.pos.y)
         dest = self._clamp_to_wall(a, a + away.normalized() * dist)
         e.pos = dest

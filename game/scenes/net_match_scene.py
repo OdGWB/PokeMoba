@@ -333,7 +333,8 @@ class NetMatchScene:
                 hold = (pygame.time.get_ticks() - self.aim_start) / 1000.0
                 self.renderer.draw_aim(surface, self.camera, me.pos,
                                        (wx / config.TILE_SIZE, wy / config.TILE_SIZE), mv,
-                                       hold=hold, rain=getattr(me, "arch_rain", False))
+                                       hold=hold, rain=getattr(me, "arch_rain", False),
+                                       ammo=getattr(me, "ammo", "Water"))
 
     def _draw_world_extras(self, surface):
         """Effetti che durano, sopra mappa e unità (la scena online li ha)."""
