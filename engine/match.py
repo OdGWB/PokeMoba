@@ -35,7 +35,7 @@ from .archaludon import ARCH_PASSIVES, ArchaludonMixin
 from .hatterene import HATT_PASSIVES, HattereneMixin
 from .magnezone import MAG_PASSIVES, MagnezoneMixin
 from .mamoswine import MamoswineMixin
-from .venomoth import MOTH_PASSIVES, VenomothMixin, is_steel
+from .venomoth import MOTH_PASSIVES, VenomothMixin
 from .corviknight import CORVI_PASSIVES, CorviknightMixin
 from .eevee import EEVEE_PASSIVES, EeveeMixin
 from .item_effects import ItemEffectsMixin, cdr_to_haste
@@ -3407,10 +3407,6 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             return
         if self._mien_parry(caster, target, mv.shape in PROJ_SHAPES):   # Individua
             return
-        # Regola globale: i Pokemon Acciaio sono immuni alle mosse Veleno nemiche.
-        if (mv.type == "Poison" and is_steel(target)
-                and getattr(caster, "team", -1) != target.team):
-            return
         fx = mv.effects
         power = mv.power_at(rank)
         if power > 0:
@@ -3725,8 +3721,6 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             p.sleep_until = max(p.sleep_until, self.time + dur)
 
     def _apply_poison(self, p, src, dps, dur):
-        if is_steel(p):   # regola globale: gli Acciaio non si avvelenano
-            return
         p.poison_dps = max(p.poison_dps, dps)
         p.poison_until = max(p.poison_until, self.time + dur)
         p.poison_src = src.id if src is not None else None

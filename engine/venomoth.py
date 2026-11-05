@@ -12,12 +12,9 @@ Passive (si sommano con l'evoluzione):
     SPECIALE (come Ecolocalizzazione: potere speciale per livello + Att. Sp.,
     mitigati dalla Dif. Sp.); l'Attacco bonus degli oggetti diventa Att. Sp.;
     ogni attacco base dà 1 accumulo di veleno al bersaglio (max 6, 4 s, si
-    rinnovano a ogni colpo), ognuno fa danno nel tempo di tipo Veleno. Non sui
-    Pokémon Acciaio.
+    rinnovano a ogni colpo), ognuno fa danno nel tempo di tipo Veleno (segue
+    la tabella dei tipi sui Pokémon: es. poco efficace sugli Acciaio).
   - Lentifumé (Venomoth): le mosse poco efficaci fanno danno normale (x1).
-
-Regola GLOBALE (vale per tutti, vedi match._hit/_apply_poison): i Pokémon di
-tipo Acciaio sono immuni allo stato avvelenamento e alle mosse Veleno.
 
 Il veleno degli accumuli NON sveglia chi dorme (altrimenti Sonnifero e la
 Tempesta di Polveri si annullerebbero da soli al primo tick).
@@ -41,10 +38,6 @@ VENOM_BASE = 1.5            # danno al secondo PER ACCUMULO = base + per_livello
 VENOM_LVL = 0.6             #   + ratio × Att. Sp.
 VENOM_RATIO = 0.02
 SCALES_AA_MULT = 0.95       # penalità da tiratore (come Ecolocalizzazione)
-
-
-def is_steel(e) -> bool:
-    return isinstance(e, Pokemon) and "Steel" in (e.types or ())
 
 
 def has_scales(p) -> bool:
@@ -90,7 +83,7 @@ class VenomothMixin:
         """Aggiunge `n` accumuli di veleno (max 6) e li rinnova tutti."""
         if n <= 0 or not getattr(e, "alive", False) or e.team == src.team:
             return
-        if isinstance(e, Structure) or is_steel(e):
+        if isinstance(e, Structure):
             return
         if isinstance(e, Pokemon) and (e.untargetable_until > self.time or e.is_decoy):
             return
@@ -129,7 +122,11 @@ class VenomothMixin:
             if src is None:
                 continue
             asleep = e.sleep_until if isinstance(e, Pokemon) else -1.0
-            self._deal_damage(src, e, st["dps"] * st["n"] * VENOM_TICK, dmg_type="Poison")
+            eff = 1.0
+            if isinstance(e, Pokemon):   # tipo Veleno: tabella dei tipi + Lentifume'
+                eff = self._moth_eff(src, self.types.moba_multiplier("Poison", e.types))
+            self._deal_damage(src, e, st["dps"] * st["n"] * VENOM_TICK * eff,
+                              dmg_type="Poison")
             if isinstance(e, Pokemon) and e.alive and asleep > now:
                 e.sleep_until = asleep   # il veleno non sveglia
 
@@ -301,8 +298,6 @@ class VenomothMixin:
         else:
             opts = ["poison"]   # minion e neutrali: solo il veleno
         pick = random.choice(opts)
-        if pick == "poison" and is_steel(e):
-            pick = "para"       # gli Acciaio non si avvelenano: tocca un altro effetto
         if pick == "poison":
             self._add_venom(src, e, cl["stacks"])
             fx = "mothpoison"

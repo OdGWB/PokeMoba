@@ -162,25 +162,34 @@ class TestVenomoth(unittest.TestCase):
         self.aa(mn)
         self.assertEqual(mn.venom_stacks, 1)
 
-    def test_steel_immune_to_stacks_and_poison(self):
+    def test_steel_takes_reduced_venom(self):
+        # Niente immunita': gli Acciaio prendono accumuli e veleno, ma il danno
+        # degli accumuli segue la tabella dei tipi (Veleno vs Acciaio = 0,25).
+        for _ in range(3):
+            self.aa(self.f)
         self.make_steel(self.e)
         for _ in range(3):
             self.aa(self.e)
-        self.assertEqual(self.e.venom_stacks, 0)
+        self.assertEqual(self.e.venom_stacks, 3)
+        he, hf = self.e.hp, self.f.hp
+        self.tick(1.0)
+        steel, other = he - self.e.hp, hf - self.f.hp
+        self.assertGreater(steel, 0.0)
+        self.assertLess(steel, other)
         self.match._apply_poison(self.e, self.u, 50.0, 3.0)
-        self.assertLess(self.e.poison_until, self.match.time)
+        self.assertGreater(self.e.poison_until, self.match.time)
 
-    def test_steel_immune_to_poison_moves(self):
+    def test_steel_resists_poison_moves(self):
         mv = Move("Q", 4, {"id": "t_sludge", "name": "Fango", "type": "Poison", "category": "special",
                    "shape": "projectile", "power": [100, 100, 100, 100], "ratio": 0.5,
                    "cooldown": [5, 5, 5, 5], "range": 6, "radius": 0.5,
                    "effects": {"slow": {"mult": 0.5, "duration": 2.0}}})
         self.make_steel(self.e)
         self.match._hit(self.u, mv, 1, self.e)
-        self.assertEqual(self.lost(self.e), 0.0)
-        self.assertLess(self.e.slow_until, self.match.time)
-        self.match._hit(self.u, mv, 1, self.f)       # gli altri tipi la subiscono
-        self.assertGreater(self.lost(self.f), 0.0)
+        self.assertGreater(self.lost(self.e), 0.0)   # nessuna immunita'
+        self.assertGreater(self.e.slow_until, self.match.time)
+        self.match._hit(self.u, mv, 1, self.f)
+        self.assertLess(self.lost(self.e), self.lost(self.f))   # ma poco efficace
 
     def test_venom_does_not_wake(self):
         for _ in range(3):
