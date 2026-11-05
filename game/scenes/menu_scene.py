@@ -55,7 +55,8 @@ def map_thumbnail(path):
 
 
 ENTRIES = [("Gioca", "play"), ("Personalizzazione", "profile"), ("Crediti", "credits"),
-           ("Tier list", "tier"), ("Animazioni", "anims"), ("Esci", "quit")]
+           ("Tier list", "tier"), ("Animazioni", "anims"), ("Opzioni", "options"),
+           ("Esci", "quit")]
 
 
 class MenuScene:
@@ -105,6 +106,9 @@ class MenuScene:
         elif key == "anims":
             from .anim_editor_scene import AnimEditorScene
             self.next_scene = AnimEditorScene(self.app, back=MenuScene(self.app))
+        elif key == "options":
+            from .options_scene import OptionsScene
+            self.next_scene = OptionsScene(self.app)
         elif key == "quit":
             self.quit_app = True
 

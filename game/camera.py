@@ -10,6 +10,8 @@ Comandi (gestiti qui, stato deciso dallo scene/input):
 """
 from __future__ import annotations
 
+import pygame
+
 import config
 
 
@@ -43,22 +45,29 @@ class Camera:
         self._clamp()
 
     def update(self, dt: float, locked: bool, target_wx: float, target_wy: float,
-               mouse_win: tuple[int, int], space_held: bool) -> None:
+               mouse_win: tuple[int, int], space_held: bool,
+               edge_ok: bool = True) -> None:
         if space_held or locked:
             self.center_on(target_wx, target_wy)
             return
-        # Sbloccata: edge-scrolling in base alla posizione del mouse nella finestra.
-        mx, my = mouse_win
-        m = config.EDGE_SCROLL_MARGIN
-        speed = config.EDGE_SCROLL_SPEED * dt
-        if mx < m:
-            self.x -= speed
-        elif mx > config.WINDOW_WIDTH - m:
-            self.x += speed
-        if my < m:
-            self.y -= speed
-        elif my > config.WINDOW_HEIGHT - m:
-            self.y += speed
+        # Sbloccata: edge-scrolling in base alla posizione del mouse nella finestra
+        # REALE (non quella di default: in schermo intero o ridimensionata no).
+        # edge_ok=False (mouse sopra la minimappa) sospende lo scorrimento.
+        if edge_ok:
+            mx, my = mouse_win
+            surf = pygame.display.get_surface()
+            ww, wh = surf.get_size() if surf is not None else (config.WINDOW_WIDTH,
+                                                               config.WINDOW_HEIGHT)
+            m = config.EDGE_SCROLL_MARGIN
+            speed = config.EDGE_SCROLL_SPEED * dt
+            if mx < m:
+                self.x -= speed
+            elif mx > ww - m:
+                self.x += speed
+            if my < m:
+                self.y -= speed
+            elif my > wh - m:
+                self.y += speed
         self._clamp()
 
     def _clamp(self) -> None:

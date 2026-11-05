@@ -381,7 +381,9 @@ class MatchScene:
         mouse_win = pygame.mouse.get_pos()
         tx = self.player.pos.x * config.TILE_SIZE
         ty = self.player.pos.y * config.TILE_SIZE
-        self.camera.update(dt, self.camera_locked, tx, ty, mouse_win, space_held)
+        over_map = self.minimap is not None and self.minimap.contains(mouse_win)
+        self.camera.update(dt, self.camera_locked, tx, ty, mouse_win, space_held,
+                           edge_ok=not over_map)
 
         alive_ids = {u.id for u in self.world.alive_units()}
         for u in self.world.alive_units():

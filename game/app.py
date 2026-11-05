@@ -7,6 +7,8 @@ l'area di gioco visibile è la stessa a qualsiasi dimensione dello schermo.
 """
 from __future__ import annotations
 
+import json
+import os
 import sys
 from pathlib import Path
 
@@ -26,9 +28,38 @@ def _set_app_icon() -> None:
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("PokeMoba.Game")
         except Exception:
             pass
+        try:    # DPI-aware: con scala 125%+ lo schermo intero copre davvero il monitor
+            import ctypes
+            ctypes.windll.user32.SetProcessDPIAware()
+        except Exception:
+            pass
     try:
         pygame.display.set_icon(pygame.image.load(str(ROOT / "assets" / "ui" / "icon.png")))
     except (pygame.error, FileNotFoundError):
+        pass
+
+
+def _options_path() -> Path:
+    base = os.environ.get("APPDATA") or str(Path.home() / ".config")
+    return Path(base) / "PokeMoba" / "options.json"
+
+
+def load_options() -> dict:
+    try:
+        data = json.loads(_options_path().read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _save_options(update: dict) -> None:
+    data = load_options()
+    data.update(update)
+    try:
+        p = _options_path()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps(data), encoding="utf-8")
+    except OSError:
         pass
 
 
@@ -40,6 +71,8 @@ class App:
         self.windowed_size = (config.WINDOW_WIDTH, config.WINDOW_HEIGHT)
         self.fullscreen = False
         self.window = pygame.display.set_mode(self.windowed_size, pygame.RESIZABLE)
+        if load_options().get("fullscreen"):
+            self.set_fullscreen(True)
         pygame.display.set_caption(config.WINDOW_TITLE)
         self.lowres = pygame.Surface((config.LOWRES_WIDTH, config.LOWRES_HEIGHT)).convert()
         self.clock = pygame.time.Clock()
@@ -67,12 +100,22 @@ class App:
                 from .scenes.menu_scene import MenuScene
                 self.scene = MenuScene(self)
 
-    def _toggle_fullscreen(self):
-        self.fullscreen = not self.fullscreen
+    def set_fullscreen(self, on: bool) -> None:
+        """Schermo intero senza bordi sull'intero monitor (niente barra del titolo
+        né barra delle applicazioni); lo stato viene salvato tra una sessione e l'altra."""
+        self.fullscreen = bool(on)
         if self.fullscreen:
-            self.window = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+            try:
+                size = pygame.display.get_desktop_sizes()[0]
+            except (pygame.error, IndexError, AttributeError):
+                size = (0, 0)
+            self.window = pygame.display.set_mode(size, pygame.FULLSCREEN | pygame.NOFRAME)
         else:
             self.window = pygame.display.set_mode(self.windowed_size, pygame.RESIZABLE)
+        _save_options({"fullscreen": self.fullscreen})
+
+    def _toggle_fullscreen(self):
+        self.set_fullscreen(not self.fullscreen)
 
     def run(self):
         while self.running:
