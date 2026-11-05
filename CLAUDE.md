@@ -737,7 +737,7 @@ Passaggi completati:
   ("Dati partite"). Screenshot: step_51_*.png.
 - SMITE e IA PIU PRUDENTE (engine/smite.py, SmiteMixin in Match). Smite come in LoL:
   danno vero ai soli neutrali, 2 cariche, 90 s per carica, 15 s tra due usi, gittata
-  4 tile, 600->1200 col livello; SmiteCommand + tasto F (solo locale, niente HUD/rete).
+  4 tile, 600->1200 col livello; SmiteCommand + tasto D (solo locale, niente HUD/rete).
   I jungler bot lo usano per finire un mostro (una sola carica = solo grandi/leggendari).
   Bot: niente inseguimento di campioni sotto torre senza buone possibilita' di kill,
   leash dalla lane (7 tile nei primi 150 s, poi 14), jungler che gankano solo da 2:30,

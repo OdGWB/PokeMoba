@@ -293,7 +293,7 @@ class MatchScene:
                   and self.match is not None):
                 # Test (solo locale): entra subito nella forma Shedinja.
                 self.match.force_shedinja(self.player)
-            elif ev.type == pygame.KEYDOWN and ev.key == pygame.K_f:
+            elif ev.type == pygame.KEYDOWN and ev.key == pygame.K_d:
                 # Smite (come in LoL): danno vero al neutrale piu' vicino a portata.
                 self._menu_seq += 1
                 self.sim.queue_command(SmiteCommand(seq=50_000 + self._menu_seq,

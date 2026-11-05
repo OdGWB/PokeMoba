@@ -90,4 +90,4 @@ class RecallCommand(Command):
 
 @dataclass
 class SmiteCommand(Command):
-    """Usa lo Smite sul neutrale piu' vicino a portata (tasto F, solo partita locale)."""
+    """Usa lo Smite sul neutrale piu' vicino a portata (tasto D, solo partita locale)."""
