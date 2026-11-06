@@ -1079,7 +1079,21 @@ Passaggi completati:
   tools/tier_watch.log + finestra di avviso. tier_build.py: gruppi EXTRA_GROUPS
   (media, posizione e colore verde/rosso, NON nel punteggio) + dati d'insieme.
   tier_scene.DeveloperDetailScene: pagina su tela alta, rotella/frecce/PagSu-PagGiu,
-  barra di scorrimento, Indietro fisso. Screenshot: step_53_a/_b (dati finti di test).
+  barra di scorrimento, Indietro fisso. Screenshot: step_53_a/_b (dati finti di test).
+- TIER LIST con NEXUS APERTO e IA A PIANI (step_54). tools/tier_sim.py --open-nexus:
+  il Core diventa attaccabile appena UNA lane (top/mid/bot) della squadra ha 0 torri
+  (regola di test, solo nel tool; nel gioco vero servono tutte e 9). Le torri morte
+  spariscono da world.structures(): si conta per LANES noti (bug iniziale: lane
+  svuotata = chiave assente, il nexus non si apriva mai; tornei scartati). --plan attiva
+  engine/bot_plan.py (BotPlanMixin, spento di default): ritorno in base a comprare
+  (oro>=850), assedio del nexus scoperto, aiuto alle torri, roam del support, gank del
+  jungler con soglie piu larghe (smite.py: bot_gank_hp, leash saltato in roam). Per ogni
+  partita "end" = torri vive per lane, PV dei Core, core_events (esposto/primo/ultimo
+  colpo/colpi). Danno diviso per bersaglio: dmg (campioni), dmg_minion, dmg_wild, sdmg
+  (strutture). tier_build.py: vittorie corrette sul contesto (attesa per support
+  proprio/avversario), pagina con "Vittorie (corr.)" e gruppo "Danno per bersaglio".
+  Torneo seed 6 (49 partite, 28 chiuse dal nexus a 11-21 min; dal primo colpo allo 0:
+  mediana 41 s, max 334 s). Screenshot: step_54_a (lista), step_54_b (Mienfoo).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

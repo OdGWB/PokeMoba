@@ -126,8 +126,9 @@ class SmiteMixin:
         if self._under_enemy_tower(p, t.pos) and not self._good_kill_chance(p, t):
             return None
         limit = LANE_LEASH_EARLY if self.time < EARLY_TIME else LANE_LEASH
-        if not p.is_jungler and self._dist_to_lane(p.assigned_lane, p.team, t.pos) > limit \
-                and not self._good_kill_chance(p, t):
+        if (not p.is_jungler and not self._ai.get(p.id, {}).get("roaming")
+                and self._dist_to_lane(p.assigned_lane, p.team, t.pos) > limit
+                and not self._good_kill_chance(p, t)):
             return None
         return t
 
@@ -144,7 +145,7 @@ class SmiteMixin:
             if d > GANK_MAX_DIST:
                 continue
             hp_frac = e.hp / max(1.0, e.max_hp)
-            if hp_frac > 0.6:
+            if hp_frac > self.bot_gank_hp:
                 continue
             if self._under_enemy_tower(p, e.pos) and not self._good_kill_chance(p, e):
                 continue

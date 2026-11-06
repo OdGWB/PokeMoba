@@ -25,7 +25,7 @@ sys.path.insert(0, str(ROOT))
 import config  # noqa: E402
 from engine.content import load_map, load_pokemon_def  # noqa: E402
 from engine import evolution  # noqa: E402
-from engine.entities import Minion, Pokemon, Wild  # noqa: E402
+from engine.entities import Core, Minion, Pokemon, Wild  # noqa: E402
 from engine.match import Match  # noqa: E402
 from engine.vec import Vec2  # noqa: E402
 from engine.stats import respawn_time  # noqa: E402
@@ -174,9 +174,19 @@ def branch_plan(rng, name, is_jungler, is_support):
     return None
 
 
+OPTS = {"open_nexus": False, "max_time": MAX_TIME, "plan": False}   # impostato nei processi dal Pool (initializer)
+
+
+def _init_worker(open_nexus, max_time, plan=False):
+    OPTS["open_nexus"] = open_nexus
+    OPTS["max_time"] = max_time
+    OPTS["plan"] = plan
+
+
 def play(job):
     """Una partita 5v5. job = (seed, jungler0, altri0, jungler1, altri1) (indici del roster)."""
     seed, j0, o0, j1, o1 = job
+    max_time = OPTS["max_time"]
     random.seed(seed)
     rng = random.Random(seed)
     defs = [load_pokemon_def(str(ROOT / rel)) for rel in config.ROSTER]
@@ -184,6 +194,31 @@ def play(job):
     world = World(map_data.grid)
     match = Match(world, map_data)
     match.vision = FastVision(world.grid)
+    core_ev = [{}, {}]              # per nucleo: esposto / primo colpo / ultimo colpo (secondi)
+    if OPTS["plan"]:
+        # IA a piani (engine/bot_plan.py): shopping, assedio, aiuto alle torri, roam del
+        # support; gank del jungler piu largo (nemici fino al 90% di vita, ogni 40 s).
+        import engine.match as _em
+        import engine.smite as _es
+        match.bot_plan = True
+        match.bot_gank_hp = 0.9
+        _em.GANK_COOLDOWN = 40.0
+        _es.GANK_MIN_TIME = 210.0
+    if OPTS["open_nexus"]:
+        # Nexus attaccabile appena UNA lane della squadra non ha piu torri vive
+        # (regola solo del tool; il gioco vero resta "tutte le torri").
+        def _exposed(team):
+            # Le torri morte spariscono dal mondo: si conta per lane NOTA (LANES), non per
+            # le lane presenti, altrimenti una lane svuotata non verrebbe mai vista.
+            left = {ln: 0 for ln in LANES}
+            for e in world.structures():
+                if e.kind == "tower" and e.team == team and e.alive and e.lane in left:
+                    left[e.lane] += 1
+            if any(n == 0 for n in left.values()):
+                core_ev[team].setdefault("exposed", round(match.time))
+                return 0
+            return 99
+        match._alive_towers = _exposed
 
     stat = {}                       # id -> dict
     units = []
@@ -209,6 +244,7 @@ def play(job):
             if plan:
                 plans[p.id] = plan
             p.is_jungler = is_jg
+            p.bot_support = bool(is_sup)
             others_n = [n for n in names if n != name]
             stat[p.id] = {"name": name, "team": team, "idx": idx, "lane": lane,
                           "kills": 0, "deaths": 0, "dmg": 0.0, "taken": 0.0, "camps": 0,
@@ -279,6 +315,14 @@ def play(job):
             r = orig_dmg(attacker, target, amount, *a, **kw)
             stat[attacker.id]["sdmg"] = stat[attacker.id].get("sdmg", 0.0) + max(0.0, hp0 - target.hp)
             return r
+        if isinstance(attacker, Pokemon) and attacker.id in stat and amount > 0:
+            key = "dmg_minion" if isinstance(target, Minion) else (
+                "dmg_wild" if isinstance(target, Wild) else None)
+            if key:
+                hp0 = target.hp
+                r = orig_dmg(attacker, target, amount, *a, **kw)
+                stat[attacker.id][key] = stat[attacker.id].get(key, 0.0) + max(0.0, hp0 - target.hp)
+                return r
         return orig_dmg(attacker, target, amount, *a, **kw)
 
     def source_of(target):
@@ -362,16 +406,29 @@ def play(job):
             stat[p.id]["smites"] = stat[p.id].get("smites", 0) + 1
         return ok
 
+    def deal_core(attacker, target, amount, *a, **kw):
+        if isinstance(target, Core):
+            hp0 = target.hp
+            r = deal(attacker, target, amount, *a, **kw)
+            if target.hp < hp0 - 0.01:
+                ev = core_ev[target.team]
+                ev.setdefault("first_hit", round(match.time))
+                ev["last_hit"] = round(match.time)
+                ev["hits"] = ev.get("hits", 0) + 1
+                ev["by_minion"] = ev.get("by_minion", 0) + (1 if isinstance(attacker, Minion) else 0)
+            return r
+        return deal(attacker, target, amount, *a, **kw)
+
     match.use_smite = smite
     match._on_death = on_death
-    match._deal_damage = deal
+    match._deal_damage = deal_core
     match._cast = cast
     match._give_heal = heal
     match._give_shield = shield
 
     dt = config.TICK_DT
     tick = 0
-    while match.winner is None and match.time < MAX_TIME:
+    while match.winner is None and match.time < max_time:
         match.update(dt, tick)
         tick += 1
         scan_cc()
@@ -415,8 +472,17 @@ def play(job):
         s["maxhit"] = round(s["maxhit"])
         s["selfheal"] = round(s["selfheal"])
         s["items"] = len(getattr(p, "items", []))
+        for k_ in ("dmg_minion", "dmg_wild", "sdmg"):
+            s[k_] = round(s.get(k_, 0.0))
         s.pop("streak", None)
-    return {"seed": seed, "winner": winner, "timeout": timeout, "time": round(match.time, 1),
+        for k_, v_ in getattr(match, "bot_stat", {}).get(p.id, {}).items():
+            s["bp_" + k_] = round(v_, 1)
+    return {"seed": seed, "winner": winner, "timeout": timeout, "open_nexus": OPTS["open_nexus"], "plan": OPTS["plan"],
+            "end": {"towers": [{ln: sum(1 for x in world.structures() if x.team == t and x.alive
+                                        and x.kind == "tower" and x.lane == ln) for ln in LANES}
+                               for t in (0, 1)],
+                    "core_hp": [round(c.hp) for c in sorted(world.cores(), key=lambda c: c.team)],
+                    "core_events": core_ev}, "time": round(match.time, 1),
             "jungler": [team_info[0]["jungler"], team_info[1]["jungler"]],
             "support": [team_info[0]["support"], team_info[1]["support"]],
             "units": list(stat.values())}
@@ -464,6 +530,12 @@ def main():
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--until", default=None,
                     help="HH:MM: non parte una partita che non farebbe in tempo a finire")
+    ap.add_argument("--open-nexus", action="store_true",
+                    help="il nexus e' attaccabile appena una lane non ha piu torri")
+    ap.add_argument("--plan", action="store_true",
+                    help="IA a piani: shopping, assedio, aiuto alle torri, roam del support, gank piu largo")
+    ap.add_argument("--max-minutes", type=float, default=MAX_TIME / 60.0,
+                    help="minuti di gioco massimi per partita")
     ap.add_argument("--status", default=str(ROOT / "tools" / "tier_status.json"))
     ap.add_argument("--out", default=str(ROOT / "tools" / "tier_matches_5v5.jsonl"))
     a = ap.parse_args()
@@ -504,7 +576,8 @@ def main():
         est = (max(durations) * 1.15) if durations else 16 * 60.0
         return time.time() + est <= deadline
 
-    with Pool(a.workers) as pool, out.open("a", encoding="utf-8") as f:
+    with Pool(a.workers, initializer=_init_worker,
+              initargs=(a.open_nexus, a.max_minutes * 60.0, a.plan)) as pool, out.open("a", encoding="utf-8") as f:
         results = []
         last_beat = 0.0
         while True:

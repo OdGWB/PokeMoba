@@ -46,7 +46,7 @@ ROLE_WEIGHTS = {
     "combattente": {"winrate": .30, "kp": .14, "dmg": .12, "kda": .10, "cc": .12, "taken": .08,
                     "assists": .05, "deaths_inv": .03, "level": .04, "sdmg": .02},
 }
-METRIC_NAME = {"winrate": "Vittorie", "level": "Livello", "taken": "Danno assorbito",
+METRIC_NAME = {"winrate": "Vittorie (corrette)", "level": "Livello", "taken": "Danno assorbito",
                "cc": "Controllo (CC)", "assists": "Assist", "deaths_inv": "Poche morti",
                "dmg": "Danno inflitto", "support": "Cure/scudi", "kda": "K/D (con assist)",
                "kp": "Partecipazione alle uccisioni", "sdmg": "Danno alle torri", "cs": "Minion"}
@@ -73,6 +73,10 @@ EXTRA_GROUPS = [
         ("dpm", "Danno al minuto", "{:.0f}", True), ("dmg_share", "% danno squadra", "{:.0%}", True),
         ("taken_share", "% danno subito", "{:.0%}", True), ("maxhit", "Colpo più forte", "{:.0f}", True),
         ("best_streak", "Serie uccisioni", "{:.1f}", True), ("selfheal", "Auto-cura", "{:.0f}", True)]),
+    ("Danno per bersaglio", [
+        ("dmg", "Danno ai nemici", "{:.0f}", True), ("dmg_minion", "Danno ai minion", "{:.0f}", True),
+        ("dmg_wild", "Danno ai neutrali", "{:.0f}", True), ("sdmg", "Danno alle torri", "{:.0f}", True),
+        ("enemy_pct", "% danno ai nemici", "{:.0%}", True)]),
     ("Rischio e tempi", [
         ("dead_pct", "Tempo da KO", "{:.0%}", False), ("tower_deaths", "Morti da torre", "{:.2f}", False),
         ("wr_short", "Vittorie < 15'", "{:.0%}", True), ("wr_long", "Vittorie ≥ 15'", "{:.0%}", True)]),
@@ -124,6 +128,7 @@ def aggregate(units: list) -> dict:
         "assists": s("assists") / n, "dmg": s("dmg") / n, "taken": s("taken") / n,
         "level": s("level") / n, "cc": s("cc") / n, "support": s("support") / n,
         "kp": s("kp") / n, "sdmg": s("sdmg") / n, "cs": s("cs") / n, "towers": s("towers") / n,
+        "dmg_minion": s("dmg_minion") / n, "dmg_wild": s("dmg_wild") / n,
         "legend": s("legend") / n, "smites": s("smites") / n,
         "kda": (s("kills") + s("assists")) / max(1.0, s("deaths")),
         "reach8": len(t8) / n, "t8": (sum(t8) / len(t8)) if t8 else None,
@@ -136,9 +141,10 @@ def winrate_of(units: list) -> float:
 
 def main():
     newest = ROOT / "tools" / "tier_matches_5v5_b.jsonl"
-    src = (Path(sys.argv[1]) if len(sys.argv) > 1 else
-           newest if newest.exists() else ROOT / "tools" / "tier_matches_5v5.jsonl")
-    matches = [json.loads(l) for l in src.read_text(encoding="utf-8").splitlines() if l.strip()]
+    srcs = ([Path(x) for x in sys.argv[1].split(",")] if len(sys.argv) > 1 else
+            [newest if newest.exists() else ROOT / "tools" / "tier_matches_5v5.jsonl"])
+    matches = [json.loads(l) for src in srcs for l in src.read_text(encoding="utf-8").splitlines()
+               if l.strip()]
     chart = json.loads((ROOT / "data" / "types.json").read_text(encoding="utf-8"))
     chart = {k: v for k, v in chart.items() if not k.startswith("_")}
     defs = {}
@@ -155,7 +161,10 @@ def main():
         tt = {t: max(1.0, sum(u["taken"] for u in m["units"] if u["team"] == t)) for t in (0, 1)}
         mins = max(1.0, m["time"] / 60.0)
         for u in m["units"]:
+            tot_d = u["dmg"] + u.get("dmg_minion", 0) + u.get("dmg_wild", 0) + u.get("sdmg", 0)
             u = dict(u, won=(u["team"] == m["winner"]),
+                     my_sup=bool(m["support"][u["team"]]), opp_sup=bool(m["support"][1 - u["team"]]),
+                     enemy_pct=(u["dmg"] / tot_d if "dmg_minion" in u and tot_d > 0 else None),
                      kp=(u["kills"] + u["assists"]) / tk[u["team"]],
                      dmg_share=u["dmg"] / td[u["team"]], taken_share=u["taken"] / tt[u["team"]],
                      dpm=u["dmg"] / mins, dead_pct=min(1.0, u.get("dead_time", 0.0) / max(1.0, m["time"])),
@@ -170,10 +179,34 @@ def main():
                     rec[1] += 1
                     rec[0] += 1 if a["team"] == m["winner"] else 0
 
+    # Vittorie CORRETTE sul contesto: chi gioca senza support vince di piu perche lo spareggio
+    # a tempo premia il danno, quindi ogni partita si confronta con la quota di vittorie
+    # attesa per (squadra con/senza support, avversario con/senza support).
+    allu = [u for n_ in names for u in rows[n_]]
+    ctx_n, ctx_w, own_n, own_w = defaultdict(int), defaultdict(int), defaultdict(int), defaultdict(int)
+    for u in allu:
+        ctx_n[u["my_sup"], u["opp_sup"]] += 1
+        ctx_w[u["my_sup"], u["opp_sup"]] += u["won"]
+        own_n[u["my_sup"]] += 1
+        own_w[u["my_sup"]] += u["won"]
+
+    def expected_wr(u):
+        k = (u["my_sup"], u["opp_sup"])
+        if ctx_n[k] >= 40:
+            return ctx_w[k] / ctx_n[k]
+        return own_w[u["my_sup"]] / max(1, own_n[u["my_sup"]])
+
+    def winrate_adj(units):
+        """0,5 + (vittorie - vittorie attese per il contesto), in media sulle partite."""
+        if not units:
+            return 0.5
+        return 0.5 + sum(u["won"] - expected_wr(u) for u in units) / len(units)
+
     per = {}
     for n in names:
         a = aggregate(rows[n])
-        a["winrate"] = winrate_of(rows[n])
+        a["winrate_raw"] = winrate_of(rows[n])
+        a["winrate"] = winrate_adj(rows[n])
         a["deaths_inv"] = -a["deaths"]
         per[n] = a
 
@@ -181,7 +214,8 @@ def main():
         """Medie delle informazioni extra su un insieme di righe (None se non ci sono dati)."""
         res = {}
         for k in ("gold10", "cs10", "kda10", "dmg10", "fb", "dpm", "dmg_share", "taken_share",
-                  "maxhit", "best_streak", "selfheal", "dead_pct", "tower_deaths"):
+                  "maxhit", "best_streak", "selfheal", "dead_pct", "tower_deaths",
+                  "dmg", "dmg_minion", "dmg_wild", "sdmg", "enemy_pct"):
             v = [u[k] for u in units if u.get(k) is not None]
             res[k] = sum(v) / len(v) if len(v) >= max(3, len(units) // 2) else None
         for k, grp in (("wr_short", [u for u in units if u["short"]]),
@@ -243,7 +277,7 @@ def main():
     def stat_box(key, p):
         a = avg
         return {
-            "winrate": ("Vittorie", f"{p['winrate'] * 100:.0f}%", f"{a['winrate'] * 100:.0f}%"),
+            "winrate": ("Vittorie (corr.)", f"{p['winrate'] * 100:.0f}%", f"{a['winrate'] * 100:.0f}%"),
             "kda": ("K/D+assist", f"{p['kda']:.2f}", f"{a['kda']:.2f}"),
             "dmg": ("Danno", f"{p['dmg']:.0f}", f"{a['dmg']:.0f}"),
             "taken": ("Danno subito", f"{p['taken']:.0f}", f"{a['taken']:.0f}"),
@@ -264,8 +298,10 @@ def main():
         rk = {k: rank_of({m: per[m][k] for m in names}, n) for k in METRIC_NAME}
 
         phrase = {
-            "winrate": (f"vince molto: {p['winrate'] * 100:.0f}% delle partite",
-                        f"vince poco: solo {p['winrate'] * 100:.0f}% delle partite"),
+            "winrate": (f"vince più del previsto: {p['winrate'] * 100:.0f}% corretto sul contesto "
+                        f"(grezzo {p['winrate_raw'] * 100:.0f}%)",
+                        f"vince meno del previsto: {p['winrate'] * 100:.0f}% corretto sul contesto "
+                        f"(grezzo {p['winrate_raw'] * 100:.0f}%)"),
             "level": (f"sale di livello in fretta (liv. medio {p['level']:.1f})",
                       f"sale di livello piano (liv. medio {p['level']:.1f})"),
             "taken": (f"assorbe tantissimo danno: {p['taken']:.0f} a partita (media {avg['taken']:.0f})",
@@ -355,11 +391,11 @@ def main():
                     forms.append({"name": f, "games": len(us), "score": None})
                     continue
                 a = aggregate(us)
-                a["winrate"] = sum(1 for u in us if u["won"]) / len(us)
+                a["winrate"] = winrate_adj(us)
                 a["deaths_inv"] = -a["deaths"]
                 ftypes = us[0].get("types") or list(d.types)
                 forms.append({"name": f, "games": len(us), "score": round(score_of(role, a), 3),
-                              "winrate": round(a["winrate"], 3), "kda": round(a["kda"], 2),
+                              "winrate": round(winrate_of(us), 3), "kda": round(a["kda"], 2),
                               "dmg": round(a["dmg"]), "assists": round(a["assists"], 1),
                               "cc": round(a["cc"]), "types": ftypes,
                               "rule": FORM_RULE.get(f, FORM_RULE_DEFAULT.get(d.name, "")),
@@ -420,7 +456,8 @@ def main():
         out.append({
             "name": n, "pos": pos, "tier": tiers[n], "score": round(score[n], 3),
             "role": d.role, "types": list(d.types), "passive": d.passive,
-            "games": p["games"], "winrate": round(p["winrate"], 4),
+            "games": p["games"], "winrate": round(p["winrate_raw"], 4),
+            "winrate_adj": round(p["winrate"], 4),
             "stats": [{"label": a, "value": b, "avg": c} for a, b, c in stats],
             "ranks": rk, "summary": f"{head} (posizione {pos} su {len(names)}, tier {tiers[n]}).",
             "weights": {METRIC_NAME[k]: v for k, v in weights.items()},
@@ -464,6 +501,7 @@ def main():
         "matches": len(matches),
         "minutes": round(sum(m["time"] for m in matches) / len(matches) / 60, 1),
         "decided_by_core": sum(1 for m in matches if not m["timeout"]),
+        "open_nexus": sum(1 for m in matches if m.get("open_nexus")),
         "blue_wins": round(sum(1 for m in matches if m["winner"] == 0) / len(matches), 3),
         "teams_with_support": team_rows(True), "teams_without_support": team_rows(False),
         "junglers": jung,
@@ -485,14 +523,14 @@ def main():
                                                for u in m["units"]) / len(matches), 1)
     match_data["new_fields"] = sum(1 for m in matches if "gold10" in m["units"][0])
 
-    dst = ROOT / "data" / "tier_developer.json"
+    dst = Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "data" / "tier_developer.json"
     dst.write_text(json.dumps({
         "matches": len(matches), "minutes": round(sum(m["time"] for m in matches) / len(matches) / 60, 1),
         "match_data": match_data, "map": "5v5", "avg_winrate": round(avg["winrate"], 4), "reach8": round(avg["reach8"], 3),
         "list": out}, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"{len(matches)} partite -> {dst}")
     for e in out:
-        print(f"{e['pos']:>2} {e['tier']} {e['name']:<11} {e['role']:<11} wr {e['winrate'] * 100:3.0f}%  "
+        print(f"{e['pos']:>2} {e['tier']} {e['name']:<11} {e['role']:<11} wr {e['winrate'] * 100:3.0f}% (corr {e['winrate_adj'] * 100:3.0f}%)  "
               + "  ".join(f"{s['label']} {s['value']}" for s in e["stats"][1:-1]))
 
 

@@ -6,3 +6,6 @@ tools/tier_watch.log
 tools/tier_watch.out
 tools/tier_watch.err
 tools/tier_matches_5v5_b.jsonl
+tools/tier_matches_5v5_nexus.jsonl
+tools/tier_matches_5v5_plan.jsonl
+tools/tier_matches_5v5_plan_nexusbug.jsonl

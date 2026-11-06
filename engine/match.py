@@ -43,6 +43,7 @@ from .incineroar import INCIN_PASSIVES, IncineroarMixin
 from .corviknight import CORVI_PASSIVES, CorviknightMixin
 from .eevee import EEVEE_PASSIVES, EeveeMixin
 from .item_effects import ItemEffectsMixin, cdr_to_haste
+from .bot_plan import BotPlanMixin
 from .smite import (GANK_COOLDOWN, GANK_DURATION, SmiteMixin, smite_damage)
 from .basic_attack import (ACQUIRE_EXTRA, AMOVE_DROP_EXTRA, AMOVE_EXTRA, AS_CAP,
                            IDLE_CHASE_LEASH, BasicAttackMixin)
@@ -178,7 +179,7 @@ CAST_ANIMS = {"projectile": "Shoot", "bubble": "Shoot",
 
 class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, NoivernMixin,
             UrsaringMixin, SneaselMixin, MienshaoMixin, ArchaludonMixin,
-            HattereneMixin, MagnezoneMixin, MamoswineMixin, VenomothMixin, OctilleryMixin, FlorgesMixin, ScizorMixin, IncineroarMixin, BasicAttackMixin, SmiteMixin, ItemEffectsMixin):
+            HattereneMixin, MagnezoneMixin, MamoswineMixin, VenomothMixin, OctilleryMixin, FlorgesMixin, ScizorMixin, IncineroarMixin, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPlanMixin):
     def __init__(self, world, map_data):
         self.world = world
         self.map = map_data
@@ -394,6 +395,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
                 continue              # Presa a Ventosa: attacca solo l'afferrato
             if p.is_bot and self._flor_bot_seek(p, dt):
                 continue              # Giardino: un bot ferito raccoglie un fiore vicino
+            if p.is_bot and self.bot_plan and self._bot_plan_step(p, dt):
+                continue              # IA a piani (shopping, assedio, torri, roam; opzionale)
             if p.is_bot and p.is_jungler:
                 self._ai_jungler(p, dt)
             elif p.is_bot:
