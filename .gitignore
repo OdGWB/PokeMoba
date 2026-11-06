@@ -1,2 +1,8 @@
 build/
 dist/
+tools/tier_status.json
+tools/tier_run.*
+tools/tier_watch.log
+tools/tier_watch.out
+tools/tier_watch.err
+tools/tier_matches_5v5_b.jsonl

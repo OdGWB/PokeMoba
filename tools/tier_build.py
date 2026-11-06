@@ -61,6 +61,22 @@ ROLE_STATS = {
 }
 JUNGLERS = ["Nincada", "Sneasel", "Teddiursa", "Swinub", "Totodile"]
 SUPPORT_NAMES = {"Spiritomb", "Duraludon", "Rookidee", "Flabébé"}
+SHORT_GAME = 15 * 60.0   # secondi: sotto = partita "breve" (decisa presto), sopra = "lunga"
+MIN_SPLIT = 8            # partite minime per mostrare le vittorie brevi/lunghe
+# Informazioni EXTRA (non entrano nel punteggio): (chiave, etichetta, formato, piu' alto = meglio).
+EXTRA_GROUPS = [
+    ("Primi 10 minuti", [
+        ("gold10", "Oro a 10'", "{:.0f}", True), ("cs10", "Farm a 10'", "{:.0f}", True),
+        ("kda10", "K/D+A a 10'", "{:.2f}", True), ("dmg10", "Danno a 10'", "{:.0f}", True),
+        ("fb", "Primo sangue", "{:.0%}", True)]),
+    ("Combattimento", [
+        ("dpm", "Danno al minuto", "{:.0f}", True), ("dmg_share", "% danno squadra", "{:.0%}", True),
+        ("taken_share", "% danno subito", "{:.0%}", True), ("maxhit", "Colpo più forte", "{:.0f}", True),
+        ("best_streak", "Serie uccisioni", "{:.1f}", True), ("selfheal", "Auto-cura", "{:.0f}", True)]),
+    ("Rischio e tempi", [
+        ("dead_pct", "Tempo da KO", "{:.0%}", False), ("tower_deaths", "Morti da torre", "{:.2f}", False),
+        ("wr_short", "Vittorie < 15'", "{:.0%}", True), ("wr_long", "Vittorie ≥ 15'", "{:.0%}", True)]),
+]
 FORM_RULE = {"Sneasler": "se è il jungler della squadra", "Weavile": "se gioca in lane",
              "Poliwrath": "se in squadra c'è già un supporto",
              "Politoad": "se è lui il supporto della squadra",
@@ -119,7 +135,9 @@ def winrate_of(units: list) -> float:
 
 
 def main():
-    src = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "tools" / "tier_matches_5v5.jsonl"
+    newest = ROOT / "tools" / "tier_matches_5v5_b.jsonl"
+    src = (Path(sys.argv[1]) if len(sys.argv) > 1 else
+           newest if newest.exists() else ROOT / "tools" / "tier_matches_5v5.jsonl")
     matches = [json.loads(l) for l in src.read_text(encoding="utf-8").splitlines() if l.strip()]
     chart = json.loads((ROOT / "data" / "types.json").read_text(encoding="utf-8"))
     chart = {k: v for k, v in chart.items() if not k.startswith("_")}
@@ -133,9 +151,17 @@ def main():
     duel = defaultdict(lambda: defaultdict(lambda: [0, 0]))     # a -> b -> [vittorie, partite]
     for m in matches:
         tk = {t: max(1, sum(u["kills"] for u in m["units"] if u["team"] == t)) for t in (0, 1)}
+        td = {t: max(1.0, sum(u["dmg"] for u in m["units"] if u["team"] == t)) for t in (0, 1)}
+        tt = {t: max(1.0, sum(u["taken"] for u in m["units"] if u["team"] == t)) for t in (0, 1)}
+        mins = max(1.0, m["time"] / 60.0)
         for u in m["units"]:
             u = dict(u, won=(u["team"] == m["winner"]),
-                     kp=(u["kills"] + u["assists"]) / tk[u["team"]])
+                     kp=(u["kills"] + u["assists"]) / tk[u["team"]],
+                     dmg_share=u["dmg"] / td[u["team"]], taken_share=u["taken"] / tt[u["team"]],
+                     dpm=u["dmg"] / mins, dead_pct=min(1.0, u.get("dead_time", 0.0) / max(1.0, m["time"])),
+                     short=m["time"] < SHORT_GAME)
+            if "gold10" in u:
+                u["kda10"] = (u["kills10"] + u["assists10"]) / max(1.0, u["deaths10"])
             rows[u["name"]].append(u)
         for a in m["units"]:
             for b in m["units"]:
@@ -150,6 +176,19 @@ def main():
         a["winrate"] = winrate_of(rows[n])
         a["deaths_inv"] = -a["deaths"]
         per[n] = a
+
+    def extra_of(units):
+        """Medie delle informazioni extra su un insieme di righe (None se non ci sono dati)."""
+        res = {}
+        for k in ("gold10", "cs10", "kda10", "dmg10", "fb", "dpm", "dmg_share", "taken_share",
+                  "maxhit", "best_streak", "selfheal", "dead_pct", "tower_deaths"):
+            v = [u[k] for u in units if u.get(k) is not None]
+            res[k] = sum(v) / len(v) if len(v) >= max(3, len(units) // 2) else None
+        for k, grp in (("wr_short", [u for u in units if u["short"]]),
+                       ("wr_long", [u for u in units if not u["short"]])):
+            res[k] = winrate_of(grp) if len(grp) >= MIN_SPLIT else None
+        return res
+    extra = {n: extra_of(rows[n]) for n in names}
 
     # Vantaggio di tipo: intrinseco (contro tutto il roster) e "fortuna" nel campione.
     adv = {}
@@ -362,6 +401,22 @@ def main():
                 "B": "È nella fascia di mezzo", "C": "È sotto la media",
                 "D": "È tra i più deboli del roster"}[tiers[n]]
         stats = [stat_box(k, p) for k in ["winrate"] + ROLE_STATS[role] + ["level"]]
+        extra_out = []
+        for gname, items in EXTRA_GROUPS:
+            cells = []
+            for k, label, fmt, hi in items:
+                vals = {m: extra[m][k] for m in names if extra[m][k] is not None}
+                v = extra[n][k]
+                if v is None or len(vals) < 4:
+                    continue
+                rank_ = rank_of(vals, n, hi)
+                avg_ = sum(vals.values()) / len(vals)
+                q = max(1, round(len(vals) * 0.25))
+                cells.append({"label": label, "value": fmt.format(v), "avg": fmt.format(avg_),
+                              "rank": rank_, "of": len(vals),
+                              "good": 1 if rank_ <= q else -1 if rank_ > len(vals) - q else 0})
+            if cells:
+                extra_out.append({"group": gname, "cells": cells})
         out.append({
             "name": n, "pos": pos, "tier": tiers[n], "score": round(score[n], 3),
             "role": d.role, "types": list(d.types), "passive": d.passive,
@@ -371,6 +426,7 @@ def main():
             "weights": {METRIC_NAME[k]: v for k, v in weights.items()},
             "pros": pros, "cons": cons, "best": best, "worst": worst,
             "types_info": types_info, "forms": forms, "context": context,
+            "extra": extra_out,
         })
 
     # Dati sull'insieme delle partite (pagina "Dati partite").
@@ -415,6 +471,19 @@ def main():
                          for k, v in sorted(forms_all.items())},
         "smites": round(sum(u.get("smites", 0) for m in matches for u in m["units"]) / len(matches), 1),
     }
+    # Dati extra sull'insieme: primo sangue, durata, uccisioni e torri per partita.
+    fbm = [(next((u["team"] for u in m["units"] if u.get("fb")), None), m["winner"]) for m in matches]
+    fbm = [(a, b) for a, b in fbm if a is not None]
+    short = [m for m in matches if m["time"] < SHORT_GAME]
+    match_data["first_blood_wins"] = {"games": len(fbm), "winrate": round(
+        sum(1 for a, b in fbm if a == b) / max(1, len(fbm)), 3)}
+    match_data["short_games"] = {"games": len(short), "minutes": round(
+        sum(m["time"] for m in short) / max(1, len(short)) / 60, 1)}
+    match_data["kills_per_match"] = round(sum(u["kills"] for m in matches for u in m["units"])
+                                          / len(matches), 1)
+    match_data["towers_per_match"] = round(sum(u.get("towers", 0) for m in matches
+                                               for u in m["units"]) / len(matches), 1)
+    match_data["new_fields"] = sum(1 for m in matches if "gold10" in m["units"][0])
 
     dst = ROOT / "data" / "tier_developer.json"
     dst.write_text(json.dumps({

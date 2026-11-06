@@ -305,6 +305,12 @@ class DeveloperMatchDataScene(_DevBase):
             f"{md['decided_by_core']} finite con il nucleo distrutto, le altre decise a 18 minuti "
             f"da torri, uccisioni e danno. Vittorie squadra blu: {md['blue_wins'] * 100:.0f}%.")
         row(f"Ogni squadra ha sempre un jungler. Smite usati a partita: {md['smites']}.")
+        if "first_blood_wins" in md and md["first_blood_wins"]["games"]:
+            fb = md["first_blood_wins"]
+            row(f"Chi ottiene il primo sangue vince il {fb['winrate'] * 100:.0f}% delle partite "
+                f"({fb['games']}). Uccisioni a partita: {md['kills_per_match']}, torri abbattute: "
+                f"{md['towers_per_match']}; {md['short_games']['games']} partite finite prima di "
+                f"15 minuti (media {md['short_games']['minutes']:.0f} min).")
         y += 6
         head("Squadre con e senza supporto in bot lane")
         a, b = md["teams_with_support"], md["teams_without_support"]
@@ -340,6 +346,10 @@ class DeveloperDetailScene(_DevBase):
         self.color = tuple(d.color)
         self.buttons = Buttons()
         self._fonts = {}
+        self.scroll = 0
+        self._max_scroll = 0
+        self._page = 200
+        self._canvas = None             # (W, H) -> Surface con tutta la pagina
 
     def _back(self):
         self.next_scene = DeveloperTierScene(self.app)
@@ -348,13 +358,57 @@ class DeveloperDetailScene(_DevBase):
         for ev in events:
             if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
                 self._back()
+            elif ev.type == pygame.KEYDOWN:
+                step = {pygame.K_DOWN: 60, pygame.K_UP: -60, pygame.K_PAGEDOWN: self._page,
+                        pygame.K_PAGEUP: -self._page, pygame.K_SPACE: self._page,
+                        pygame.K_END: 10 ** 6, pygame.K_HOME: -10 ** 6}.get(ev.key)
+                if step:
+                    self._scroll_by(step)
+            elif ev.type == pygame.MOUSEWHEEL:
+                self._scroll_by(-ev.y * 70)
             elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
                 self.buttons.click(ev.pos)
 
+    def _scroll_by(self, dy):
+        self.scroll = max(0, min(self._max_scroll, self.scroll + dy))
+
     def draw_fullres(self, surface, font):
+        """Tutta la pagina e' disegnata una volta su una tela alta; qui se ne mostra la
+        finestra scorrevole (rotella, frecce, PagSu/PagGiu) con il tasto Indietro fisso."""
         W, H = surface.get_size()
         surface.fill(BG)
         self.buttons.clear()
+        mid = self._font(max(14, H // 46))
+        bh = mid.get_height() + 14
+        view_h = H - bh - 24
+        if self._canvas is None or self._canvas[0] != (W, H):
+            canvas = pygame.Surface((W, H * 6))
+            end = self._paint(canvas, W, H)
+            self._canvas = ((W, H), canvas, end)
+        _, canvas, end = self._canvas
+        self._max_scroll = max(0, end + 16 - view_h)
+        self._page = max(100, view_h - 60)
+        self.scroll = min(self.scroll, self._max_scroll)
+        surface.blit(canvas, (0, 0), pygame.Rect(0, self.scroll, W, view_h))
+        if self._max_scroll > 0:
+            tr = pygame.Rect(W - 10, 4, 6, view_h - 8)
+            pygame.draw.rect(surface, PANEL, tr, border_radius=3)
+            th = max(30, int(tr.h * view_h / (end + 16)))
+            ty = tr.y + int((tr.h - th) * self.scroll / self._max_scroll)
+            pygame.draw.rect(surface, GOLD, (tr.x, ty, tr.w, th), border_radius=3)
+            if self.scroll < self._max_scroll:
+                hint = self._font(max(12, H // 56)).render("▼ scorri per altre informazioni", True, DIM)
+                hr = pygame.Rect(0, 0, hint.get_width() + 16, hint.get_height() + 4)
+                hr.midbottom = (W // 2, view_h - 4)
+                pygame.draw.rect(surface, PANEL_HI, hr, border_radius=6)
+                surface.blit(hint, (hr.x + 8, hr.y + 2))
+        pygame.draw.rect(surface, BG, (0, view_h, W, H - view_h))
+        pygame.draw.line(surface, BORDER, (0, view_h), (W, view_h))
+        self.buttons.draw(surface, (int(W * 0.05), H - bh - 12, 200, bh), "Indietro  (Esc)",
+                          self._back, mid)
+
+    def _paint(self, surface, W, H):
+        surface.fill(BG)
         e = self.entry
         col = dict(TIERS)[e["tier"]]
         title_f = self._font(max(28, H // 16), bold=True)
@@ -455,6 +509,7 @@ class DeveloperDetailScene(_DevBase):
                 line("Corsie: " + ", ".join(f"{k} {v['winrate'] * 100:.0f}% ({v['games']})"
                                             for k, v in lanes.items()), DIM)
 
+        left_end = cur["y"]
         cur.update(x=x + colw + gap, y=y)
         if e["forms"]:
             title("Classifica delle forme", GOLD)
@@ -488,14 +543,48 @@ class DeveloperDetailScene(_DevBase):
         duels("Va meglio contro", e["best"], GREEN)
         duels("Soffre contro", e["worst"], RED)
 
-        wtxt = ", ".join(f"{k} {int(v * 100)}%" for k, v in e["weights"].items())
-        note = small.render("Punteggio per ruolo: " + wtxt, True, DIM)
-        while note.get_width() > cw and len(wtxt) > 10:
-            wtxt = wtxt[:-6] + "…"
-            note = small.render("Punteggio per ruolo: " + wtxt, True, DIM)
-        surface.blit(note, (x, H - note.get_height() - 10))
-        bh = mid.get_height() + 14
-        self.buttons.draw(surface, (pad, H - bh - 12, 200, bh), "Indietro  (Esc)", self._back, mid)
+        end = max(left_end, cur["y"])
+        end = self._paint_extra(surface, e, pad, end + 18, W - 2 * pad, small, mid, big)
+        wtxt = "Punteggio per ruolo: " + ", ".join(f"{k} {int(v * 100)}%" for k, v in e["weights"].items())
+        y = end + 12
+        for ln in _wrap(small, wtxt, W - 2 * pad):
+            surface.blit(small.render(ln, True, DIM), (pad, y))
+            y += small.get_height() + 2
+        return y
+
+    def _paint_extra(self, surface, e, x, y, w, small, mid, big):
+        """Informazioni extra (non entrano nel punteggio): carte con valore, media del
+        roster e posizione; verde = tra i migliori, rosso = tra i peggiori."""
+        groups = e.get("extra") or []
+        if not groups:
+            return y
+        GREEN, RED = (130, 200, 100), (230, 120, 90)
+        surface.blit(big.render("Informazioni extra", True, GOLD), (x, y))
+        y += big.get_height() + 2
+        note = small.render("Non cambiano la posizione in classifica: servono a capire perché. "
+                            "Verde = tra i migliori del roster, rosso = tra i peggiori.", True, DIM)
+        surface.blit(note, (x, y))
+        y += note.get_height() + 10
+        gap = 8
+        cw = max(150, (w - 5 * gap) // 6)
+        per_row = max(1, (w + gap) // (cw + gap))
+        cw = (w - (per_row - 1) * gap) // per_row
+        chh = small.get_height() * 2 + big.get_height() + 14
+        for g in groups:
+            surface.blit(mid.render(g["group"], True, TEXT), (x, y))
+            y += mid.get_height() + 4
+            for i, c in enumerate(g["cells"]):
+                r = pygame.Rect(x + (i % per_row) * (cw + gap), y + (i // per_row) * (chh + gap), cw, chh)
+                col = GREEN if c["good"] > 0 else RED if c["good"] < 0 else TEXT
+                pygame.draw.rect(surface, PANEL, r, border_radius=6)
+                pygame.draw.rect(surface, col if c["good"] else BORDER, r, 1, border_radius=6)
+                surface.blit(small.render(c["label"], True, DIM), (r.x + 8, r.y + 5))
+                surface.blit(big.render(c["value"], True, col), (r.x + 8, r.y + 5 + small.get_height()))
+                surface.blit(small.render(f"media {c['avg']} · {c['rank']}º/{c['of']}", True, DIM),
+                             (r.x + 8, r.bottom - small.get_height() - 5))
+            rows_n = (len(g["cells"]) + per_row - 1) // per_row
+            y += rows_n * (chh + gap) + 6
+        return y
 
 
 class TierListScene:

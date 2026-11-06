@@ -15,6 +15,7 @@ import os
 import random
 import sys
 import time
+from datetime import datetime, timedelta
 from multiprocessing import Pool
 from pathlib import Path
 
@@ -226,7 +227,9 @@ def play(job):
     last_hit = {}                   # id vittima -> {id attaccante: tempo ultimo colpo}
 
     for s in stat.values():
-        s.update(assists=0, cc=0.0, support=0.0, t8=None, t5=None)
+        s.update(assists=0, cc=0.0, support=0.0, t8=None, t5=None,
+                 maxhit=0.0, selfheal=0.0, tower_deaths=0, streak=0, best_streak=0, fb=0)
+    first_blood = [False]
 
     def on_death(victim, killer):
         if isinstance(victim, Wild) and isinstance(killer, Pokemon) and killer.id in stat:
@@ -239,6 +242,17 @@ def play(job):
             stat[killer.id]["towers"] = stat[killer.id].get("towers", 0) + 1
         if isinstance(victim, Pokemon) and victim.id in stat:
             stat[victim.id]["deaths"] += 1
+            stat[victim.id]["streak"] = 0
+            if isinstance(killer, Structure):
+                stat[victim.id]["tower_deaths"] += 1
+            if (isinstance(killer, Pokemon) and killer.id in stat and killer.team != victim.team
+                    and not first_blood[0]):
+                first_blood[0] = True
+                stat[killer.id]["fb"] = 1
+            if isinstance(killer, Pokemon) and killer.id in stat and killer.team != victim.team:
+                k_ = stat[killer.id]
+                k_["streak"] += 1
+                k_["best_streak"] = max(k_["best_streak"], k_["streak"])
             stat[victim.id]["dead_time"] = stat[victim.id].get("dead_time", 0.0) +                 respawn_time(victim.level)
             if isinstance(killer, Pokemon) and killer.id in stat and killer.team != victim.team:
                 stat[killer.id]["kills"] += 1
@@ -256,6 +270,7 @@ def play(job):
             stat[target.id]["taken"] += lost
             if isinstance(attacker, Pokemon) and attacker.id in stat and attacker.team != target.team:
                 stat[attacker.id]["dmg"] += lost
+                stat[attacker.id]["maxhit"] = max(stat[attacker.id]["maxhit"], lost)
                 last_hit.setdefault(target.id, {})[attacker.id] = match.time
             scan_cc(attacker if isinstance(attacker, Pokemon) else None)
             return r
@@ -312,6 +327,8 @@ def play(job):
     def heal(caster, target, amount):
         hp0 = target.hp
         r = orig_heal(caster, target, amount)
+        if (isinstance(caster, Pokemon) and caster.id in stat and target is caster):
+            stat[caster.id]["selfheal"] += max(0.0, target.hp - hp0)
         if (isinstance(caster, Pokemon) and caster.id in stat and target is not caster
                 and isinstance(target, Pokemon) and target.id in stat):
             stat[caster.id]["support"] += max(0.0, target.hp - hp0)
@@ -365,7 +382,13 @@ def play(job):
                 if p.level >= 5 and stat[p.id].get("t5") is None:
                     stat[p.id]["t5"] = round(match.time, 1)
                 if match.time >= 600.0 and "lvl10" not in stat[p.id]:
-                    stat[p.id]["lvl10"] = p.level
+                    st = stat[p.id]
+                    st["lvl10"] = p.level
+                    st["gold10"] = round(float(getattr(p, "gold", 0)))
+                    st["kills10"], st["deaths10"] = st["kills"], st["deaths"]
+                    st["assists10"] = st["assists"]
+                    st["dmg10"] = round(st["dmg"])
+                    st["cs10"] = st.get("cs", 0) + st["camps"]
                 if p.level >= 7 and p.id in plans and p.stage < 2:
                     prepare_branch(p, plans[p.id])
 
@@ -389,6 +412,10 @@ def play(job):
         s["cc"] = round(s["cc"], 1)
         s["support"] = round(s["support"])
         s["gold"] = round(float(getattr(p, "gold", 0)))
+        s["maxhit"] = round(s["maxhit"])
+        s["selfheal"] = round(s["selfheal"])
+        s["items"] = len(getattr(p, "items", []))
+        s.pop("streak", None)
     return {"seed": seed, "winner": winner, "timeout": timeout, "time": round(match.time, 1),
             "jungler": [team_info[0]["jungler"], team_info[1]["jungler"]],
             "support": [team_info[0]["support"], team_info[1]["support"]],
@@ -420,14 +447,29 @@ def make_jobs(n, start_seed):
     return jobs
 
 
+def parse_until(txt):
+    """'16:00' -> timestamp di oggi (o di domani se l'ora e' gia' passata)."""
+    h, m = (int(x) for x in txt.split(":"))
+    now = datetime.now()
+    t = now.replace(hour=h, minute=m, second=0, microsecond=0)
+    if t <= now:
+        t += timedelta(days=1)
+    return t.timestamp()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--matches", type=int, default=160)
     ap.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 2))
     ap.add_argument("--seed", type=int, default=1)
+    ap.add_argument("--until", default=None,
+                    help="HH:MM: non parte una partita che non farebbe in tempo a finire")
+    ap.add_argument("--status", default=str(ROOT / "tools" / "tier_status.json"))
     ap.add_argument("--out", default=str(ROOT / "tools" / "tier_matches_5v5.jsonl"))
     a = ap.parse_args()
     out = Path(a.out)
+    status = Path(a.status)
+    deadline = parse_until(a.until) if a.until else None
     done = set()
     if out.exists():
         for line in out.read_text(encoding="utf-8").splitlines():
@@ -435,17 +477,59 @@ def main():
                 done.add(json.loads(line)["seed"])
             except (ValueError, KeyError):
                 pass
-    jobs = [j for j in make_jobs(a.matches, a.seed) if j[0] not in done]
-    print(f"{len(done)} gia' fatte, {len(jobs)} da giocare con {a.workers} processi", flush=True)
+    todo = [j for j in make_jobs(a.matches, a.seed) if j[0] not in done]
+    print(f"{len(done)} gia' fatte, {len(todo)} da giocare con {a.workers} processi"
+          + (f", stop alle {a.until}" if a.until else ""), flush=True)
     t0 = time.time()
+    running = {}                    # seed -> istante di avvio
+    durations = []                  # secondi reali per partita (per sapere se c'e' tempo)
+    finished = 0
+    queue = list(todo)
+    reason = "finito"
+
+    def write_status(state):
+        data = {"pid": os.getpid(), "state": state, "started": t0, "updated": time.time(),
+                "out": str(out), "deadline": deadline, "workers": a.workers,
+                "done_before": len(done), "finished": finished, "running": len(running),
+                "running_since": sorted(running.values()), "queued": len(queue),
+                "avg_match_s": (sum(durations) / len(durations)) if durations else None,
+                "out_lines": sum(1 for _ in out.open(encoding="utf-8")) if out.exists() else 0}
+        tmp = status.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data), encoding="utf-8")
+        tmp.replace(status)
+
+    def can_start():
+        if deadline is None:
+            return True
+        est = (max(durations) * 1.15) if durations else 16 * 60.0
+        return time.time() + est <= deadline
+
     with Pool(a.workers) as pool, out.open("a", encoding="utf-8") as f:
-        for k, res in enumerate(pool.imap_unordered(play, jobs), 1):
-            f.write(json.dumps(res, ensure_ascii=False) + "\n")
-            f.flush()
-            if k % 10 == 0 or k == len(jobs):
+        results = []
+        last_beat = 0.0
+        while True:
+            while queue and len(running) < a.workers and can_start():
+                job = queue.pop(0)
+                running[job[0]] = time.time()
+                pool.apply_async(play, (job,), callback=results.append)
+            if not running and (not queue or not can_start()):
+                reason = "finito" if not queue else "limite orario"
+                break
+            while results:
+                res = results.pop(0)
+                started = running.pop(res["seed"], time.time())
+                durations.append(time.time() - started)
+                f.write(json.dumps(res, ensure_ascii=False) + "\n")
+                f.flush()
+                finished += 1
                 el = time.time() - t0
-                print(f"{k}/{len(jobs)}  {el:.0f}s  (~{el / k * (len(jobs) - k):.0f}s rimasti)",
-                      flush=True)
+                print(f"{finished} fatte  {el:.0f}s  (partita {durations[-1]:.0f}s)", flush=True)
+            if time.time() - last_beat > 20:
+                write_status("running")
+                last_beat = time.time()
+            time.sleep(1.0)
+    write_status("stopped: " + reason)
+    print(f"Fine ({reason}): {finished} partite in {time.time() - t0:.0f}s", flush=True)
 
 
 if __name__ == "__main__":
