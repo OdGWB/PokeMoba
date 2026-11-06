@@ -1068,6 +1068,18 @@ Passaggi completati:
   46,9 -> 33,3 ms, p95 107 -> 69, p99 181 -> 92, max 825 -> 338; la mediana resta
   ~26 ms. Il resto: engine/vision.update (12%, insiemi di tile in Python; il
   _draw_fog 8%) e tick di logica fino a 90 ms (line_of_sight/pathfinding).
+- TIER LIST: torneo con stop orario, guardiano e pagina scorrevole (step_53).
+  tools/tier_sim.py: --until HH:MM (non parte una partita che non farebbe in tempo a
+  finire, stima = durata massima x1,15), stato in tools/tier_status.json ogni 20 s,
+  nuovi campi per unita' (oro/farm/danno/K-D-A a 10', primo sangue, colpo piu' forte,
+  auto-cura, morti da torre, serie di uccisioni, oggetti). Regole di punteggio
+  INVARIATE. Torneo 2026-11-06: seed 3, 7 processi, out tools/tier_matches_5v5_b.jsonl,
+  fine alle 16:00. tools/tier_watch.py: ogni 30 min controlla stato vivo, CPU dei
+  worker, file che cresce, partite non vuote (10 Pokemon, durata, danno); log in
+  tools/tier_watch.log + finestra di avviso. tier_build.py: gruppi EXTRA_GROUPS
+  (media, posizione e colore verde/rosso, NON nel punteggio) + dati d'insieme.
+  tier_scene.DeveloperDetailScene: pagina su tela alta, rotella/frecce/PagSu-PagGiu,
+  barra di scorrimento, Indietro fisso. Screenshot: step_53_a/_b (dati finti di test).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul
