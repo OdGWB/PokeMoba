@@ -20,6 +20,20 @@ MAX_FRAME_DT = 0.25
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _set_dpi_aware() -> None:
+    """Windows con scala >100%: senza DPI-awareness la finestra a schermo intero viene
+    ingrandita dal sistema e la barra delle applicazioni resta visibile/zoomata."""
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            try:
+                ctypes.windll.shcore.SetProcessDpiAwareness(2)   # per-monitor
+            except Exception:
+                ctypes.windll.user32.SetProcessDPIAware()
+        except Exception:
+            pass
+
+
 def _set_app_icon() -> None:
     """Icona della finestra e della barra applicazioni (prima di set_mode)."""
     if sys.platform == "win32":
@@ -61,6 +75,7 @@ def _save_options(update: dict) -> None:
 class App:
     def __init__(self, initial="menu", map_path=None, pokemon_path=None, start_level=1,
                  start_items=None, start_armature=None, flower_color=None):
+        _set_dpi_aware()
         pygame.init()
         _set_app_icon()
         self.windowed_size = (config.WINDOW_WIDTH, config.WINDOW_HEIGHT)
