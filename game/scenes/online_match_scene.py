@@ -50,6 +50,7 @@ class OnlineMatchScene(NetMatchScene):
         session.on_command = self._on_command
         self.fx = FXSystem()
         self.fx.pos_of = self._unit_pos   # proiettili dell attacco base che seguono il bersaglio
+        self.fx.me = self.your_id         # "+oro" dell'ultimo colpo: solo il proprio
         # Regolazioni visive dell'editor delle animazioni (partenza proiettili).
         self._fx_tuner = anim_tuning.FxTuner(config.TILE_SIZE)
         self.show_debug = True
@@ -116,6 +117,10 @@ class OnlineMatchScene(NetMatchScene):
         super().update(dt)          # poll della sessione + interpolazione + animatori
         if self.session.fx_queue:
             events, self.session.fx_queue = self.session.fx_queue, []
+            try:   # minion e mostri morti: morte rapida (death_fx)
+                self.fx.deaths.from_events(events, self.animators)
+            except Exception:
+                pass
             try:
                 anim_tuning.apply_unit_events(self.animators, events)
             except Exception:       # evento cosmetico incompleto: si salta

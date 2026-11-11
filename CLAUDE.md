@@ -1133,6 +1133,24 @@ Passaggi completati:
   passano da enc_fx (verificato andata/ritorno). Screenshot: step_55_ted_seq
   (mischia), step_55_owl_seq (freccia che insegue un bersaglio in movimento),
   step_55_tedfast_seq (vel. d'attacco al tetto 2,5/s), step_55_sprites, aa_sync_sheet.
+- MORTE RAPIDA di minion e mostri + "+ORO" dell'ultimo colpo (step_56), nuovo
+  game/death_fx.py (DeathFx in FXSystem.deaths). Il motore emette solo eventi fx
+  COSMETICI: {"kind":"unit_death","who","c","big"} in Match._on_death per Minion/
+  Wild (big = leggendari) e {"kind":"gold","who","c","g"} all'oro del last-hit
+  (minion in _award_gold, campi in jungle.on_wild_death). (1) MORTE: le scene
+  chiamano fx.deaths.from_events PRIMA di buttare gli animatori delle unita'
+  rimosse; l'animatore viene STACCATO e SpriteAnimator.die() recita Faint (se
+  c'e') o Hurt a x1,8, poi resta sull'ultima posa (frozen); svanisce dal 45% di
+  0,55 s (1,1 s leggendari) con uno SBUFFO di polvere pixel art ai piedi (4
+  fotogrammi in cache; nei gruppi uno per membro, GroupAnimator.die inoltra ai
+  compagni). Disegnato all'inizio di FXSystem.draw (sotto le forme). I Pokemon
+  dei giocatori restano col loro sistema (Hurt + dissolvenza 1,5 s). (2) ORO:
+  "(moneta) +N" con cifre 3x5 disegnate a mano, toni oro, contorno scuro a 8
+  vicini (sprite in cache per importo), un fotogramma x2 d'ingresso, sale di 13
+  px con ease-out e svanisce in 1 s; disegnato per ultimo. Lo vede SOLO chi
+  prende l'oro (FXSystem.me = id del proprio Pokemon, impostato da entrambe le
+  scene). Online: eventi via enc_fx (verificato andata/ritorno), filtrati da
+  fx_visible sulla posizione. Screenshot: step_56_minion_seq, step_56_wild_seq.
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

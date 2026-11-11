@@ -51,6 +51,7 @@ class SpriteAnimator:
         self._aa_hold = 0.0         # s passati in posa d'anticipazione
         self.flash_t = 0.0          # lampo bianco del colpo subito (s rimasti)
         self._white: dict = {}      # cache delle sagome bianche
+        self._die = False           # morte: a fine una-tantum resta fermo sull'ultima posa
 
     def _tuning(self, action):
         if not action:
@@ -157,6 +158,23 @@ class SpriteAnimator:
             self._set_range(None, anim)
             self.frame = max(0, anim.frame_count - 1)
 
+    def die(self, speed: float = 1.8) -> None:
+        """Morte rapida (minion, neutrali): Faint se c'e', altrimenti Hurt,
+        accelerata; finita, resta sull'ultima posa (game/death_fx.py)."""
+        name = next((n for n in ("Faint", "Hurt") if self.anim_set.has(n)), None)
+        self.pose = None
+        self._aa = False
+        if name is None:
+            self.frozen = True
+            return
+        self.frozen = False
+        self.oneshot = self.state = name
+        self.oneshot_speed = speed
+        self._cfg, self._action = None, None
+        self._set_range(None, self.anim_set.get(name))
+        self.frame, self.timer = 0, 0.0
+        self._die = True
+
     def _frame_surface(self, state, direction, idx, frame):
         if self.scale == 1.0:
             return frame
@@ -231,6 +249,7 @@ class SpriteAnimator:
             if self.frame > hi:
                 if self.oneshot:              # una tantum finita: torna a Idle/Walk
                     self.oneshot = None
+                    self.frozen = self._die   # morte: resta sull'ultima posa
                     self._aa = False
                     self.frame = hi
                     self.timer = 0.0
@@ -330,6 +349,11 @@ class GroupAnimator(SpriteAnimator):
         for c, _, _ in self.companions:
             c.hit_flash(dur)
 
+    def die(self, speed=1.8):
+        super().die(speed)
+        for c, _, _ in self.companions:
+            c.die(speed)
+
     def update(self, dt, moving, facing):
         super().update(dt, moving, facing)
         for c, _, _ in self.companions:
@@ -369,6 +393,9 @@ class FallbackAnimator:
         pass
 
     def hit_flash(self, dur: float = 0.12) -> None:
+        pass
+
+    def die(self, speed: float = 1.8) -> None:
         pass
 
     def update(self, dt: float, moving: bool, facing: int) -> None:

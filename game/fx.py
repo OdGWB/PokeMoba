@@ -21,7 +21,7 @@ import config
 from . import (arch_fx, charcadet_fx, corvi_fx, eevee_fx, hatt_fx, mag_fx, mien_fx, noivern_fx,
                flor_fx, incin_fx, moth_fx, octi_fx, scy_fx, sneasel_fx, swine_fx, ursa_fx)
 from . import structure_gfx
-from . import aa_fx
+from . import aa_fx, death_fx
 
 # Forme "in volo" (testa che avanza da a verso b) che l'attacco base a distanza
 # fa SEGUIRE al bersaglio; valore = frazione della vita in cui la testa arriva.
@@ -218,6 +218,8 @@ class FXSystem:
         self.particles: list[list] = []  # [x, y, vx, vy, life, maxlife, (r,g,b), size]
         self.shapes: list[dict] = []     # forme geometriche animate
         self.hits = aa_fx.HitFx()        # scintille/fendenti dell'attacco base
+        self.deaths = death_fx.DeathFx()  # morte di minion/mostri + "+oro"
+        self.me = None                   # id del proprio Pokemon (l'oro lo vede solo lui)
         self.pos_of = None               # id -> (x, y) o None (impostato dalla scena)
 
     # --- creazione -----------------------------------------------------------
@@ -243,6 +245,11 @@ class FXSystem:
             style = e.get("fx")
             if kind == "aa_hit":
                 self._aa_hit(e)
+                continue
+            if kind == "unit_death":      # gia' gestito da deaths.from_events
+                continue
+            if kind == "gold":
+                self.deaths.add_gold(e, self.me)
                 continue
             aa_poke = kind == "attack" and e.get("src") is not None
             if aa_poke and e.get("melee", False) and style in (None, "slash"):
@@ -1077,9 +1084,12 @@ class FXSystem:
                 sh.append(s)
         self.shapes = sh
         self.hits.update(dt)
+        self.deaths.update(dt)
 
     def draw(self, surface, camera) -> None:
         ts = config.TILE_SIZE
+        if self.deaths.dying:
+            self.deaths.draw_deaths(surface, camera, ts)
         if self.shapes:
             self._draw_shapes(surface, camera, ts)
         if self.hits.hits:
@@ -1092,6 +1102,8 @@ class FXSystem:
                  int(bg[1] + (col[1] - bg[1]) * f),
                  int(bg[2] + (col[2] - bg[2]) * f))
             pygame.draw.circle(surface, c, (sx, sy), size)
+        if self.deaths.golds:            # "+oro" sopra tutto il resto
+            self.deaths.draw_gold(surface, camera, ts)
 
     def _draw_shapes(self, surface, camera, ts):
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)

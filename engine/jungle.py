@@ -232,6 +232,8 @@ class JungleSystem:
                 gold *= 1.0 + config.CAMP_GOLD_PER_LEVEL * self.m._avg_player_level()
                 gold *= self.m._comeback_mult(killer.team)
                 killer.gold += gold
+                self.m.fx_events.append({"kind": "gold", "who": killer.id,   # cosmetico: "+oro"
+                                         "c": (victim.pos.x, victim.pos.y), "g": round(gold)})
                 self.m._track_gold(killer, gold, "wild")   # Sole e Luna (Sneasel)
             # I campi danno +3% XP per ogni livello medio dei giocatori; chi e' 2+
             # livelli sotto la media prende il bonus recupero (+15%).

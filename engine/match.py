@@ -1146,6 +1146,11 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
     def _on_death(self, victim, killer) -> None:
         victim.hp = 0.0
         victim.alive = False
+        if isinstance(victim, (Minion, Wild)):
+            # Cosmetico: morte rapida del minion/mostro (game/death_fx.py).
+            self.fx_events.append({"kind": "unit_death", "who": victim.id,
+                                   "c": (victim.pos.x, victim.pos.y),
+                                   "big": getattr(victim, "kind", "camp") in ("meteo", "arceus")})
         if isinstance(victim, Wild):
             self._honey_on_wild_death(victim, killer)   # Miele: vasetto per campo ripulito
             self.jungle.on_wild_death(victim, killer)
@@ -1496,6 +1501,9 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             # minion danno 0 (killer non è un Pokémon).
             if isinstance(killer, Pokemon):
                 killer.gold += self._minion_gold(victim)
+                self.fx_events.append({"kind": "gold", "who": killer.id,   # cosmetico: "+oro"
+                                       "c": (victim.pos.x, victim.pos.y),
+                                       "g": self._minion_gold(victim)})
                 self._track_gold(killer, self._minion_gold(victim), "minion")   # Sole e Luna
                 self._exp_share(victim, killer)   # Condividi Esp. degli alleati vicini
         elif isinstance(victim, Pokemon):

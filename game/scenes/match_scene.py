@@ -116,6 +116,7 @@ class MatchScene:
         self.renderer.map.set_camps(map_data.camps)   # sentieri di terra verso le lane
         self.fx = FXSystem()
         self.fx.pos_of = self._unit_pos   # proiettili dell attacco base che seguono il bersaglio
+        self.fx.me = self.player.id       # "+oro" dell'ultimo colpo: solo il proprio
         # Regolazioni visive dell'editor delle animazioni (partenza proiettili).
         self._fx_tuner = anim_tuning.FxTuner(config.TILE_SIZE)
         # Particelle d'atmosfera (lucciole/polline/foglie): cosmetiche, aggiornate
@@ -400,6 +401,10 @@ class MatchScene:
                 anim.pose = "Sleep" if getattr(u, "sleep_until", -1.0) > self.match.time else None
                 anim.update(dt, u.moving, u.facing)
 
+        # Minion e mostri morti: il motore li ha gia' tolti dal mondo; prima della
+        # pulizia degli animatori si staccano i loro per la morte rapida (death_fx).
+        if self.match is not None and self.match.fx_events:
+            self.fx.deaths.from_events(self.match.fx_events, self.animators)
         # Morte: avvia l'animazione Hurt + dissolvenza (così si capisce che sei morto).
         for uid in list(self.animators.keys()):
             if uid in alive_ids or uid in self._dying:
