@@ -1079,7 +1079,7 @@ Passaggi completati:
   tools/tier_watch.log + finestra di avviso. tier_build.py: gruppi EXTRA_GROUPS
   (media, posizione e colore verde/rosso, NON nel punteggio) + dati d'insieme.
   tier_scene.DeveloperDetailScene: pagina su tela alta, rotella/frecce/PagSu-PagGiu,
-  barra di scorrimento, Indietro fisso. Screenshot: step_53_a/_b (dati finti di test).
+  barra di scorrimento, Indietro fisso. Screenshot: step_53_a/_b (dati finti di test).
 - TIER LIST con NEXUS APERTO e IA A PIANI (step_54). tools/tier_sim.py --open-nexus:
   il Core diventa attaccabile appena UNA lane (top/mid/bot) della squadra ha 0 torri
   (regola di test, solo nel tool; nel gioco vero servono tutte e 9). Le torri morte
@@ -1094,6 +1094,45 @@ Passaggi completati:
   proprio/avversario), pagina con "Vittorie (corr.)" e gruppo "Danno per bersaglio".
   Torneo seed 6 (49 partite, 28 chiuse dal nexus a 11-21 min; dal primo colpo allo 0:
   mediana 41 s, max 334 s). Screenshot: step_54_a (lista), step_54_b (Mienfoo).
+- ATTACCO BASE LEGGIBILE (step_55): animazione completa sincronizzata col danno,
+  proiettili che seguono il bersaglio, effetto del colpo. Solo grafica: il motore
+  emette solo eventi fx COSMETICI in piu' (engine/basic_attack.py): all'avvio
+  "wu"/"cy" (caricamento e ciclo) e "melee"; {"eid","aa_rel"} al rilascio;
+  {"eid","aa_cancel"} quando il caricamento si annulla; "tgt"/"spd" nell'evento
+  "attack"; {"kind":"aa_hit","hit","src","c","melee","mtype"} quando il colpo va a
+  segno (dopo schivate/parate). (1) TOOL tools/aa_anim_sync.py: per ogni forma del
+  roster sceglie l'animazione (mischia Attack>Strike>Swing, distanza
+  Shoot>Attack>Charge) e il fotogramma del colpo (<HitFrame> del file; se manca o e'
+  0, il fotogramma con lo sprite piu' in AVANTI), stampa velocita' e tagli a vel.
+  d'attacco base e al tetto, scrive data/aa_anims.json e la tavola
+  screenshots/aa_sync_sheet.png (colpo in oro, fotogrammi tagliati al tetto
+  scuriti). Rilanciarlo quando si aggiunge un Pokemon. (2) game/aa_sync.plan:
+  fase 1 dall'inizio al colpo in `wu` s (s1; oltre S1_MAX=4x si TAGLIANO i
+  fotogrammi di preparazione, sotto S1_MIN=0,6x si TIENE la posa che precede il
+  colpo), fase 2 dal colpo alla fine nel resto del ciclo (s2 >= 1x). SpriteAnimator
+  .play_aa/release_aa/cancel_aa: l'animazione RIPARTE a ogni attacco (prima
+  play_once ignorava la stessa una-tantum non finita), aspetta in posa
+  d'anticipazione l'evento aa_rel (max HOLD_MAX 0,35 s) e salta al colpo in quello
+  stesso tick. Con la vel. d'attacco che sale l'intera animazione si comprime come
+  nei MOBA. L'editor delle animazioni (anim_overrides "aa": anim, release, taglio,
+  velocita') ha la precedenza. anim_tuning.apply_unit_events gestisce tutti gli
+  eventi sugli sprite in entrambe le scene. (3) PROIETTILI A RICERCA (fx.py
+  _aa_ranged/_home): lo stile del Pokemon (arrow, energy, florpetal, sonicbolt,
+  steelball, mothscale, octipellet...) disegna la sua forma, ma la testa avanza alla
+  velocita' del proiettile del motore verso la posizione ATTUALE del bersaglio
+  (FXSystem.pos_of, impostato dalle scene); vita della forma ricavata dal
+  progresso, niente dissolvenza in volo; spruzzi d'arrivo dello stile scartati. Gli
+  stili istantanei (saetta di Jolteon) diventano un pallino d'energia del tipo.
+  All'aa_hit il proiettile sparisce: arrivo visivo = danno. (4) COLPO (game/aa_fx.py,
+  sprite pixel-art in cache, solo blit): scintilla a 4+4 raggi col nucleo bianco nel
+  colore del tipo (4 fotogrammi, 0,2 s) ancorata al busto del bersaglio; in mischia
+  anche una MEZZALUNA che taglia il corpo (3 fotogrammi, 0,13 s, sopra la scintilla);
+  lampo BIANCO sullo sprite colpito (SpriteAnimator.hit_flash: sagoma bianca da
+  mask in cache, 0,12 s). Corretto: lo stile "slash" (24 forme in mischia) cercava
+  campi o/dir che l'attacco base non ha e non disegnava NULLA. Online: gli eventi
+  passano da enc_fx (verificato andata/ritorno). Screenshot: step_55_ted_seq
+  (mischia), step_55_owl_seq (freccia che insegue un bersaglio in movimento),
+  step_55_tedfast_seq (vel. d'attacco al tetto 2,5/s), step_55_sprites, aa_sync_sheet.
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

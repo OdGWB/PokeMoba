@@ -122,6 +122,7 @@ class BasicAttackMixin:
         if u.aa_active:
             u.aa_active = False
             u.attack_timer = 0.0
+            self.fx_events.append({"eid": u.id, "aa_cancel": True})   # solo visivo
 
     def _aa_reset(self, u) -> None:
         """Reset dell'attacco (mosse con "aa_reset"): il prossimo parte subito."""
@@ -144,6 +145,7 @@ class BasicAttackMixin:
             if self.time >= u.aa_until:
                 u.aa_active = False
                 u.last_aa_at = self.time
+                self.fx_events.append({"eid": u.id, "aa_rel": True})   # anim: fotogramma del colpo
                 self._aa_release(u, tgt)
                 u.aa_quick = False
             return
@@ -162,10 +164,14 @@ class BasicAttackMixin:
         cycle, windup = self._aa_timing(u)
         u.aa_active = True
         u.aa_target_id = t.id
-        u.aa_until = self.time + windup * self._item_aa_windup(u)   # Rapidartigli: 0
+        wu = windup * self._item_aa_windup(u)   # Rapidartigli: 0
+        u.aa_until = self.time + wu
         u.attack_timer = cycle            # il ciclo parte dall'inizio dell'attacco
         self._face(u, t)
-        self.fx_events.append({"eid": u.id, "anim": "Attack", "aa": True})   # avvia l'anim
+        # Avvia l'anim: caricamento e ciclo servono SOLO a sincronizzarla (game/aa_sync).
+        self.fx_events.append({"eid": u.id, "anim": "Attack", "aa": True,
+                               "wu": round(wu, 3), "cy": round(cycle, 3),
+                               "melee": is_melee(u)})
 
     def _aa_release(self, u, tgt) -> None:
         """Fine del caricamento: colpo (corpo a corpo) o proiettile (distanza)."""
@@ -184,7 +190,8 @@ class BasicAttackMixin:
         mt = snap.get("ammo") or (u.types[0] if u.types else "Normal")
         self.fx_events.append({"kind": "attack", "a": (u.pos.x, u.pos.y),
                                "b": (tgt.pos.x, tgt.pos.y), "mtype": mt,
-                               "melee": melee, "src": u.id,
+                               "melee": melee, "src": u.id, "tgt": tgt.id,
+                               "spd": proj_speed(u),
                                "fx": "shadowclawhit" if snap["claws"] else u.attack_fx})
         if melee:
             self._aa_land(u, tgt, snap)
@@ -233,6 +240,11 @@ class BasicAttackMixin:
             dmg *= MELEE_MINION_MULT
         self._deal_damage(u, tgt, dmg,
                           dmg_type="Ghost" if snap["claws"] else snap.get("ammo"))
+        # Colpo andato a segno (solo visivo: lampo sul bersaglio + scintilla).
+        self.fx_events.append({"kind": "aa_hit", "hit": tgt.id, "src": u.id,
+                               "c": (tgt.pos.x, tgt.pos.y), "melee": snap["melee"],
+                               "mtype": ("Ghost" if snap["claws"] else snap.get("ammo")
+                                         or (u.types[0] if u.types else "Normal"))})
         if not u.alive:
             return   # il proiettile colpisce lo stesso, ma niente effetti su chi è caduto
         self._vamp(u, dmg, physical=True)

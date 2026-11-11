@@ -115,6 +115,7 @@ class MatchScene:
             self.renderer.flower_source = lambda: self.match.flowers
         self.renderer.map.set_camps(map_data.camps)   # sentieri di terra verso le lane
         self.fx = FXSystem()
+        self.fx.pos_of = self._unit_pos   # proiettili dell attacco base che seguono il bersaglio
         # Regolazioni visive dell'editor delle animazioni (partenza proiettili).
         self._fx_tuner = anim_tuning.FxTuner(config.TILE_SIZE)
         # Particelle d'atmosfera (lucciole/polline/foglie): cosmetiche, aggiornate
@@ -450,13 +451,9 @@ class MatchScene:
                 self.minimap.rebuild_fog(self.vision, self.player.team)
 
     def _trigger_anims(self, events) -> None:
-        """Avvia le animazioni una-tantum (Attack/Shoot) dagli eventi FX."""
-        for e in events:
-            eid = e.get("eid")
-            if eid is not None and "anim" in e:
-                anim = self.animators.get(eid)
-                if isinstance(anim, SpriteAnimator):
-                    anim_tuning.trigger_anim(anim, e)
+        """Avvia le animazioni una-tantum (Attack/Shoot) dagli eventi FX, rilascio
+        e annullo dell'attacco base, lampo del colpo subito."""
+        anim_tuning.apply_unit_events(self.animators, events)
 
     def _unit_pos(self, uid):
         u = self.world.get(uid)

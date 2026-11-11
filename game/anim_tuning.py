@@ -152,8 +152,34 @@ def trigger_anim(animator, e) -> None:
     play = getattr(animator, "play_once", None)
     if play is None or not hasattr(animator, "anim_set"):
         return
+    if e.get("aa") and e.get("wu") is not None:
+        # Attacco base: animazione completa sincronizzata col motore (aa_sync).
+        animator.play_aa(float(e["wu"]), float(e.get("cy", 1.0)),
+                         "Attack" if e.get("melee", True) else "Shoot")
+        return
     animator.play_once(e.get("anim") or "", float(e.get("anim_speed", 1.0)),
                        action=action_of(e) if (e.get("aa") or e.get("move")) else None)
+
+
+def apply_unit_events(animators, events) -> None:
+    """Eventi che toccano gli SPRITE (non le forme dell'FX): avvio delle
+    animazioni una-tantum, rilascio/annullo dell'attacco base, lampo del colpo."""
+    for e in events:
+        eid = e.get("eid")
+        if eid is not None:
+            an = animators.get(int(eid))
+            if an is None:
+                continue
+            if "anim" in e:
+                trigger_anim(an, e)
+            elif e.get("aa_rel") and hasattr(an, "release_aa"):
+                an.release_aa()
+            elif e.get("aa_cancel") and hasattr(an, "cancel_aa"):
+                an.cancel_aa()
+        elif e.get("kind") == "aa_hit" and e.get("hit") is not None:
+            an = animators.get(int(e["hit"]))
+            if an is not None and hasattr(an, "hit_flash"):
+                an.hit_flash()
 
 
 class FxTuner:

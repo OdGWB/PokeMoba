@@ -1,0 +1,342 @@
+{
+ "0004": {
+  "anim": "Shoot",
+  "hit": 5,
+  "melee": false
+ },
+ "0005": {
+  "anim": "Shoot",
+  "hit": 2,
+  "melee": false
+ },
+ "0006": {
+  "anim": "Shoot",
+  "hit": 2,
+  "melee": false
+ },
+ "0048": {
+  "anim": "Shoot",
+  "hit": 1,
+  "melee": false
+ },
+ "0049": {
+  "anim": "Shoot",
+  "hit": 4,
+  "melee": false
+ },
+ "0060": {
+  "anim": "Shoot",
+  "hit": 2,
+  "melee": false
+ },
+ "0061": {
+  "anim": "Shoot",
+  "hit": 3,
+  "melee": false
+ },
+ "0062": {
+  "anim": "Attack",
+  "hit": 2,
+  "melee": true
+ },
+ "0081": {
+  "anim": "Shoot",
+  "hit": 2,
+  "melee": false
+ },
+ "0082": {
+  "anim": "Shoot",
+  "hit": 1,
+  "melee": false
+ },
+ "0123": {
+  "anim": "Attack",
+  "hit": 3,
+  "melee": true
+ },
+ "0133": {
+  "anim": "Attack",
+  "hit": 3,
+  "melee": true
+ },
+ "0134": {
+  "anim": "Shoot",
+  "hit": 2,
+  "melee": false
+ },
+ "0135": {
+  "anim": "Shoot",
+  "hit": 3,
+  "melee": false
+ },
+ "0136": {
+  "anim": "Attack",
+  "hit": 5,
+  "melee": true
+ },
+ "0186": {
+  "anim": "Shoot",
+  "hit": 3,
+  "melee": false
+ },
+ "0196": {
+  "anim": "Shoot",
+  "hit": 5,
+  "melee": false
+ },
+ "0197": {
+  "anim": "Attack",
+  "hit": 2,
+  "melee": true
+ },
+ "0212": {
+  "anim": "Attack",
+  "hit": 3,
+  "melee": true
+ },
+ "0215": {
+  "anim": "Attack",
+  "hit": 3,
+  "melee": true
+ },
+ "0216": {
+  "anim": "Attack",
+  "hit": 3,
+  "melee": true
+ },
+ "0217": {
+  "anim": "Attack",
+  "hit": 3,
+  "melee": true
+ },
+ "0220": {
+  "anim": "Attack",
+  "hit": 3,
+  "melee": true
+ },
+ "0221": {
+  "anim": "Attack",
+  "hit": 3,
+  "melee": true
+ },
+ "0223": {
+  "anim": "Shoot",
+  "hit": 1,
+  "melee": false
+ },
+ "0224": {
+  "anim": "Shoot",
+  "hit": 2,
+  "melee": false
+ },
+ "0290": {
+  "anim": "Attack",
+  "hit": 4,
+  "melee": true
+ },
+ "0291": {
+  "anim": "Attack",
+  "hit": 3,
+  "melee": true
+ },
+ "0442": {
+  "anim": "Shoot",
+  "hit": 6,
+  "melee": false
+ },
+ "0461": {
+  "anim": "Attack",
+  "hit": 2,
+  "melee": true
+ },
+ "0462": {
+  "anim": "Shoot",
+  "hit": 2,
+  "melee": false
+ },
+ "0470": {
+  "anim": "Attack",
+  "hit": 2,
+  "melee": true
+ },
+ "0471": {
+  "anim": "Shoot",
+  "hit": 2,
+  "melee": false
+ },
+ "0473": {
+  "anim": "Attack",
+  "hit": 2,
+  "melee": true
+ },
+ "0495": {
+  "anim": "Shoot",
+  "hit": 5,
+  "melee": false
+ },
+ "0496": {
+  "anim": "Shoot",
+  "hit": 5,
+  "melee": false
+ },
+ "0497": {
+  "anim": "Shoot",
+  "hit": 2,
+  "melee": false
+ },
+ "0524": {
+  "anim": "Attack",
+  "hit": 7,
+  "melee": true
+ },
+ "0525": {
+  "anim": "Attack",
+  "hit": 3,
+  "melee": true
+ },
+ "0526": {
+  "anim": "Attack",
+  "hit": 2,
+  "melee": true
+ },
+ "0619": {
+  "anim": "Attack",
+  "hit": 3,
+  "melee": true
+ },
+ "0620": {
+  "anim": "Attack",
+  "hit": 3,
+  "melee": true
+ },
+ "0669": {
+  "anim": "Shoot",
+  "hit": 2,
+  "melee": false
+ },
+ "0670": {
+  "anim": "Shoot",
+  "hit": 2,
+  "melee": false
+ },
+ "0671": {
+  "anim": "Shoot",
+  "hit": 5,
+  "melee": false
+ },
+ "0700": {
+  "anim": "Shoot",
+  "hit": 2,
+  "melee": false
+ },
+ "0714": {
+  "anim": "Shoot",
+  "hit": 5,
+  "melee": false
+ },
+ "0715": {
+  "anim": "Shoot",
+  "hit": 2,
+  "melee": false
+ },
+ "0722": {
+  "anim": "Shoot",
+  "hit": 2,
+  "melee": false
+ },
+ "0723": {
+  "anim": "Shoot",
+  "hit": 2,
+  "melee": false
+ },
+ "0724": {
+  "anim": "Shoot",
+  "hit": 2,
+  "melee": false
+ },
+ "0725": {
+  "anim": "Attack",
+  "hit": 5,
+  "melee": true
+ },
+ "0726": {
+  "anim": "Attack",
+  "hit": 2,
+  "melee": true
+ },
+ "0727": {
+  "anim": "Attack",
+  "hit": 7,
+  "melee": true
+ },
+ "0821": {
+  "anim": "Attack",
+  "hit": 4,
+  "melee": true
+ },
+ "0822": {
+  "anim": "Attack",
+  "hit": 6,
+  "melee": true
+ },
+ "0823": {
+  "anim": "Attack",
+  "hit": 6,
+  "melee": true
+ },
+ "0856": {
+  "anim": "Shoot",
+  "hit": 2,
+  "melee": false
+ },
+ "0857": {
+  "anim": "Shoot",
+  "hit": 5,
+  "melee": false
+ },
+ "0858": {
+  "anim": "Shoot",
+  "hit": 3,
+  "melee": false
+ },
+ "0884": {
+  "anim": "Shoot",
+  "hit": 5,
+  "melee": false
+ },
+ "0900": {
+  "anim": "Attack",
+  "hit": 3,
+  "melee": true
+ },
+ "0901": {
+  "anim": "Attack",
+  "hit": 6,
+  "melee": true
+ },
+ "0903": {
+  "anim": "Attack",
+  "hit": 2,
+  "melee": true
+ },
+ "0935": {
+  "anim": "Attack",
+  "hit": 6,
+  "melee": true
+ },
+ "0936": {
+  "anim": "Shoot",
+  "hit": 1,
+  "melee": false
+ },
+ "0937": {
+  "anim": "Attack",
+  "hit": 3,
+  "melee": true
+ },
+ "1018": {
+  "anim": "Shoot",
+  "hit": 5,
+  "melee": false
+ }
+}

@@ -16,7 +16,7 @@ import pygame
 
 from engine.vec import DIR_VECTORS
 
-from .. import anim_tuning
+from .. import aa_sync, anim_tuning
 from .spritesheet import AnimationSet
 
 # Un'unità di durata PMD vale circa 1/30 di secondo (ritmo d'animazione).
@@ -43,6 +43,14 @@ class SpriteAnimator:
         self._lo, self._hi = 0, None   # fotogrammi tenuti dopo il taglio
         self._tv = -1               # versione della tabella in cache
         self._tune: dict = {}
+        # Attacco base sincronizzato col motore (game/aa_sync.py).
+        self._aa = False            # True = l'una-tantum in corso e' un attacco base
+        self._aa_hit = 0            # fotogramma del colpo
+        self._aa_s1 = self._aa_s2 = 1.0
+        self._aa_rel = False        # il motore ha rilasciato il colpo
+        self._aa_hold = 0.0         # s passati in posa d'anticipazione
+        self.flash_t = 0.0          # lampo bianco del colpo subito (s rimasti)
+        self._white: dict = {}      # cache delle sagome bianche
 
     def _tuning(self, action):
         if not action:
@@ -65,6 +73,7 @@ class SpriteAnimator:
                 name = cfg["anim"]
             speed *= anim_tuning.speed_of(cfg)
         if name and self.anim_set.has(name) and self.oneshot != name:
+            self._aa = False
             self.oneshot = name
             self.oneshot_speed = max(0.05, speed)
             self.state = name
@@ -72,6 +81,58 @@ class SpriteAnimator:
             self._set_range(cfg, self.anim_set.get(name))
             self.frame = self._lo
             self.timer = 0.0
+
+    # --- attacco base sincronizzato ----------------------------------------------
+    def play_aa(self, windup: float, cycle: float, fallback: str = "Attack") -> None:
+        """Avvia l'animazione COMPLETA dell'attacco base, scalata perche' il
+        fotogramma del colpo cada dopo `windup` s e tutto finisca nel `cycle`.
+        Riparte sempre (anche se la precedente non e' finita: alta vel. d'attacco)."""
+        cfg = self._tuning("aa")
+        ent = aa_sync.entry(getattr(self.anim_set, "key", None)) or {}
+        name = None
+        for cand in ((cfg or {}).get("anim"), ent.get("anim"), fallback, "Attack", "Shoot"):
+            if cand and self.anim_set.has(cand):
+                name = cand
+                break
+        if name is None:
+            return
+        anim = self.anim_set.get(name)
+        n = anim.frame_count
+        lo, hi = anim_tuning.frame_range(cfg, n)
+        hit = anim_tuning.release_frame(cfg, n)
+        if hit is None:
+            hit = ent.get("hit") if name == ent.get("anim") else None
+            if hit is None:
+                hit = aa_sync.default_hit(anim.durations, anim.hit_frame)
+        start, s1, s2 = aa_sync.plan(anim.durations, hit, windup, cycle, lo, hi)
+        k = anim_tuning.speed_of(cfg) if cfg and cfg.get("speed") else 1.0
+        self.oneshot = self.state = name
+        self.oneshot_speed = s1 * k
+        self._cfg, self._action = cfg, "aa"
+        self._lo, self._hi = lo, hi
+        self.frame, self.timer = start, 0.0
+        self._aa, self._aa_hit = True, max(start, min(hi, hit))
+        self._aa_s1, self._aa_s2 = s1 * k, s2 * k
+        self._aa_rel, self._aa_hold = False, 0.0
+
+    def release_aa(self) -> None:
+        """Il motore ha rilasciato il colpo: si va al fotogramma del colpo e si
+        prosegue col recupero (velocita' s2)."""
+        if not (self.oneshot and self._aa) or self._aa_rel:
+            return
+        self._aa_rel = True
+        if self.frame < self._aa_hit:
+            self.frame, self.timer = self._aa_hit, 0.0
+        self.oneshot_speed = self._aa_s2
+
+    def cancel_aa(self) -> None:
+        """Caricamento annullato (movimento, stordimento): torna a Idle/Walk."""
+        if self.oneshot and self._aa and not self._aa_rel:
+            self.oneshot = None
+            self._aa = False
+
+    def hit_flash(self, dur: float = 0.12) -> None:
+        self.flash_t = dur
 
     def snap_release(self) -> None:
         """Il colpo e' partito: se l'animazione non e' ancora al fotogramma del
@@ -123,6 +184,8 @@ class SpriteAnimator:
 
     def update(self, dt: float, moving: bool, facing: int) -> None:
         self.facing = facing
+        if self.flash_t > 0.0:
+            self.flash_t -= dt
         if self.frozen:            # morte: nessun avanzamento, resta sulla posa Hurt
             return
         if self.oneshot:
@@ -149,16 +212,26 @@ class SpriteAnimator:
         hi = anim.frame_count - 1 if self._hi is None else min(self._hi, anim.frame_count - 1)
         speed = self.oneshot_speed if self.oneshot else anim_tuning.speed_of(self._cfg)
         self.timer += dt * speed
+        hold_at = (self._aa_hit - 1 if (self.oneshot and self._aa and not self._aa_rel)
+                   else None)
         # Avanza finché il tempo accumulato copre la durata del frame corrente.
         while True:
             cur_dur = max(1, anim.durations[self.frame % anim.frame_count]) * DURATION_UNIT
             if self.timer < cur_dur:
+                break
+            if hold_at is not None and self.frame >= hold_at:
+                # Posa d'anticipazione: il colpo esce solo quando lo dice il motore.
+                self.timer = cur_dur
+                self._aa_hold += dt
+                if self._aa_hold > aa_sync.HOLD_MAX:   # rilascio mai arrivato
+                    self.release_aa()
                 break
             self.timer -= cur_dur
             self.frame += 1
             if self.frame > hi:
                 if self.oneshot:              # una tantum finita: torna a Idle/Walk
                     self.oneshot = None
+                    self._aa = False
                     self.frame = hi
                     self.timer = 0.0
                     break
@@ -192,6 +265,8 @@ class SpriteAnimator:
                 big = big.copy()
                 big.fill((255, 255, 255, max(0, alpha)), None, pygame.BLEND_RGBA_MULT)
             surface.blit(big, (sx - bb.centerx, sy - bb.bottom))
+            if self.flash_t > 0.0 and alpha >= 200:
+                self._blit_flash(surface, gkey, big, sx - bb.centerx, sy - bb.bottom)
             return
         # Ancora il BORDO INFERIORE del contenuto reale (non del riquadro, che ha
         # margini trasparenti) al punto a terra, centrato orizzontalmente su di esso.
@@ -206,6 +281,19 @@ class SpriteAnimator:
             frame = frame.copy()
             frame.fill((255, 255, 255, max(0, alpha)), None, pygame.BLEND_RGBA_MULT)
         surface.blit(frame, (sx - bb.centerx, sy - bb.bottom))
+        if self.flash_t > 0.0 and alpha >= 200:
+            self._blit_flash(surface, key, frame, sx - bb.centerx, sy - bb.bottom)
+
+    def _blit_flash(self, surface, key, frame, x, y) -> None:
+        """Lampo del colpo subito: sagoma bianca (in cache) sopra lo sprite, che
+        si spegne in ~0,12 s. Un solo blit in piu', nessuna allocazione per frame."""
+        w = self._white.get(key)
+        if w is None:
+            w = pygame.mask.from_surface(frame, 60).to_surface(
+                setcolor=(255, 255, 255, 255), unsetcolor=(0, 0, 0, 0))
+            self._white[key] = w
+        w.set_alpha(int(200 * min(1.0, self.flash_t / 0.12)))
+        surface.blit(w, (x, y))
 
 
 class GroupAnimator(SpriteAnimator):
@@ -221,6 +309,26 @@ class GroupAnimator(SpriteAnimator):
         super().play_once(name, speed, action)
         for c, _, _ in self.companions:
             c.play_once(name, speed, action)
+
+    def play_aa(self, windup, cycle, fallback="Attack"):
+        super().play_aa(windup, cycle, fallback)
+        for c, _, _ in self.companions:
+            c.play_aa(windup, cycle, fallback)
+
+    def release_aa(self):
+        super().release_aa()
+        for c, _, _ in self.companions:
+            c.release_aa()
+
+    def cancel_aa(self):
+        super().cancel_aa()
+        for c, _, _ in self.companions:
+            c.cancel_aa()
+
+    def hit_flash(self, dur=0.12):
+        super().hit_flash(dur)
+        for c, _, _ in self.companions:
+            c.hit_flash(dur)
 
     def update(self, dt, moving, facing):
         super().update(dt, moving, facing)
@@ -249,6 +357,18 @@ class FallbackAnimator:
         pass
 
     def snap_release(self) -> None:
+        pass
+
+    def play_aa(self, windup, cycle, fallback="Attack") -> None:
+        pass
+
+    def release_aa(self) -> None:
+        pass
+
+    def cancel_aa(self) -> None:
+        pass
+
+    def hit_flash(self, dur: float = 0.12) -> None:
         pass
 
     def update(self, dt: float, moving: bool, facing: int) -> None:

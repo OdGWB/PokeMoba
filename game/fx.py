@@ -21,6 +21,14 @@ import config
 from . import (arch_fx, charcadet_fx, corvi_fx, eevee_fx, hatt_fx, mag_fx, mien_fx, noivern_fx,
                flor_fx, incin_fx, moth_fx, octi_fx, scy_fx, sneasel_fx, swine_fx, ursa_fx)
 from . import structure_gfx
+from . import aa_fx
+
+# Forme "in volo" (testa che avanza da a verso b) che l'attacco base a distanza
+# fa SEGUIRE al bersaglio; valore = frazione della vita in cui la testa arriva.
+_AA_TRAVEL = {"energy": 1.0, "shot": 1.0, "leaf": 1.0, "flame": 1.0, "orb": 1.0,
+              "shard": 1.0, "arrow": 1.0, "florpetal": 1.0, "sonicbolt": 0.8,
+              "steelball": None, "mothscale": 0.85, "octipellet": 0.8}
+_AA_HOMING_MAX = 2.0   # s: come PROJ_MAX_LIFE del motore
 
 # Colore per tipo (per le particelle).
 TYPE_COLORS = {
@@ -209,6 +217,8 @@ class FXSystem:
     def __init__(self):
         self.particles: list[list] = []  # [x, y, vx, vy, life, maxlife, (r,g,b), size]
         self.shapes: list[dict] = []     # forme geometriche animate
+        self.hits = aa_fx.HitFx()        # scintille/fendenti dell'attacco base
+        self.pos_of = None               # id -> (x, y) o None (impostato dalla scena)
 
     # --- creazione -----------------------------------------------------------
     def _add(self, x, y, vx, vy, life, color, size):
@@ -231,6 +241,12 @@ class FXSystem:
             # Aggiungere un effetto nuovo = una voce qui + (se serve) un ramo di
             # disegno in _draw_shapes. Vedi _FX_STYLES in fondo alla classe.
             style = e.get("fx")
+            if kind == "aa_hit":
+                self._aa_hit(e)
+                continue
+            aa_poke = kind == "attack" and e.get("src") is not None
+            if aa_poke and e.get("melee", False) and style in (None, "slash"):
+                continue   # fendente disegnato all'impatto (aa_hit), sincronizzato col danno
             # Se la mossa non dichiara uno stile, per i colpi "da tiro" (proiettili e
             # auto-attacchi a distanza) si usa lo stile di default del TIPO: così ogni
             # Pokémon nuovo prende da solo un effetto a tema, senza doverlo taggare.
@@ -238,6 +254,10 @@ class FXSystem:
                               or (kind == "attack" and not e.get("melee", False))):
                 style = TYPE_DEFAULT_FX.get(e.get("mtype", "Normal"))
             handler = self._FX_STYLES.get(style) if style else None
+            if (aa_poke and not e.get("melee", False) and e.get("tgt") is not None
+                    and self.pos_of is not None):
+                self._aa_ranged(e, col, handler)
+                continue
             if handler is not None:
                 handler(self, e, col)
                 continue
@@ -285,6 +305,80 @@ class FXSystem:
                 self._minion_shot(e)
             elif kind == "tower_shot":
                 self._tower_shot(e)
+
+    # --- attacco base dei Pokémon -------------------------------------------
+    def _aa_ranged(self, e, col, handler) -> None:
+        """Proiettile dell'attacco base a distanza: lo stile del Pokémon disegna
+        la sua forma, ma la testa SEGUE il bersaglio alla velocita' del proiettile
+        del motore (non vola piu' verso un punto fisso in tempo fisso). Gli
+        spruzzi/anelli d'arrivo dello stile si scartano: l'impatto arriva con
+        l'evento aa_hit, nel momento esatto del danno."""
+        n_s, n_p = len(self.shapes), len(self.particles)
+        if handler is not None:
+            handler(self, e, col)
+        new = self.shapes[n_s:]
+        del self.shapes[n_s:]
+        del self.particles[n_p:]
+        kept = [s for s in new if s.get("kind") in _AA_TRAVEL and "a" in s and "b" in s
+                and s.get("wait", 0.0) <= 0.06]
+        if not kept:   # stile istantaneo (saetta, raggio): pallino d'energia del tipo
+            seg = self._ab(e)
+            if seg is None:
+                return
+            kept = [{"kind": "energy", "a": seg[:2], "b": seg[2:], "col": col, "life": 0.3,
+                     "maxlife": 0.3, "sz": 0.13, "lift_a": 0.45, "lift_b": 0.42, "trail": 4}]
+        eb = e.get("b") or kept[0]["b"]
+        for s in kept:
+            fly = _AA_TRAVEL[s["kind"]]
+            if fly is None:
+                fly = s.get("fly", 0.7)
+            s["hom"] = {"tgt": e["tgt"], "src": e.get("src"), "spd": float(e.get("spd", 20.0)),
+                        "off": (s["b"][0] - eb[0], s["b"][1] - eb[1]),
+                        "head": list(s["a"]), "fly": fly, "age": 0.0}
+            if len(self.shapes) < MAX_SHAPES:
+                self.shapes.append(s)
+
+    def _home(self, s, dt) -> bool:
+        """Avanza la testa di una forma a ricerca; False = arrivata o persa."""
+        h = s["hom"]
+        h["age"] += dt
+        p = self.pos_of(h["tgt"]) if self.pos_of is not None else None
+        if p is None or h["age"] > _AA_HOMING_MAX:
+            return False
+        bx, by = p[0] + h["off"][0], p[1] + h["off"][1]
+        s["b"] = (bx, by)
+        hx, hy = h["head"]
+        dx, dy = bx - hx, by - hy
+        d = math.hypot(dx, dy)
+        step = h["spd"] * dt
+        if d <= step:
+            return False   # arrivata: il colpo lo mostra aa_hit
+        hx += dx / d * step
+        hy += dy / d * step
+        h["head"] = [hx, hy]
+        ax, ay = s["a"]
+        done = math.hypot(hx - ax, hy - ay)
+        prog = done / max(1e-6, done + d - step)
+        s["life"] = max(1e-3, s["maxlife"] * (1.0 - prog * h["fly"]))
+        return True
+
+    def _aa_hit(self, e) -> None:
+        """Colpo a segno: il proiettile sparisce e compare la scintilla (+ il
+        fendente in corpo a corpo) ancorata al bersaglio."""
+        tgt, src = e.get("hit"), e.get("src")
+        if self.shapes:
+            self.shapes = [s for s in self.shapes
+                           if not (s.get("hom") and s["hom"]["tgt"] == tgt
+                                   and s["hom"]["src"] == src)]
+        c = e.get("c")
+        if c is None:
+            return
+        ang = None
+        ps = self.pos_of(src) if (self.pos_of is not None and src is not None) else None
+        if ps is not None and (c[0] - ps[0]) ** 2 + (c[1] - ps[1]) ** 2 > 1e-4:
+            ang = math.atan2(c[1] - ps[1], c[0] - ps[0])
+        self.hits.add(tgt, c, type_color(e.get("mtype", "Normal")),
+                      bool(e.get("melee", False)), ang)
 
     def _minion_shot(self, e) -> None:
         """Pallino d'energia dei minion a distanza: piccolo (caster) o un po' piu
@@ -974,15 +1068,22 @@ class FXSystem:
                 s["wait"] -= dt
                 sh.append(s)
                 continue
+            if "hom" in s:   # attacco base a distanza: segue il bersaglio
+                if self._home(s, dt):
+                    sh.append(s)
+                continue
             s["life"] -= dt
             if s["life"] > 0:
                 sh.append(s)
         self.shapes = sh
+        self.hits.update(dt)
 
     def draw(self, surface, camera) -> None:
         ts = config.TILE_SIZE
         if self.shapes:
             self._draw_shapes(surface, camera, ts)
+        if self.hits.hits:
+            self.hits.draw(surface, camera, ts, self.pos_of)
         bg = (18, 20, 24)
         for x, y, _vx, _vy, life, maxlife, col, size in self.particles:
             sx, sy = camera.world_to_screen(x * ts, y * ts)
@@ -1002,7 +1103,7 @@ class FXSystem:
             if s.get("wait", 0.0) > 0.0:   # non ancora comparsa (stagger)
                 continue
             f = max(0.0, min(1.0, s["life"] / s["maxlife"]))
-            a = int(230 * f)
+            a = 230 if "hom" in s else int(230 * f)   # a ricerca: niente dissolvenza in volo
             col = s["col"]
             kind = s["kind"]
             if kind == "beam":
