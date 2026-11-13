@@ -9,3 +9,9 @@ tools/tier_matches_5v5_b.jsonl
 tools/tier_matches_5v5_nexus.jsonl
 tools/tier_matches_5v5_plan.jsonl
 tools/tier_matches_5v5_plan_nexusbug.jsonl
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
