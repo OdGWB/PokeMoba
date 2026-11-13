@@ -81,6 +81,12 @@ class EeveeMixin:
         "precheck": "_eevee_precheck",
         "cast": "_eevee_cast",
         "bot_cast": "_bot_eevee_cast",
+        # Rete (net/visual.py, game/online_world.py): cosa passa al client.
+        "net": {
+            "lists": {"thunders": "c", "blizzards": "c", "future_sights": "c", "swift_stars": "pos"},
+            "moving": ("swift_stars",),
+            "me": ("voltabsorb_ready_at", "flashfire_until"),
+        },
     }
 
     def _init_eevee(self) -> None:

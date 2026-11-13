@@ -58,6 +58,11 @@ class VenomothMixin:
         "cast": "_moth_cast",
         "bot_cast": "_bot_moth_cast",
         "speed_mult": "_moth_speed_mult",
+        # Rete (net/visual.py, game/online_world.py): cosa passa al client.
+        "net": {
+            "lists": {"powder_clouds": "c"},
+            "unit_flags": {"venom_stacks": 0},
+        },
     }
 
     def _init_moth(self) -> None:

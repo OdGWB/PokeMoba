@@ -64,6 +64,12 @@ class SneaselMixin:
         "precheck": "_sneasel_precheck",
         "cast": "_sneasel_cast",
         "bot_cast": "_bot_sneasel_cast",
+        # Rete (net/visual.py, game/online_world.py): cosa passa al client.
+        "net": {
+            "lists": {"claw_leaps": "c", "beatups": "pos", "sludge_lobs": "c"},
+            "unit_flags": {"snatch_down": 0, "snatch_up": 0},
+            "me": ("climb_ready_at",),
+        },
     }
 
     def _init_sneasel(self) -> None:

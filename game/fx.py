@@ -18,10 +18,9 @@ import pygame
 
 import config
 
-from . import (arch_fx, charcadet_fx, corvi_fx, eevee_fx, hatt_fx, mag_fx, mien_fx, noivern_fx,
-               flor_fx, incin_fx, moth_fx, octi_fx, scy_fx, sneasel_fx, swine_fx, ursa_fx)
 from . import structure_gfx
 from . import aa_fx, death_fx
+from .fx_lines import LINE_SHAPES, LINE_STYLES
 
 # Forme "in volo" (testa che avanza da a verso b) che l'attacco base a distanza
 # fa SEGUIRE al bersaglio; valore = frazione della vita in cui la testa arriva.
@@ -1575,38 +1574,8 @@ class FXSystem:
                 lite = _lighten(col)
                 pygame.draw.lines(overlay, (*col, a // 3), False, pts, max(3, int(0.22 * ts)))
                 pygame.draw.lines(overlay, (*lite, a), False, pts, max(2, int(0.08 * ts)))
-            elif kind in eevee_fx.SHAPES:   # linea Eevee: denti di Morso, stelline
-                eevee_fx.draw_shape(overlay, s, S, ts, f, a)
-            elif kind in corvi_fx.SHAPES:   # linea Rookidee: becco, piume, ali, "!"
-                corvi_fx.draw_shape(overlay, s, S, ts, f, a)
-            elif kind in charcadet_fx.SHAPES:   # linea Charcadet: fuoco, lava, artigli, lame
-                charcadet_fx.draw_shape(overlay, s, S, ts, f, a)
-            elif kind in noivern_fx.SHAPES:   # linea Noibat: onde sonore, lame d'aria, meteore
-                noivern_fx.draw_shape(overlay, s, S, ts, f, a)
-            elif kind in ursa_fx.SHAPES:   # linea Teddiursa: artigli, pugno, crepe, sassi, luna
-                ursa_fx.draw_shape(overlay, s, S, ts, f, a)
-            elif kind in sneasel_fx.SHAPES:   # linea Sneasel: scheggia, fendente, monete, stelle
-                sneasel_fx.draw_shape(overlay, s, S, ts, f, a)
-            elif kind in mien_fx.SHAPES:   # linea Mienfoo: manica, palmo, occhio, nastri
-                mien_fx.draw_shape(overlay, s, S, ts, f, a)
-            elif kind in arch_fx.SHAPES:   # linea Duraludon: palla d'acciaio, fulmini, raggio
-                arch_fx.draw_shape(overlay, s, S, ts, f, a)
-            elif kind in hatt_fx.SHAPES:   # linea Hatenna: increspature, Psicoraggio, note, ciocche
-                hatt_fx.draw_shape(overlay, s, S, ts, f, a)
-            elif kind in mag_fx.SHAPES:   # linea Magnemite: saette, linee di campo, cariche
-                mag_fx.draw_shape(overlay, s, S, ts, f, a)
-            elif kind in swine_fx.SHAPES:   # linea Swinub: neve, rocce, cristalli
-                swine_fx.draw_shape(overlay, s, S, ts, f, a)
-            elif kind in moth_fx.SHAPES:   # linea Venonat: scaglie, raggi, polveri, ali
-                moth_fx.draw_shape(overlay, s, S, ts, f, a)
-            elif kind in octi_fx.SHAPES:   # linea Remoraid: munizioni, inchiostro, raggio
-                octi_fx.draw_shape(overlay, s, S, ts, f, a)
-            elif kind in flor_fx.SHAPES:   # linea Flabébé: petali, vortici, Solarraggio
-                flor_fx.draw_shape(overlay, s, S, ts, f, a)
-            elif kind in scy_fx.SHAPES:   # linea Scyther: falci, chele, pugni, asce, schegge
-                scy_fx.draw_shape(overlay, s, S, ts, f, a)
-            elif kind in incin_fx.SHAPES:   # linea Litten: fauci, croce, corde, Lariat
-                incin_fx.draw_shape(overlay, s, S, ts, f, a)
+            elif kind in LINE_SHAPES:   # linee con grafica propria (game/fx_lines.py)
+                LINE_SHAPES[kind](overlay, s, S, ts, f, a)
         surface.blit(overlay, (0, 0))
 
     # Registro degli stili d'attacco: nome ("fx" nel JSON / "attack_fx") -> handler.
@@ -1660,29 +1629,6 @@ class FXSystem:
         "legionfear": _fx_legionfear,
         "memento": _fx_memento,
         "mementocurse": _fx_mementocurse,
-        # linea Eevee (game/eevee_fx.py)
-        **eevee_fx.STYLES,
-        # linea Rookidee (game/corvi_fx.py)
-        **corvi_fx.STYLES,
-        # linea Charcadet (game/charcadet_fx.py)
-        **charcadet_fx.STYLES,
-        # linea Noibat (game/noivern_fx.py)
-        **noivern_fx.STYLES,
-        # linea Teddiursa (game/ursa_fx.py)
-        **ursa_fx.STYLES,
-        # linea Sneasel (game/sneasel_fx.py)
-        **sneasel_fx.STYLES,
-        # linea Mienfoo (game/mien_fx.py)
-        **mien_fx.STYLES,
-        # linea Duraludon (game/arch_fx.py)
-        **arch_fx.STYLES,
-        # linea Hatenna (game/hatt_fx.py)
-        **hatt_fx.STYLES,
-        **mag_fx.STYLES,
-        **swine_fx.STYLES,
-        **moth_fx.STYLES,
-        **octi_fx.STYLES,
-        **flor_fx.STYLES,
-        **scy_fx.STYLES,
-        **incin_fx.STYLES,
+        # linee con grafica propria (game/fx_lines.py)
+        **LINE_STYLES,
     }

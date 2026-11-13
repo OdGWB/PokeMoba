@@ -76,6 +76,10 @@ class IncineroarMixin:
         "cast": "_incin_cast",
         "bot_cast": "_bot_incin_cast",
         "speed_mult": "_incin_speed_mult",
+        # Rete (net/visual.py, game/online_world.py): cosa passa al client.
+        "net": {
+            "me": ("incin_calm_at", "incin_ring_n"),
+        },
     }
 
     def _init_incin(self) -> None:

@@ -11,13 +11,25 @@ dichiara nell'attributo di classe `LINE` quali metodi agganciare:
         "cast": "_xxx_cast",            # (p, mv, rank, origin, tgt, dirv) -> True se gestita
         "bot_cast": "_bot_xxx_cast",    # (p, target) -> True se il bot ha lanciato
         "speed_mult": "_xxx_speed_mult",  # (p) -> moltiplicatore della velocità
+        "net": {                        # cosa passa al client online (net/visual.py)
+            "lists": {"xxx_zones": "c"},    # liste del Match filtrate dalla visione:
+                                            # nome -> chiave della posizione
+            "shared": ("xxx_walls",),       # liste che vedono TUTTE e due le squadre
+            "moving": ("xxx_bolts",),       # liste con pos/dir/speed: il client le fa avanzare
+            "unit_flags": {"xxx_stacks": 0},  # campi dell'unità (non timer) + valore "spento"
+            "me": ("xxx_ready",),           # campi del proprio Pokémon per l'HUD
+        },
     }
+
+I timer *_until / *_ready_at delle unità passano da soli (net/visual.timer_fields).
 
 Tutti i campi tranne "passives" sono facoltativi. Match chiama gli agganci
 nell'ordine di LINE_MIXINS.
 
 PER AGGIUNGERE UNA LINEA: scrivi il mixin con il suo `LINE` e aggiungilo a
-LINE_MIXINS. Non serve toccare engine/match.py per questi agganci.
+LINE_MIXINS. Non serve toccare engine/match.py, net/visual.py né
+game/online_world.py: Match chiama gli agganci e la rete legge "net" da qui.
+Resta da fare a mano la GRAFICA (game/<linea>_fx.py, registrato in game/fx.py).
 tests/test_lines.py controlla che ogni metodo dichiarato esista e che due mixin
 non definiscano lo stesso nome di metodo (si coprirebbero a vicenda in silenzio).
 """
@@ -50,6 +62,7 @@ LINE_MIXINS: tuple = (
 )
 
 HOOK_KINDS = ("init", "update", "precheck", "cast", "bot_cast", "speed_mult")
+NET_KINDS = ("lists", "shared", "moving", "unit_flags", "me")
 
 
 def hook_names(kind: str) -> tuple:
@@ -61,3 +74,18 @@ def bot_cast_table() -> tuple:
     """((passive della linea, nome del metodo), ...) per l'IA dei bot."""
     return tuple((m.LINE["passives"], m.LINE["bot_cast"])
                  for m in LINE_MIXINS if m.LINE.get("bot_cast"))
+
+
+def net_table(kind: str):
+    """Unione delle dichiarazioni "net" delle linee per `kind` (vedi NET_KINDS):
+    dict per "lists"/"unit_flags", tupla (senza doppioni) per gli altri."""
+    if kind in ("lists", "unit_flags"):
+        out: dict = {}
+        for m in LINE_MIXINS:
+            out.update(m.LINE.get("net", {}).get(kind, {}))
+        return out
+    seen: dict = {}
+    for m in LINE_MIXINS:
+        for name in m.LINE.get("net", {}).get(kind, ()):
+            seen.setdefault(name, None)
+    return tuple(seen)

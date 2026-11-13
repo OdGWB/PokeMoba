@@ -22,46 +22,39 @@ from __future__ import annotations
 import dataclasses
 
 from engine.entities import Minion, Pokemon, Wild
+from engine.lines import net_table
 
 SLOTS = ["Q", "W", "E", "R"]
+
+# Le tabelle qui sotto uniscono la parte COMUNE (mosse generiche del motore e
+# linee scritte direttamente in engine/match.py) e quella dichiarata da ogni
+# linea nel suo LINE["net"] (engine/lines.py). Una linea nuova NON si aggiunge qui.
 
 # Liste del Match: nome -> (chiave della posizione, chiave della squadra).
 LISTS = {
     "projectiles": ("pos", "team"), "avalanches": ("pos", "team"),
-    "legion_waves": ("c", "team"), "spirit_beams": ("pos", "team"),
-    "thunders": ("c", "team"), "blizzards": ("c", "team"),
-    "future_sights": ("c", "team"), "swift_stars": ("pos", "team"),
-    "item_clouds": ("center", "team"), "tailwinds": ("c", "team"),
-    "shades": ("pos", "team"), "smogs": ("c", "team"), "cannon_charges": ("pos", "team"),
-    "psy_zones": ("c", "team"), "flurries": ("pos", "team"),
-    "sonar_pings": ("c", "team"), "hurricanes": ("c", "team"), "meteors": ("c", "team"),
-    "honey_zones": ("c", "team"), "quakes": ("c", "team"),
-    "claw_leaps": ("c", "team"), "beatups": ("pos", "team"), "sludge_lobs": ("c", "team"),
-    "mien_leaps": ("c", "team"), "wave_zones": ("c", "team"), "thunder_marks": ("c", "team"),
-    "hatt_marks": ("c", "team"), "moon_orbs": ("pos", "team"), "witch_waves": ("c", "team"),
-    "mag_bolts": ("pos", "team"), "ion_trails": ("c", "team"), "mag_links": ("c", "team"),
-    "ice_trails": ("c", "team"), "glacial_blocks": ("pos", "team"), "ice_storms": ("c", "team"),
-    "powder_clouds": ("c", "team"), "octi_shots": ("pos", "team"),
+    "item_clouds": ("center", "team"),
+    **{name: (pk, "team") for name, pk in net_table("lists").items()},
 }
+# Liste che vedono entrambe le squadre (aree d'effetto da evitare, ostacoli...).
+SHARED = net_table("shared")
+# Liste prese a mano in capture_visual (regole di visibilità particolari).
+CUSTOM = ("pain_binds", "wishes", "bear_leaps", "swine_tracks")
+# Tutte le liste che il client riceve (game/online_world.py le tiene in fxs).
+ALL_LISTS = (*LISTS, *SHARED, *CUSTOM)
+# Liste con pos/dir/speed che il client fa avanzare tra un pacchetto e l'altro.
+MOVING = ("projectiles", "avalanches", *net_table("moving"))
 # Campi solo di logica (oggetti del motore, insiemi di bersagli già colpiti).
 SKIP = {"mv", "hit", "touched", "since", "rank", "explode", "first", "caught", "slept", "freed", "rel",
         "_pts"}
 # Stati sulle unità che non sono timer *_until (valore "spento" a destra).
 UNIT_FLAGS = {"air_z": 0.0, "sand_radius": 0.0, "invisible": False, "submerged": False,
-              "spirit_awaken": 0, "smoke_hidden": False, "armor_blocks": 0, "echo_count": 0,
-              "honey": 0, "guts_active": False,
-              "snatch_down": 0, "snatch_up": 0, "mien_regen": False,
-              "arch_rain": False, "thunder_left": 0, "agitated": False, "mag_sign": 0,
-              "frost_stacks": 0, "fat_shield": 0.0, "venom_stacks": 0, "octi_lock_by": -1,
-              "flower_color": "red", "scy_fury_stacks": 0, "scy_double_ready": False,
-              "scy_shred": 0, "scy_infield": False}
+              "smoke_hidden": False, **net_table("unit_flags")}
 # Il proprio Pokémon: passive e ricariche mostrate nell'interfaccia.
-ME_FIELDS = ("passive_id", "soul_charges", "inversion_stacks", "muta_cd_until", "muta_cd_max",
-             "form_until", "sandstorm_boost_until", "sand_radius", "spirit_charges",
-             "wander_ready_at", "voltabsorb_ready_at", "flashfire_until", "recalling",
-             "recall_until", "respawn_timer", "guard_ready_at", "climb_ready_at",
-             "fakeout_ready", "dance_seq", "mien_calm_at", "ammo", "ammo_boost",
-             "flower_color", "incin_calm_at", "incin_ring_n")
+ME_FIELDS = tuple(dict.fromkeys((
+    "passive_id", "soul_charges", "inversion_stacks", "muta_cd_until", "muta_cd_max",
+    "form_until", "sandstorm_boost_until", "sand_radius", "recalling", "recall_until",
+    "respawn_timer", *net_table("me"))))
 
 _timer_fields: dict = {}
 
@@ -125,23 +118,9 @@ def capture_visual(match, team: int, player=None) -> dict:
             wishes.append(_clean(w))
     if wishes:
         out["wishes"] = wishes
-    # Taxi Volante: il punto d'atterraggio lo vede anche la squadra avversaria.
-    taxis = [_clean(fl) for fl in getattr(match, "taxi_flights", ())]
-    if taxis:
-        out["taxi_flights"] = taxis
-    # Carica di Elettroraggio: la vedono anche i nemici (anche fuori visione).
-    charges = [_clean(ch) for ch in getattr(match, "beam_charges", ())]
-    if charges:
-        out["beam_charges"] = charges
-    # Distortozona (Hatterene): l'area la vedono tutti (cambia la velocità di tutti).
-    tricks = [_clean(z) for z in getattr(match, "trick_rooms", ())]
-    if tricks:
-        out["trick_rooms"] = tricks
-    # Linea Magnemite: cariche sui muri, pilastro di Bombagnete (un ostacolo) e
-    # Campo Elettrico li vedono tutti.
-    for name in ("mag_walls", "mag_pillars", "mag_fields",
-                 "flowers", "flor_roots", "flor_mists",   # + Giardino (Flabébé)
-                 "scy_fields", "scy_chops"):   # + schegge e Taglio d'Albero (Kleavor)
+    # Liste che vedono tutti (LINE["net"]["shared"]): Taxi Volante, carica di
+    # Elettroraggio, Distortozona, cariche sui muri, fiori, schegge...
+    for name in SHARED:
         items = [_clean(d) for d in getattr(match, name, ())]
         if items:
             out[name] = items

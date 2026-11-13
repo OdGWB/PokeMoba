@@ -49,6 +49,12 @@ class CharcadetMixin:
         "precheck": "_charcadet_precheck",
         "cast": "_charcadet_cast",
         "bot_cast": "_bot_charcadet_cast",
+        # Rete (net/visual.py, game/online_world.py): cosa passa al client.
+        "net": {
+            "lists": {"shades": "pos", "smogs": "c", "cannon_charges": "pos", "psy_zones": "c", "flurries": "pos"},
+            "unit_flags": {"armor_blocks": 0},
+            "me": ("guard_ready_at",),
+        },
     }
 
     def _init_charcadet(self) -> None:

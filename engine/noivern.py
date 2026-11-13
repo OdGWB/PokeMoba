@@ -43,6 +43,11 @@ class NoivernMixin:
         "update": "_update_noivern",
         "cast": "_noivern_cast",
         "bot_cast": "_bot_noivern_cast",
+        # Rete (net/visual.py, game/online_world.py): cosa passa al client.
+        "net": {
+            "lists": {"sonar_pings": "c", "hurricanes": "c", "meteors": "c"},
+            "unit_flags": {"echo_count": 0},
+        },
     }
 
     def _init_noivern(self) -> None:

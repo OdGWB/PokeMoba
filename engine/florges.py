@@ -79,6 +79,12 @@ class FlorgesMixin:
         "cast": "_flor_cast",
         "bot_cast": "_bot_flor_cast",
         "speed_mult": "_flor_speed_mult",
+        # Rete (net/visual.py, game/online_world.py): cosa passa al client.
+        "net": {
+            "shared": ("flowers", "flor_roots", "flor_mists"),
+            "unit_flags": {"flower_color": "red"},
+            "me": ("flower_color",),
+        },
     }
 
     def _init_flor(self) -> None:

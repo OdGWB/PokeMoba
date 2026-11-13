@@ -54,6 +54,12 @@ class MienshaoMixin:
         "update": "_update_mien",
         "cast": "_mien_cast",
         "bot_cast": "_bot_mien_cast",
+        # Rete (net/visual.py, game/online_world.py): cosa passa al client.
+        "net": {
+            "lists": {"mien_leaps": "c"},
+            "unit_flags": {"mien_regen": False},
+            "me": ("fakeout_ready", "dance_seq", "mien_calm_at"),
+        },
     }
 
     def _init_mien(self) -> None:

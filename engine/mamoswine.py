@@ -68,6 +68,12 @@ class MamoswineMixin:
         "update": "_update_swine",
         "cast": "_swine_cast",
         "speed_mult": "_swine_speed_mult",
+        # Rete (net/visual.py, game/online_world.py): cosa passa al client.
+        "net": {
+            "lists": {"ice_trails": "c", "glacial_blocks": "pos", "ice_storms": "c"},
+            "moving": ("glacial_blocks",),
+            "unit_flags": {"frost_stacks": 0, "fat_shield": 0.0},
+        },
     }
 
     def _init_swine(self) -> None:

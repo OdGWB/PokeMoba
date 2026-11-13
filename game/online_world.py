@@ -22,13 +22,11 @@ from engine.pathfinding import find_path, smooth_path
 from engine.vec import Vec2
 from net import protocol as P
 from net.interp import INTERP_DELAY, InterpBuffer
-from net.visual import LISTS, UNIT_FLAGS, timer_fields
+from net.visual import ALL_LISTS, MOVING, UNIT_FLAGS, timer_fields
 from sim.simulation import _nearest_walkable
 
 from .networld import NetWorld
 
-MOVING = ("projectiles", "avalanches", "spirit_beams", "swift_stars", "moon_orbs", "mag_bolts",
-          "glacial_blocks", "octi_shots")
 _WILD_COLORS = {"camp": (170, 160, 120), "meteo": (220, 180, 80), "arceus": (230, 220, 240)}
 
 
@@ -79,13 +77,7 @@ class OnlineWorld(NetWorld):
         self.disconnected: set = set()
         self._last_t = None
         # Stato visivo (vedi net/visual.py).
-        self.fxs = SimpleNamespace(**{n: [] for n in (*LISTS, "pain_binds", "wishes", "taxi_flights",
-                                                       "bear_leaps", "beam_charges",
-                                                       "trick_rooms", "mag_walls",
-                                                       "mag_pillars", "mag_fields",
-                                                       "swine_tracks", "flowers",
-                                                       "flor_roots", "flor_mists",
-                                                       "scy_fields", "scy_chops")})
+        self.fxs = SimpleNamespace(**{n: [] for n in ALL_LISTS})
         self.respawning: list = []
         self.dead: set = set()
         self.me_vis: dict = {}

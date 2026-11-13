@@ -52,6 +52,13 @@ class HattereneMixin:
         "cast": "_hatt_cast",
         "bot_cast": "_bot_hatt_cast",
         "speed_mult": "_hatt_speed_mult",
+        # Rete (net/visual.py, game/online_world.py): cosa passa al client.
+        "net": {
+            "lists": {"hatt_marks": "c", "moon_orbs": "pos", "witch_waves": "c"},
+            "shared": ("trick_rooms",),
+            "moving": ("moon_orbs",),
+            "unit_flags": {"agitated": False},
+        },
     }
 
     def _init_hatt(self) -> None:

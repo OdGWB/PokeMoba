@@ -67,6 +67,13 @@ class OctilleryMixin:
         "precheck": "_octi_precheck",
         "cast": "_octi_cast",
         "bot_cast": "_bot_octi_cast",
+        # Rete (net/visual.py, game/online_world.py): cosa passa al client.
+        "net": {
+            "lists": {"octi_shots": "pos"},
+            "moving": ("octi_shots",),
+            "unit_flags": {"octi_lock_by": -1},
+            "me": ("ammo", "ammo_boost"),
+        },
     }
 
     def _init_octi(self) -> None:

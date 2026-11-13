@@ -47,6 +47,13 @@ class SpiritombMixin:
         "precheck": "_spirit_precheck",
         "cast": "_spirit_cast",
         "bot_cast": "_bot_spiritomb_cast",
+        # Rete (net/visual.py, game/online_world.py): cosa passa al client.
+        "net": {
+            "lists": {"legion_waves": "c", "spirit_beams": "pos"},
+            "moving": ("spirit_beams",),
+            "unit_flags": {"spirit_awaken": 0},
+            "me": ("spirit_charges", "wander_ready_at"),
+        },
     }
 
     def _init_spiritomb(self) -> None:

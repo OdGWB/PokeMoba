@@ -18,10 +18,11 @@ from engine.entities import Core, Pillar, Pokemon, Structure, Unit
 from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
                          TILE_PUDDLE, TILE_RIVER, TILE_WALL)
 from . import spirit_fx
-from . import (arch_fx, charcadet_fx, corvi_fx, eevee_fx, hatt_fx, mag_fx, mien_fx, noivern_fx,
+from . import (arch_fx, eevee_fx, hatt_fx, mag_fx, mien_fx, noivern_fx,
                flor_fx, incin_fx, moth_fx, octi_fx, scy_fx, swine_fx,
                sneasel_fx, ursa_fx)
 from . import structure_gfx
+from .fx_lines import UNIT_OVERLAYS
 from .fx import EMBER, ROCK_HI, ROCK_MID, ROCK_OUT, ROCK_SH, type_color
 from .map_renderer import MapRenderer
 from .sprites.animator import SpriteAnimator
@@ -900,21 +901,8 @@ class Renderer:
                 if isinstance(e, Pokemon) and getattr(e, "spirit_awaken", 0) > 0:
                     spirit_fx.draw_aura(surface, camera, e, now, 110 if ghost else 255)
                 if isinstance(e, Pokemon):   # ghiaccio, cuori, sabbia, Resistenza
-                    eevee_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)
-                    corvi_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # provocato, Trespolo
-                    charcadet_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # spallacci, artigli
-                    ursa_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # Riposo, Dentistretti
-                    sneasel_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # cure ridotte, Arraffalesto
-                    mien_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # oggetti spenti, Rigenergia
-                    arch_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # Conduzione, Tuono
-                    hatt_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # agitato, Magipolvere
-                    mag_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # carica + / -
-                    swine_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # Forzantica
-                    moth_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # Eledanza, Polvoscudo
-                    octi_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # Presa, Iper Raggio
-                    flor_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # Petalodanza, fiori
-                    scy_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # Focalenergia, Chele...
-                    incin_fx.draw_unit_overlay(surface, e, gx, gy, now, ts)   # Lariat, Bullo, Prepotenza
+                    for draw_overlay in UNIT_OVERLAYS:   # game/fx_lines.py
+                        draw_overlay(surface, e, gx, gy, now, ts)
                 if in_bush:
                     self._draw_hidden_hint(surface, e, gx, gy, now)
                 self._draw_unit_hp(surface, e, gx, gy, grow)

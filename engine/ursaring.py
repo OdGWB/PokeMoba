@@ -47,6 +47,11 @@ class UrsaringMixin:
         "update": "_update_ursa",
         "cast": "_ursa_cast",
         "bot_cast": "_bot_ursa_cast",
+        # Rete (net/visual.py, game/online_world.py): cosa passa al client.
+        "net": {
+            "lists": {"honey_zones": "c", "quakes": "c"},
+            "unit_flags": {"honey": 0, "guts_active": False},
+        },
     }
 
     def _init_ursa(self) -> None:

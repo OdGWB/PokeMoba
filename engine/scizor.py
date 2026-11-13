@@ -89,6 +89,11 @@ class ScizorMixin:
         "cast": "_scy_cast",
         "bot_cast": "_bot_scy_cast",
         "speed_mult": "_scy_speed_mult",
+        # Rete (net/visual.py, game/online_world.py): cosa passa al client.
+        "net": {
+            "shared": ("scy_fields", "scy_chops"),
+            "unit_flags": {"scy_fury_stacks": 0, "scy_double_ready": False, "scy_shred": 0, "scy_infield": False},
+        },
     }
 
     def _init_scy(self) -> None:

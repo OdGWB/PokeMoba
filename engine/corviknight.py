@@ -40,6 +40,11 @@ class CorviknightMixin:
         "update": "_update_corvi",
         "cast": "_corvi_cast",
         "bot_cast": "_bot_corvi_cast",
+        # Rete (net/visual.py, game/online_world.py): cosa passa al client.
+        "net": {
+            "lists": {"tailwinds": "c"},
+            "shared": ("taxi_flights",),
+        },
     }
 
     def _init_corvi(self) -> None:

@@ -82,6 +82,13 @@ class MagnezoneMixin:
         "precheck": "_mag_precheck",
         "cast": "_mag_cast",
         "bot_cast": "_bot_mag_cast",
+        # Rete (net/visual.py, game/online_world.py): cosa passa al client.
+        "net": {
+            "lists": {"mag_bolts": "pos", "ion_trails": "c", "mag_links": "c"},
+            "shared": ("mag_walls", "mag_pillars", "mag_fields"),
+            "moving": ("mag_bolts",),
+            "unit_flags": {"mag_sign": 0},
+        },
     }
 
     def _init_mag(self) -> None:

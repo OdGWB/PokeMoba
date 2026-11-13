@@ -51,6 +51,12 @@ class ArchaludonMixin:
         "update": "_update_arch",
         "cast": "_arch_cast",
         "bot_cast": "_bot_arch_cast",
+        # Rete (net/visual.py, game/online_world.py): cosa passa al client.
+        "net": {
+            "lists": {"wave_zones": "c", "thunder_marks": "c"},
+            "shared": ("beam_charges",),
+            "unit_flags": {"arch_rain": False, "thunder_left": 0},
+        },
     }
 
     def _init_arch(self) -> None:
