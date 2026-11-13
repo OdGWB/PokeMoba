@@ -38,6 +38,17 @@ def _frac(p) -> float:
 
 
 class SpiritombMixin:
+    # Agganci al Match (registro in engine/lines.py): nome dell'aggancio ->
+    # metodo di questa classe. "passives" = passive della linea (IA dei bot).
+    LINE = {
+        "passives": frozenset({PASSIVE_ID}),
+        "init": "_init_spiritomb",
+        "update": "_update_spiritomb",
+        "precheck": "_spirit_precheck",
+        "cast": "_spirit_cast",
+        "bot_cast": "_bot_spiritomb_cast",
+    }
+
     def _init_spiritomb(self) -> None:
         self.spirit_beams: list[dict] = []   # Stordiraggio / Neropulsar / Finta in volo
         self.pain_binds: list[dict] = []     # Malcomune: legami di 1s

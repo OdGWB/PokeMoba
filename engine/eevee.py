@@ -72,6 +72,17 @@ def eevee_candidates(p, extra: dict | None = None) -> list:
 
 
 class EeveeMixin:
+    # Agganci al Match (registro in engine/lines.py): nome dell'aggancio ->
+    # metodo di questa classe. "passives" = passive della linea (IA dei bot).
+    LINE = {
+        "passives": frozenset(EEVEE_PASSIVES),
+        "init": "_init_eevee",
+        "update": "_update_eevee",
+        "precheck": "_eevee_precheck",
+        "cast": "_eevee_cast",
+        "bot_cast": "_bot_eevee_cast",
+    }
+
     def _init_eevee(self) -> None:
         self.wishes: list[dict] = []        # Desiderio: cura ritardata
         self.swift_stars: list[dict] = []   # Comete: stelle che inseguono

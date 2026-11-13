@@ -39,6 +39,16 @@ def has_honey(p) -> bool:
 
 
 class UrsaringMixin:
+    # Agganci al Match (registro in engine/lines.py): nome dell'aggancio ->
+    # metodo di questa classe. "passives" = passive della linea (IA dei bot).
+    LINE = {
+        "passives": frozenset(URSA_PASSIVES),
+        "init": "_init_ursa",
+        "update": "_update_ursa",
+        "cast": "_ursa_cast",
+        "bot_cast": "_bot_ursa_cast",
+    }
+
     def _init_ursa(self) -> None:
         self.honey_zones: list[dict] = []   # Profumino: nuvole di miele a terra
         self.bear_leaps: list[dict] = []    # balzi in volo (Corposcontro, Battiterra, Luna Piena)

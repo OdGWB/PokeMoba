@@ -69,6 +69,18 @@ def _rank_at(arr, rank, default=0.0):
 
 
 class FlorgesMixin:
+    # Agganci al Match (registro in engine/lines.py): nome dell'aggancio ->
+    # metodo di questa classe. "passives" = passive della linea (IA dei bot).
+    LINE = {
+        "passives": frozenset(FLOR_PASSIVES),
+        "init": "_init_flor",
+        "update": "_update_flor",
+        "precheck": "_flor_precheck",
+        "cast": "_flor_cast",
+        "bot_cast": "_bot_flor_cast",
+        "speed_mult": "_flor_speed_mult",
+    }
+
     def _init_flor(self) -> None:
         self.flowers: list[dict] = []     # fiori sul terreno (visibili a tutti)
         self.flor_roots: list[dict] = []  # Radici: aree di cura dopo una raccolta

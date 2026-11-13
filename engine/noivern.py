@@ -35,6 +35,16 @@ HURRICANE_STEP = 0.2          # s tra due richieste dell'animazione "Hurt"
 
 
 class NoivernMixin:
+    # Agganci al Match (registro in engine/lines.py): nome dell'aggancio ->
+    # metodo di questa classe. "passives" = passive della linea (IA dei bot).
+    LINE = {
+        "passives": frozenset(NOIVERN_PASSIVES),
+        "init": "_init_noivern",
+        "update": "_update_noivern",
+        "cast": "_noivern_cast",
+        "bot_cast": "_bot_noivern_cast",
+    }
+
     def _init_noivern(self) -> None:
         self.sonar_pings: list[dict] = []    # Ecolocalizzazione: zone rivelate
         self.hurricanes: list[dict] = []     # Tifone: tornado che avanza

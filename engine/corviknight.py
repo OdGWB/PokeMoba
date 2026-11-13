@@ -32,6 +32,16 @@ TAXI_PEAK = 1.3               # altezza visiva del volo (tile)
 
 
 class CorviknightMixin:
+    # Agganci al Match (registro in engine/lines.py): nome dell'aggancio ->
+    # metodo di questa classe. "passives" = passive della linea (IA dei bot).
+    LINE = {
+        "passives": frozenset(CORVI_PASSIVES),
+        "init": "_init_corvi",
+        "update": "_update_corvi",
+        "cast": "_corvi_cast",
+        "bot_cast": "_bot_corvi_cast",
+    }
+
     def _init_corvi(self) -> None:
         self.tailwinds: list[dict] = []     # Ventoincoda: correnti di vento a tempo
         self.taxi_flights: list[dict] = []  # Taxi Volante: canalizzazione e volo

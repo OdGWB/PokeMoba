@@ -73,6 +73,17 @@ def sign_of(hold: float) -> int:
 
 
 class MagnezoneMixin:
+    # Agganci al Match (registro in engine/lines.py): nome dell'aggancio ->
+    # metodo di questa classe. "passives" = passive della linea (IA dei bot).
+    LINE = {
+        "passives": frozenset(MAG_PASSIVES),
+        "init": "_init_mag",
+        "update": "_update_mag",
+        "precheck": "_mag_precheck",
+        "cast": "_mag_cast",
+        "bot_cast": "_bot_mag_cast",
+    }
+
     def _init_mag(self) -> None:
         self.mag_bolts: list[dict] = []    # Tuonoshock in volo
         self.mag_walls: list[dict] = []    # cariche sui muri (visibili a tutti)

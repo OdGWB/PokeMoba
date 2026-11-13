@@ -40,6 +40,17 @@ BURN_HP_FRAC = 0.025          # scottatura: 2,5% degli HP max al secondo
 
 
 class CharcadetMixin:
+    # Agganci al Match (registro in engine/lines.py): nome dell'aggancio ->
+    # metodo di questa classe. "passives" = passive della linea (IA dei bot).
+    LINE = {
+        "passives": frozenset(CHARCADET_PASSIVES),
+        "init": "_init_charcadet",
+        "update": "_update_charcadet",
+        "precheck": "_charcadet_precheck",
+        "cast": "_charcadet_cast",
+        "bot_cast": "_bot_charcadet_cast",
+    }
+
     def _init_charcadet(self) -> None:
         self.shades: list[dict] = []          # Ombra Notturna: ombre in viaggio a terra
         self.smogs: list[dict] = []           # Pulifumo: nubi a tempo

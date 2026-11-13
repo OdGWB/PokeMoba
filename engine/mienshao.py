@@ -46,6 +46,16 @@ def is_mien_line(p) -> bool:
 
 
 class MienshaoMixin:
+    # Agganci al Match (registro in engine/lines.py): nome dell'aggancio ->
+    # metodo di questa classe. "passives" = passive della linea (IA dei bot).
+    LINE = {
+        "passives": frozenset(MIEN_PASSIVES),
+        "init": "_init_mien",
+        "update": "_update_mien",
+        "cast": "_mien_cast",
+        "bot_cast": "_bot_mien_cast",
+    }
+
     def _init_mien(self) -> None:
         self.mien_leaps: list[dict] = []    # Calcinvolo: balzi in volo
         self._mien_guard = False            # una Guardia Rapida è aperta (salta il giro)

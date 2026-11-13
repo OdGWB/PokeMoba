@@ -43,6 +43,17 @@ def is_hatt_line(p) -> bool:
 
 
 class HattereneMixin:
+    # Agganci al Match (registro in engine/lines.py): nome dell'aggancio ->
+    # metodo di questa classe. "passives" = passive della linea (IA dei bot).
+    LINE = {
+        "passives": frozenset(HATT_PASSIVES),
+        "init": "_init_hatt",
+        "update": "_update_hatt",
+        "cast": "_hatt_cast",
+        "bot_cast": "_bot_hatt_cast",
+        "speed_mult": "_hatt_speed_mult",
+    }
+
     def _init_hatt(self) -> None:
         self.hatt_marks: list[dict] = []    # Confusione: aree che scattano dopo il ritardo
         self.moon_orbs: list[dict] = []     # Forza Lunare: sfere lente in volo

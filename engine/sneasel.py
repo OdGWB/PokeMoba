@@ -55,6 +55,17 @@ def is_sneasel_line(p) -> bool:
 
 
 class SneaselMixin:
+    # Agganci al Match (registro in engine/lines.py): nome dell'aggancio ->
+    # metodo di questa classe. "passives" = passive della linea (IA dei bot).
+    LINE = {
+        "passives": frozenset(SNEASEL_PASSIVES),
+        "init": "_init_sneasel",
+        "update": "_update_sneasel",
+        "precheck": "_sneasel_precheck",
+        "cast": "_sneasel_cast",
+        "bot_cast": "_bot_sneasel_cast",
+    }
+
     def _init_sneasel(self) -> None:
         self.claw_leaps: list[dict] = []    # balzi: scavalcamento dei muri e Agguato dalla Rupe
         self.beatups: list[dict] = []       # Picchiaduro: raffica di colpi in corso

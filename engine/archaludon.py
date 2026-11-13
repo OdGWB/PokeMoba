@@ -43,6 +43,16 @@ def is_arch_line(p) -> bool:
 
 
 class ArchaludonMixin:
+    # Agganci al Match (registro in engine/lines.py): nome dell'aggancio ->
+    # metodo di questa classe. "passives" = passive della linea (IA dei bot).
+    LINE = {
+        "passives": frozenset(ARCH_PASSIVES),
+        "init": "_init_arch",
+        "update": "_update_arch",
+        "cast": "_arch_cast",
+        "bot_cast": "_bot_arch_cast",
+    }
+
     def _init_arch(self) -> None:
         self.wave_zones: list[dict] = []     # Tuononda: aree che scattano dopo il ritardo
         self.beam_charges: list[dict] = []   # Elettroraggio: carica visibile ai nemici

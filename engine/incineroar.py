@@ -66,6 +66,18 @@ def _in_cone(pos, origin, dirv, rng, half, extra=0.0) -> bool:
 
 
 class IncineroarMixin:
+    # Agganci al Match (registro in engine/lines.py): nome dell'aggancio ->
+    # metodo di questa classe. "passives" = passive della linea (IA dei bot).
+    LINE = {
+        "passives": frozenset(INCIN_PASSIVES),
+        "init": "_init_incin",
+        "update": "_update_incin",
+        "precheck": "_incin_precheck",
+        "cast": "_incin_cast",
+        "bot_cast": "_bot_incin_cast",
+        "speed_mult": "_incin_speed_mult",
+    }
+
     def _init_incin(self) -> None:
         self.incin_runs: list[dict] = []     # Corsa alle Corde in corso
         self.incin_throws: list[dict] = []   # Presa del Campione: nemici in volo

@@ -58,6 +58,17 @@ def _rank_at(arr, rank, default):
 
 
 class OctilleryMixin:
+    # Agganci al Match (registro in engine/lines.py): nome dell'aggancio ->
+    # metodo di questa classe. "passives" = passive della linea (IA dei bot).
+    LINE = {
+        "passives": frozenset(OCTI_PASSIVES),
+        "init": "_init_octi",
+        "update": "_update_octi",
+        "precheck": "_octi_precheck",
+        "cast": "_octi_cast",
+        "bot_cast": "_bot_octi_cast",
+    }
+
     def _init_octi(self) -> None:
         self.octi_shots: list[dict] = []    # proiettili di Pistolacqua / Raffica / Colpo Perforante
         self._octi_queue: list[dict] = []   # colpi di Raffica non ancora partiti

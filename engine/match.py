@@ -26,28 +26,16 @@ from .items import ITEM_SLOTS, ItemCatalog
 from .jungle import JungleSystem
 from .pathfinding import find_path, smooth_path
 from .spatial import SpatialHash
-from .charcadet import CHARCADET_PASSIVES, CharcadetMixin
-from .noivern import ECHO_ID, NOIVERN_PASSIVES, NoivernMixin
-from .ursaring import URSA_PASSIVES, UrsaringMixin
-from .sneasel import SNEASEL_PASSIVES, SneaselMixin
-from .mienshao import MIEN_PASSIVES, PROJ_SHAPES, MienshaoMixin
-from .archaludon import ARCH_PASSIVES, ArchaludonMixin
-from .hatterene import HATT_PASSIVES, HattereneMixin
-from .magnezone import MAG_PASSIVES, MagnezoneMixin
-from .mamoswine import MamoswineMixin
-from .venomoth import MOTH_PASSIVES, VenomothMixin
-from .octillery import OCTI_PASSIVES, OctilleryMixin
-from .florges import FLOR_PASSIVES, FlorgesMixin, has_garden
-from .scizor import SCY_PASSIVES, ScizorMixin
-from .incineroar import INCIN_PASSIVES, IncineroarMixin
-from .corviknight import CORVI_PASSIVES, CorviknightMixin
-from .eevee import EEVEE_PASSIVES, EeveeMixin
+from .noivern import ECHO_ID
+from .mienshao import PROJ_SHAPES
+from .venomoth import MOTH_PASSIVES
 from .item_effects import ItemEffectsMixin, cdr_to_haste
 from .bot_plan import BotPlanMixin
+from .lines import LINE_MIXINS, bot_cast_table, hook_names
 from .smite import (GANK_COOLDOWN, GANK_DURATION, SmiteMixin, smite_damage)
 from .basic_attack import (ACQUIRE_EXTRA, AMOVE_DROP_EXTRA, AMOVE_EXTRA, AS_CAP,
                            IDLE_CHASE_LEASH, BasicAttackMixin)
-from .spiritomb import PASSIVE_ID as SPIRITOMB_PASSIVE, SpiritombMixin
+from .spiritomb import PASSIVE_ID as SPIRITOMB_PASSIVE
 from .stats import (CRIT_MULT, HIGH_CRIT_CHANCE, STAB_MULT, Stats,
                     ability_haste_factor, combine_tenacity as stat_combine_ten,
                     derive, evolution_mult as stat_evo_mult,
@@ -177,9 +165,7 @@ CAST_ANIMS = {"projectile": "Shoot", "bubble": "Shoot",
             "incinbully": "Charge", "incinropes": "Hop", "incinlariat": "Rotate",
             "incingrab": "Swing"}
 
-class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, NoivernMixin,
-            UrsaringMixin, SneaselMixin, MienshaoMixin, ArchaludonMixin,
-            HattereneMixin, MagnezoneMixin, MamoswineMixin, VenomothMixin, OctilleryMixin, FlorgesMixin, ScizorMixin, IncineroarMixin, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPlanMixin):
+class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPlanMixin):
     def __init__(self, world, map_data):
         self.world = world
         self.map = map_data
@@ -209,23 +195,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self.avalanches: list[dict] = []
         self.smackdown_zones: list[dict] = []
         self.item_clouds: list[dict] = []   # nubi della Palla Fumo (oggetto attivabile)
-        self._init_spiritomb()   # Spiritomb: spiriti, Stordiraggio, Malcomune, Legione
-        self._init_eevee()       # linea Eevee: Desiderio, Comete, ultimate delle forme
-        self._init_corvi()       # linea Rookidee: Ventoincoda, Taxi Volante
-        self._init_charcadet()   # linea Charcadet: Ombra Notturna, Pulifumo, ultimate
-        self._init_noivern()     # linea Noibat: ping, Tifone, Dragobolide
-        self._init_ursa()        # linea Teddiursa: Profumino, balzi, Terremoto
-        self._init_sneasel()     # linea Sneasel: scavalcamenti, Picchiaduro, Sporcolancio
-        self._init_mien()        # linea Mienfoo: balzi di Calcinvolo, Guardia Rapida
-        self._init_arch()        # linea Duraludon: Tuononda, Elettroraggio, Tuono
-        self._init_hatt()        # linea Hatenna: Confusione, Forza Lunare, Distortozona, Strega
-        self._init_mag()         # linea Magnemite: cariche magnetiche, Bombagnete, Campo Elettrico
-        self._init_swine()       # linea Swinub: impronte, Scia Ghiacciata, Era Glaciale
-        self._init_moth()        # linea Venonat: nubi di polvere, accumuli di veleno
-        self._init_octi()        # linea Remoraid: proiettili di Pistolacqua
-        self._init_flor()        # linea Flabébé: fiori, Radici, Campo Nebbioso
-        self._init_scy()         # linea Scyther: campi di schegge, Taglio d'Albero
-        self._init_incin()       # linea Litten: Corsa alle Corde, Presa del Campione
+        for name in hook_names("init"):   # linee con logica propria (engine/lines.py)
+            getattr(self, name)()
         self._init_basic_attack()   # attacco base: proiettili a ricerca
         self.vision = VisionSystem(self.world.grid)
         self._build_structures()
@@ -280,24 +251,9 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self._update_air_landings(dt)  # Rimbalzo: atterraggio dopo il salto (prima dei cast)
         self._update_casts(dt)       # esecuzione mosse Q/W/E/R
         self._update_channels(dt)    # canalizzazioni (Lanciafiamme continuo, Volo, Esplosione)
-        self._update_corvi(dt)       # Ventoincoda, Taxi Volante, Trespolo (linea Rookidee)
-        self._update_charcadet(dt)   # Armor Cannon, Ombra Notturna, Lama dei Rancori... (linea Charcadet)
-        self._update_noivern(dt)     # ping di Ecolocalizzazione, Tifone, Dragobolide (linea Noibat)
-        self._update_ursa(dt)        # Miele, Dentistretti, balzi, Profumino, Terremoto (linea Teddiursa)
-        self._update_sneasel(dt)     # Arraffalesto, Notte Fonda, Scalaroccia... (linea Sneasel)
-        self._update_mien(dt)        # Calcinvolo, Rigenergia, Individua, Danza (linea Mienfoo)
-        self._update_arch(dt)        # Tuononda, Elettroraggio, Tuono (linea Duraludon)
-        self._update_hatt(dt)        # Confusione, Forza Lunare, Distortozona, Quiete (linea Hatenna)
-        self._update_mag(dt)         # cariche magnetiche, Tuonoshock, Bombagnete... (linea Magnemite)
-        self._update_swine(dt)       # Fiuto, Grassospesso, Gelo, Era Glaciale (linea Swinub)
-        self._update_moth(dt)        # nubi, veleno, Eledanza (linea Venonat)
-        self._update_octi(dt)        # Pistolacqua, Raffica (linea Remoraid)
-        self._update_flor(dt)        # fiori, Radici, Campo Nebbioso, Petalodanza (linea Flabébé)
-        self._update_scy(dt)         # Cuordeciso, campi di schegge, secondi colpi (linea Scyther)
-        self._update_incin(dt)       # Corsa alle Corde, Presa, Lariat, Prepotenza (linea Litten)
+        for name in hook_names("update"):   # linee con logica propria (engine/lines.py)
+            getattr(self, name)(dt)
         self._update_rock_moves(dt)  # Rocciotomba / Pesobomba / Frana / Abbattimento
-        self._update_spiritomb(dt)   # spiriti, Stordiraggio, Malcomune, Legione, Memento
-        self._update_eevee(dt)       # Desiderio, Comete, Tuono, Bora, Divinazione, Idratazione
         self._update_projectiles(dt) # proiettili che viaggiano (bolla)
         self._update_area_effects(dt)  # aree persistenti (Pioggia di Frecce, Acquanello, Ultimocanto)
         self._update_rain_zones(dt)    # Pioggiadanza: scadenza delle zone di pioggia a tempo
@@ -1803,22 +1759,12 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         rank = ms.rank
         # Spiritomb: senza un bersaglio valido (nessuno da legare, nessuno spirito
         # nel raggio) la mossa non parte e la ricarica non si spende.
-        if not self._spirit_precheck(p, mv, Vec2(tx, ty)):
-            return
-        if not self._eevee_precheck(p, mv, Vec2(tx, ty)):   # Comete senza bersagli
-            return
-        if not self._charcadet_precheck(p, mv, Vec2(tx, ty)):   # Ombra Notturna, Rancori
-            return
-        if not self._sneasel_precheck(p, mv, Vec2(tx, ty)):   # Picchiaduro, Agguato
-            return
-        if not self._mag_precheck(p, mv, Vec2(tx, ty)):   # Campo Magnetico senza bersaglio
-            return
-        if not self._octi_precheck(p, mv, Vec2(tx, ty)):   # Presa a Ventosa senza bersaglio
-            return
-        if not self._flor_precheck(p, mv, Vec2(tx, ty)):   # Solarraggio senza fiori
-            return
-        if not self._incin_precheck(p, mv, Vec2(tx, ty)):   # Presa del Campione senza bersaglio
-            return
+        # Linee con logica propria: senza un bersaglio valido (nessuno da legare,
+        # Comete senza bersagli...) la mossa non parte e la ricarica non si spende.
+        tgt0 = Vec2(tx, ty)
+        for name in hook_names("precheck"):
+            if not getattr(self, name)(p, mv, tgt0):
+                return
         self._sneasel_on_cast(p, mv)   # Notte Fonda: lanciare una mossa toglie l'invisibilità
         # Lanciare annulla un attacco base in CARICAMENTO (il ciclo non si consuma);
         # se il colpo è già uscito il recupero continua da dove era (niente punizione).
@@ -1915,40 +1861,9 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
             self._cast_avalanche(p, mv, rank, origin, tgt)
         elif shape == "explosion":
             self._cast_explosion(p, mv, rank, origin)
-        elif self._spirit_cast(p, mv, rank, origin, tgt, dirv):
-            pass   # Spiritomb (engine/spiritomb.py)
-        elif self._eevee_cast(p, mv, rank, origin, tgt, dirv):
-            pass   # linea Eevee (engine/eevee.py)
-        elif self._corvi_cast(p, mv, rank, origin, tgt, dirv):
-            pass   # linea Rookidee (engine/corviknight.py)
-        elif self._charcadet_cast(p, mv, rank, origin, tgt, dirv):
-            pass   # linea Charcadet (engine/charcadet.py)
-        elif self._noivern_cast(p, mv, rank, origin, tgt, dirv):
-            pass   # linea Noibat (engine/noivern.py)
-        elif self._ursa_cast(p, mv, rank, origin, tgt, dirv):
-            pass   # linea Teddiursa (engine/ursaring.py)
-        elif self._sneasel_cast(p, mv, rank, origin, tgt, dirv):
-            pass   # linea Sneasel (engine/sneasel.py)
-        elif self._mien_cast(p, mv, rank, origin, tgt, dirv):
-            pass   # linea Mienfoo (engine/mienshao.py)
-        elif self._arch_cast(p, mv, rank, origin, tgt, dirv):
-            pass   # linea Duraludon (engine/archaludon.py)
-        elif self._hatt_cast(p, mv, rank, origin, tgt, dirv):
-            pass   # linea Hatenna (engine/hatterene.py)
-        elif self._mag_cast(p, mv, rank, origin, tgt, dirv):
-            pass   # linea Magnemite (engine/magnezone.py)
-        elif self._swine_cast(p, mv, rank, origin, tgt, dirv):
-            pass   # linea Swinub (engine/mamoswine.py)
-        elif self._moth_cast(p, mv, rank, origin, tgt, dirv):
-            pass   # linea Venonat (engine/venomoth.py)
-        elif self._octi_cast(p, mv, rank, origin, tgt, dirv):
-            pass   # linea Remoraid (engine/octillery.py)
-        elif self._flor_cast(p, mv, rank, origin, tgt, dirv):
-            pass   # linea Flabébé (engine/florges.py)
-        elif self._scy_cast(p, mv, rank, origin, tgt, dirv):
-            pass   # linea Scyther (engine/scizor.py)
-        elif self._incin_cast(p, mv, rank, origin, tgt, dirv):
-            pass   # linea Litten (engine/incineroar.py)
+        elif any(getattr(self, name)(p, mv, rank, origin, tgt, dirv)
+                 for name in hook_names("cast")):
+            pass   # mossa di una linea con logica propria (engine/lines.py)
         elif shape == "buff":
             self._apply_support(p, mv, rank, origin)
             self.fx_events.append({"kind": "buff", "c": (origin.x, origin.y),
@@ -4005,12 +3920,8 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
                        * self.jungle.terrain_speed_mult(p))
             if p.passive_id == "nuotovelox" and self._in_rain(p):
                 p.speed *= NUOTOVELOX_SPEED   # +20% in acqua/pioggia
-            p.speed *= self._hatt_speed_mult(p)   # Distortozona (Hatterene)
-            p.speed *= self._swine_speed_mult(p)   # Scia Ghiacciata, Forzantica
-            p.speed *= self._moth_speed_mult(p)    # Eledanza, Ventargenteo
-            p.speed *= self._flor_speed_mult(p)    # fiore Giallo, Petalodanza
-            p.speed *= self._scy_speed_mult(p)     # Cuordeciso: +30%
-            p.speed *= self._incin_speed_mult(p)   # Darkest Lariat: 70%
+            for name in hook_names("speed_mult"):   # Distortozona, Scia Ghiacciata...
+                p.speed *= getattr(self, name)(p)
             # Nitrocarica: cariche di velocità cumulabili (scadono insieme).
             if p.fc_until > self.time and p.fc_stacks > 0:
                 p.speed *= 1.0 + p.fc_per * p.fc_stacks
@@ -4070,38 +3981,9 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
     def _bot_try_cast(self, p, target) -> None:
         if p.pending_cast is not None or p.silence_until > self.time:
             return
-        if p.passive_id == SPIRITOMB_PASSIVE and self._bot_spiritomb_cast(p, target):
-            return
-        if p.passive_id in EEVEE_PASSIVES and self._bot_eevee_cast(p, target):
-            return
-        if p.passive_id in CORVI_PASSIVES and self._bot_corvi_cast(p, target):
-            return
-        if p.passive_id in CHARCADET_PASSIVES and self._bot_charcadet_cast(p, target):
-            return
-        if p.passive_id in NOIVERN_PASSIVES and self._bot_noivern_cast(p, target):
-            return
-        if p.passive_id in URSA_PASSIVES and self._bot_ursa_cast(p, target):
-            return
-        if p.passive_id in SNEASEL_PASSIVES and self._bot_sneasel_cast(p, target):
-            return
-        if p.passive_id in MIEN_PASSIVES and self._bot_mien_cast(p, target):
-            return
-        if p.passive_id in ARCH_PASSIVES and self._bot_arch_cast(p, target):
-            return
-        if p.passive_id in HATT_PASSIVES and self._bot_hatt_cast(p, target):
-            return
-        if p.passive_id in MAG_PASSIVES and self._bot_mag_cast(p, target):
-            return
-        if p.passive_id in MOTH_PASSIVES and self._bot_moth_cast(p, target):
-            return
-        if p.passive_id in OCTI_PASSIVES and self._bot_octi_cast(p, target):
-            return
-        if p.passive_id in FLOR_PASSIVES and self._bot_flor_cast(p, target):
-            return
-        if p.passive_id in SCY_PASSIVES and self._bot_scy_cast(p, target):
-            return
-        if p.passive_id in INCIN_PASSIVES and self._bot_incin_cast(p, target):
-            return
+        for passives, name in bot_cast_table():   # IA delle linee (engine/lines.py)
+            if p.passive_id in passives and getattr(self, name)(p, target):
+                return
         for slot in ("R", "Q", "W", "E"):
             ms = p.moveset.get(slot)
             if ms and ms.ready and ms.chosen and ms.chosen.power_at(ms.rank) > 0:

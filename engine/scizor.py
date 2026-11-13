@@ -80,6 +80,17 @@ def _in_cone(pos, origin, dirv, rng, half, extra=0.0) -> bool:
 
 
 class ScizorMixin:
+    # Agganci al Match (registro in engine/lines.py): nome dell'aggancio ->
+    # metodo di questa classe. "passives" = passive della linea (IA dei bot).
+    LINE = {
+        "passives": frozenset(SCY_PASSIVES),
+        "init": "_init_scy",
+        "update": "_update_scy",
+        "cast": "_scy_cast",
+        "bot_cast": "_bot_scy_cast",
+        "speed_mult": "_scy_speed_mult",
+    }
+
     def _init_scy(self) -> None:
         self.scy_fields: list[dict] = []    # campi di schegge (Asciapietra, Taglio d'Albero)
         self.scy_chops: list[dict] = []     # Taglio d'Albero in carica (0,5 s)

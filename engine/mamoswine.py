@@ -60,6 +60,16 @@ def has_gelo(p) -> bool:
 
 
 class MamoswineMixin:
+    # Agganci al Match (registro in engine/lines.py): nome dell'aggancio ->
+    # metodo di questa classe. "passives" = passive della linea (IA dei bot).
+    LINE = {
+        "passives": frozenset(SWINE_PASSIVES),
+        "init": "_init_swine",
+        "update": "_update_swine",
+        "cast": "_swine_cast",
+        "speed_mult": "_swine_speed_mult",
+    }
+
     def _init_swine(self) -> None:
         self.swine_tracks: list[dict] = []    # Fiuto: impronte dei nemici (per la squadra che fiuta)
         self.ice_trails: list[dict] = []      # Scia Ghiacciata

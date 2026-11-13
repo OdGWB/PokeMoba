@@ -49,6 +49,17 @@ def has_tinted(p) -> bool:
 
 
 class VenomothMixin:
+    # Agganci al Match (registro in engine/lines.py): nome dell'aggancio ->
+    # metodo di questa classe. "passives" = passive della linea (IA dei bot).
+    LINE = {
+        "passives": frozenset(MOTH_PASSIVES),
+        "init": "_init_moth",
+        "update": "_update_moth",
+        "cast": "_moth_cast",
+        "bot_cast": "_bot_moth_cast",
+        "speed_mult": "_moth_speed_mult",
+    }
+
     def _init_moth(self) -> None:
         self.powder_clouds: list[dict] = []   # Velenpolvere / Paralizzante / Sonnifero / Tempesta
         self._venom: dict = {}                # id unità -> stato degli accumuli
