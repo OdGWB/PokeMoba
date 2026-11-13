@@ -205,19 +205,15 @@ def play(job):
         _em.GANK_COOLDOWN = 40.0
         _es.GANK_MIN_TIME = 210.0
     if OPTS["open_nexus"]:
-        # Nexus attaccabile appena UNA lane della squadra non ha piu torri vive
-        # (regola solo del tool; il gioco vero resta "tutte le torri").
+        # La regola "nexus scoperto con una lane senza torri" ora e' nel motore
+        # (Match._alive_towers); qui si registra solo quando si apre, per le statistiche.
+        _orig_alive = match._alive_towers
+
         def _exposed(team):
-            # Le torri morte spariscono dal mondo: si conta per lane NOTA (LANES), non per
-            # le lane presenti, altrimenti una lane svuotata non verrebbe mai vista.
-            left = {ln: 0 for ln in LANES}
-            for e in world.structures():
-                if e.kind == "tower" and e.team == team and e.alive and e.lane in left:
-                    left[e.lane] += 1
-            if any(n == 0 for n in left.values()):
+            n = _orig_alive(team)
+            if n == 0:
                 core_ev[team].setdefault("exposed", round(match.time))
-                return 0
-            return 99
+            return n
         match._alive_towers = _exposed
 
     stat = {}                       # id -> dict

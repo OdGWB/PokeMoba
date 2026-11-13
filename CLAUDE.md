@@ -1094,6 +1094,12 @@ Passaggi completati:
   proprio/avversario), pagina con "Vittorie (corr.)" e gruppo "Danno per bersaglio".
   Torneo seed 6 (49 partite, 28 chiuse dal nexus a 11-21 min; dal primo colpo allo 0:
   mediana 41 s, max 334 s). Screenshot: step_54_a (lista), step_54_b (Mienfoo).
+- BOT A PIANI SEMPRE ATTIVI + NEXUS CON UNA LANE SENZA TORRI (nel gioco vero): engine/bot_plan.py
+  `bot_plan = True` di default (shopping, assedio, aiuto alle torri, roam del support). Regola
+  nuova nel motore: config.CORE_OPEN_ON_EMPTY_LANE; Match._alive_towers ritorna 0 appena una lane
+  (top/mid/bot, registrate in Match._tower_lanes) non ha piu torri vive, quindi il nucleo si
+  scopre e i bot lo attaccano. tier_sim --open-nexus usa ormai la regola del motore e registra
+  solo il momento in cui si apre.
 - ATTACCO BASE LEGGIBILE (step_55): animazione completa sincronizzata col danno,
   proiettili che seguono il bersaglio, effetto del colpo. Solo grafica: il motore
   emette solo eventi fx COSMETICI in piu' (engine/basic_attack.py): all'avvio

@@ -1,7 +1,6 @@
 """IA dei bot a PIANI (opzionale): shopping, assedio, aiuto alle torri, roam del support.
 
-Si attiva con `match.bot_plan = True` (di DEFAULT e' spento: il gioco normale non cambia;
-lo usa tools/tier_sim.py). Il piano gira PRIMA dell'IA di base: se prende il comando del
+E' ATTIVO di default su tutti i bot (`match.bot_plan = False` lo spegne). Il piano gira PRIMA dell'IA di base: se prende il comando del
 bot ritorna True, altrimenti (False) il bot si comporta come sempre (lane, combattimento,
 farm del jungler). Ordine di priorita':
   1. tornare in base a COMPRARE (oro sufficiente per il prossimo pezzo) e curarsi;
@@ -31,7 +30,7 @@ TOWER_NEAR_LOW = 45.0       # tile: se e' quasi caduta si viene da piu' lontano
 
 
 class BotPlanMixin:
-    bot_plan = False
+    bot_plan = True
     bot_gank_hp = 0.6
 
     # --- statistiche (solo osservazione) ------------------------------------

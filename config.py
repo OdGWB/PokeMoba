@@ -170,6 +170,9 @@ WIND_FLYING_SPEED = 1.35     # bonus velocità ai Volanti col Vento forte
 # --- Ritmo partita / strutture (per partite da ~15-25 min, stile Wild Rift) --
 # Il nucleo è invulnerabile finché la squadra ha più di questo numero di torri.
 CORE_EXPOSE_TOWERS_LEFT = 0
+# Il nucleo si scopre anche appena UNA lane (top/mid/bot) della squadra non ha piu torri
+# vive: le altre torri non servono (le torri morte spariscono dal mondo).
+CORE_OPEN_ON_EMPTY_LANE = True
 TOWER_HP_OUTER = 2900       # torre esterna (tier 1)
 TOWER_HP_INNER = 3900       # torre interna (tier 2), più vicina al nucleo
 TOWER_DAMAGE = 110

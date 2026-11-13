@@ -229,6 +229,10 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
         self._init_basic_attack()   # attacco base: proiettili a ricerca
         self.vision = VisionSystem(self.world.grid)
         self._build_structures()
+        self._tower_lanes = {}
+        for e in self.world.structures():
+            if e.kind == "tower" and e.lane:
+                self._tower_lanes.setdefault(e.team, set()).add(e.lane)
         self.jungle = JungleSystem(self)
 
     # --- costruzione ---------------------------------------------------------
@@ -1048,8 +1052,17 @@ class Match(SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, Noiver
                    1.0 + tower._ramp_stacks * config.TOWER_RAMP_PER_HIT)
 
     def _alive_towers(self, team: int) -> int:
-        return sum(1 for e in self.world.structures()
-                   if e.kind == "tower" and e.team == team and e.alive)
+        """Torri vive della squadra; 0 se una lane e' rimasta senza torri (nucleo scoperto)."""
+        n = 0
+        left = {ln: 0 for ln in getattr(self, "_tower_lanes", {}).get(team, ())}
+        for e in self.world.structures():
+            if e.kind == "tower" and e.team == team and e.alive:
+                n += 1
+                if e.lane in left:
+                    left[e.lane] += 1
+        if config.CORE_OPEN_ON_EMPTY_LANE and any(v == 0 for v in left.values()):
+            return 0
+        return n
 
     def _deal_damage(self, attacker, target, amount: float,
                      dmg_type: str | None = None, ignore_shield: bool = False) -> None:
