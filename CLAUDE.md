@@ -1225,7 +1225,7 @@ Passaggi completati:
   Screenshot: step_59_opzioni, step_59_tasti.
 - LINEE VECCHIE portate al livello delle nuove (punto 24), una per passo. Eevee
   (eevee_fx) e Spiritomb (spirit_fx) avevano gia' un modulo; Roggenrola ha effetti
-  su misura in fx.py. Restano da fare: Nincada, Poliwag.
+  su misura in fx.py. Restano da fare: Poliwag.
   Registro: fx_lines.FX_LINES; ogni modulo puo' esporre anche AA_TRAVEL
   (forma -> frazione del volo, per gli attacchi base a ricerca: fx._AA_TRAVEL).
 - LINEA CHARMANDER > CHARMELEON > CHARIZARD (step_60), nuovo game/char_fx.py.
@@ -1351,6 +1351,26 @@ Passaggi completati:
   step_64_* (attacco, pistolacqua/_colpo, idropompa/_colpo, idropulsar_volo/
   _colpo/_confuso, morso/_chiuso, sgranocchio, gelodenti, visotruce,
   dragodanza, acquagetto, sub_tuffo/_riemersione/_geyser, oltraggio/_dopo).
+- LINEA NINCADA > NINJASK / SHEDINJA (step_65), nuovo game/nincada_fx.py. Nomi "fx"
+  nel JSON (attack_fx "ninclaw" su tutte le forme, nin* sulle mosse) e pochi TAG
+  COSMETICI nel motore: l'area di Muta/Rancore (_enter_shedinja) porta "src" e fx
+  (ninmolt / ningrudge), il ritorno da Shedinja un'area "ninrevert", lo scoppio del
+  clone (_pop_decoy) e la riemersione del clone di Doppioteam fx, gli scatti di
+  Aeroassalto (_cast_chain) "hit"/"tgt"/"i". Forme: graffi AFFUSOLATI paralleli che
+  corrono uno dopo l'altro sul colpito (ninscratch: attacco base DORATO con contorno
+  spesso, chiaro sugli sprite bianchi non si vedeva; Graffio; Sfuriate arancioni
+  incrociate), X di Forbice X (ninx: due lame verdi che si incrociano + lampo, raggio
+  ~0,6 tile e sottili: a 1,2 tile coprivano gli sprite e sembravano foglie), buca
+  (ninhole: Fossa/Sabbiotomba/Doppioteam al tuffo; in RIEMERSIONE solo il bordo di
+  terra smossa, la buca scura copriva chi esce), vortice di sabbia (ninsand),
+  sbuffi (ninpuff: il clone), linee di velocita' (ninspeed: Agilita'), aureola che
+  scende (ninhalo) e fiammelle spettrali (ninwisp: Muta, Rancore). Riusa hexshell
+  (Indurimento), sword (Danzaspada), windline (Aeroassalto), impactstar, ring,
+  twinkle. Sulle unita' (a tutti, dex 292): aureola dorata che ondeggia sopra la
+  testa + fiammelle ai lati (viola, 4 cremisi in forma Rancore). Screenshot:
+  step_65_* (attacco, graffio, sfuriate, forbicex/_incrocio, fossa_tuffo/
+  _riemersione, sabbiotomba/_dopo, doppioteam_tuffo/_clone/_sparito, indurimento,
+  agilita, danzaspada, aeroassalto/_colpo, rancore/_forma/_fine, muta, shedinja).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

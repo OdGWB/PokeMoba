@@ -12,7 +12,7 @@
   "attack_cooldown": 0.8,
   "sprite_dir": "assets/pokemon/0290",
   "passive": "muta",
-  "attack_fx": "slash",
+  "attack_fx": "ninclaw",
 
   "base_stats": {"hp": 31, "attack": 45, "defense": 90, "sp_attack": 30, "sp_defense": 30, "speed": 40},
 
@@ -24,56 +24,56 @@
   },
 
   "evolutions": [
-    {"stage": 0, "level": 1, "name": "Nincada", "dex": 290, "sprite_dir": "assets/pokemon/0290", "types": ["Bug", "Ground"], "radius": 0.38, "base_stats": {"hp": 31, "attack": 45, "defense": 90, "sp_attack": 30, "sp_defense": 30, "speed": 40}},
-    {"stage": 1, "level": 8, "name": "Ninjask", "dex": 291, "sprite_dir": "assets/pokemon/0291", "types": ["Bug", "Flying"], "radius": 0.5, "base_stats": {"hp": 61, "attack": 90, "defense": 45, "sp_attack": 50, "sp_defense": 50, "speed": 160}}
+    {"stage": 0, "level": 1, "name": "Nincada", "dex": 290, "sprite_dir": "assets/pokemon/0290", "types": ["Bug", "Ground"], "radius": 0.38, "attack_fx": "ninclaw", "base_stats": {"hp": 31, "attack": 45, "defense": 90, "sp_attack": 30, "sp_defense": 30, "speed": 40}},
+    {"stage": 1, "level": 8, "name": "Ninjask", "dex": 291, "sprite_dir": "assets/pokemon/0291", "types": ["Bug", "Flying"], "radius": 0.5, "attack_fx": "ninclaw", "base_stats": {"hp": 61, "attack": 90, "defense": 45, "sp_attack": 50, "sp_defense": 50, "speed": 160}}
   ],
 
   "moves": {
     "Q": {
       "base": {"id": "scratch", "name": "Graffio", "type": "Normal", "category": "physical", "shape": "cone",
-               "fx": "slash",
+               "fx": "ninscratch",
                "target": "direction", "power": [36, 55, 75, 95], "ratio": 0.55,
                "cooldown": [4.5, 4, 3.5, 3], "range": 2.6, "angle": 55},
       "upgrades": [
         {"id": "furyswipes", "name": "Sfuriate", "type": "Normal", "category": "physical", "shape": "cone",
-         "fx": "slash", "fury": true,
+         "fx": "ninfury", "fury": true,
          "target": "direction", "power": [21, 32, 43, 55], "ratio": 0.35,
          "cooldown": [3.5, 3.25, 3, 2.75], "range": 2.6, "angle": 48},
         {"id": "xscissor", "name": "Forbice X", "type": "Bug", "category": "physical", "shape": "area",
-         "fx": "xscissor", "high_crit": true,
+         "fx": "ninxscissor", "high_crit": true,
          "target": "self", "power": [55, 85, 110, 140], "ratio": 0.85,
          "cooldown": [6, 5.5, 5, 4.5], "range": 0, "radius": 2.0}
       ]
     },
     "W": {
       "base": {"id": "dig", "name": "Fossa", "type": "Ground", "category": "physical", "shape": "sub",
-               "fx": "orb",
+               "fx": "nindig",
                "target": "point", "power": [60, 90, 115, 145], "ratio": 0.85,
                "cooldown": [10, 9, 8, 7], "range": 4.5, "radius": 2.0,
                "effects": {"untargetable": {"duration": 1.0}}},
       "upgrades": [
         {"id": "sandtomb", "name": "Sabbiotomba", "type": "Ground", "category": "physical", "shape": "sub",
-         "fx": "orb",
+         "fx": "ninsandtomb",
          "target": "point", "power": [48, 70, 95, 120], "ratio": 0.7,
          "cooldown": [11, 10, 9, 8], "range": 4.5, "radius": 2.2,
          "effects": {"untargetable": {"duration": 1.0}, "root": {"duration": 1.5}}},
         {"id": "doubleteam", "name": "Doppioteam", "type": "Normal", "category": "none", "shape": "sub",
-         "fx": "orb",
+         "fx": "nindouble",
          "target": "point", "power": [0, 0, 0, 0],
          "cooldown": [12, 11, 10, 9], "range": 4.5, "radius": 1.0,
          "effects": {"untargetable": {"duration": 1.0}, "decoy": {"duration": 4.0}}}
       ]
     },
     "E": {
-      "base": {"id": "harden", "name": "Indurimento", "type": "Bug", "category": "none", "shape": "buff",
+      "base": {"id": "harden", "name": "Indurimento", "type": "Bug", "category": "none", "fx": "ninharden", "shape": "buff",
                "target": "self", "power": [0, 0, 0, 0],
                "cooldown": [12, 11, 10, 9],
                "effects": {"def": {"mult": 1.2, "duration": 4.0}}},
       "upgrades": [
-        {"id": "agility", "name": "Agilita", "type": "Bug", "category": "none", "shape": "buff",
+        {"id": "agility", "name": "Agilita", "type": "Bug", "category": "none", "fx": "ninagility", "shape": "buff",
          "target": "self", "cooldown": [12, 11, 10, 9],
          "effects": {"speed": {"mult": 1.2, "duration": 4.0}}},
-        {"id": "swordsdance", "name": "Danzaspada", "type": "Normal", "category": "none", "shape": "buff",
+        {"id": "swordsdance", "name": "Danzaspada", "type": "Normal", "category": "none", "fx": "ninswords", "shape": "buff",
          "target": "self", "cooldown": [14, 13, 12, 11],
          "passive": {"stat": "attack", "amount": [6, 12, 18, 24]},
          "effects": {"atk": {"mult": 1.25, "duration": 5.0}}}
@@ -82,11 +82,11 @@
     "R": {
       "upgrades": [
         {"id": "aerialassault", "name": "Aeroassalto", "type": "Flying", "category": "physical", "shape": "chain",
-         "fx": "slash",
+         "fx": "ninaerial",
          "target": "direction", "power": [120, 175, 230], "ratio": 1,
          "cooldown": [90, 80, 70], "range": 5.0, "max_targets": 4,
          "effects": {"hop": 4.5}},
-        {"id": "grudge", "name": "Rancore", "type": "Ghost", "category": "none", "shape": "rancore",
+        {"id": "grudge", "name": "Rancore", "type": "Ghost", "category": "none", "fx": "ningrudge", "shape": "rancore",
          "target": "self", "power": [0, 0, 0],
          "cooldown": [150, 150, 150],
          "effects": {"duration": 5.0}}

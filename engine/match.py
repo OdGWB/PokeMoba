@@ -1299,7 +1299,8 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         p.max_hp = 1.0
         p.shield = 0.0
         self.fx_events.append({"kind": "area", "c": (p.pos.x, p.pos.y),
-                               "radius": 1.4, "mtype": "Ghost"})
+                               "radius": 1.4, "mtype": "Ghost", "src": p.id,
+                               "fx": "ningrudge" if rancore else "ninmolt"})   # fx: solo grafica
         self.fx_events.append({"eid": p.id, "form": "shedinja"})
         self.announcements.append(
             (self.time, f"{p.name} -> Shedinja ({'Rancore' if rancore else 'Muta'})!"))
@@ -1319,6 +1320,8 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         self._recompute_stats(p)
         p.hp = max(1.0, p.max_hp * hp_frac)
         p.untargetable_until = self.time   # torna bersagliabile all'istante
+        self.fx_events.append({"kind": "area", "c": (p.pos.x, p.pos.y), "radius": 0.8,
+                               "mtype": "Bug", "fx": "ninrevert"})   # solo grafica
         self.fx_events.append({"eid": p.id, "form": ""})
 
     def _update_forms(self, dt: float) -> None:
@@ -1358,7 +1361,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
 
     def _pop_decoy(self, d) -> None:
         self.fx_events.append({"kind": "area", "c": (d.pos.x, d.pos.y),
-                               "radius": 0.8, "mtype": "Normal"})
+                               "radius": 0.8, "mtype": "Normal", "fx": "nindouble"})   # fx: solo grafica
         self._remove_decoy(d)
 
     def _remove_decoy(self, d) -> None:
@@ -2221,13 +2224,15 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
             p.pos = dest
             p.stop()
             self.fx_events.append({"kind": "dash", "a": (origin.x, origin.y),
-                                   "b": (dest.x, dest.y), "mtype": mv.type})
+                                   "b": (dest.x, dest.y), "mtype": mv.type, "hit": False})
             return
         prev = origin
-        for e in chain:
+        for i, e in enumerate(chain):
             tp = Vec2(e.pos.x, e.pos.y)
+            # hit/tgt/i: solo grafica (graffi sul bersaglio, balzi in sequenza)
             self.fx_events.append({"kind": "dash", "a": (prev.x, prev.y),
-                                   "b": (tp.x, tp.y), "mtype": mv.type})
+                                   "b": (tp.x, tp.y), "mtype": mv.type,
+                                   "hit": True, "tgt": e.id, "i": i})
             self._hit(p, mv, rank, e)
             prev = tp
         p.pos = self._nearest_walkable(prev, origin)
@@ -2647,8 +2652,10 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
             dirv = DIR_VECTORS[p.facing].normalized()
             self._spawn_decoy(p, dirv, float(mv.effects["decoy"].get("duration", 4.0)))
             p.stop()
-            self.fx_events.append({"kind": "area", "c": (center.x, center.y),
-                                   "radius": 1.0, "mtype": mv.type})
+            ev = {"kind": "area", "c": (center.x, center.y), "radius": 1.0, "mtype": mv.type}
+            if mv.fx:   # solo grafica: sbuffo del clone (linea Nincada)
+                ev["fx"] = mv.fx
+            self.fx_events.append(ev)
             return
         for e in self._combat_hash.query_radius(center.x, center.y, mv.radius + 1.0):
             if e.team == p.team or not getattr(e, "alive", False):
