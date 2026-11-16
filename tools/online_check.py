@@ -19,6 +19,7 @@ sulle entità. L'orologio è virtuale: niente attese reali.
 from __future__ import annotations
 
 import os
+import random
 import sys
 import time
 import traceback
@@ -46,14 +47,31 @@ from net import protocol as P  # noqa: E402
 from net.client import ClientSession  # noqa: E402
 from net.host import HostSession  # noqa: E402
 from net.transport import LoopbackTransport  # noqa: E402
-from net.visual import timer_fields  # noqa: E402
+from net.visual import LISTS, UNIT_FLAGS, timer_fields  # noqa: E402
 
 SLOTS = ["Q", "W", "E", "R"]
-CAST_TIME = 2.5          # s di partita osservati dopo ogni lancio
+CAST_TIME = 2.8          # s di partita osservati dopo ogni lancio (non un multiplo
+                         # del ciclo d'attacco: un colpo sul bordo esatto della finestra
+                         # entrerebbe offline e uscirebbe online per 30 ms di latenza)
 DUMMY_DIST = 3.0         # tile tra chi lancia e il bersaglio
 DUMMY_HP = 50000.0
 LOWRES = None
 _shared_renderer = [None]
+
+
+# Il draft dell'host usa un random.Random() suo: qui con un seme, così i bot
+# scelgono sempre gli stessi Pokémon (e il bersaglio è lo stesso a ogni collaudo).
+import net.draft as _draft  # noqa: E402
+
+_DRAFT_SEED = [0]
+_draft_init = _draft.Draft.__init__
+
+
+def _seeded_draft_init(self, *a, rng=None, **k):
+    _draft_init(self, *a, rng=rng or random.Random(_DRAFT_SEED[0]), **k)
+
+
+_draft.Draft.__init__ = _seeded_draft_init
 
 
 class App:
@@ -91,6 +109,7 @@ class Online:
         self.h.attach_transport(1, a)
         self.c = ClientSession(b, "Amico")
         self.scene = None
+        self.client_rng = random.Random(12345).getstate()
         self.fx_kinds = set()
         self.frame = 0
         self.pump(0.3)
@@ -123,6 +142,18 @@ class Online:
         while _clock[0] < end:
             _clock[0] += FRAME
             host_step(self.h)
+            # Il client (effetti grafici, particelle) usa il suo generatore casuale:
+            # così i numeri del MOTORE restano gli stessi della partita offline.
+            engine_rng = random.getstate()
+            random.setstate(self.client_rng)
+            try:
+                self._client_step(draw_every)
+            finally:
+                self.client_rng = random.getstate()
+                random.setstate(engine_rng)
+
+    def _client_step(self, draw_every):
+        if True:
             self.c.poll()
             if self.scene is not None:
                 try:
@@ -266,7 +297,30 @@ def prepare(side):
             side.dmg_log.append(amount)
         return orig(attacker, target, amount, *a, **k)
     m._deal_damage = deal
+    random.seed(77)                                    # il bot sceglie le stesse evoluzioni
     m._gain_xp(dummy, CUMULATIVE_XP[15] + 1.0)        # bersaglio di pari livello
+    # Bersaglio INERTE: non attacca e non ha passiva. Altrimenti risponde al fuoco
+    # (stati e danni su chi lancia) e la sua passiva cambia i risultati.
+    orig_aa = m._pokemon_auto_attack
+
+    def auto_attack(u):
+        if u is dummy:
+            u.target_id = None
+            return None
+        # Chi lancia non attacca finché la mossa del giro non è partita: online il
+        # comando arriva qualche tick dopo (latenza) e un attacco base "di attesa"
+        # finirebbe nel conto solo da una parte.
+        slot = getattr(side, "aa_block_slot", None)
+        if slot is not None and u.id == side.eid:
+            ms = u.moveset.get(slot)
+            if ms is not None and ms.cooldown_remaining <= 0.0:
+                return None
+            side.aa_block_slot = None
+        return orig_aa(u)
+    m._pokemon_auto_attack = auto_attack
+    for _ in range(6):                                 # stadi e scelte del bot, subito
+        m._update_evolution(0)
+    dummy.passive_id = ""
     for q in w.pokemons():
         q.is_bot = False
         q.order, q.path = "stop", []
@@ -298,9 +352,36 @@ def reset_round(side, dummy, pos):
             ms.cooldown_remaining = 0.0
             if ms.chosen is not None and ms.chosen.charges > 0:
                 ms.charges_cur = float(ms.chosen.charges)
-    for lst in ("projectiles", "avalanches", "legion_waves", "pain_binds", "spirit_beams",
-                "thunders", "blizzards", "future_sights", "wishes", "swift_stars"):
-        getattr(m, lst, []).clear()
+    # Ricariche delle passive (Spirito Vagante, Scalaroccia...): pronte a ogni giro.
+    # Il giro prima, online, è finito qualche tick dopo (latenza), e una passiva che
+    # torna pronta proprio in quel margine scatterebbe solo da una parte.
+    for name in list(vars(p)):
+        if name.endswith("_ready_at") and isinstance(getattr(p, name), (int, float)):
+            setattr(p, name, 0.0)
+    # Effetti rimasti dal giro prima (bufere, nubi, proiettili...): tutte le liste
+    # del registro (net/visual.LISTS), più le speciali. Restano le condivise
+    # (fiori, schegge...), che sono risorse di chi lancia.
+    for lst in (*LISTS, "pain_binds", "wishes", "area_effects", "rain_zones", "rock_waves",
+                "rock_charges", "smackdown_zones", "channels"):
+        v = getattr(m, lst, None)
+        if isinstance(v, list):
+            v.clear()
+    # Accumuli e marchi sul BERSAGLIO (Gelo, veleno, cariche...) tornano a zero.
+    for name, off in UNIT_FLAGS.items():
+        if name != "flower_color" and hasattr(dummy, name):
+            setattr(dummy, name, off)
+    # Spiriti di Spiritomb: compaiono a caso nel tempo, quindi online e offline ne
+    # avrebbero di diversi. Si riparte da UNO solo, nello stesso punto (lo spot
+    # libero più vicino), così Richiamo/Accompagnatore/Inseguimento si confrontano.
+    if hasattr(m.world, "spirits"):
+        m.world.spirits.clear()
+        if hasattr(m, "_spirit_candidates") and p.passive_id == "108spiriti":
+            from engine.entities import Spirit
+            spots = m._spirit_candidates()
+            if spots:
+                c = min(spots, key=lambda v: (v.dist(pos), v.x, v.y))
+                m.world.spirits.append(Spirit(pos=Vec2(c.x, c.y), owner_id=p.id, team=p.team,
+                                              born=m.time, seed=7))
 
 
 def statuses(u, now):
@@ -310,6 +391,8 @@ def statuses(u, now):
 
 def run_pair(idx, choice):
     errors = []
+    random.seed(idx * 10 + choice)
+    _DRAFT_SEED[0] = idx * 10 + choice                 # stesso avversario a ogni collaudo
     on = Online(idx, choice, errors)
     off = Offline(idx, on.h.draft.entries)
     rows = []
@@ -329,6 +412,7 @@ def run_pair(idx, choice):
         res = {}
         for side in (on, off):
             d = dums[side]
+            side.aa_block_slot = None if sl == "AA" else sl
             reset_round(side, d, pos[side])
             side.pump(0.3)
             reset_round(side, d, pos[side])
@@ -343,6 +427,7 @@ def run_pair(idx, choice):
                 side.fx_kinds.clear()
                 seen_vis = set()
                 mirrored = set()
+            random.seed(1000 + k)                      # stessi numeri casuali online e offline
             if sl == "AA":
                 side.attack(d.id)
             else:
