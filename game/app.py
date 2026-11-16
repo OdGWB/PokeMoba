@@ -78,10 +78,14 @@ class App:
         _set_dpi_aware()
         pygame.init()
         _set_app_icon()
+        opts = load_options()
+        from . import audio
+        audio.init(opts)
+        self.fps_cap = int(opts.get("fps_cap", 120) or 0)   # 0 = senza limite
         self.windowed_size = (config.WINDOW_WIDTH, config.WINDOW_HEIGHT)
         self.fullscreen = False
         self.window = pygame.display.set_mode(self.windowed_size, pygame.RESIZABLE)
-        if load_options().get("fullscreen"):
+        if opts.get("fullscreen"):
             self.set_fullscreen(True)
         pygame.display.set_caption(config.WINDOW_TITLE)
         self.lowres = pygame.Surface((config.LOWRES_WIDTH, config.LOWRES_HEIGHT)).convert()
@@ -127,9 +131,17 @@ class App:
     def _toggle_fullscreen(self):
         self.set_fullscreen(not self.fullscreen)
 
+    def _sync_music(self):
+        from . import audio
+        if audio.scene_wants_menu_music(self.scene):
+            audio.play_music()
+        else:
+            audio.stop_music()
+
     def run(self):
+        self._sync_music()
         while self.running:
-            dt = min(self.clock.tick(120) / 1000.0, MAX_FRAME_DT)
+            dt = min(self.clock.tick(self.fps_cap) / 1000.0, MAX_FRAME_DT)
             events = pygame.event.get()
             for ev in events:
                 if ev.type == pygame.QUIT:
@@ -156,6 +168,7 @@ class App:
             if nxt is not None:
                 self.scene.next_scene = None
                 self.scene = nxt
+                self._sync_music()
 
         if self.server is not None:
             self.server.stop()

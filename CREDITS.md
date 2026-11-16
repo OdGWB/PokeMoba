@@ -215,6 +215,13 @@ Pokémon e i relativi nomi, personaggi e tipi sono © Nintendo / Game Freak /
 The Pokémon Company. Questo è un progetto amatoriale, senza scopo di lucro e
 non ufficiale, non affiliato né approvato dai detentori dei diritti.
 
+## Musica del menu
+
+- `assets/audio/menu_music.mp3`: **"Before the Gate Opens"**, brano fornito
+  dallo sviluppatore del progetto per la musica del menu principale. I diritti
+  restano del suo autore; il file non contiene metadati (titolo/autore/licenza)
+  oltre al nome.
+
 ## Icone degli oggetti
 
 Le icone degli oggetti del negozio sono gli **sprite originali degli strumenti
