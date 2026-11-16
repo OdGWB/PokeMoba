@@ -34,6 +34,8 @@ import pygame
 import pygame.surfarray
 
 import config
+
+from . import map_cache
 from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
                          TILE_RIVER, TILE_WALL)
 
@@ -293,7 +295,11 @@ class MapRenderer:
     def ensure_built(self, grid) -> None:
         """Costruisce i layer se mancano o se la griglia e cambiata."""
         if self._grid is not grid or not self.layers:
-            self.build(grid)
+            # Cache su disco (game/map_cache.py): la stessa mappa con lo stesso
+            # codice di disegno si ricarica in ~1 s invece di ricostruirla.
+            if not map_cache.load(self, grid, _Layer):
+                self.build(grid)
+                map_cache.save(self, grid, self.LAYER_NAMES)
 
     def build(self, grid) -> None:
         ts = self.tile_size

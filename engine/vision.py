@@ -14,22 +14,58 @@ Regole:
   - Le strutture non vengono nascoste (sono elementi fissi noti della mappa);
     la nebbia nasconde solo le unità nemiche.
 
-Prestazioni: il calcolo (costoso) viene rifatto SOLO quando una fonte di visione
-cambia tile (o compare/sparisce); il disegno della nebbia è a parte, nel client.
+Prestazioni: il calcolo viene rifatto SOLO quando una fonte di visione cambia
+tile (o compare/sparisce); il disegno della nebbia è a parte, nel client.
+I tile visibili ed esplorati sono MASCHERE numpy (righe = y, colonne = x): ogni
+fonte "timbra" un disco precalcolato del suo raggio, invece di aggiungere a un
+insieme Python tile per tile (in un 5v5 con le ondate era ~1/5 del frame).
 """
 from __future__ import annotations
+
+import numpy as np
 
 from .entities import Structure, Unit
 from .grid import TILE_BUSH
 
 BUSH_REVEAL = 2.6   # tile: un alleato entro questa distanza rivela il nemico nel cespuglio
 
+_DISCS: dict = {}
+
+
+def _disc(r: int):
+    """Disco di raggio r tile (dx*dx + dy*dy <= r*r), lato 2r+1, in cache."""
+    d = _DISCS.get(r)
+    if d is None:
+        k = np.arange(-r, r + 1)
+        d = _DISCS[r] = (k[None, :] ** 2 + k[:, None] ** 2) <= r * r
+    return d
+
+
+class TileMask:
+    """Maschera booleana di tile (mask[y, x]) che si interroga come un insieme di
+    coppie (x, y): `(x, y) in m`, `len(m)` (tile accesi), `bool(m)`."""
+    __slots__ = ("mask",)
+
+    def __init__(self, mask):
+        self.mask = mask
+
+    def __contains__(self, xy) -> bool:
+        x, y = xy
+        h, w = self.mask.shape
+        return 0 <= x < w and 0 <= y < h and bool(self.mask[y, x])
+
+    def __len__(self) -> int:
+        return int(np.count_nonzero(self.mask))
+
+    def __bool__(self) -> bool:
+        return bool(self.mask.any())
+
 
 class VisionSystem:
     def __init__(self, grid):
         self.grid = grid
-        self.visible_tiles: dict[int, set] = {}
-        self.explored: dict[int, set] = {}
+        self.visible_tiles: dict[int, TileMask] = {}
+        self.explored: dict[int, TileMask] = {}
         self.visible_enemies: dict[int, set] = {}
         self.version: dict[int, int] = {}   # incrementa a ogni ricalcolo (per cache UI)
         self._sig: dict[int, frozenset] = {}
@@ -79,20 +115,22 @@ class VisionSystem:
         self.version[team] = self.version.get(team, 0) + 1
 
         w, h = self.grid.width, self.grid.height
-        vis: set = set()
+        vm = np.zeros((h, w), dtype=bool)
         for e in sources:
             cx, cy = int(e.pos.x), int(e.pos.y)
             r = int(getattr(e, "vision", 0))
-            r2 = r * r
-            for y in range(max(0, cy - r), min(h, cy + r + 1)):
-                dy = y - cy
-                for x in range(max(0, cx - r), min(w, cx + r + 1)):
-                    dx = x - cx
-                    if dx * dx + dy * dy <= r2:
-                        vis.add((x, y))
-        self.visible_tiles[team] = vis
-        exp = self.explored.setdefault(team, set())
-        exp |= vis
+            x0, x1 = max(0, cx - r), min(w, cx + r + 1)
+            y0, y1 = max(0, cy - r), min(h, cy + r + 1)
+            if x0 >= x1 or y0 >= y1:
+                continue
+            d = _disc(r)
+            vm[y0:y1, x0:x1] |= d[y0 - (cy - r):y1 - (cy - r), x0 - (cx - r):x1 - (cx - r)]
+        self.visible_tiles[team] = TileMask(vm)
+        exp = self.explored.get(team)
+        if exp is None or exp.mask.shape != vm.shape:
+            self.explored[team] = TileMask(vm.copy())
+        else:
+            exp.mask |= vm
 
         # Unità nemiche visibili (con la regola dei cespugli).
         enemies: set = set()
@@ -103,7 +141,7 @@ class VisionSystem:
             if any((u.pos.x - x) ** 2 + (u.pos.y - y) ** 2 <= r * r for x, y, r in reveals):
                 enemies.add(u.id)   # ping: visibile anche in nebbia, cespuglio o invisibile
                 continue
-            if (tx, ty) not in vis:
+            if not (0 <= tx < w and 0 <= ty < h) or not vm[ty, tx]:
                 continue
             if getattr(u, "invisible", False):   # Memento: invisibile ai nemici
                 continue
@@ -117,10 +155,12 @@ class VisionSystem:
 
     # --- interrogazioni ------------------------------------------------------
     def is_tile_visible(self, team: int, x: int, y: int) -> bool:
-        return (x, y) in self.visible_tiles.get(team, ())
+        v = self.visible_tiles.get(team)
+        return v is not None and (x, y) in v
 
     def is_tile_explored(self, team: int, x: int, y: int) -> bool:
-        return (x, y) in self.explored.get(team, ())
+        e = self.explored.get(team)
+        return e is not None and (x, y) in e
 
     def is_enemy_visible(self, team: int, unit_id: int) -> bool:
         return unit_id in self.visible_enemies.get(team, ())

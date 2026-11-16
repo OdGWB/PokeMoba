@@ -34,8 +34,6 @@ class Minimap:
         self.mh = int(h * self.scale)
         self.base = self._render_base()
         self._fog = None
-        self._exp_mask = None
-        self._exp_len = -1
         self.rect = pygame.Rect(0, 0, self.mw, self.mh)  # aggiornato al draw
 
     def _render_base(self):
@@ -53,28 +51,19 @@ class Minimap:
     def rebuild_fog(self, vision, team):
         """Ricostruisce l'overlay di nebbia (solo quando la visione cambia).
 
-        Una immagine RGBA a risoluzione di TILE costruita con numpy (visibile =
-        trasparente, esplorato = velo leggero, mai visto = velo scuro) e poi scalata
-        NEAREST alla dimensione della minimappa: un'operazione sola invece di un
-        `fill` per ogni tile (prima ~40 ms a chiamata, ora ~1 ms)."""
+        Una immagine RGBA a risoluzione di TILE costruita con numpy dalle maschere
+        della visione (visibile = trasparente, esplorato = velo leggero, mai visto =
+        velo scuro) e poi scalata NEAREST alla dimensione della minimappa."""
         w, h = self.grid.width, self.grid.height
-        exp = vision.explored.get(team) or ()
-        if len(exp) != self._exp_len or self._exp_mask is None:
-            # L'esplorato cresce soltanto: la maschera si rifa solo quando cambia.
-            self._exp_len = len(exp)
-            m = np.zeros((h, w), dtype=bool)
-            if exp:
-                pts = np.array(list(exp), dtype=np.intp)
-                m[pts[:, 1], pts[:, 0]] = True
-            self._exp_mask = m
         img = np.empty((h, w, 4), dtype=np.uint8)
         img[:] = _FOG_UNSEEN
-        img[self._exp_mask] = _FOG_SEEN
+        exp = vision.explored.get(team)
+        if exp is not None:
+            img[exp.mask] = _FOG_SEEN
         vis = vision.visible_tiles.get(team)
-        if vis:
-            pts = np.array(list(vis), dtype=np.intp)
-            img[pts[:, 1], pts[:, 0]] = 0
-        small = pygame.image.frombuffer(img.tobytes(), (w, h), "RGBA")
+        if vis is not None:
+            img[vis.mask] = 0
+        small = pygame.image.frombuffer(img.tobytes(), (w, h), "RGBA").convert_alpha()
         self._fog = pygame.transform.scale(small, (self.mw, self.mh))
 
     # --- conversioni ---------------------------------------------------------
@@ -96,7 +85,7 @@ class Minimap:
         surface.blit(self.base, self.rect)
         if self._fog is not None:
             surface.blit(self._fog, self.rect)
-        explored = vision.explored.get(player_team, set()) if vision is not None else None
+        explored = vision.explored.get(player_team, ()) if vision is not None else None
 
         # Tane (se esplorate).
         for name, (dx, dy) in (dens or {}).items():

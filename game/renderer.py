@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import numpy as np
 import pygame
 
 import math
@@ -30,6 +31,8 @@ from .sprites.animator import SpriteAnimator
 # Palette greybox (sostituita dai tileset in futuro).
 COL_BG = (18, 20, 24)
 _TOWER_RANGE_DEFAULT = config.TOWER_RANGE   # tile: fallback gittata (es. in rete)
+_FOG_UNSEEN = (6, 7, 12, 235)    # nebbia: tile mai visto (quasi nero)
+_FOG_SEEN = (8, 10, 16, 110)     # nebbia: tile esplorato ma non visibile ora
 TILE_COLORS = {
     0: (58, 92, 62),     # erba / giungla
     TILE_LANE: (150, 134, 92),    # strada
@@ -131,6 +134,9 @@ class Renderer:
         self._now = 0.0
         self.tile_size = tile_size
         self._tile_cache: dict = {}   # (ts, tile_type, variant) -> Surface
+        self._fog_key = None          # nebbia in cache (camera + versione della visione)
+        self._fog_surf = None
+        self._fog_pos = (0, 0)
         # Mappa statica in layer pre-renderizzati (costruiti al primo draw).
         self.map = MapRenderer(self, tile_size)
 
@@ -768,22 +774,42 @@ class Renderer:
             pygame.draw.circle(surface, col, S(ox, oy), r, 1)
 
     def _draw_fog(self, surface, camera, grid, vision, team):
-        """Nebbia di guerra: scuro dove non visibile, penombra dove esplorato."""
+        """Nebbia di guerra: scuro dove non visibile, penombra dove esplorato.
+
+        Si costruisce un'immagine a risoluzione di TILE (numpy, dalle maschere della
+        visione) per i tile che coprono lo schermo e la si scala NEAREST di
+        tile_size: un'operazione sola invece di un fill per tile. Rifatta solo se
+        la camera o la visione cambiano."""
         ts = self.tile_size
-        x0, y0, x1, y1 = camera.visible_tile_bounds(ts, grid.width, grid.height)
-        fog = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
-        fog.fill((6, 7, 12, 235))                       # non esplorato (quasi nero)
-        vis = vision.visible_tiles.get(team, set())
-        exp = vision.explored.get(team, set())
-        for ty in range(y0, y1):
-            for tx in range(x0, x1):
-                sx, sy = camera.world_to_screen(tx * ts, ty * ts)
-                rect = pygame.Rect(sx, sy, ts, ts)
-                if (tx, ty) in vis:
-                    fog.fill((0, 0, 0, 0), rect)          # pienamente visibile
-                elif (tx, ty) in exp:
-                    fog.fill((8, 10, 16, 110), rect)      # esplorato: penombra
-        surface.blit(fog, (0, 0))
+        W, H = surface.get_size()
+        ox, oy = camera.ox, camera.oy
+        key = (ox, oy, W, H, team, id(vision), vision.version.get(team, 0))
+        if key != self._fog_key:
+            self._fog_key = key
+            tx0, ty0 = ox // ts, oy // ts
+            tx1, ty1 = (ox + W) // ts + 1, (oy + H) // ts + 1
+            nw, nh = tx1 - tx0, ty1 - ty0
+            img = np.empty((nh, nw, 4), dtype=np.uint8)
+            img[:] = _FOG_UNSEEN                              # non esplorato (quasi nero)
+            gx0, gy0 = max(0, tx0), max(0, ty0)
+            gx1, gy1 = min(grid.width, tx1), min(grid.height, ty1)
+            if gx0 < gx1 and gy0 < gy1:
+                sub = img[gy0 - ty0:gy1 - ty0, gx0 - tx0:gx1 - tx0]
+                exp = vision.explored.get(team)
+                if exp is not None:
+                    sub[exp.mask[gy0:gy1, gx0:gx1]] = _FOG_SEEN   # esplorato: penombra
+                vis = vision.visible_tiles.get(team)
+                if vis is not None:
+                    sub[vis.mask[gy0:gy1, gx0:gx1]] = 0          # pienamente visibile
+            # convert_alpha PRIMA di scalare: col formato grezzo di frombuffer sia la
+            # scala sia il blit passano dalla conversione lenta (~7 ms contro ~0,6).
+            small = pygame.image.frombuffer(img.tobytes(), (nw, nh), "RGBA").convert_alpha()
+            size = (nw * ts, nh * ts)
+            if self._fog_surf is None or self._fog_surf.get_size() != size:
+                self._fog_surf = pygame.Surface(size, pygame.SRCALPHA).convert_alpha()
+            pygame.transform.scale(small, size, self._fog_surf)
+            self._fog_pos = (tx0 * ts - ox, ty0 * ts - oy)
+        surface.blit(self._fog_surf, self._fog_pos)
 
     def _draw_respawns(self, surface, camera, respawning):
         """Marcatore di respawn alla base: un anello che si riempie col tempo."""

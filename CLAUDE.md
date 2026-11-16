@@ -1157,6 +1157,30 @@ Passaggi completati:
   prende l'oro (FXSystem.me = id del proprio Pokemon, impostato da entrambe le
   scene). Online: eventi via enc_fx (verificato andata/ritorno), filtrati da
   fx_visible sulla posizione. Screenshot: step_56_minion_seq, step_56_wild_seq.
+- PRESTAZIONI: visione, nebbia, line_of_sight, A* e cache della mappa (step_57).
+  Stessi risultati di prima (verificati su scenari casuali contro il codice vecchio:
+  0 differenze), solo piu' veloci. (1) engine/vision.py: tile visibili ed esplorati
+  sono MASCHERE numpy (TileMask: si interroga ancora come insieme, `(x, y) in m`),
+  ogni fonte timbra un disco precalcolato del suo raggio. (2) Nebbia del renderer
+  (Renderer._draw_fog) e della minimappa costruite dalle maschere a risoluzione di
+  tile e scalate NEAREST una volta (convert_alpha PRIMA di scalare: col formato
+  grezzo di frombuffer era 10x piu' lento); la nebbia si rifa solo se cambiano
+  camera o visione. Corretto un difetto vecchio: Surface.fill con un rettangolo che
+  parte da coordinate negative lo SPOSTA a 0 invece di ritagliarlo, quindi la prima
+  riga/colonna di tile parzialmente fuori schermo mostrava lo stato sbagliato.
+  (3) engine/grid.py: le righe della griglia sono liste che a ogni scrittura fanno
+  avanzare grid._ver; da li' maschere numpy dei bloccanti in cache. line_of_sight
+  sopra i 24 campioni (minion verso il prossimo punto della lane, ~200 campioni) li
+  calcola in numpy con la stessa aritmetica. A* (engine/pathfinding.find_path) su
+  una lista piatta di calpestabilita' con bordo (grid.walk_flags): stessi vicini,
+  costi e spareggio, percorsi identici, ~3,5x piu' veloce. (4) game/map_cache.py:
+  i layer pre-renderizzati si salvano in %APPDATA%/PokeMoba/cache (intestazione
+  JSON + blocchi zlib, niente pickle; scrittura in un thread, atomica; max 4 file)
+  e si ricaricano in ~1 s. La chiave contiene griglia, campi, tile, versioni di
+  pygame/numpy e l'HASH dei sorgenti di disegno (map_renderer.py, renderer.py,
+  fx.py, config.py): una modifica grafica invalida la cache da sola.
+  POKEMOBA_NO_MAP_CACHE=1 la disattiva. Screenshot: screenshots/step_57.png
+  (identico al codice vecchio nello stesso istante).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

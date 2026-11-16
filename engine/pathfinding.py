@@ -17,12 +17,6 @@ _NEIGHBORS = [
 ]
 
 
-def _heuristic(ax: int, ay: int, bx: int, by: int) -> float:
-    """Distanza octile: coerente col movimento a 8 direzioni e ammissibile."""
-    dx, dy = abs(ax - bx), abs(ay - by)
-    return (dx + dy) + (_SQRT2 - 2.0) * min(dx, dy)
-
-
 def find_path(grid: Grid, start: tuple[int, int], goal: tuple[int, int],
               block_bush: bool = False) -> list[tuple[int, int]]:
     """A* fra due tile. Ritorna la lista di tile (start..goal) o [] se irraggiungibile.
@@ -39,52 +33,57 @@ def find_path(grid: Grid, start: tuple[int, int], goal: tuple[int, int],
     if start == goal:
         return [start]
 
-    open_heap: list[tuple[float, int, tuple[int, int]]] = []
+    # Nodi = indici in una lista piatta di calpestabilita' con un bordo non
+    # calpestabile (niente controlli dei confini); stesso ordine dei vicini, stessi
+    # costi e stesso spareggio di prima, quindi lo stesso percorso, ~3x piu' veloce.
+    walk, stride = grid.walk_flags(block_bush)
+    steps = [(dx, dy, cost, dy * stride + dx) for dx, dy, cost in _NEIGHBORS]
+    sq2m2 = _SQRT2 - 2.0
+    s_id = (sy + 1) * stride + sx + 1
+    g_id = (gy + 1) * stride + gx + 1
+    open_heap: list = [(0.0, 0, s_id, sx, sy)]
     counter = 0  # tie-breaker stabile per l'heap
-    heapq.heappush(open_heap, (0.0, counter, start))
-    came_from: dict[tuple[int, int], tuple[int, int]] = {}
-    g_score: dict[tuple[int, int], float] = {start: 0.0}
-    closed: set[tuple[int, int]] = set()
+    came_from: dict = {}
+    g_score: dict = {s_id: 0.0}
+    closed: set = set()
+    push, pop, inf = heapq.heappush, heapq.heappop, math.inf
 
     while open_heap:
-        _, _, current = heapq.heappop(open_heap)
-        if current == goal:
-            return _reconstruct(came_from, current)
-        if current in closed:
+        _, _, cur, cx, cy = pop(open_heap)
+        if cur == g_id:
+            path = [(cx, cy)]
+            while cur in came_from:
+                cur = came_from[cur]
+                y, x = divmod(cur, stride)
+                path.append((x - 1, y - 1))
+            path.reverse()
+            return path
+        if cur in closed:
             continue
-        closed.add(current)
-
-        cx, cy = current
-        for dx, dy, cost in _NEIGHBORS:
-            nx, ny = cx + dx, cy + dy
-            if not grid.is_walkable(nx, ny, block_bush):
+        closed.add(cur)
+        g_cur = g_score[cur]
+        for dx, dy, cost, off in steps:
+            nb = cur + off
+            if not walk[nb]:
                 continue
             if dx != 0 and dy != 0:
                 # No corner cutting attraverso i muri (o i cespugli, per i minion).
-                if (not grid.is_walkable(cx + dx, cy, block_bush)
-                        or not grid.is_walkable(cx, cy + dy, block_bush)):
+                if not walk[cur + dx] or not walk[cur + dy * stride]:
                     continue
-            neighbor = (nx, ny)
-            if neighbor in closed:
+            if nb in closed:
                 continue
-            tentative = g_score[current] + cost
-            if tentative < g_score.get(neighbor, math.inf):
-                came_from[neighbor] = current
-                g_score[neighbor] = tentative
-                f = tentative + _heuristic(nx, ny, gx, gy)
+            tentative = g_cur + cost
+            if tentative < g_score.get(nb, inf):
+                came_from[nb] = cur
+                g_score[nb] = tentative
+                nx, ny = cx + dx, cy + dy
+                # Distanza octile: coerente col movimento a 8 direzioni e ammissibile.
+                hx, hy = abs(nx - gx), abs(ny - gy)
+                f = tentative + ((hx + hy) + sq2m2 * (hx if hx < hy else hy))
                 counter += 1
-                heapq.heappush(open_heap, (f, counter, neighbor))
+                push(open_heap, (f, counter, nb, nx, ny))
 
     return []
-
-
-def _reconstruct(came_from: dict, current: tuple[int, int]) -> list[tuple[int, int]]:
-    path = [current]
-    while current in came_from:
-        current = came_from[current]
-        path.append(current)
-    path.reverse()
-    return path
 
 
 def smooth_path(grid: Grid, tile_path: list[tuple[int, int]],
