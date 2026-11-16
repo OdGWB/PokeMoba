@@ -1225,7 +1225,7 @@ Passaggi completati:
   Screenshot: step_59_opzioni, step_59_tasti.
 - LINEE VECCHIE portate al livello delle nuove (punto 24), una per passo. Eevee
   (eevee_fx) e Spiritomb (spirit_fx) avevano gia' un modulo; Roggenrola ha effetti
-  su misura in fx.py. Restano da fare: Totodile, Nincada, Poliwag.
+  su misura in fx.py. Restano da fare: Nincada, Poliwag.
   Registro: fx_lines.FX_LINES; ogni modulo puo' esporre anche AA_TRAVEL
   (forma -> frazione del volo, per gli attacchi base a ricerca: fx._AA_TRAVEL).
 - LINEA CHARMANDER > CHARMELEON > CHARIZARD (step_60), nuovo game/char_fx.py.
@@ -1329,6 +1329,28 @@ Passaggi completati:
   erboscivolata, campoerboso, avvolgibotta/_allunga/_stretta, laccioerboso/
   _corsa, erbapatto/_colpo, verdebufera/_tick, vastoimpatto/_balzo/_dopo,
   inversione/_sovraccarico).
+- LINEA TOTODILE > CROCONAW > FERALIGATR (step_64), nuovo game/totodile_fx.py.
+  Nomi "fx" nel JSON (attack_fx "totonip" su tutte le forme, toto* sulle mosse)
+  e pochi TAG COSMETICI nel motore: _cast_cone mette "hits" (lista PIATTA
+  [x0, y0, x1, y1...], max 4 colpiti: annidata non passerebbe da enc_fx) per
+  disegnare i morsi SUI colpiti, la riemersione di Sub (_emerge) porta mv.fx.
+  Forme: getto d'acqua con testa e spruzzo (totojet: Pistolacqua, Idropompa;
+  testa piccola, larga sembrava un pallone), bolle (totobubble), FAUCI a due
+  mezzelune con gengive ROSSE e denti verso il centro che si chiudono (totojaws:
+  attacco base, Morso, Sgranocchio, Gelodenti in azzurro; la prima a due barre
+  dritte sembrava una graffetta e le gengive scure sparivano sugli sprite
+  chiari), occhi minacciosi (totoeyes: Visotruce, con archi CORTI incinroar),
+  aura di Dragodanza (totoaura), scia di Acquagetto (totowake), colonna d'acqua
+  TRASLUCIDA con corona di schiuma (totosplash: tuffo, riemersione e geyser di
+  Sub; piena e col cappello ellittico sembrava un tubo). Idropulsar in volo
+  (world_fx.draw_projectiles -> totodile_fx.draw_projectile): sfera d'acqua con
+  anelli che pulsano, stelline della confusione all'impatto. Sulle unita' (a
+  tutti, dex 158-160): Oltraggio = 5 fiammelle rosse piccole che tremolano +
+  vapore dalla testa finche' dura rampage_until (grandi coprivano lo sprite).
+  Riusa impactstar (piccola), incinroar, flake, ring, flash. Screenshot:
+  step_64_* (attacco, pistolacqua/_colpo, idropompa/_colpo, idropulsar_volo/
+  _colpo/_confuso, morso/_chiuso, sgranocchio, gelodenti, visotruce,
+  dragodanza, acquagetto, sub_tuffo/_riemersione/_geyser, oltraggio/_dopo).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

@@ -2656,8 +2656,10 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
             if center.dist(e.pos) <= mv.radius + getattr(e, "radius", 0.0):
                 self._hit(p, mv, rank, e)   # onda d'urto in riemersione
         p.stop()
-        self.fx_events.append({"kind": "area", "c": (center.x, center.y),
-                               "radius": mv.radius, "mtype": mv.type})
+        ev = {"kind": "area", "c": (center.x, center.y), "radius": mv.radius, "mtype": mv.type}
+        if mv.fx:   # solo grafica: geyser della riemersione (linea Totodile)
+            ev["fx"] = mv.fx
+        self.fx_events.append(ev)
 
     # --- mosse della linea Charmander ----------------------------------------
     def _cast_flamethrower(self, p, mv, rank, origin, dirv):
@@ -3358,6 +3360,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
 
     def _cast_cone(self, p, mv, rank, origin, dirv):
         half = math.radians(mv.angle)
+        hits = []   # cosmetico: dove sono i colpiti (morsi della linea Totodile)
         for e in self._combat_hash.query_radius(origin.x, origin.y, mv.range + 1.0):
             if e.team == p.team or not getattr(e, "alive", False):
                 continue
@@ -3371,10 +3374,14 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                 if math.acos(max(-1.0, min(1.0, cosang))) > half:
                     continue
             self._hit(p, mv, rank, e)
+            if len(hits) < 8:   # piatta [x0, y0, x1, y1, ...]: passa online (enc_fx)
+                hits += [round(e.pos.x, 2), round(e.pos.y, 2)]
         ev = {"kind": "cone", "o": (origin.x, origin.y), "dir": (dirv.x, dirv.y),
               "range": mv.range, "angle": mv.angle, "mtype": mv.type}
         if mv.fx:   # anche i tick del Lanciafiamme (fuori da _cast_move): solo grafica
             ev["fx"] = mv.fx
+            if hits:
+                ev["hits"] = hits
         self.fx_events.append(ev)
 
     def _cast_area(self, p, mv, rank, origin, tgt):

@@ -10,55 +10,56 @@
   "base_speed": 3.6,
   "sprite_dir": "assets/pokemon/0158",
   "passive": "forzabruta",
+  "attack_fx": "totonip",
 
   "base_stats": {"hp": 50, "attack": 65, "defense": 64, "sp_attack": 44, "sp_defense": 48, "speed": 43},
 
   "evolutions": [
-    {"stage": 0, "level": 1, "name": "Totodile", "dex": 158, "sprite_dir": "assets/pokemon/0158", "radius": 0.44, "base_stats": {"hp": 50, "attack": 65, "defense": 64, "sp_attack": 44, "sp_defense": 48, "speed": 43}},
-    {"stage": 1, "level": 4, "name": "Croconaw", "dex": 159, "sprite_dir": "assets/pokemon/0159", "radius": 0.52, "base_stats": {"hp": 65, "attack": 80, "defense": 80, "sp_attack": 59, "sp_defense": 63, "speed": 58}},
-    {"stage": 2, "level": 8, "name": "Feraligatr", "dex": 160, "sprite_dir": "assets/pokemon/0160", "radius": 0.62, "base_stats": {"hp": 85, "attack": 105, "defense": 100, "sp_attack": 79, "sp_defense": 83, "speed": 78}}
+    {"stage": 0, "level": 1, "name": "Totodile", "attack_fx": "totonip", "dex": 158, "sprite_dir": "assets/pokemon/0158", "radius": 0.44, "base_stats": {"hp": 50, "attack": 65, "defense": 64, "sp_attack": 44, "sp_defense": 48, "speed": 43}},
+    {"stage": 1, "level": 4, "name": "Croconaw", "attack_fx": "totonip", "dex": 159, "sprite_dir": "assets/pokemon/0159", "radius": 0.52, "base_stats": {"hp": 65, "attack": 80, "defense": 80, "sp_attack": 59, "sp_defense": 63, "speed": 58}},
+    {"stage": 2, "level": 8, "name": "Feraligatr", "attack_fx": "totonip", "dex": 160, "sprite_dir": "assets/pokemon/0160", "radius": 0.62, "base_stats": {"hp": 85, "attack": 105, "defense": 100, "sp_attack": 79, "sp_defense": 83, "speed": 78}}
   ],
 
   "moves": {
     "Q": {
-      "base": {"id": "watergun", "name": "Pistolacqua", "type": "Water", "category": "special", "shape": "projectile",
+      "base": {"id": "watergun", "fx": "totowatergun", "name": "Pistolacqua", "type": "Water", "category": "special", "shape": "projectile",
                "target": "direction", "power": [44, 70, 90, 115], "ratio": 0.7,
                "cooldown": [4.5, 4, 3.5, 3], "range": 7, "radius": 0.5, "speed": 11},
       "upgrades": [
-        {"id": "hydropump", "name": "Idropompa", "type": "Water", "category": "special", "shape": "projectile",
+        {"id": "hydropump", "fx": "totohydropump", "name": "Idropompa", "type": "Water", "category": "special", "shape": "projectile",
          "target": "direction", "power": [90, 130, 170, 210], "ratio": 1.25,
          "cooldown": [7, 6.5, 6, 5.5], "range": 10, "radius": 0.6, "speed": 13},
-        {"id": "hydropulse", "name": "Idropulsar", "type": "Water", "category": "special", "shape": "bubble",
+        {"id": "hydropulse", "fx": "totopulse", "name": "Idropulsar", "type": "Water", "category": "special", "shape": "bubble",
          "target": "direction", "power": [65, 95, 130, 160], "ratio": 0.95,
          "cooldown": [7, 6.5, 6, 5.5], "range": 8, "radius": 0.7, "speed": 9,
          "effects": {"confuse": {"duration": 0.9}}}
       ]
     },
     "W": {
-      "base": {"id": "bite", "name": "Morso", "type": "Dark", "category": "physical", "shape": "cone",
+      "base": {"id": "bite", "fx": "totobite", "name": "Morso", "type": "Dark", "category": "physical", "shape": "cone",
                "target": "direction", "power": [44, 70, 90, 115], "ratio": 0.7,
                "cooldown": [5, 4.5, 4, 3.5], "range": 2.3, "angle": 55,
                "effects": {"stun": {"duration": 0.45}}},
       "upgrades": [
-        {"id": "crunch", "name": "Sgranocchio", "type": "Dark", "category": "physical", "shape": "cone",
+        {"id": "crunch", "fx": "totocrunch", "name": "Sgranocchio", "type": "Dark", "category": "physical", "shape": "cone",
          "target": "direction", "power": [70, 110, 145, 180], "ratio": 1.1,
          "cooldown": [6, 5.5, 5, 4.5], "range": 2.6, "angle": 55,
          "effects": {"def_debuff": {"amount": 25, "duration": 3.5}}},
-        {"id": "icefang", "name": "Gelodenti", "type": "Ice", "category": "none", "shape": "cone",
+        {"id": "icefang", "fx": "totoicefang", "name": "Gelodenti", "type": "Ice", "category": "none", "shape": "cone",
          "target": "direction", "power": [0, 0, 0, 0],
          "cooldown": [10, 9.5, 9, 8.5], "range": 2.6, "angle": 50,
          "effects": {"freeze": {"duration": 1.4}}}
       ]
     },
     "E": {
-      "base": {"id": "scaryface", "name": "Visotruce", "type": "Normal", "category": "none", "shape": "cone",
+      "base": {"id": "scaryface", "fx": "totoscary", "name": "Visotruce", "type": "Normal", "category": "none", "shape": "cone",
                "target": "direction", "cooldown": [9, 8.5, 8, 7.5], "range": 4.2, "angle": 60,
                "effects": {"slow": {"mult": 0.55, "duration": 1.6}}},
       "upgrades": [
-        {"id": "dragondance", "name": "Dragodanza", "type": "Dragon", "category": "none", "shape": "buff",
+        {"id": "dragondance", "fx": "totodragondance", "name": "Dragodanza", "type": "Dragon", "category": "none", "shape": "buff",
          "target": "self", "cooldown": [14, 13, 12, 11],
          "effects": {"atk": {"mult": 1.4, "duration": 5}, "speed": {"mult": 1.3, "duration": 5}}},
-        {"id": "aquajet", "name": "Acquagetto", "type": "Water", "category": "physical", "shape": "dash",
+        {"id": "aquajet", "fx": "totoaquajet", "name": "Acquagetto", "type": "Water", "category": "physical", "shape": "dash",
          "target": "direction", "power": [0, 0, 0, 0],
          "cooldown": [7, 6.5, 6, 5.5], "range": 5.5, "radius": 1.0,
          "effects": {"speed": {"mult": 1.2, "duration": 1.5}}}
@@ -66,12 +67,12 @@
     },
     "R": {
       "upgrades": [
-        {"id": "dig", "name": "SUB", "type": "Water", "category": "physical", "shape": "sub",
+        {"id": "dig", "fx": "totodig", "name": "SUB", "type": "Water", "category": "physical", "shape": "sub",
          "target": "point", "power": [175, 265, 350], "ratio": 1.5,
          "cooldown": [85, 75, 65], "range": 6.5, "radius": 2.3,
          "_comment": "SUB: ci si inabissa (intargetabili) e si resta liberi di muoversi per 'duration' secondi; si riemerge a tempo o ri-premendo R, facendo danno ad area attorno al punto raggiunto.",
          "effects": {"untargetable": {"duration": 3.0}}},
-        {"id": "outrage", "name": "Oltraggio", "type": "Dragon", "category": "none", "shape": "buff",
+        {"id": "outrage", "fx": "totooutrage", "name": "Oltraggio", "type": "Dragon", "category": "none", "shape": "buff",
          "target": "self", "cooldown": [90, 80, 70],
          "effects": {"rampage": {"duration": 4}, "atk": {"mult": 1.3, "duration": 4},
                      "speed": {"mult": 1.15, "duration": 4}}}
