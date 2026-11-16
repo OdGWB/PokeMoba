@@ -266,10 +266,15 @@ def draw_slot(surface, r: pygame.Rect, s: SlotView, type_color, nsize: int = 11)
         frame = (0, 0, 0)
     pygame.draw.rect(surface, frame, r, 2 if frame != (0, 0, 0) else 1, border_radius=5)
     # tasto in alto a sinistra
-    kr = pygame.Rect(r.x + 2, r.y + 2, 15, 15)
+    from . import keybinds   # tasto assegnato nelle Opzioni (predefinito = lettera dello slot)
+    lab = keybinds.key_name(s.key) if s.key in keybinds.SLOTS else s.key
+    lab = lab[:4]
+    ksz = 12 if len(lab) == 1 else 10
+    kr = pygame.Rect(r.x + 2, r.y + 2, max(15, font(ksz, True).size(lab)[0] + 6), 15)
     pygame.draw.rect(surface, (10, 12, 16), kr, border_radius=4)
     pygame.draw.rect(surface, TRIM, kr, 1, border_radius=4)
-    text(surface, s.key, (kr.centerx, kr.y + 1), 12, GOLD, bold=True, center=True, shadow=False)
+    text(surface, lab, (kr.centerx, kr.y + (1 if ksz == 12 else 2)), ksz, GOLD, bold=True,
+         center=True, shadow=False)
     # "+" per salire di grado: in alto a destra
     if s.can_rank:
         pc = (r.right - 9, r.y + 9)

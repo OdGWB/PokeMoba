@@ -1202,6 +1202,27 @@ Passaggi completati:
   Online: net/visual.capture_score (una volta per tick, danno arrotondato alle
   centinaia: il pacchetto R_VIS parte solo se cambia) e "recap" solo a chi e' morto.
   Screenshot: step_58_tabellone, step_58_morte, step_58_fine.
+- RIENTRO ONLINE e OPZIONI (step_59). (1) net/host.py: chi cade a partita in
+  corso resta col suo slot; dopo STANDIN_DELAY (15 s) un BOT SOSTITUTO lo guida
+  (p.is_bot + p.bot_standin: combatte, farma, alza le mosse, ma NON compra e NON
+  sceglie evoluzioni); al rientro torna al giocatore, fermo. L'host riapre lo slot
+  da solo (OnlineMatchScene._auto_reopen -> nuovo codice, avviso "premi F2"). Il
+  client che perde la connessione preme R: torna a "Unisciti" con l'avviso di
+  rientro; un R_START a partita in corso (fase LOADING senza draft) passa da
+  OnlineDraftScene, che mostra "Rientro in partita..." e apre la partita.
+  (2) game/keybinds.py: tasti personalizzabili (Q/W/E/R, fermati, richiamo,
+  Punizione, negozio, camera, tabellone), scambio se il tasto era gia' usato,
+  tasti riservati (ESC, F11/F, F2/F3, Invio, 1-6, Ctrl/Maiusc); lancio rapido
+  (la mossa parte alla pressione, tranne Tiro Lungo e le R a polarita':
+  input_controller.needs_aim); velocita' della camera (Camera, scorrimento ai
+  bordi); limite FPS (App.fps_cap, 0 = senza limite); volume della musica. HUD:
+  la casella della mossa mostra il tasto assegnato. Opzioni e pagina Tasti in
+  game/scenes/options_scene.py. PRESTAZIONI misurate (5v5, i5): _track_damage
+  3 us a colpo (0,01% della logica); tabellone 0,5-0,9 ms a frame solo con TAB
+  tenuto (ricostruzione 7-10 ms quando cambiano i dati, al piu' 1/s; il primo
+  ~30-50 ms per icone e font); riepilogo 0,04-0,07 ms; online capture_score 20 us
+  e +690 B su R_VIS al piu' una volta al secondo (SCORE_EVERY).
+  Screenshot: step_59_opzioni, step_59_tasti.
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

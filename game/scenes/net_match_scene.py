@@ -22,8 +22,8 @@ from engine.vision import VisionSystem
 from .. import hud, mag_fx, scy_fx
 from ..camera import Camera
 from ..fx import type_color
-from .. import match_ui
-from ..input_controller import champs_only_held
+from .. import keybinds, match_ui
+from ..input_controller import champs_only_held, needs_aim
 from ..minimap import Minimap
 from ..networld import NetWorld
 from ..particles import ParticleSystem
@@ -117,7 +117,7 @@ class NetMatchScene:
             if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
                 self.client.close()
                 self.quit_app = True
-            elif ev.type == pygame.KEYDOWN and ev.key == pygame.K_p:
+            elif ev.type == pygame.KEYDOWN and ev.key == keybinds.key("shop"):
                 self.shop.toggle()
             elif (self.shop.open and ev.type == pygame.MOUSEBUTTONDOWN
                   and self.shop.consumes(ev.pos)):
@@ -128,9 +128,9 @@ class NetMatchScene:
                         self.client.send_buy(val)
                     else:
                         self.client.send_sell(val)
-            elif ev.type == pygame.KEYDOWN and ev.key == pygame.K_y:
+            elif ev.type == pygame.KEYDOWN and ev.key == keybinds.key("camera"):
                 self.camera_locked = not self.camera_locked
-            elif ev.type == pygame.KEYDOWN and ev.key == pygame.K_b:
+            elif ev.type == pygame.KEYDOWN and ev.key == keybinds.key("recall"):
                 self.client.send_recall()
             elif ev.type == pygame.KEYDOWN and ev.key in (pygame.K_1, pygame.K_2) \
                     and self._pending() and self._near_base():
@@ -141,15 +141,18 @@ class NetMatchScene:
             elif (self.minimap is not None and ev.type == pygame.MOUSEBUTTONDOWN
                   and self.minimap.contains(ev.pos)):
                 self._minimap_click(ev)
-            elif ev.type == pygame.KEYDOWN and ev.key in ABILITY_KEYS:
-                slot = ABILITY_KEYS[ev.key]
+            elif ev.type == pygame.KEYDOWN and keybinds.slot_for(ev.key):
+                slot = "QWER".index(keybinds.slot_for(ev.key))
                 if pygame.key.get_mods() & pygame.KMOD_CTRL:
                     self.client.send_rank(slot)
                 elif self._slot_castable(slot):
-                    self.aiming_slot = slot
                     self.aim_start = pygame.time.get_ticks()
-            elif ev.type == pygame.KEYUP and ev.key in ABILITY_KEYS:
-                if self.aiming_slot == ABILITY_KEYS[ev.key]:
+                    if keybinds.smart_cast and not needs_aim(self._aim_move(slot)):
+                        self._cast(slot, pygame.mouse.get_pos())   # lancio rapido
+                    else:
+                        self.aiming_slot = slot
+            elif ev.type == pygame.KEYUP and keybinds.slot_for(ev.key):
+                if self.aiming_slot == "QWER".index(keybinds.slot_for(ev.key)):
                     self._cast(self.aiming_slot, pygame.mouse.get_pos())
                     self.aiming_slot = None
             elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
@@ -163,10 +166,10 @@ class NetMatchScene:
                 else:
                     tx, ty = self._tile(ev.pos)
                     self.client.send_move(tx, ty)
-            elif ev.type == pygame.KEYDOWN and ev.key == pygame.K_s:
+            elif ev.type == pygame.KEYDOWN and ev.key == keybinds.key("stop"):
                 self.client.send_stop()
             elif ((ev.type == pygame.MOUSEWHEEL
-                   or (ev.type == pygame.KEYDOWN and ev.key == pygame.K_TAB))
+                   or (ev.type == pygame.KEYDOWN and ev.key == keybinds.key("score")))
                   and self.aiming_slot is not None
                   and mag_fx.has_polarity(self._aim_move(self.aiming_slot))):
                 mag_fx.toggle_polarity()   # Bombagnete / Campo Elettrico: + <-> -
@@ -497,7 +500,7 @@ class NetMatchScene:
                            near, self._me_vis().get("item_cd", {}), self.world.match_time,
                            evo=scy_fx.evo_hint(self.world.get(self.your_id)))   # Scyther
         rows = self._score_rows()
-        if (rows and pygame.key.get_pressed()[pygame.K_TAB] and self.aiming_slot is None):
+        if (rows and pygame.key.get_pressed()[keybinds.key("score")] and self.aiming_slot is None):
             match_ui.draw_scoreboard(surface, rows, self.team, self.world.match_time, icon,
                                      self._score_portrait)
 

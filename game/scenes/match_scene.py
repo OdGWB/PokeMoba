@@ -37,7 +37,7 @@ from ..sprites.animator import FallbackAnimator, SpriteAnimator
 from ..sprites.spritesheet import load_pokemon_animations, make_wild_animator
 from .. import hud
 from ..fx import type_color
-from .. import match_ui
+from .. import keybinds, match_ui
 from ..hud_passives import PassiveCtx, draw_passive
 from ..world_fx import draw_projectiles, draw_world_effects, update_world_fx
 
@@ -292,25 +292,25 @@ class MatchScene:
                 continue
             if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
                 self.quit_app = True
-            elif ev.type == pygame.KEYDOWN and ev.key == pygame.K_p and self.match is not None:
+            elif ev.type == pygame.KEYDOWN and ev.key == keybinds.key("shop") and self.match is not None:
                 self.shop.toggle()
             elif (self.shop.open and ev.type == pygame.MOUSEBUTTONDOWN
                   and self.shop.consumes(ev.pos)):
                 action = self.shop.handle_event(ev)
                 if action is not None:
                     self._shop_action(action)
-            elif ev.type == pygame.KEYDOWN and ev.key == pygame.K_y:
+            elif ev.type == pygame.KEYDOWN and ev.key == keybinds.key("camera"):
                 self.camera_locked = not self.camera_locked
             elif (ev.type == pygame.KEYDOWN and ev.key == pygame.K_h
                   and self.match is not None):
                 # Test (solo locale): entra subito nella forma Shedinja.
                 self.match.force_shedinja(self.player)
-            elif ev.type == pygame.KEYDOWN and ev.key == pygame.K_d:
+            elif ev.type == pygame.KEYDOWN and ev.key == keybinds.key("smite"):
                 # Smite (come in LoL): danno vero al neutrale piu' vicino a portata.
                 self._menu_seq += 1
                 self.sim.queue_command(SmiteCommand(seq=50_000 + self._menu_seq,
                                                     entity_id=self.player.id))
-            elif ev.type == pygame.KEYDOWN and ev.key == pygame.K_b:
+            elif ev.type == pygame.KEYDOWN and ev.key == keybinds.key("recall"):
                 self._menu_seq += 1
                 self.sim.queue_command(RecallCommand(seq=50_000 + self._menu_seq,
                                                      entity_id=self.player.id))
@@ -714,7 +714,7 @@ class MatchScene:
                            p.rec_items or self.pdef.role, near_base, p.item_cd, self.match.time,
                            evo=scy_fx.evo_hint(p))   # Scyther: oggetti evolutivi in evidenza
         # Tabellone: TAB tenuto premuto (se non si sta mirando: li' TAB cambia polarita').
-        if pygame.key.get_pressed()[pygame.K_TAB] and not self.input.aiming_slot:
+        if pygame.key.get_pressed()[keybinds.key("score")] and not self.input.aiming_slot:
             match_ui.draw_scoreboard(surface, match_ui.rows_from_world(self.world, p.id),
                                      p.team, self.match.time, icon, self._score_portrait)
 

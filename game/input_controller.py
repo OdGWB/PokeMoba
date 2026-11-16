@@ -20,7 +20,7 @@ import pygame
 
 import config
 from engine.entities import Pokemon, Structure, Unit
-from game import mag_fx
+from game import keybinds, mag_fx
 from sim.commands import (AttackCommand, AttackMoveCommand, CastMoveCommand,
                           MoveCommand, RankMoveCommand, StopCommand)
 
@@ -29,7 +29,15 @@ def champs_only_held() -> bool:
     return bool(pygame.key.get_mods() & pygame.KMOD_SHIFT)
 
 
-ABILITY_KEYS = {pygame.K_q: "Q", pygame.K_w: "W", pygame.K_e: "E", pygame.K_r: "R"}
+ABILITY_KEYS = {pygame.K_q: "Q", pygame.K_w: "W", pygame.K_e: "E", pygame.K_r: "R"}  # predefiniti
+
+
+def needs_aim(mv) -> bool:
+    """Mosse che usano la PRESSIONE tenuta (Tiro Lungo) o la polarità scelta
+    mirando (Magnezone): restano a mira normale anche col lancio rapido."""
+    if mv is None:
+        return False
+    return bool(mv.effects.get("hold")) or mag_fx.has_polarity(mv)
 PICK_RADIUS = 1.4
 
 
@@ -48,16 +56,22 @@ class InputController:
         commands = []
         me = world.get(self.controlled_id) if world is not None else None
         for ev in events:
-            if ev.type == pygame.KEYDOWN and ev.key in ABILITY_KEYS:
-                slot = ABILITY_KEYS[ev.key]
+            if ev.type == pygame.KEYDOWN and keybinds.slot_for(ev.key):
+                slot = keybinds.slot_for(ev.key)
                 if pygame.key.get_mods() & pygame.KMOD_CTRL:
                     commands.append(RankMoveCommand(seq=self._next_seq(),
                                                     entity_id=self.controlled_id, slot=slot))
                 elif self._can_aim(me, slot):
-                    self.aiming_slot = slot
                     self.aim_start = pygame.time.get_ticks()
-            elif ev.type == pygame.KEYUP and ev.key in ABILITY_KEYS:
-                slot = ABILITY_KEYS[ev.key]
+                    if keybinds.smart_cast and not needs_aim(self._move(me, slot)):
+                        # Lancio rapido: parte subito verso il mouse, senza mirino.
+                        commands.append(self._cast_at_mouse(slot, camera,
+                                                            pygame.mouse.get_pos(), me))
+                        self.aiming_slot = None
+                    else:
+                        self.aiming_slot = slot
+            elif ev.type == pygame.KEYUP and keybinds.slot_for(ev.key):
+                slot = keybinds.slot_for(ev.key)
                 if self.aiming_slot == slot:
                     commands.append(self._cast_at_mouse(slot, camera, pygame.mouse.get_pos(), me))
                     self.aiming_slot = None
@@ -74,10 +88,10 @@ class InputController:
                     tx, ty = self._world_tile(camera, ev.pos)
                     commands.append(MoveCommand(seq=self._next_seq(),
                                                 entity_id=self.controlled_id, x=tx, y=ty))
-            elif ev.type == pygame.KEYDOWN and ev.key == pygame.K_s:
+            elif ev.type == pygame.KEYDOWN and ev.key == keybinds.key("stop"):
                 commands.append(StopCommand(seq=self._next_seq(), entity_id=self.controlled_id))
             elif ((ev.type == pygame.MOUSEWHEEL
-                   or (ev.type == pygame.KEYDOWN and ev.key == pygame.K_TAB))
+                   or (ev.type == pygame.KEYDOWN and ev.key == keybinds.key("score")))
                   and self.aiming_slot and mag_fx.has_polarity(self._move(me, self.aiming_slot))):
                 mag_fx.toggle_polarity()   # Bombagnete / Campo Elettrico: + <-> -
         return commands

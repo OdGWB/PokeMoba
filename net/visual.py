@@ -161,12 +161,17 @@ def capture_visual(match, team: int, player=None) -> dict:
     return out
 
 
+SCORE_EVERY = 1.0   # s tra due aggiornamenti del tabellone online
+
+
 def capture_score(match) -> list:
-    """Tabellone (TAB) e fine partita: uguale per tutti, calcolato una volta per
-    tick. Il danno e' arrotondato alle centinaia: il pacchetto visivo parte solo
-    quando qualcosa cambia davvero."""
+    """Tabellone (TAB) e fine partita: uguale per tutti, rifatto al massimo
+    una volta al SECONDO (a fine partita subito). Danno arrotondato alle
+    centinaia: il pacchetto visivo (~700 B in piu') riparte solo se cambia, quindi
+    al massimo una volta al secondo per il tabellone."""
     cache = getattr(match, "_score_cache", None)
-    if cache is not None and cache[0] == match.time:
+    if (cache is not None and 0.0 <= match.time - cache[0] < SCORE_EVERY
+            and match.winner is None):
         return cache[1]
     rows = [[p.id, p.name, p.team, p.dex, p.stat_kills, p.stat_deaths, p.stat_assists, p.stat_cs,
              p.level, int(round(p.stat_dmg, -2)), list(p.items)]

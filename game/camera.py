@@ -14,6 +14,8 @@ import pygame
 
 import config
 
+from . import keybinds
+
 
 class Camera:
     def __init__(self, view_w: int, view_h: int, map_w_px: int, map_h_px: int):
@@ -59,7 +61,7 @@ class Camera:
             ww, wh = surf.get_size() if surf is not None else (config.WINDOW_WIDTH,
                                                                config.WINDOW_HEIGHT)
             m = config.EDGE_SCROLL_MARGIN
-            speed = config.EDGE_SCROLL_SPEED * dt
+            speed = config.EDGE_SCROLL_SPEED * keybinds.camera_speed * dt
             if mx < m:
                 self.x -= speed
             elif mx > ww - m:

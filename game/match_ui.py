@@ -165,6 +165,7 @@ class _Cache:
 _board = _Cache()
 _end = _Cache()
 _recap = _Cache()
+_veil = _Cache()
 
 
 def draw_scoreboard(surface, rows, my_team, time_s, icon=None, portrait=None) -> None:
@@ -198,9 +199,11 @@ def draw_end_screen(surface, rows, winner, my_team, time_s, icon=None, portrait=
     """Schermata di fine partita: esito, durata e statistiche di tutti, con il
     danno ai campioni. Ritorna il rettangolo del pulsante "Torna al menu"."""
     W, H = surface.get_size()
-    veil = pygame.Surface((W, H), pygame.SRCALPHA)
-    veil.fill((6, 8, 12, 150))
-    surface.blit(veil, (0, 0))
+    if _veil.key != (W, H):
+        _veil.key = (W, H)
+        _veil.surf = pygame.Surface((W, H), pygame.SRCALPHA)
+        _veil.surf.fill((6, 8, 12, 150))
+    surface.blit(_veil.surf, (0, 0))
     width = min(W - 40, 940)
     key = (tuple(r.key() for r in rows), width, winner, my_team, int(time_s))
     if _end.key != key:

@@ -79,8 +79,9 @@ class App:
         pygame.init()
         _set_app_icon()
         opts = load_options()
-        from . import audio
+        from . import audio, keybinds
         audio.init(opts)
+        keybinds.load(opts)
         self.fps_cap = int(opts.get("fps_cap", 120) or 0)   # 0 = senza limite
         self.windowed_size = (config.WINDOW_WIDTH, config.WINDOW_HEIGHT)
         self.fullscreen = False
