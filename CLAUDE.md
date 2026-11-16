@@ -1223,6 +1223,39 @@ Passaggi completati:
   ~30-50 ms per icone e font); riepilogo 0,04-0,07 ms; online capture_score 20 us
   e +690 B su R_VIS al piu' una volta al secondo (SCORE_EVERY).
   Screenshot: step_59_opzioni, step_59_tasti.
+- LINEE VECCHIE portate al livello delle nuove (punto 24), una per passo. Eevee
+  (eevee_fx) e Spiritomb (spirit_fx) avevano gia' un modulo; Roggenrola ha effetti
+  su misura in fx.py. Restano da fare: Gastly, Rowlet, Snivy, Totodile, Nincada,
+  Poliwag. Registro: fx_lines.FX_LINES; ogni modulo puo' esporre anche AA_TRAVEL
+  (forma -> frazione del volo, per gli attacchi base a ricerca: fx._AA_TRAVEL).
+- LINEA CHARMANDER > CHARMELEON > CHARIZARD (step_60), nuovo game/char_fx.py.
+  Solo i nomi "fx" nel JSON e qualche TAG COSMETICO nel motore (il cono porta
+  mv.fx anche nei tick del Lanciafiamme, l'esplosione di Fuocobomba e il blink
+  di Volo portano fx, il mirino di Volo porta "t" = avanzamento, la Scottatura
+  di Fiammacoda "charburn", il proiettile di Fuocobomba porta "fx"). Forme:
+  palla di fuoco con coda a goccia e braci (charball: attacco base e Braciere,
+  a ricerca), getto del Lanciafiamme (charstream: 22 sbuffi per tick, gialli
+  alla bocca -> arancio -> rossi -> fumo, uniti da un ALONE tenue a cono: senza
+  sembravano una fila di palline), vortice di Turbofuoco (charspin: ellisse,
+  spirale di braci, fiamme che girano ordinate per profondita'), Fuocobomba
+  (in volo: world_fx.draw_projectiles -> char_fx.draw_blast, sfera con la stella
+  a cinque bracci TOZZI che gira e ombra; all'impatto charstar = disco + stella
+  piccola che si apre in 0,3 s: grande e sottile col contorno sembrava un
+  pentagramma), mirino di Volo (charflymark: ellisse tratteggiata che gira,
+  anello che si chiude con la carica, OMBRA con le ali che cresce; rinnovato a
+  ogni tick come lo stesso disegno), ali al decollo (charwings: membrana verde
+  acqua a festoni, osso arancio, sagoma del corpo; staccate sembravano schegge).
+  Riusa flametongue (Charcadet: Incendio, impatti), claw3 (Teddiursa: Graffio
+  chiaro, Dragartigli viola piccoli sul bersaglio), incinroar (Litten: archi di
+  Ondacalda), flamecharge (Charcadet: Nitrocarica), groundring/groundcrack,
+  impactstar; scossa dello schermo a Fuocobomba/Incendio/Volo. Sulle unita':
+  CALORE = tre fiammelle sotto la barra della vita (accese quante le cariche,
+  a tutti; heat_stacks in net/visual.UNIT_FLAGS), SCOTTATURA = due fiammelle
+  sul corpo e fumo che sale (ogni burn_until, anche Charcadet). Il Muro di Fumo
+  resta il fumo generico (gia' adatto). Screenshot: step_60_* (ember_volo,
+  lanciafiamme, fuocobomba_volo/_colpo, turbofuoco, ondacalda, graffio,
+  dragartigli, nitrocarica, fumo, incendio, volo_mira2/_arrivo, calore,
+  scottatura).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

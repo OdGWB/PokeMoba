@@ -2753,14 +2753,18 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                         if dest.dist(e.pos) <= mv.radius + getattr(e, "radius", 0.0):
                             self._hit(p, mv, rank, e)
                     self.fx_events.append({"kind": "blink", "a": (src.x, src.y),
-                                           "b": (dest.x, dest.y), "mtype": mv.type})
+                                           "b": (dest.x, dest.y), "mtype": mv.type,
+                                           "fx": mv.fx})
                     self.fx_events.append({"kind": "area", "c": (dest.x, dest.y),
                                            "radius": mv.radius, "mtype": mv.type, "fx": mv.fx})
                     continue
-                # Telegraph del punto d'arrivo durante la canalizzazione.
+                # Telegraph del punto d'arrivo durante la canalizzazione
+                # ("t" = avanzamento della carica, solo grafica).
+                ch_t = ch["end"] - float(ch["mv"].effects.get("channel", 1.5))
                 self.fx_events.append({"kind": "zone", "c": (ch["dest"].x, ch["dest"].y),
                                        "radius": ch["mv"].radius, "mtype": ch["mv"].type,
-                                       "fx": ch["mv"].fx})
+                                       "fx": ch["mv"].fx,
+                                       "t": (now - ch_t) / max(1e-6, ch["end"] - ch_t)})
                 alive.append(ch)
         self.channels = alive
 
@@ -3249,7 +3253,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
             "pos": Vec2(origin.x, origin.y), "dir": Vec2(dirv.x, dirv.y),
             "speed": mv.speed, "left": mv.range, "radius": mv.radius,
             "team": p.team, "caster_id": p.id, "mv": mv, "rank": rank, "mtype": mv.type,
-            "burst": float(mv.d.get("burst", 0.0))})
+            "burst": float(mv.d.get("burst", 0.0)), "fx": mv.fx})
         muzzle = origin + dirv * 1.3
         self.fx_events.append({"kind": "projectile", "a": (origin.x, origin.y),
                                "b": (muzzle.x, muzzle.y), "mtype": mv.type})
@@ -3313,7 +3317,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                     self._hit(caster, pr["mv"], pr["rank"], e)
         # Esplosione: anello generico colorato per tipo (fx di viaggio escluso).
         self.fx_events.append({"kind": "area", "c": (c.x, c.y),
-                               "radius": br, "mtype": pr["mtype"]})
+                               "radius": br, "mtype": pr["mtype"], "fx": pr["mv"].fx})
 
     def _cast_projectile(self, p, mv, rank, origin, dirv):
         best, best_proj = None, mv.range + 1.0
@@ -3353,9 +3357,11 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                 if math.acos(max(-1.0, min(1.0, cosang))) > half:
                     continue
             self._hit(p, mv, rank, e)
-        self.fx_events.append({"kind": "cone", "o": (origin.x, origin.y),
-                               "dir": (dirv.x, dirv.y), "range": mv.range,
-                               "angle": mv.angle, "mtype": mv.type})
+        ev = {"kind": "cone", "o": (origin.x, origin.y), "dir": (dirv.x, dirv.y),
+              "range": mv.range, "angle": mv.angle, "mtype": mv.type}
+        if mv.fx:   # anche i tick del Lanciafiamme (fuori da _cast_move): solo grafica
+            ev["fx"] = mv.fx
+        self.fx_events.append(ev)
 
     def _cast_area(self, p, mv, rank, origin, tgt):
         to = tgt - origin
@@ -3883,7 +3889,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                 target.burn_dps = max(target.burn_dps, 0.025 * target.max_hp)
                 target.burn_src = caster.id
                 self.fx_events.append({"kind": "area", "c": (target.pos.x, target.pos.y),
-                                       "radius": 0.9, "mtype": "Fire"})
+                                       "radius": 0.9, "mtype": "Fire", "fx": "charburn"})
 
     def _has_status(self, p) -> bool:
         """Vero se il Pokémon ha un qualunque stato alterato (per Sciagura)."""

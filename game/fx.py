@@ -20,13 +20,14 @@ import config
 
 from . import structure_gfx
 from . import aa_fx, death_fx
-from .fx_lines import LINE_SHAPES, LINE_STYLES
+from .fx_lines import LINE_AA_TRAVEL, LINE_SHAPES, LINE_STYLES
 
 # Forme "in volo" (testa che avanza da a verso b) che l'attacco base a distanza
 # fa SEGUIRE al bersaglio; valore = frazione della vita in cui la testa arriva.
 _AA_TRAVEL = {"energy": 1.0, "shot": 1.0, "leaf": 1.0, "flame": 1.0, "orb": 1.0,
               "shard": 1.0, "arrow": 1.0, "florpetal": 1.0, "sonicbolt": 0.8,
               "steelball": None, "mothscale": 0.85, "octipellet": 0.8}
+_AA_TRAVEL.update(LINE_AA_TRAVEL)   # forme a ricerca delle linee (game/*_fx.py)
 _AA_HOMING_MAX = 2.0   # s: come PROJ_MAX_LIFE del motore
 
 # Colore per tipo (per le particelle).

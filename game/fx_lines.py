@@ -13,13 +13,13 @@ passiva (game/hud_passives.py).
 """
 from __future__ import annotations
 
-from . import (arch_fx, charcadet_fx, corvi_fx, eevee_fx, flor_fx, hatt_fx, incin_fx, mag_fx,
+from . import (arch_fx, char_fx, charcadet_fx, corvi_fx, eevee_fx, flor_fx, hatt_fx, incin_fx, mag_fx,
                mien_fx, moth_fx, noivern_fx, octi_fx, scy_fx, sneasel_fx, swine_fx, ursa_fx)
 
 # L'ORDINE conta: a parità di forma vince il primo modulo, a parità di stile l'ultimo.
 FX_LINES: tuple = (
     eevee_fx, corvi_fx, charcadet_fx, noivern_fx, ursa_fx, sneasel_fx, mien_fx, arch_fx,
-    hatt_fx, mag_fx, swine_fx, moth_fx, octi_fx, flor_fx, scy_fx, incin_fx,
+    hatt_fx, mag_fx, swine_fx, moth_fx, octi_fx, flor_fx, scy_fx, incin_fx, char_fx,
 )
 
 
@@ -42,6 +42,8 @@ def _styles() -> dict:
 LINE_SHAPES: dict = _shapes()
 # stile "fx" -> handler (unito agli stili generici in FXSystem._FX_STYLES)
 LINE_STYLES: dict = _styles()
+# forma -> frazione del volo della testa per gli attacchi base a ricerca
+LINE_AA_TRAVEL: dict = {k: v for mod in FX_LINES for k, v in getattr(mod, "AA_TRAVEL", {}).items()}
 # disegni sulle unità, nell'ordine del registro
 UNIT_OVERLAYS: tuple = tuple(mod.draw_unit_overlay for mod in FX_LINES
                              if hasattr(mod, "draw_unit_overlay"))

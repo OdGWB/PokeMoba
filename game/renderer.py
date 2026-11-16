@@ -18,7 +18,7 @@ import config
 from engine.entities import Core, Pillar, Pokemon, Structure, Unit
 from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
                          TILE_PUDDLE, TILE_RIVER, TILE_WALL)
-from . import spirit_fx
+from . import char_fx, spirit_fx
 from . import (arch_fx, eevee_fx, hatt_fx, mag_fx, mien_fx, noivern_fx,
                flor_fx, incin_fx, moth_fx, octi_fx, scy_fx, swine_fx,
                sneasel_fx, ursa_fx)
@@ -1120,6 +1120,9 @@ class Renderer:
                 row += 1
         moth_fx.draw_venom_pips(surface, u, gx, top, w, row)   # veleno (anche minion e neutrali)
         if getattr(u, "venom_stacks", 0) > 0:
+            row += 1
+        if char_fx.has_heat(u, self._now):   # Calore di Fiammacoda (Charmander)
+            char_fx.draw_heat_pips(surface, u, gx, top, w, row, self._now)
             row += 1
         scy_fx.draw_hp_extras(surface, u, gx, top, w, row)   # Spaccaroccia: armatura incrinata
         octi_fx.draw_lock(surface, u, gx, top, self._now)   # mirino di Prendimira (a tutti)

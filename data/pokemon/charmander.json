@@ -12,38 +12,38 @@
   "attack_cooldown": 0.9,
   "sprite_dir": "assets/pokemon/0004",
   "passive": "fiammacoda",
-  "attack_fx": "flame",
+  "attack_fx": "charember",
   "base_stats": {"hp": 39, "attack": 52, "defense": 43, "sp_attack": 60, "sp_defense": 50, "speed": 65},
 
   "evolutions": [
     {"stage": 0, "level": 1, "name": "Charmander", "dex": 4, "sprite_dir": "assets/pokemon/0004",
      "types": ["Fire"], "passive": "fiammacoda", "role": "mago mobile", "color": [237, 122, 66],
-     "attack_fx": "flame", "attack_range": 5.0, "ranged": true, "radius": 0.42,
+     "attack_fx": "charember", "attack_range": 5.0, "ranged": true, "radius": 0.42,
      "base_stats": {"hp": 39, "attack": 52, "defense": 43, "sp_attack": 60, "sp_defense": 50, "speed": 65}},
 
     {"stage": 1, "level": 4, "name": "Charmeleon", "dex": 5, "sprite_dir": "assets/pokemon/0005",
      "types": ["Fire"], "passive": "fiammacoda", "role": "mago mobile", "color": [226, 96, 58],
-     "attack_fx": "flame", "attack_range": 5.0, "ranged": true, "radius": 0.5,
+     "attack_fx": "charember", "attack_range": 5.0, "ranged": true, "radius": 0.5,
      "base_stats": {"hp": 58, "attack": 64, "defense": 58, "sp_attack": 80, "sp_defense": 65, "speed": 80}},
 
     {"stage": 2, "level": 8, "name": "Charizard", "dex": 6, "sprite_dir": "assets/pokemon/0006",
      "types": ["Fire", "Flying"], "passive": "fiammacoda", "role": "mago mobile", "color": [238, 110, 56],
-     "attack_fx": "flame", "attack_range": 5.5, "ranged": true, "radius": 0.6,
+     "attack_fx": "charember", "attack_range": 5.5, "ranged": true, "radius": 0.6,
      "base_stats": {"hp": 78, "attack": 84, "defense": 78, "sp_attack": 109, "sp_defense": 85, "speed": 100}}
   ],
 
   "moves": {
     "Q": {
       "base": {"id": "ember", "name": "Braciere", "type": "Fire", "category": "special", "shape": "projectile",
-               "fx": "flame", "target": "direction", "power": [48, 75, 105, 130], "ratio": 0.8,
+               "fx": "charember", "target": "direction", "power": [48, 75, 105, 130], "ratio": 0.8,
                "cooldown": [5, 4.5, 4, 3.5], "range": 7, "radius": 0.5, "speed": 13},
       "upgrades": [
-        {"id": "flamethrower", "name": "Lanciafiamme", "type": "Fire", "category": "special", "shape": "flamethrower",
+        {"id": "flamethrower", "fx": "charflamethrower", "name": "Lanciafiamme", "type": "Fire", "category": "special", "shape": "flamethrower",
          "target": "direction", "power": [13, 19, 25, 31], "ratio": 0.19,
          "cooldown": [7, 6.5, 6, 5.5], "range": 7.0, "angle": 15,
          "effects": {"duration": 1.5, "interval": 0.2, "move_mult": 0.5}},
         {"id": "fireblast", "name": "Fuocobomba", "type": "Fire", "category": "special", "shape": "bubble",
-         "fx": "flame", "target": "direction", "power": [110, 165, 215, 270], "ratio": 1.6,
+         "fx": "charblast", "target": "direction", "power": [110, 165, 215, 270], "ratio": 1.6,
          "cooldown": [9, 8.5, 8, 7.5], "range": 9.0, "speed": 6.0, "radius": 0.55, "burst": 2.0}
       ]
     },
@@ -54,24 +54,24 @@
                "effects": {"duration": 4.0, "interval": 0.5}},
       "upgrades": [
         {"id": "fireup", "name": "Turbofuoco", "type": "Fire", "category": "special", "shape": "whirlpool",
-         "fx": "vortex", "target": "point", "power": [16, 24, 32, 40], "ratio": 0.25,
+         "fx": "charfirespin", "target": "point", "power": [16, 24, 32, 40], "ratio": 0.25,
          "cooldown": [12, 11, 10, 9], "range": 5.0, "radius": 1.5, "slow_only": false,
          "effects": {"duration": 1.5, "interval": 0.3, "root": {"duration": 0.5}}},
-        {"id": "heatwave", "name": "Ondacalda", "type": "Fire", "category": "special", "shape": "cone",
+        {"id": "heatwave", "fx": "charheatwave", "name": "Ondacalda", "type": "Fire", "category": "special", "shape": "cone",
          "target": "direction", "power": [80, 120, 160, 200], "ratio": 1.2,
          "cooldown": [9, 8.5, 8, 7.5], "range": 5.0, "angle": 38,
          "effects": {"slow": {"mult": 0.6, "duration": 1.5}}}
       ]
     },
     "E": {
-      "base": {"id": "scratch", "name": "Graffio", "type": "Normal", "category": "physical", "shape": "cone",
+      "base": {"id": "scratch", "fx": "charscratch", "name": "Graffio", "type": "Normal", "category": "physical", "shape": "cone",
                "target": "direction", "power": [40, 65, 90, 110], "ratio": 0.65,
                "cooldown": [4, 3.5, 3, 2.5], "range": 2.3, "angle": 60},
       "upgrades": [
         {"id": "dragonclaw", "name": "Dragartigli", "type": "Dragon", "category": "physical", "shape": "cone",
-         "fx": "slash", "target": "direction", "power": [70, 110, 145, 180], "ratio": 1.1,
+         "fx": "chardragonclaw", "target": "direction", "power": [70, 110, 145, 180], "ratio": 1.1,
          "cooldown": [6, 5.5, 5, 4.5], "range": 2.6, "angle": 60},
-        {"id": "flamecharge", "name": "Nitrocarica", "type": "Fire", "category": "physical", "shape": "dash",
+        {"id": "flamecharge", "fx": "flamecharge", "name": "Nitrocarica", "type": "Fire", "category": "physical", "shape": "dash",
          "target": "direction", "power": [40, 60, 80, 100], "ratio": 0.6,
          "cooldown": [0.8, 0.8, 0.8, 0.8], "range": 4.5, "radius": 0.9,
          "charges": 3, "charge_time": 6, "refund_on_hit": false,
@@ -80,11 +80,11 @@
     },
     "R": {
       "upgrades": [
-        {"id": "inferno", "name": "Incendio", "type": "Fire", "category": "special", "shape": "area",
+        {"id": "inferno", "fx": "charinferno", "name": "Incendio", "type": "Fire", "category": "special", "shape": "area",
          "target": "self", "power": [225, 335, 450], "ratio": 1.95,
          "cooldown": [90, 80, 70], "range": 0, "radius": 3.2,
          "effects": {"self_root": {"duration": 1.2}, "slow": {"mult": 0.6, "duration": 1.5}}},
-        {"id": "fly", "name": "Volo", "type": "Flying", "category": "physical", "shape": "fly",
+        {"id": "fly", "fx": "charfly", "name": "Volo", "type": "Flying", "category": "physical", "shape": "fly",
          "target": "point", "power": [200, 295, 390], "ratio": 1.7,
          "cooldown": [100, 90, 80], "range": 40, "radius": 2.6,
          "effects": {"channel": 1.5}}
