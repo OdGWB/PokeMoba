@@ -49,7 +49,7 @@ SKIP = {"mv", "hit", "touched", "since", "rank", "explode", "first", "caught", "
         "_pts"}
 # Stati sulle unità che non sono timer *_until (valore "spento" a destra).
 UNIT_FLAGS = {"air_z": 0.0, "sand_radius": 0.0, "invisible": False, "submerged": False,
-              "heat_stacks": 0,
+              "heat_stacks": 0, "soul_charges": 0,
               "smoke_hidden": False, **net_table("unit_flags")}
 # Il proprio Pokémon: passive e ricariche mostrate nell'interfaccia.
 ME_FIELDS = tuple(dict.fromkeys((

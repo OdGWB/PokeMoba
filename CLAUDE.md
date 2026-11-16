@@ -1225,8 +1225,8 @@ Passaggi completati:
   Screenshot: step_59_opzioni, step_59_tasti.
 - LINEE VECCHIE portate al livello delle nuove (punto 24), una per passo. Eevee
   (eevee_fx) e Spiritomb (spirit_fx) avevano gia' un modulo; Roggenrola ha effetti
-  su misura in fx.py. Restano da fare: Gastly, Rowlet, Snivy, Totodile, Nincada,
-  Poliwag. Registro: fx_lines.FX_LINES; ogni modulo puo' esporre anche AA_TRAVEL
+  su misura in fx.py. Restano da fare: Rowlet, Snivy, Totodile, Nincada, Poliwag.
+  Registro: fx_lines.FX_LINES; ogni modulo puo' esporre anche AA_TRAVEL
   (forma -> frazione del volo, per gli attacchi base a ricerca: fx._AA_TRAVEL).
 - LINEA CHARMANDER > CHARMELEON > CHARIZARD (step_60), nuovo game/char_fx.py.
   Solo i nomi "fx" nel JSON e qualche TAG COSMETICO nel motore (il cono porta
@@ -1256,6 +1256,31 @@ Passaggi completati:
   lanciafiamme, fuocobomba_volo/_colpo, turbofuoco, ondacalda, graffio,
   dragartigli, nitrocarica, fumo, incendio, volo_mira2/_arrivo, calore,
   scottatura).
+- LINEA GASTLY > HAUNTER > GENGAR (step_61), nuovo game/gastly_fx.py. Nomi "fx"
+  nel JSON (attack_fx "gastorb" su tutte le forme) e pochi TAG COSMETICI nel
+  motore: il ritorno di Spettrotuffo porta fx + "ret" (p.blink_return_fx), lo
+  scoppio della Maledizione porta fx + "pop" (curse_fx sul bersaglio). Forme:
+  sfera di gas a ricerca (gastorb, attacco base), lingua di Leccata (gastlick),
+  globo di fango ad arco (gastglob: Velenoshock, Fangobomba e le sue gocce),
+  pozza velenosa a lobi scura e traslucida con bolle che scoppiano (gastpuddle;
+  la prima, viola chiaro piena, sembrava un disco piatto; gli schizzi "pebble"
+  sembravano quadratini marroni), fili di sogno rosa che tornano a chi mangia
+  (gastdrain: Mangiasogni), Furtivombra = fila di sbuffi d'ombra che svaniscono
+  dalla coda + occhietti (gastshade; a striscia piena sembrava un'asse), occhi
+  maligni di Congiura ALTI sopra la barra (gasteyes, alone piccolo per occhio:
+  con l'alone unico sopra la barra era una macchia scura), portali di
+  Spettrotuffo (gastportal, chiusi dall'evento di ritorno), sigillo e faccia
+  ghignante della Maledizione (gastsigil/gastface). Niente groundring sugli
+  impatti di Palla Ombra e Maledizione (sembravano ciambelle piatte): anello
+  piccolo. In volo (world_fx.draw_projectiles -> gastly_fx.draw_projectile):
+  Palla Ombra (sfera di gas con nucleo scuro) e Ipnosi (spirale rosa). Sulle
+  unita': fiammelle d'anima (una ogni 25 soul_charges, max 4; soul_charges in
+  net/visual.UNIT_FLAGS), anello della Maledizione con l'arco che si chiude e
+  l'occhio, spirale della sonnolenza di Ipnosi (sleep_arm_at: SOLO offline, il
+  campo non passa online). Screenshot: step_61_* (attacco, leccata,
+  pallaombra_volo/_colpo, sciagura, velenoshock/_dopo, fangobomba_volo/_,
+  ipnosi_volo/_colpo/_sonno, mangiasogni, congiura, furtivombra, maledizione/
+  _attesa/_scoppio, spettrotuffo/_ritorno, anime).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

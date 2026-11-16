@@ -2033,6 +2033,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         dest = self._nearest_walkable(dest, origin)
         p.blink_return_pos = Vec2(origin.x, origin.y)
         p.blink_return_until = self.time + float(mv.effects.get("return_delay", 1.5))
+        p.blink_return_fx = mv.fx   # solo grafica: stile del ritorno
         p.pos = dest
         p.stop()
         # Poof ai due capi + animazione Hop veloce (effetto teletrasporto).
@@ -2058,6 +2059,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         best.curse_until = self.time + float(mv.effects.get("delay", 3.0))
         best.curse_src = p.id
         setattr(best, "curse_type", mv.type)
+        setattr(best, "curse_fx", mv.fx)   # solo grafica: stile dell'esplosione
         self.fx_events.append({"kind": "buff", "c": (best.pos.x, best.pos.y),
                                "mtype": mv.type, "radius": 1.2})
 
@@ -2069,8 +2071,12 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                     src = Vec2(p.pos.x, p.pos.y)
                     p.pos = Vec2(p.blink_return_pos.x, p.blink_return_pos.y)
                     p.stop()
-                    self.fx_events.append({"kind": "blink", "a": (src.x, src.y),
-                                           "b": (p.pos.x, p.pos.y), "mtype": "Ghost"})
+                    ev = {"kind": "blink", "a": (src.x, src.y),
+                          "b": (p.pos.x, p.pos.y), "mtype": "Ghost"}
+                    if getattr(p, "blink_return_fx", None):   # solo grafica
+                        ev["fx"] = p.blink_return_fx
+                        ev["ret"] = 1
+                    self.fx_events.append(ev)
                     self.fx_events.append({"eid": p.id, "anim": "Hop", "anim_speed": 2.5})
                 p.blink_return_until = -1.0
                 p.blink_return_pos = None
@@ -2083,8 +2089,11 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                     dmg = self._mitigate_hit(src, p, p.curse_power, magic=True)
                     self._deal_damage(src, p, dmg, dmg_type=getattr(p, "curse_type", "Ghost"))
                     self._vamp(src, dmg, physical=False)
-                    self.fx_events.append({"kind": "area", "c": (p.pos.x, p.pos.y),
-                                           "radius": 1.6, "mtype": "Ghost"})
+                    ev = {"kind": "area", "c": (p.pos.x, p.pos.y),
+                          "radius": 1.6, "mtype": "Ghost"}
+                    if getattr(p, "curse_fx", None):   # solo grafica
+                        ev["fx"] = p.curse_fx + "pop"
+                    self.fx_events.append(ev)
                 p.curse_until = -1.0
                 p.curse_src = None
                 p.curse_power = 0.0
