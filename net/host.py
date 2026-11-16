@@ -152,6 +152,12 @@ class HostSession:
         return min(MAX_SLOTS, 2 * self.team_size)
 
     def start(self):
+        # Il motore (e numpy) si importa QUI, nel thread chiamante, non la prima
+        # volta dentro il thread dell'host: su Windows caricare la DLL di numpy in
+        # un thread secondario mentre girano i thread nativi di WebRTC puo' restare
+        # bloccato per sempre (deadlock del loader). Nel gioco numpy e' gia'
+        # caricato dal renderer; senza grafica (collaudo, host dedicato) no.
+        import engine.content, engine.match, engine.world, sim.simulation  # noqa: F401,E401
         self._running = True
         self._thread = threading.Thread(target=self._run, name="host-sim", daemon=True)
         self._thread.start()
