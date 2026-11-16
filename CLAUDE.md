@@ -1225,7 +1225,7 @@ Passaggi completati:
   Screenshot: step_59_opzioni, step_59_tasti.
 - LINEE VECCHIE portate al livello delle nuove (punto 24), una per passo. Eevee
   (eevee_fx) e Spiritomb (spirit_fx) avevano gia' un modulo; Roggenrola ha effetti
-  su misura in fx.py. Restano da fare: Poliwag.
+  su misura in fx.py. Tutte le linee vecchie sono fatte.
   Registro: fx_lines.FX_LINES; ogni modulo puo' esporre anche AA_TRAVEL
   (forma -> frazione del volo, per gli attacchi base a ricerca: fx._AA_TRAVEL).
 - LINEA CHARMANDER > CHARMELEON > CHARIZARD (step_60), nuovo game/char_fx.py.
@@ -1371,6 +1371,30 @@ Passaggi completati:
   step_65_* (attacco, graffio, sfuriate, forbicex/_incrocio, fossa_tuffo/
   _riemersione, sabbiotomba/_dopo, doppioteam_tuffo/_clone/_sparito, indurimento,
   agilita, danzaspada, aeroassalto/_colpo, rancore/_forma/_fine, muta, shedinja).
+- LINEA POLIWAG > POLIWHIRL > POLIWRATH / POLITOAD (step_66), nuovo game/poli_fx.py:
+  ULTIMA delle linee vecchie. Nomi "fx" nel JSON (attack_fx "polibubble", "polipunch"
+  per Poliwrath; poli* sulle mosse) e pochi TAG COSMETICI nel motore: "dur" sulle
+  zone di Pioggiadanza/Acquanello e sul mirino di Rimbalzo, "land" sull'area
+  dell'atterraggio, "left" (secondi al conto) sulla zona di Ultimocanto. Forme:
+  bolla con la SPIRALE della pancia (polibubble/poliarc: attacco base e Bolla ad
+  arco col mirino politarget che si stringe), Bollaraggio in volo (world_fx ->
+  poli_fx.draw_projectile: grappolo di bolle + scia, ombra TENUE: piena e scura
+  sembrava un trattino nero), Speculmossa (freccia bianca + twinkle a specchio),
+  Pioggiadanza (velo, bordo tratteggiato, gocce oblique e schizzi), Panciamburo
+  (spirale rossa PICCOLA e traslucida sulla pancia + battiti: grande copriva lo
+  sprite), Acquanello (anello d'acqua ai piedi che segue chi lo lancia + crocette),
+  Colpo di Fango ad arco con schizzi, Vitaltiro, Mulinello (vortice), Dinamipugno e
+  Zuffa (scyfist di Scyther), Rimbalzo (polimark: ombra che cresce + anello che si
+  chiude), Ultimocanto (area viola, note che girano, CIFRA del conto sopra il
+  centro; allo scoppio stella + anello sottile + 5 note: il disco pieno sembrava
+  piatto). Sulle unita' (a tutti, dex 60-62/186): Panciamburo = battito rosso sul
+  corpo + freccine ROSSE in su AI LATI (incin_fx.draw_arrow; i quadratini
+  sembravano pixel sporchi). NB banco di prova: il mirino rosso a angolari negli
+  scatti era il Prendimira del Remoraid nemico, non Poliwag. Screenshot: step_66_*
+  (attacco, attacco_poliwrath, bolla_volo/_colpo, bollaraggio_volo/_colpo,
+  speculmossa/_colpo, pioggia/_dopo, panciamburo/_dopo, acquanello/_dopo,
+  colpodifango_volo/_colpo, vitaltiro/_dopo, mulinello/_dopo, dinamipugno/_dopo,
+  zuffa/_dopo, rimbalzo/_atterraggio, ultimocanto/_conto/_scoppio).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

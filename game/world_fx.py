@@ -20,7 +20,7 @@ import pygame
 import config
 
 from . import (arch_fx, char_fx, charcadet_fx, corvi_fx, eevee_fx, gastly_fx, hatt_fx, mag_fx, mien_fx, noivern_fx,
-               flor_fx, moth_fx, octi_fx, scy_fx, sneasel_fx, spirit_fx, swine_fx, totodile_fx, ursa_fx)
+               flor_fx, moth_fx, octi_fx, poli_fx, scy_fx, sneasel_fx, spirit_fx, swine_fx, totodile_fx, ursa_fx)
 from .fx import draw_avalanche, draw_sandstorm, type_color
 
 
@@ -215,6 +215,9 @@ def draw_projectiles(surface, camera, m, now=0.0) -> None:
             continue
         if pr.get("fx") == "totopulse":   # Idropulsar
             totodile_fx.draw_projectile(surface, camera, pr, now)
+            continue
+        if pr.get("fx") == "polibeam":   # Bollaraggio
+            poli_fx.draw_projectile(surface, camera, pr, now)
             continue
         gx, gy = camera.world_to_screen(pr["pos"].x * ts, pr["pos"].y * ts)
         col = type_color(pr["mtype"])

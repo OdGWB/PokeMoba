@@ -2276,7 +2276,8 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         self.rain_zones.append({"center": Vec2(origin.x, origin.y), "radius": rad,
                                 "end": self.time + dur, "team": p.team})
         self.fx_events.append({"kind": "zone", "c": (origin.x, origin.y),
-                               "radius": rad, "mtype": mv.type, "fx": mv.fx})
+                               "radius": rad, "mtype": mv.type, "fx": mv.fx,
+                               "dur": dur})   # dur: solo grafica
 
     def _cast_healzone(self, p, mv, rank, origin, tgt):
         """Acquanello: cura nel tempo a sé e agli alleati vicini (la zona segue
@@ -2293,7 +2294,8 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
             "caster_id": p.id, "heal_ally": amt, "follow": p.id,
             "mtype": mv.type, "fx": mv.fx})
         self.fx_events.append({"kind": "zone", "c": (origin.x, origin.y),
-                               "radius": rad, "mtype": mv.type, "fx": mv.fx})
+                               "radius": rad, "mtype": mv.type, "fx": mv.fx,
+                               "dur": dur})   # dur: solo grafica
 
     def _cast_throwback(self, p, mv, rank, origin, tgt, dirv):
         """Ribaltiro: afferra il nemico più vicino a portata e lo scaraventa
@@ -2341,7 +2343,8 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                                   "mv": mv, "rank": rank, "at": self.time + dur})
         self.fx_events.append({"eid": p.id, "anim": "Hop", "anim_speed": 1.5})
         self.fx_events.append({"kind": "area", "c": (dest.x, dest.y),
-                               "radius": mv.radius, "mtype": mv.type})
+                               "radius": mv.radius, "mtype": mv.type,
+                               "dur": dur})   # dur: solo grafica (mirino d'arrivo)
 
     def _update_air_landings(self, dt: float) -> None:
         pend = []
@@ -2363,7 +2366,8 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                 if dest.dist(e.pos) <= mv.radius + getattr(e, "radius", 0.0):
                     self._hit(p, mv, rank, e)   # danno + stordimento (negli effects)
             self.fx_events.append({"kind": "area", "c": (dest.x, dest.y),
-                                   "radius": mv.radius, "mtype": mv.type, "fx": mv.fx})
+                                   "radius": mv.radius, "mtype": mv.type, "fx": mv.fx,
+                                   "land": True})   # land: solo grafica
         self.air_landings = pend
 
     def _update_tosses(self, dt: float) -> None:
@@ -2463,7 +2467,8 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
             "next": self.time, "interval": 0.5,
             "caster_id": p.id, "mtype": mv.type, "fx": mv.fx})
         self.fx_events.append({"kind": "zone", "c": (center.x, center.y),
-                               "radius": mv.radius, "mtype": mv.type, "fx": mv.fx})
+                               "radius": mv.radius, "mtype": mv.type, "fx": mv.fx,
+                               "left": countdown})   # left: solo grafica (conto alla rovescia)
 
     def _update_area_effects(self, dt: float) -> None:
         now = self.time
@@ -2553,7 +2558,8 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                     ae["next"] = now + ae["interval"]
                     self.fx_events.append({"kind": "zone", "c": (c.x, c.y),
                                            "radius": ae["radius"], "mtype": ae["mtype"],
-                                           "fx": ae.get("fx", "")})
+                                           "fx": ae.get("fx", ""),
+                                           "left": ae["detonate_at"] - now})   # solo grafica
                 alive.append(ae)
                 continue
             if self.time >= ae["end"]:
