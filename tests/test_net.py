@@ -377,5 +377,22 @@ class TestHostClientLoopback(unittest.TestCase):
             h.shutdown()
 
 
+class TestClockSync(unittest.TestCase):
+    def test_pong_before_first_tick_is_ignored(self):
+        """Durante il caricamento l'orologio della partita e' fermo: quei PONG non
+        devono entrare nella stima (darebbero un offset sbagliato di tutta l'attesa)."""
+        from net import ClientSession, LoopbackTransport
+        _a, b = LoopbackTransport.pair()
+        c = ClientSession(b, "Amico")
+        t0 = c._t0
+        # caricamento: 5 s di attesa con l'orologio dell'host fermo a 0
+        for k in range(5):
+            c._handle(P.CH_RELIABLE, P.enc_pong(k * 1000, 0.0, 0), t0 + k + 0.05)
+        self.assertIsNone(c.clock.offset)
+        # partita: l'host e' a 2,0 s quando il client e' a t0+10
+        c._handle(P.CH_RELIABLE, P.enc_pong(10000, 2.0, 60), t0 + 10.05)
+        self.assertAlmostEqual(c.clock.host_time(t0 + 10.05), 2.025, places=3)
+
+
 if __name__ == "__main__":
     unittest.main()

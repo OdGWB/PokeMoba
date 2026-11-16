@@ -174,7 +174,11 @@ class ClientSession:
         elif t == P.R_PONG:
             p = P.dec_pong(data)
             sent = self._t0 + p["t_client"] / 1000.0
-            self.clock.add(sent, p["host_time"], now)
+            # Prima del primo tick (draft, caricamento) l'orologio della partita è
+            # fermo: un campione preso lì darebbe un offset sbagliato di tutta
+            # l'attesa, e col RTT minimo potrebbe restare il "migliore" per 16 s.
+            if p["host_tick"] > 0:
+                self.clock.add(sent, p["host_time"], now)
         elif t == P.R_BYE:
             self._lose("L'host ha chiuso la partita.")
         else:
