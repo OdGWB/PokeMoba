@@ -2161,9 +2161,10 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
             "interval": float(mv.effects.get("interval", 0.75)),
             "caster_id": p.id, "mv": mv, "rank": rank, "mtype": mv.type,
             "fx": "", "inversion_owner": True})
-        # Zona visibile fin dal lancio (fx "" così resta un evento "zone", non uno stile).
+        # Zona visibile fin dal lancio (fx "" così resta un evento "zone", non uno
+        # stile, a meno che la mossa non abbia uno stile suo: tag solo cosmetico).
         self.fx_events.append({"kind": "zone", "c": (center.x, center.y),
-                               "radius": mv.radius, "mtype": mv.type, "fx": ""})
+                               "radius": mv.radius, "mtype": mv.type, "fx": mv.fx or ""})
 
     def _cast_leap(self, p, mv, rank, origin, tgt, dirv):
         """VastoImpatto: Serperior salta e, atterrando, infligge ingenti danni
@@ -2579,7 +2580,8 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                 elif ae.get("inversion_owner"):
                     # VerdeBufera: ripulsa la zona intera a ogni tick (campo animato continuo).
                     self.fx_events.append({"kind": "zone", "c": (c.x, c.y),
-                                           "radius": ae["radius"], "mtype": ae["mtype"], "fx": ""})
+                                           "radius": ae["radius"], "mtype": ae["mtype"],
+                                           "fx": getattr(ae.get("mv"), "fx", "") or ""})
                 else:
                     self.fx_events.append({"kind": "area", "c": (c.x, c.y),
                                            "radius": ae["radius"] * 0.5, "mtype": ae["mtype"],
@@ -3459,7 +3461,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
             self._apply_flamecharge(p, float(ss.get("per", 0.12)),
                                     int(ss.get("max", 3)), float(ss.get("duration", 4.0)))
         self.fx_events.append({"kind": "dash", "a": (origin.x, origin.y),
-                               "b": (dest.x, dest.y), "mtype": mv.type})
+                               "b": (dest.x, dest.y), "mtype": mv.type, "hit": hit_any})
 
     def _apply_flamecharge(self, p, per, maxst, dur):
         """Nitrocarica: accumula una carica di velocità (fino a maxst). Le cariche

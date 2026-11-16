@@ -1225,7 +1225,7 @@ Passaggi completati:
   Screenshot: step_59_opzioni, step_59_tasti.
 - LINEE VECCHIE portate al livello delle nuove (punto 24), una per passo. Eevee
   (eevee_fx) e Spiritomb (spirit_fx) avevano gia' un modulo; Roggenrola ha effetti
-  su misura in fx.py. Restano da fare: Snivy, Totodile, Nincada, Poliwag.
+  su misura in fx.py. Restano da fare: Totodile, Nincada, Poliwag.
   Registro: fx_lines.FX_LINES; ogni modulo puo' esporre anche AA_TRAVEL
   (forma -> frazione del volo, per gli attacchi base a ricerca: fx._AA_TRAVEL).
 - LINEA CHARMANDER > CHARMELEON > CHARIZARD (step_60), nuovo game/char_fx.py.
@@ -1306,6 +1306,29 @@ Passaggi completati:
   foglielama, gigassorbimento/_volo, sgomento, spavento, sintesi,
   danzadipiume/_dopo, retromarcia, granvoce/_dopo, sbigoattacco/_colpo,
   cucitombra/_colpo/_legato, pioggia_mira/_/_dopo).
+- LINEA SNIVY > SERVINE > SERPERIOR (step_63), nuovo game/snivy_fx.py. Nomi "fx"
+  nel JSON (attack_fx "snvleaf" su tutte le forme, snv* sulle mosse) e pochi TAG
+  COSMETICI nel motore: la zona della VerdeBufera porta mv.fx (al lancio e a ogni
+  tick), lo scatto "dash" porta "hit" (a segno o no). Forme: foglia-rasoio a
+  ricerca (snvleaf, attacco base), liana che frusta nel cono (snvwhip: Frustata,
+  Codacciaio in ACCIAIO; stella piccola e bassa sulla punta, grande sembrava una
+  macchia), sfera d'energia (snvball: EnergiPalla), liana che si allunga e si
+  avvolge (snvreach/snvwrap: Avvolgibotta), cappio d'erba (snvknot:
+  Laccioerboso), CIUFFI che spuntano (snvsprout: Apripista, Erboscivolata, Campo
+  Erboso; lame SOTTILI e aperte: col contorno spesso sembravano pillole scure),
+  spine d'erba (snvspike: Erbapatto), campo erboso con fiorellini (snvfield),
+  radici spinose (snvroot) e mirino (snvmark) della VerdeBufera, arco del salto
+  (snvarc: Vasto Impatto). Apripista/Erboscivolata a segno = pochi foglie che
+  schizzano (la stella copriva lo sprite). Vasto Impatto all'atterraggio = stella
+  viola + due anelli SOTTILI e scossa: niente groundcrack (rametti sopra gli
+  sprite), pebble (quadratini marroni), flash (disco bianco) o groundring spesso
+  (ciambella). Sulle unita' (a tutti): foglie in orbita = cariche di Inversione
+  (una ogni 10), DORATE oltre il tetto normale (sovraccarico della VerdeBufera);
+  inversion_stacks in net/visual.UNIT_FLAGS. Screenshot: step_63_* (attacco,
+  frustata/_fine, codacciaio, energipalla_volo/_colpo, apripista/_dopo,
+  erboscivolata, campoerboso, avvolgibotta/_allunga/_stretta, laccioerboso/
+  _corsa, erbapatto/_colpo, verdebufera/_tick, vastoimpatto/_balzo/_dopo,
+  inversione/_sovraccarico).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul
