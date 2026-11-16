@@ -1753,7 +1753,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
     def _update_bot_shop(self, dt: float) -> None:
         """I bot comprano oggetti quando tornano in base con abbastanza oro."""
         for p in self.world.pokemons():
-            if not p.alive or not p.is_bot:
+            if not p.alive or not p.is_bot or p.bot_standin:
                 continue
             if p.pos.dist(p.spawn_pos) > config.SHOP_RANGE:
                 continue
@@ -4056,10 +4056,11 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                 if ms and len(ms.upgrades) == 1:
                     evolution.apply_choice(p, slot, 0)
             if p.is_bot:
-                for slot in list(p.pending_choices):
-                    ms = p.moveset.get(slot)
-                    if ms and ms.upgrades:
-                        evolution.apply_choice(p, slot, random.randrange(len(ms.upgrades)))
+                if not p.bot_standin:   # il sostituto lascia le scelte al giocatore
+                    for slot in list(p.pending_choices):
+                        ms = p.moveset.get(slot)
+                        if ms and ms.upgrades:
+                            evolution.apply_choice(p, slot, random.randrange(len(ms.upgrades)))
                 self._bot_spend_points(p)
 
     def _bot_spend_points(self, p) -> None:

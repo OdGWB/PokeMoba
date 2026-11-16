@@ -360,6 +360,10 @@ class TestHostClientLoopback(unittest.TestCase):
             p = h.world.get(eid)
             self.assertTrue(p.alive)
             self.assertLess(p.pos.dist(pos), 0.5)
+            # Dopo STANDIN_DELAY lo guida un bot (che non compra e non sceglie).
+            from net.host import STANDIN_DELAY
+            h._standins(time.monotonic() + STANDIN_DELAY + 1.0)
+            self.assertTrue(p.is_bot and p.bot_standin)
             # Rientro sullo stesso slot: stesso Pokémon.
             a2, b2 = LoopbackTransport.pair(latency=0.03)
             h.attach_transport(1, a2)
@@ -368,6 +372,7 @@ class TestHostClientLoopback(unittest.TestCase):
             self.assertEqual(c2.start_info["your_entity_id"], eid)
             self.assertIsNotNone(c2.latest)
             self.assertNotIn(eid, h.disconnected)
+            self.assertFalse(p.is_bot or p.bot_standin)        # torna al giocatore
             # Chiusura pulita dell'host.
             h.shutdown()
             self._pump([me, c2], 0.3)

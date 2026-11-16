@@ -100,7 +100,7 @@ class ClientSession:
         elif tr.state == CLOSED and self._connected_once:
             self._lose("L'host ha chiuso la connessione.")
         elif self._connected_once and now - tr.last_rx > HOST_TIMEOUT:
-            self._lose("L'host non risponde più: la partita è finita (connessione persa).")
+            self._lose("L'host non risponde più (connessione persa).")
         if self.phase in (ENDED, LOST) or tr.state != CONNECTED:
             return
         if now - self._last_ping >= PING_DT:

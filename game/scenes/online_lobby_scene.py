@@ -366,6 +366,7 @@ class OnlineJoinScene:
         self.offer = TextField("incolla qui il codice dell'host (Ctrl+V)")
         self.chat = TextField("chat (INVIO per mandare)", limit=120)
         self.buttons = Buttons()
+        self.notice = ""              # avviso (es. rientro in una partita in corso)
         self._reset()
 
     def _reset(self):
@@ -470,7 +471,9 @@ class OnlineJoinScene:
             if ph == C.LOBBY and self.session.slot is not None and not self._sent:
                 self.team = 1 if self.session.slot % 2 else 0
                 self._choice(); self._sent = True
-            if ph == C.DRAFT:
+            if ph == C.DRAFT or (ph == C.LOADING and self.session.start_info):
+                # LOADING diretto = RIENTRO a partita in corso: la scena del draft
+                # mostra il caricamento e poi apre la partita (stesso Pokémon).
                 from .online_draft_scene import OnlineDraftScene
                 self.next_scene = OnlineDraftScene(self.app, self.session)
             if ph in (C.LOST, C.ENDED) and not self.error:
@@ -492,8 +495,13 @@ class OnlineJoinScene:
         surface.blit(font(24, True).render("UNISCITI ONLINE", True, GOLD), (x, y)); y += 46
         s = self.session
         if s is not None and s.phase == C.LOBBY:
+            if self.notice:     # rientro: WELCOME arrivato, la partita sta per ripartire
+                surface.blit(md.render("Connesso! Rientro in partita...", True, GOLD), (x, y))
+                return
             self._draw_lobby(surface, x, y)
             return
+        if self.notice:
+            surface.blit(md.render(self.notice, True, GOLD), (x, y)); y += 34
         surface.blit(md.render("1. Incolla il codice che ti ha mandato l'host", True, TEXT), (x, y))
         y += 30
         busy = self.future is not None or bool(self.answer_code)

@@ -78,6 +78,7 @@ class Pokemon(Unit):
     role: str = ""
     attack_fx: str = ""              # stile effetto dell'auto-attacco (vedi game/fx.py)
     is_bot: bool = False
+    bot_standin: bool = False        # bot che guida un giocatore caduto (online): niente acquisti/evoluzioni
     is_jungler: bool = False
     smite_charges: int = 2           # Smite (engine/smite.py): cariche, blocco e ricarica
     smite_ready_at: float = 0.0

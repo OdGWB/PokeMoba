@@ -145,7 +145,8 @@ class OnlineDraftScene:
         W, H = surface.get_size()
         if self.session.phase == C.LOADING:
             from .. import loading_screen
-            loading_screen.draw(surface, self.t, "Caricamento della mappa...")
+            loading_screen.draw(surface, self.t, "Caricamento della mappa..." if self.session.draft
+                                else "Rientro in partita...")
             self._loading_drawn = True
             return
         surface.fill(BG)

@@ -63,6 +63,7 @@ class OnlineMatchScene(NetMatchScene):
         self._dying: dict = {}         # come MatchScene: posa Hurt che si dissolve
         self._portraits: dict = {}
         self._end_btn = None
+        self._slot_status: dict = {}  # host: stato degli slot al frame prima (riapertura)
 
     def _on_command(self, seq, kind, f):
         target = (f["x"], f["y"]) if "x" in f else None
@@ -87,6 +88,10 @@ class OnlineMatchScene(NetMatchScene):
                 from .online_lobby_scene import SlotPanel
                 self.slot_panel = None if self.slot_panel else SlotPanel(self.host, in_match=True)
                 continue
+            if (self.session.phase == C.LOST and self.host is None and self.world.winner is None
+                    and ev.type == pygame.KEYDOWN and ev.key == pygame.K_r):
+                self._rejoin()
+                continue
             if self.session.phase in (C.ENDED, C.LOST) or self.world.winner is not None:
                 if ((ev.type == pygame.KEYDOWN and ev.key in (pygame.K_RETURN, pygame.K_KP_ENTER))
                         or (ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1
@@ -104,6 +109,27 @@ class OnlineMatchScene(NetMatchScene):
             self.session.close()
         from .menu_scene import MenuScene
         self.next_scene = MenuScene(self.app)
+
+    def _rejoin(self):
+        """Connessione persa a partita in corso: si torna alla schermata
+        "Unisciti" per incollare il NUOVO codice dell'host (stesso slot e Pokémon)."""
+        self.session.close()
+        from .online_lobby_scene import OnlineJoinScene
+        self.next_scene = OnlineJoinScene(self.app)
+        self.next_scene.notice = ("RIENTRO: chiedi all'host il nuovo codice (lo trova con F2) "
+                                  "e incollalo qui.")
+
+    def _auto_reopen(self):
+        """Host: quando un amico cade a partita in corso, il suo slot si riapre da
+        solo (nuovo codice di rientro, visibile con F2) e compare un avviso."""
+        seen = self._slot_status
+        for v in self.host.view:
+            prev = seen.get(v["index"])
+            seen[v["index"]] = v["status"]
+            if v["status"] == "disconnected" and prev != "disconnected" and v["entity_id"]:
+                self.host.open_slot(v["index"])
+                self.session.events.append((time.monotonic(),
+                                            f"Codice di rientro per {v['name']} pronto: premi F2"))
 
     def _unit_pos(self, uid):
         u = self.world.get(int(uid))
@@ -144,6 +170,8 @@ class OnlineMatchScene(NetMatchScene):
         self.fx.update(dt)
         if self.slot_panel is not None:
             self.slot_panel.update()
+        if self.host is not None and self.session.phase == C.MATCH:
+            self._auto_reopen()
 
     def _update_deaths(self, dt):
         """Morte: posa Hurt + dissolvenza come offline. Lo snapshot toglie il
@@ -335,7 +363,9 @@ class OnlineMatchScene(NetMatchScene):
         for i, line in enumerate(_wrap(sub, 70)[:3]):
             st = small.render(line, True, (230, 230, 230))
             surface.blit(st, (panel.centerx - st.get_width() // 2, panel.y + 74 + i * 22))
-        hint = small.render("INVIO o ESC: torna al menu", True, DIM)
+        can_rejoin = s.phase == C.LOST and self.host is None
+        hint = small.render("R: rientra in partita      INVIO o ESC: torna al menu" if can_rejoin
+                            else "INVIO o ESC: torna al menu", True, DIM)
         surface.blit(hint, (panel.centerx - hint.get_width() // 2, panel.bottom - 30))
 
 

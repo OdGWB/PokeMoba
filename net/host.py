@@ -47,6 +47,7 @@ ROOT = Path(__file__).resolve().parent.parent
 MAX_SLOTS = 10                 # 5v5
 CLIENT_TIMEOUT = 3.0           # s senza nulla dal client = caduto
 CONNECT_TIMEOUT = 45.0         # s per completare ICE dopo la risposta
+STANDIN_DELAY = 15.0          # s di assenza dopo cui un bot guida il Pokémon di chi è caduto
 LOAD_TIMEOUT = 90.0            # s massimo di attesa del caricamento mappa
 SNAP_DT = 1.0 / config.SNAPSHOT_RATE
 SNAP_HISTORY = 64              # snapshot inviati tenuti come basi (~3.2 s)
@@ -120,6 +121,7 @@ class HostSession:
         self.local = None
         self.match = self.world = self.sim = None
         self.disconnected: set = set()
+        self._dc_since: dict = {}     # entity_id -> istante della caduta (bot sostituto)
         self.rejected_total = 0
         self._cmds: queue.Queue = queue.Queue()
         self._fx: list = []
@@ -243,6 +245,7 @@ class HostSession:
             steps += 1
         if steps == 8:                           # rallentamento: niente spirale di recupero
             self._next_tick = now + config.TICK_DT
+        self._standins(now)
         if now >= self._next_snap:
             self._send_snapshots(now)
             self._next_snap = max(self._next_snap + SNAP_DT, now)
@@ -251,6 +254,18 @@ class HostSession:
             self.phase = "ended"
             self._send_snapshots(now)
             self._broadcast(P.enc_end(self.match.winner, P.END_VICTORY))
+
+    def _standins(self, now):
+        """Chi resta fuori per STANDIN_DELAY secondi viene guidato da un bot
+        (combatte, farma, alza le mosse) finché non rientra. Il bot NON compra
+        oggetti e NON sceglie le evoluzioni: quelle restano al giocatore."""
+        for eid, t0 in self._dc_since.items():
+            if now - t0 < STANDIN_DELAY:
+                continue
+            p = self.world.get(eid)
+            if p is not None and not p.is_bot:
+                p.is_bot = True
+                p.bot_standin = True
 
     def host_clock(self, now=None) -> float:
         """Orologio della partita (s) continuo: tick * dt + frazione del tick in corso."""
@@ -425,6 +440,7 @@ class HostSession:
             p.pending_cast = None
             p.stop()
         self.disconnected.add(s.entity_id)
+        self._dc_since[s.entity_id] = time.monotonic()
         self._broadcast(P.enc_event(P.EV_DISCONNECT, s.index, s.name))
         self._broadcast_lobby()
 
@@ -529,8 +545,16 @@ class HostSession:
             self._broadcast_lobby()
             return
         if s.entity_id:
-            # RIENTRO dopo una disconnessione: stesso slot, stesso Pokémon.
+            # RIENTRO dopo una disconnessione: stesso slot, stesso Pokémon. Se lo
+            # guidava un bot, torna al giocatore (fermo, senza ordini del bot).
             self.disconnected.discard(s.entity_id)
+            self._dc_since.pop(s.entity_id, None)
+            p = self.world.get(s.entity_id) if self.world is not None else None
+            if p is not None and getattr(p, "bot_standin", False):
+                p.is_bot = False
+                p.bot_standin = False
+                p.order, p.target_id, p.pending_cast = "stop", None, None
+                p.stop()
             self._send(s, P.enc_start(config.MAPS[self.map_index][1], s.entity_id,
                                       self._players_info()))
             self._broadcast(P.enc_event(P.EV_RECONNECT, s.index, s.name))

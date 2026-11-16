@@ -46,7 +46,7 @@ class BotPlanMixin:
         st = self._ai.setdefault(p.id, {})
         if p.hp < p.max_hp * 0.28 and not st.get("recall"):
             return False                      # ritirata di base
-        if self._plan_shop(p, st, dt):
+        if not p.bot_standin and self._plan_shop(p, st, dt):
             return True
         if self._acquire_enemy_champ(p, 4.5) is not None:
             return False                      # scontro in corso: combatte l'IA di base
