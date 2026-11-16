@@ -80,6 +80,22 @@ SHEDINJA_DEX = 292
 # Tipi superefficaci contro Coleottero/Spettro: bucano la Magidifesa (letali).
 _SHEDINJA_WEAK = {"Fire", "Flying", "Rock", "Ghost", "Dark"}
 FORZABRUTA_WILD_MULT = 1.30   # ForzaBruta (Totodile): danno ai neutrali
+def _src_name(u) -> str:
+    """Nome leggibile di chi infligge danno (riepilogo della morte)."""
+    if isinstance(u, Pokemon):
+        return u.name
+    if isinstance(u, Core):
+        return "Nucleo"
+    if isinstance(u, Structure):
+        return "Torre"
+    if isinstance(u, Minion):
+        return "Minion"
+    if isinstance(u, Wild):
+        return "Leggendario" if getattr(u, "kind", "") in ("meteo", "arceus") else "Mostro"
+    return "?"
+
+
+RECAP_WINDOW = 10.0     # secondi di danni nel riepilogo della morte
 MUTA_WILD_MULT = 1.30    # danno ai Pokémon neutrali (come Miele/Scalaroccia)
 MUTA_DURATION = 5.0       # s in forma Shedinja
 MUTA_COOLDOWN = 150.0      # ricarica condivisa Muta/Rancore
@@ -172,6 +188,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         self.time = 0.0
         self.winner: int | None = None
         self._first_blood_done = False   # prima uccisione della partita (punto 4)
+        self._dmg_label = None           # nome della fonte del danno in corso (riepilogo morte)
         self.announcements: list[tuple[float, str]] = []  # (tempo, testo) per l'HUD
         self._wave_timer = config.FIRST_WAVE_TIME
         self._wave_number = 0
@@ -1080,6 +1097,9 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         if isinstance(target, Pokemon) and not ignore_shield:
             amount = self._fat_absorb(target, amount)   # Grassospesso (dopo gli altri scudi)
         target.hp -= amount
+        if amount > 0.0:   # statistiche: senza l'eccesso oltre gli HP rimasti
+            self._track_damage(attacker, target,
+                               min(amount, max(0.0, target.hp + amount)), dmg_type)
         self._scy_on_dealt(attacker, target, amount)   # Chele d'Acciaio: cura del 10%
         if isinstance(target, Pokemon) and target.endure_until > self.time:
             target.hp = max(1.0, target.hp)   # Resistenza: non scende sotto 1 HP
@@ -1112,6 +1132,62 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                 return
             self._on_death(target, attacker)
 
+    def _track_damage(self, attacker, target, amount, dmg_type) -> None:
+        """Statistiche (danno ai campioni, subito) e registro per il riepilogo
+        della morte. Solo bersagli Pokemon: costo = un append per colpo."""
+        if not isinstance(target, Pokemon):
+            return
+        target.stat_taken += amount
+        if isinstance(attacker, Pokemon) and attacker.team != target.team:
+            attacker.stat_dmg += amount
+        log = target.dmg_log
+        now = self.time
+        if log and log[0][0] < now - RECAP_WINDOW:
+            cut = 0
+            while cut < len(log) and log[cut][0] < now - RECAP_WINDOW:
+                cut += 1
+            del log[:cut]
+        label = self._dmg_label
+        if label is None:
+            label = "Altro" if isinstance(attacker, Pokemon) else _src_name(attacker)
+        aid = getattr(attacker, "id", None)
+        # I tick (veleno, zone) dello stesso attaccante e fonte si fondono: il
+        # registro resta corto anche con tanti danni piccoli.
+        if log:
+            t0, a0, l0, d0, ty0 = log[-1]
+            if a0 == aid and l0 == label and now - t0 < 0.5:
+                log[-1] = (now, aid, label, d0 + amount, ty0)
+                return
+        log.append((now, aid, label, amount, dmg_type))
+        if len(log) > 40:
+            del log[:-40]
+
+    def _make_death_recap(self, victim, killer) -> None:
+        """Riassunto dell'ultima morte: chi ha ucciso e il danno subito negli
+        ultimi RECAP_WINDOW secondi per attaccante e per fonte."""
+        now = self.time
+        by = {}
+        for t, aid, label, dmg, ty in victim.dmg_log:
+            if t < now - RECAP_WINDOW:
+                continue
+            e = by.setdefault(aid, {"total": 0.0, "src": {}})
+            e["total"] += dmg
+            s = e["src"].setdefault(label, [0.0, ty])
+            s[0] += dmg
+        rows = []
+        for aid, e in by.items():
+            a = self.world.get(aid) if aid is not None else None
+            name = _src_name(a)
+            rows.append({"id": aid, "name": name,
+                         "champ": isinstance(a, Pokemon), "total": round(e["total"]),
+                         "src": sorted(([lbl, round(v[0]), v[1]] for lbl, v in e["src"].items()),
+                                       key=lambda r: -r[1])[:4]})
+        rows.sort(key=lambda r: -r["total"])
+        victim.death_recap = {"killer": getattr(killer, "id", None),
+                              "killer_name": _src_name(killer),
+                              "t": round(now, 1), "rows": rows[:5]}
+        victim.dmg_log.clear()
+
     def _on_death(self, victim, killer) -> None:
         victim.hp = 0.0
         victim.alive = False
@@ -1127,6 +1203,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         self._award_xp(victim, killer)
         self._award_gold(victim, killer)
         if isinstance(victim, Pokemon):
+            self._make_death_recap(victim, killer)
             victim.stop()
             victim.target_id = None
             victim.airborne_until = -1.0   # niente sprite sospeso in aria da morto
@@ -1469,6 +1546,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
             # Oro solo a chi dà l'ultimo colpo (last-hit); kill da torre/altri
             # minion danno 0 (killer non è un Pokémon).
             if isinstance(killer, Pokemon):
+                killer.stat_cs += 1
                 killer.gold += self._minion_gold(victim)
                 self.fx_events.append({"kind": "gold", "who": killer.id,   # cosmetico: "+oro"
                                        "c": (victim.pos.x, victim.pos.y),
@@ -1580,6 +1658,11 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
             if isinstance(a, Pokemon) and a.alive and a.team != victim.team:
                 assisters.append(a)
         setattr(victim, "_damagers", {})
+        victim.stat_deaths += 1
+        if killer_is_champ:
+            killer.stat_kills += 1
+        for a in assisters:
+            a.stat_assists += 1
 
         fb_assist = config.FIRST_BLOOD_ASSIST if first_blood else 0
         if killer_is_champ:
@@ -3397,6 +3480,14 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
 
     def _hit(self, caster, mv, rank, target, mult: float = 1.0) -> None:
         """`mult` scala il danno (tick di una zona, es. Bora)."""
+        prev = self._dmg_label
+        self._dmg_label = mv.name        # riepilogo della morte: danno "da mossa"
+        try:
+            self._hit_core(caster, mv, rank, target, mult)
+        finally:
+            self._dmg_label = prev
+
+    def _hit_core(self, caster, mv, rank, target, mult: float = 1.0) -> None:
         # Bersaglio non bersagliabile (es. SUB sott'acqua): niente danno né CC.
         if isinstance(target, Pokemon) and target.untargetable_until > self.time:
             return
@@ -3885,14 +3976,18 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
             if p.poison_until > self.time and p.poison_dps > 0.0:
                 src = self.world.get(p.poison_src) if p.poison_src is not None else None
                 if src is not None and src.alive:
+                    self._dmg_label = "Veleno"
                     self._deal_damage(src, p, p.poison_dps * dt)
+                    self._dmg_label = None
             # Scottatura (Fiammacoda): danno nel tempo + Attacco ridotto (vedi
             # eff_attack, via burn_active).
             p.burn_active = p.burn_until > self.time
             if p.burn_active and p.burn_dps > 0.0:
                 src = self.world.get(p.burn_src) if p.burn_src is not None else None
                 if src is not None and src.alive:
+                    self._dmg_label = "Scottatura"
                     self._deal_damage(src, p, p.burn_dps * dt, dmg_type="Fire")
+                    self._dmg_label = None
             elif not p.burn_active:
                 p.burn_dps = 0.0
             # Passiva Inversione: senza colpi per 10s le cariche calano di 2 ogni 0.75s.

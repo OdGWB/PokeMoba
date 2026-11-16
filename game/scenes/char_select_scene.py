@@ -166,6 +166,7 @@ class CharSelectScene:
                 str(self.app.root / config.MAPS[self.map_index][1]),
                 str(self.app.root / config.ROSTER[self.sel]),
                 flower_color=self.flower_color if self._has_colors() else None)
+            self.next_scene.app = self.app   # "Torna al menu" a fine partita
 
     # --- disegno -------------------------------------------------------------
     def draw(self, surface):

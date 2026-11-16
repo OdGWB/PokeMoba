@@ -153,9 +153,26 @@ def capture_visual(match, team: int, player=None) -> dict:
         out["respawn"] = [(p.spawn_pos.x, p.spawn_pos.y, p.team,
                            round(1.0 - max(0.0, p.respawn_timer) / max(0.1, p.respawn_max), 2))
                           for p in dead]
+    out["score"] = capture_score(match)
     if isinstance(player, Pokemon):
         out["me"] = capture_me_visual(match, player)
+        if not player.alive and player.death_recap:
+            out["recap"] = player.death_recap   # riepilogo della morte (solo a chi e' morto)
     return out
+
+
+def capture_score(match) -> list:
+    """Tabellone (TAB) e fine partita: uguale per tutti, calcolato una volta per
+    tick. Il danno e' arrotondato alle centinaia: il pacchetto visivo parte solo
+    quando qualcosa cambia davvero."""
+    cache = getattr(match, "_score_cache", None)
+    if cache is not None and cache[0] == match.time:
+        return cache[1]
+    rows = [[p.id, p.name, p.team, p.dex, p.stat_kills, p.stat_deaths, p.stat_assists, p.stat_cs,
+             p.level, int(round(p.stat_dmg, -2)), list(p.items)]
+            for p in match.world.pokemons() if not getattr(p, "is_decoy", False)]
+    match._score_cache = (match.time, rows)
+    return rows
 
 
 def capture_me_visual(match, p) -> dict:

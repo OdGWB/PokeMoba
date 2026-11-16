@@ -238,8 +238,10 @@ class BasicAttackMixin:
         dmg = self._octi_aa_land(u, tgt, snap, dmg)   # munizione: efficacia del tipo + STAB
         if snap["melee"] and isinstance(tgt, Minion):
             dmg *= MELEE_MINION_MULT
+        self._dmg_label = "Attacco base"
         self._deal_damage(u, tgt, dmg,
                           dmg_type="Ghost" if snap["claws"] else snap.get("ammo"))
+        self._dmg_label = None
         # Colpo andato a segno (solo visivo: lampo sul bersaglio + scintilla).
         self.fx_events.append({"kind": "aa_hit", "hit": tgt.id, "src": u.id,
                                "c": (tgt.pos.x, tgt.pos.y), "melee": snap["melee"],

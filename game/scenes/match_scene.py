@@ -37,6 +37,7 @@ from ..sprites.animator import FallbackAnimator, SpriteAnimator
 from ..sprites.spritesheet import load_pokemon_animations, make_wild_animator
 from .. import hud
 from ..fx import type_color
+from .. import match_ui
 from ..hud_passives import PassiveCtx, draw_passive
 from ..world_fx import draw_projectiles, draw_world_effects, update_world_fx
 
@@ -66,6 +67,7 @@ class MatchScene:
         self._sprite_key: dict = {}   # id -> (dex, stadio, forma) dello sprite attuale
         self._register_def(self.pdef)
 
+        self._end_btn = None          # pulsante "Torna al menu" della fine partita
         self.animators: dict[int, object] = {}
         self._dying: dict = {}      # unità morte: anim Hurt + dissolvenza breve
         self._sprite_cache: dict = {}
@@ -280,6 +282,14 @@ class MatchScene:
     def handle_events(self, events) -> None:
         passthrough = []
         for ev in events:
+            if self.match is not None and self.match.winner is not None:
+                # Fine partita: solo il pulsante "Torna al menu" (clic o Invio).
+                if ((ev.type == pygame.KEYDOWN and ev.key in (pygame.K_RETURN, pygame.K_KP_ENTER,
+                                                              pygame.K_ESCAPE))
+                        or (ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1
+                            and self._end_btn is not None and self._end_btn.collidepoint(ev.pos))):
+                    self._back_to_menu()
+                continue
             if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
                 self.quit_app = True
             elif ev.type == pygame.KEYDOWN and ev.key == pygame.K_p and self.match is not None:
@@ -552,6 +562,18 @@ class MatchScene:
             self._portraits[key] = img
         return self._portraits[key]
 
+    def _back_to_menu(self):
+        app = getattr(self, "app", None)
+        if app is None:          # avviata dal launcher di test: si chiude
+            self.quit_app = True
+            return
+        from .menu_scene import MenuScene
+        self.next_scene = MenuScene(app)
+
+    def _score_portrait(self, dex):
+        sd = self._dex_sprite.get(dex) or f"assets/pokemon/{dex:04d}"
+        return self._portrait(sd, match_ui.PORT - 4)
+
     def hud_lines(self) -> list[str]:
         # L'HUD vero e' in draw_fullres (game/hud.py); qui niente righe di testo.
         return []
@@ -672,15 +694,15 @@ class MatchScene:
                                        first=(sl == p.pending_choices[0]))
         # Avvisi al centro
         if self.match.winner is not None:
-            squad = "BLU" if self.match.winner == 0 else "ROSSA"
-            win = self.match.winner == p.team
-            hud.draw_banner(surface, "VITTORIA!" if win else "SCONFITTA",
-                            f"Ha vinto la squadra {squad}",
-                            (255, 230, 120) if win else (240, 120, 110),
-                            y=surface.get_height() // 3)
+            self._end_btn = match_ui.draw_end_screen(
+                surface, match_ui.rows_from_world(self.world, p.id), self.match.winner, p.team,
+                self.match.time, icon, self._score_portrait)
+            return
         elif not p.alive:
             hud.draw_banner(surface, "ABBATTUTO", f"Rinasci tra {p.respawn_timer:.0f}s",
                             (240, 120, 110))
+            match_ui.draw_death_recap(surface, p.death_recap,
+                                      lay.rect.y - (34 if skills.available_points(p) > 0 else 10))
         elif p.recalling:
             left = max(0.0, p.recall_until - self.match.time)
             hud.draw_banner(surface, f"RICHIAMO  {left:.1f}s",
@@ -691,6 +713,10 @@ class MatchScene:
             self.shop.draw(surface, font, self.match.item_catalog, p.gold, p.items,
                            p.rec_items or self.pdef.role, near_base, p.item_cd, self.match.time,
                            evo=scy_fx.evo_hint(p))   # Scyther: oggetti evolutivi in evidenza
+        # Tabellone: TAB tenuto premuto (se non si sta mirando: li' TAB cambia polarita').
+        if pygame.key.get_pressed()[pygame.K_TAB] and not self.input.aiming_slot:
+            match_ui.draw_scoreboard(surface, match_ui.rows_from_world(self.world, p.id),
+                                     p.team, self.match.time, icon, self._score_portrait)
 
     def _choice_size(self, sl) -> tuple:
         if self.player.passive_id == "adattabilita" and sl in CHOICE_SLOTS:

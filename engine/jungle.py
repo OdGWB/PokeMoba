@@ -228,6 +228,7 @@ class JungleSystem:
             # giocatori, raddoppiato dalla taglia di recupero se la squadra è
             # indietro. I leggendari danno oro di squadra (sotto).
             if victim.kind == "camp":
+                killer.stat_cs += 1
                 gold = victim.reward_gold
                 gold *= 1.0 + config.CAMP_GOLD_PER_LEVEL * self.m._avg_player_level()
                 gold *= self.m._comeback_mult(killer.team)

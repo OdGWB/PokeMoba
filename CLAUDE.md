@@ -1181,6 +1181,27 @@ Passaggi completati:
   fx.py, config.py): una modifica grafica invalida la cache da sola.
   POKEMOBA_NO_MAP_CACHE=1 la disattiva. Screenshot: screenshots/step_57.png
   (identico al codice vecchio nello stesso istante).
+- MUSICA DEL MENU, TABELLONE (TAB), FINE PARTITA e RIEPILOGO DELLA MORTE (step_58).
+  (1) game/audio.py: musica in STREAMING (pygame.mixer.music, nessun costo per
+  frame) di assets/audio/menu_music.mp3 su tutte le scene senza camera; dissolvenza
+  in uscita quando parte una partita (App._sync_music a ogni cambio scena). Volumi
+  in options.json. (2) Motore: contatori di sola statistica sui Pokemon
+  (stat_kills/deaths/assists/cs/dmg/taken) aggiornati in _award_kill, _award_gold
+  (minion), jungle.on_wild_death (campi) e Match._track_damage (chiamato da
+  _deal_damage, danno SENZA l'eccesso oltre gli HP). Registro dmg_log per
+  bersaglio (10 s, RECAP_WINDOW; i tick dello stesso attaccante e fonte entro 0,5 s
+  si fondono, max 40 voci) con l'etichetta Match._dmg_label: nome della mossa
+  (_hit fa da involucro a _hit_core), "Attacco base", "Veleno", "Scottatura";
+  senza etichetta Torre/Nucleo/Minion/Mostro/Leggendario o "Altro". Alla morte
+  _make_death_recap -> p.death_recap (uccisore + danno per attaccante e fonte).
+  (3) game/match_ui.py (MatchScene e OnlineMatchScene): tabellone con TAB tenuto
+  (non mentre si mira: li' TAB cambia la polarita' di Magnezone), schermata di fine
+  partita (esito, durata, tabella con barra del danno ai campioni, "Più danno/
+  partecipazioni/CS", pulsante "Torna al menu"), riepilogo della morte sopra la
+  barra. Ogni pannello e' una Surface IN CACHE rifatta solo quando cambiano i dati.
+  Online: net/visual.capture_score (una volta per tick, danno arrotondato alle
+  centinaia: il pacchetto R_VIS parte solo se cambia) e "recap" solo a chi e' morto.
+  Screenshot: step_58_tabellone, step_58_morte, step_58_fine.
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

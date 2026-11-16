@@ -22,6 +22,7 @@ from engine.vision import VisionSystem
 from .. import hud, mag_fx, scy_fx
 from ..camera import Camera
 from ..fx import type_color
+from .. import match_ui
 from ..input_controller import champs_only_held
 from ..minimap import Minimap
 from ..networld import NetWorld
@@ -474,13 +475,20 @@ class NetMatchScene:
                 hud.draw_choice(surface, r, title, self.disp_moveset[sl].upgrades[:2],
                                 type_color, False, col)
         if self.world.winner is not None:
-            win = self.world.winner == self.team
-            hud.draw_banner(surface, "VITTORIA!" if win else "SCONFITTA",
-                            f"Ha vinto la squadra {'BLU' if self.world.winner == 0 else 'ROSSA'}",
-                            (255, 230, 120) if win else (240, 120, 110),
-                            y=surface.get_height() // 3)
+            if self._score_rows() is None:      # LAN: avviso semplice
+                win = self.world.winner == self.team
+                hud.draw_banner(surface, "VITTORIA!" if win else "SCONFITTA",
+                                f"Ha vinto la squadra {'BLU' if self.world.winner == 0 else 'ROSSA'}",
+                                (255, 230, 120) if win else (240, 120, 110),
+                                y=surface.get_height() // 3)
+            return   # online: la schermata di fine partita la disegna OnlineMatchScene
         elif me is None or me.id in getattr(self.world, "dead", ()):
-            hud.draw_banner(surface, "ABBATTUTO", "Rinasci in base tra poco", (240, 120, 110))
+            left = self._me_vis().get("respawn_timer")
+            hud.draw_banner(surface, "ABBATTUTO",
+                            f"Rinasci tra {left:.0f}s" if left else "Rinasci in base tra poco",
+                            (240, 120, 110))
+            match_ui.draw_death_recap(surface, self._death_recap(),
+                                      self._bar.rect.y - (34 if h.get("points", 0) > 0 else 10))
 
         if self.shop.open:
             near = me is not None and me.pos.dist(self.base) <= config.SHOP_RANGE
@@ -488,3 +496,18 @@ class NetMatchScene:
                            h.get("items", []), self.pdef.recommended_items or self.pdef.role,
                            near, self._me_vis().get("item_cd", {}), self.world.match_time,
                            evo=scy_fx.evo_hint(self.world.get(self.your_id)))   # Scyther
+        rows = self._score_rows()
+        if (rows and pygame.key.get_pressed()[pygame.K_TAB] and self.aiming_slot is None):
+            match_ui.draw_scoreboard(surface, rows, self.team, self.world.match_time, icon,
+                                     self._score_portrait)
+
+    # --- tabellone / riepilogo (riempiti da OnlineMatchScene) -------------------
+    def _score_rows(self):
+        return None
+
+    def _death_recap(self):
+        return None
+
+    def _score_portrait(self, dex):
+        port = getattr(self, "_portrait", None)
+        return port(f"assets/pokemon/{dex:04d}", match_ui.PORT - 4) if port else None

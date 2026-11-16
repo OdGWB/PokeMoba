@@ -144,6 +144,17 @@ class Pokemon(Unit):
     gold: float = 500.0
     kill_streak: int = 0                # uccisioni consecutive (serie di uccisioni)
     death_streak: int = 0               # morti consecutive (serie di morti)
+    # Statistiche della partita (solo conteggi: tabellone TAB e fine partita).
+    stat_kills: int = 0
+    stat_deaths: int = 0
+    stat_assists: int = 0
+    stat_cs: int = 0                    # minion + mostri dei campi (ultimo colpo)
+    stat_dmg: float = 0.0               # danno inflitto ai campioni nemici
+    stat_taken: float = 0.0             # danno subito
+    # Riepilogo della morte: colpi subiti negli ultimi RECAP_WINDOW secondi
+    # (t, id attaccante, etichetta, danno, tipo) e il riassunto dell'ultima morte.
+    dmg_log: list = field(default_factory=list)
+    death_recap: dict | None = None
     items: list = field(default_factory=list)           # id degli oggetti (max 6)
     item_bonus: dict = field(default_factory=dict)       # {stat: valore} dagli oggetti
     rec_items: list = field(default_factory=list)        # oggetti consigliati (JSON del Pokémon)

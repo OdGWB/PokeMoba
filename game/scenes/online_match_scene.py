@@ -22,7 +22,7 @@ import config
 from net import client as C
 from net.prediction import Predictor
 
-from .. import anim_tuning, arch_fx, hatt_fx, hud, mag_fx, moth_fx, swine_fx
+from .. import anim_tuning, arch_fx, hatt_fx, hud, mag_fx, match_ui, moth_fx, swine_fx
 from ..fx import FXSystem
 from ..hud_passives import PassiveCtx, draw_passive
 from ..online_world import MovementModel, OnlineWorld
@@ -62,6 +62,7 @@ class OnlineMatchScene(NetMatchScene):
         self._gone: dict = {}          # eid -> (pos, facing, animatore, istante)
         self._dying: dict = {}         # come MatchScene: posa Hurt che si dissolve
         self._portraits: dict = {}
+        self._end_btn = None
 
     def _on_command(self, seq, kind, f):
         target = (f["x"], f["y"]) if "x" in f else None
@@ -86,8 +87,10 @@ class OnlineMatchScene(NetMatchScene):
                 from .online_lobby_scene import SlotPanel
                 self.slot_panel = None if self.slot_panel else SlotPanel(self.host, in_match=True)
                 continue
-            if self.session.phase in (C.ENDED, C.LOST):
-                if ev.type == pygame.KEYDOWN and ev.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+            if self.session.phase in (C.ENDED, C.LOST) or self.world.winner is not None:
+                if ((ev.type == pygame.KEYDOWN and ev.key in (pygame.K_RETURN, pygame.K_KP_ENTER))
+                        or (ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1
+                            and self._end_btn is not None and self._end_btn.collidepoint(ev.pos))):
                     self._leave()
                 continue
             rest.append(ev)
@@ -222,8 +225,26 @@ class OnlineMatchScene(NetMatchScene):
         self._draw_disconnected(surface, font)
         if self.slot_panel is not None:
             self.slot_panel.draw(surface, font)
-        if self.session.phase in (C.ENDED, C.LOST):
+        winner = self.world.winner
+        if winner is None and self.session.phase == C.ENDED and self.session.end_info:
+            winner = self.session.end_info.get("winner")
+        if winner is not None and self._score_rows():
+            icon = lambda iid, size: self.shop._icon(self.item_catalog, iid, size, font)
+            self._end_btn = match_ui.draw_end_screen(surface, self._score_rows(), winner,
+                                                     self.team, self.world.match_time, icon,
+                                                     self._score_portrait)
+        elif self.session.phase in (C.ENDED, C.LOST):
             self._draw_end(surface)
+
+    def _score_rows(self):
+        score = (self.session.visual or {}).get("score")
+        if not score:
+            return None
+        return match_ui.rows_from_score(score, self.your_id, self._names,
+                                        set(getattr(self.world, "dead", ()) or ()))
+
+    def _death_recap(self):
+        return (self.session.visual or {}).get("recap")
 
     @property
     def HELP(self):
