@@ -12,29 +12,29 @@
   "attack_cooldown": 1.0,
   "sprite_dir": "assets/pokemon/0722",
   "passive": "distacco",
-  "attack_fx": "arrow",
+  "attack_fx": "owlarrow",
 
   "base_stats": {"hp": 68, "attack": 55, "defense": 55, "sp_attack": 50, "sp_defense": 50, "speed": 42},
 
   "evolutions": [
-    {"stage": 0, "level": 1, "name": "Rowlet", "dex": 722, "sprite_dir": "assets/pokemon/0722", "types": ["Grass", "Flying"], "radius": 0.4, "base_stats": {"hp": 68, "attack": 55, "defense": 55, "sp_attack": 50, "sp_defense": 50, "speed": 42}},
-    {"stage": 1, "level": 4, "name": "Dartrix", "dex": 723, "sprite_dir": "assets/pokemon/0723", "types": ["Grass", "Flying"], "radius": 0.48, "base_stats": {"hp": 78, "attack": 75, "defense": 75, "sp_attack": 70, "sp_defense": 70, "speed": 52}},
-    {"stage": 2, "level": 8, "name": "Decidueye", "dex": 724, "sprite_dir": "assets/pokemon/0724", "types": ["Grass", "Ghost"], "radius": 0.56, "base_stats": {"hp": 78, "attack": 107, "defense": 75, "sp_attack": 100, "sp_defense": 100, "speed": 70}}
+    {"stage": 0, "level": 1, "name": "Rowlet", "dex": 722, "sprite_dir": "assets/pokemon/0722", "attack_fx": "owlarrow", "types": ["Grass", "Flying"], "radius": 0.4, "base_stats": {"hp": 68, "attack": 55, "defense": 55, "sp_attack": 50, "sp_defense": 50, "speed": 42}},
+    {"stage": 1, "level": 4, "name": "Dartrix", "dex": 723, "sprite_dir": "assets/pokemon/0723", "attack_fx": "owlarrow", "types": ["Grass", "Flying"], "radius": 0.48, "base_stats": {"hp": 78, "attack": 75, "defense": 75, "sp_attack": 70, "sp_defense": 70, "speed": 52}},
+    {"stage": 2, "level": 8, "name": "Decidueye", "dex": 724, "sprite_dir": "assets/pokemon/0724", "attack_fx": "owlarrow", "types": ["Grass", "Ghost"], "radius": 0.56, "base_stats": {"hp": 78, "attack": 107, "defense": 75, "sp_attack": 100, "sp_defense": 100, "speed": 70}}
   ],
 
   "moves": {
     "Q": {
       "base": {"id": "leafage", "name": "Fogliame", "type": "Grass", "category": "special", "shape": "projectile",
-               "fx": "arrow",
+               "fx": "owlleafage",
                "target": "direction", "power": [44, 70, 90, 115], "ratio": 0.7,
                "cooldown": [4.5, 4, 3.5, 3], "range": 8, "radius": 0.5, "speed": 12},
       "upgrades": [
         {"id": "leafblade", "name": "Foglielama", "type": "Grass", "category": "special", "shape": "fan",
-         "fx": "arrow",
+         "fx": "owlleafblade",
          "target": "direction", "power": [32, 50, 70, 90], "ratio": 0.55,
          "cooldown": [6, 5.5, 5, 4.5], "range": 7, "radius": 0.5, "speed": 12, "spread": 16},
         {"id": "gigadrain", "name": "Gigassorbimento", "type": "Grass", "category": "special", "shape": "projectile",
-         "fx": "drain",
+         "fx": "owlgigadrain",
          "target": "direction", "power": [55, 90, 120, 150], "ratio": 0.9,
          "cooldown": [7, 6.5, 6, 5.5], "range": 8, "radius": 0.6, "speed": 12,
          "effects": {"heal_self_ratio": 0.35}}
@@ -42,32 +42,32 @@
     },
     "W": {
       "base": {"id": "astonish", "name": "Sgomento", "type": "Ghost", "category": "special", "shape": "projectile",
-               "fx": "arrow",
+               "fx": "owlastonish",
                "target": "direction", "power": [32, 50, 70, 90], "ratio": 0.55,
                "cooldown": [8, 7.5, 7, 6.5], "range": 7, "radius": 0.5, "speed": 13,
                "effects": {"fear": {"duration": 1.0}}},
       "upgrades": [
         {"id": "phantomforce", "name": "Sbigoattacco", "type": "Ghost", "category": "special", "shape": "projectile",
-         "fx": "arrow",
+         "fx": "owlphantom",
          "target": "direction", "power": [55, 90, 120, 150], "ratio": 0.9,
          "cooldown": [7, 6.5, 6, 5.5], "range": 7, "radius": 0.5, "speed": 13,
          "effects": {"bonus_vs_attacking": 1.8}},
-        {"id": "synthesis", "name": "Sintesi", "type": "Grass", "category": "none", "shape": "buff",
+        {"id": "synthesis", "name": "Sintesi", "type": "Grass", "category": "none", "fx": "owlsynthesis", "shape": "buff",
          "target": "self", "cooldown": [16, 15, 14, 13],
          "effects": {"heal": [120, 160, 200, 240], "weather_heal": true,
                      "heal_scaling": 0.85}}
       ]
     },
     "E": {
-      "base": {"id": "featherdance", "name": "Danzadipiume", "type": "Grass", "category": "none", "shape": "area",
+      "base": {"id": "featherdance", "name": "Danzadipiume", "type": "Grass", "category": "none", "fx": "owlfeatherdance", "shape": "area",
                "target": "point", "power": [0, 0, 0, 0],
                "cooldown": [10, 9, 8, 7], "range": 6, "radius": 2.2,
                "effects": {"atk_debuff": {"amount": 25, "duration": 3.0}}},
       "upgrades": [
-        {"id": "uturn", "name": "Retromarcia", "type": "Bug", "category": "physical", "shape": "dashback",
+        {"id": "uturn", "name": "Retromarcia", "type": "Bug", "category": "physical", "fx": "owluturn", "shape": "dashback",
          "target": "direction", "power": [48, 75, 105, 130], "ratio": 0.8,
          "cooldown": [9, 8, 7, 6], "range": 4.5, "radius": 1.0, "recoil": 4.5},
-        {"id": "boomburst", "name": "Granvoce", "type": "Normal", "category": "none", "shape": "buff",
+        {"id": "boomburst", "name": "Granvoce", "type": "Normal", "category": "none", "fx": "owlboomburst", "shape": "buff",
          "target": "self", "cooldown": [14, 13, 12, 11],
          "passive": {"stat": "sp_attack", "amount": [8, 16, 24, 32]},
          "effects": {"atk": {"mult": 1.35, "duration": 5}}}
@@ -76,12 +76,12 @@
     "R": {
       "upgrades": [
         {"id": "spiritshackle", "name": "Cucitombra", "type": "Ghost", "category": "special", "shape": "projectile",
-         "fx": "arrow_big",
+         "fx": "owlshackle",
          "target": "direction", "power": [175, 270, 370], "ratio": 1.6,
          "cooldown": [100, 90, 80], "range": 14, "radius": 0.5, "speed": 16,
          "effects": {"dashlock": {"stun": 0.8, "duration": 3.0}}},
         {"id": "arrowrain", "name": "Pioggia di Frecce", "type": "Grass", "category": "special", "shape": "rain",
-         "fx": "arrow_rain",
+         "fx": "owlrain",
          "target": "point", "power": [48, 75, 105], "ratio": 0.45,
          "cooldown": [90, 80, 70], "range": 12, "radius": 3.0,
          "effects": {"delay": 1.0, "duration": 3.0, "slow": {"mult": 0.6, "duration": 0.6}}}

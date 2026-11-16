@@ -193,6 +193,8 @@ class BasicAttackMixin:
                                "melee": melee, "src": u.id, "tgt": tgt.id,
                                "spd": proj_speed(u),
                                "fx": "shadowclawhit" if snap["claws"] else u.attack_fx})
+        if getattr(u, "aa_stealth", False):
+            self.fx_events[-1]["sneak"] = True   # cosmetico: colpo furtivo di Distacco
         if melee:
             self._aa_land(u, tgt, snap)
             return

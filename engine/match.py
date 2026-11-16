@@ -2124,11 +2124,11 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                 hit_any = True
         p.pos = dest
         self.fx_events.append({"kind": "dash", "a": (origin.x, origin.y),
-                               "b": (dest.x, dest.y), "mtype": mv.type})
+                               "b": (dest.x, dest.y), "mtype": mv.type, "hit": hit_any})
         if hit_any and not grounded:   # rimbalzo all'indietro (direzione opposta)
             back = self._clamp_to_wall(dest, dest - dirv * float(mv.d.get("recoil", mv.range)))
             self.fx_events.append({"kind": "dash", "a": (dest.x, dest.y),
-                                   "b": (back.x, back.y), "mtype": mv.type})
+                                   "b": (back.x, back.y), "mtype": mv.type, "ret": True})
             p.pos = back
         p.stop()
 
@@ -3348,8 +3348,11 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         end = origin + dirv * (best_proj if best else mv.range)
         if best is not None:
             self._hit(p, mv, rank, best)
-        self.fx_events.append({"kind": "projectile", "a": (origin.x, origin.y),
-                               "b": (end.x, end.y), "mtype": mv.type})
+        ev = {"kind": "projectile", "a": (origin.x, origin.y),
+              "b": (end.x, end.y), "mtype": mv.type, "hit": best is not None}
+        if best is not None:
+            ev["hit_id"] = best.id   # cosmetico: chi e' stato colpito (grafica)
+        self.fx_events.append(ev)
 
     def _cast_cone(self, p, mv, rank, origin, dirv):
         half = math.radians(mv.angle)

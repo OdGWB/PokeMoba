@@ -1225,7 +1225,7 @@ Passaggi completati:
   Screenshot: step_59_opzioni, step_59_tasti.
 - LINEE VECCHIE portate al livello delle nuove (punto 24), una per passo. Eevee
   (eevee_fx) e Spiritomb (spirit_fx) avevano gia' un modulo; Roggenrola ha effetti
-  su misura in fx.py. Restano da fare: Rowlet, Snivy, Totodile, Nincada, Poliwag.
+  su misura in fx.py. Restano da fare: Snivy, Totodile, Nincada, Poliwag.
   Registro: fx_lines.FX_LINES; ogni modulo puo' esporre anche AA_TRAVEL
   (forma -> frazione del volo, per gli attacchi base a ricerca: fx._AA_TRAVEL).
 - LINEA CHARMANDER > CHARMELEON > CHARIZARD (step_60), nuovo game/char_fx.py.
@@ -1281,6 +1281,31 @@ Passaggi completati:
   pallaombra_volo/_colpo, sciagura, velenoshock/_dopo, fangobomba_volo/_,
   ipnosi_volo/_colpo/_sonno, mangiasogni, congiura, furtivombra, maledizione/
   _attesa/_scoppio, spettrotuffo/_ritorno, anime).
+- LINEA ROWLET > DARTRIX > DECIDUEYE (step_62), nuovo game/rowlet_fx.py. Nomi "fx"
+  nel JSON (attack_fx "owlarrow" su tutte le forme) e pochi TAG COSMETICI nel
+  motore: _cast_projectile mette "hit" e "hit_id" sull'evento del proiettile, il
+  dashback "hit" sullo scatto e "ret" sul rimbalzo, l'attacco base furtivo di
+  Distacco "sneak". Forme: freccia piumata a ricerca (owlarrow: verde con punta
+  di foglia per Rowlet/Dartrix, d'ombra per Decidueye, piu' grossa e scura se
+  furtiva), foglia che rotea (owlleaf: Fogliame), lame a ventaglio
+  (owlblade: Foglielama), piuma che cade ondeggiando (owlfeather: Danzadipiume,
+  Retromarcia), freccia piantata a terra col FILO d'ombra che segue il legato
+  (owlstitch: Cucitombra, legge la posizione del bersaglio), fantasmino 7x7 che
+  sale SOPRA la barra della vita (owlboo: Sgomento; grande copriva il bersaglio),
+  raggio di sole (owlsun: Sintesi), mirino della Pioggia di Frecce (owlrainmark:
+  trattini sottili, spessi sembravano un recinto), frecce che cadono
+  (owlfall), granelli verdi che tornano a chi assorbe (owldrain: Gigassorbimento).
+  Granvoce = tre ANELLI sottili concentrici (soundarc di Noibat, half=pi, w=0.07:
+  w e' in tile, a 2 venivano bande enormi a croce); Retromarcia = folate CORTE a
+  distanze diverse + piume (lunghe da un capo all'altro sembravano righelli).
+  Riusa soundarc, windline, impactstar, flash, ring, twinkle. Sulle unita' (a
+  tutti): fantasmino della paura (fear_until), piuma del calo d'Attacco
+  (atk_debuff_until), alone a onde di Granvoce sulla linea (dex 722-724,
+  atk_until). Online: i tag viaggiano in enc_fx come chiavi in piu'.
+  Screenshot: step_62_* (attacco, attacco_decidueye, fogliame_volo/_colpo,
+  foglielama, gigassorbimento/_volo, sgomento, spavento, sintesi,
+  danzadipiume/_dopo, retromarcia, granvoce/_dopo, sbigoattacco/_colpo,
+  cucitombra/_colpo/_legato, pioggia_mira/_/_dopo).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul
