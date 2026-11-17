@@ -51,6 +51,9 @@ def _source_sheet_name(info: AnimInfo) -> str:
     return f"{base}-Anim.png"
 
 
+_ROOT = Path(__file__).resolve().parents[2]
+
+
 def load_pokemon_animations(sprite_dir: str | Path) -> AnimationSet | None:
     """Carica le animazioni da una cartella sprite PMD.
 
@@ -58,6 +61,10 @@ def load_pokemon_animations(sprite_dir: str | Path) -> AnimationSet | None:
     client userà il fallback a cerchio colorato.
     """
     d = Path(sprite_dir)
+    if not d.is_absolute():
+        # Relativa alla cartella del gioco, non a quella di avvio: nell'exe
+        # (PyInstaller) gli asset stanno nella cartella estratta, non accanto.
+        d = _ROOT / d
     xml_path = d / "AnimData.xml"
     if not d.is_dir() or not xml_path.is_file():
         return None
