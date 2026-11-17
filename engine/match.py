@@ -97,6 +97,7 @@ def _src_name(u) -> str:
 
 RECAP_WINDOW = 10.0     # secondi di danni nel riepilogo della morte
 MUTA_WILD_MULT = 1.30    # danno ai Pokémon neutrali (come Miele/Scalaroccia)
+MUTA_WILD_MULT_LARVA = 1.70   # da Nincada (stage 0, fino al liv.8): Attacco base 45
 MUTA_DURATION = 5.0       # s in forma Shedinja
 MUTA_COOLDOWN = 150.0      # ricarica condivisa Muta/Rancore
 MUTA_REVERT_HP = 0.30      # Muta: torna Ninjask col 30% degli HP max
@@ -1063,7 +1064,8 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         amount *= self._incin_dmg_mult(attacker)   # Cattivo del Ring: +5% per nemico vicino
         if (isinstance(target, Wild) and isinstance(attacker, Pokemon)
                 and attacker.passive_id == "muta"):
-            amount *= MUTA_WILD_MULT   # Muta (linea Nincada): +30% ai neutrali
+            # Muta (linea Nincada): +70% ai neutrali da Nincada, +30% dopo
+            amount *= MUTA_WILD_MULT_LARVA if attacker.stage == 0 else MUTA_WILD_MULT
         if (isinstance(target, Wild) and isinstance(attacker, Pokemon)
                 and attacker.passive_id == "forzabruta"):
             amount *= FORZABRUTA_WILD_MULT   # ForzaBruta (linea Totodile): +30% ai neutrali

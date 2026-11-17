@@ -24,6 +24,8 @@ from .entities import Pokemon, Structure, Wild
 from .grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_PUDDLE, TILE_WALL)
 from .vec import Vec2
 
+MUTA_LARVA_XP_MULT = 1.25   # Muta: da Nincada (stage 0) +25% esperienza dai Pokémon neutrali
+
 WEATHERS = ["sun", "rain", "wind"]
 WEATHER_NAMES = {"clear": "Sereno", "sun": "Sole (Groudon)",
                  "rain": "Pioggia (Kyogre)", "wind": "Vento forte (Rayquaza)"}
@@ -245,6 +247,8 @@ class JungleSystem:
                     amt = victim.reward_xp * lvl_mult
                     if victim.kind == "camp":
                         amt *= self.m._recovery_mult(p)
+                    if p.passive_id == "muta" and p.stage == 0:
+                        amt *= MUTA_LARVA_XP_MULT   # Muta: Nincada cresce in giungla
                     self.m._gain_xp(p, amt)
 
         if victim.kind == "meteo":
