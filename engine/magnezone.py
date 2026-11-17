@@ -177,15 +177,32 @@ class MagnezoneMixin:
         L = d.length()
         if L < 1e-6:
             return None
-        steps = int(L * 6) + 1
+        g = self.world.grid
+        steps = int(L * 8) + 1
         last = a
         for i in range(1, steps + 1):
             pt = a + d * (i / steps)
-            tx, ty = int(math.floor(pt.x)), int(math.floor(pt.y))
-            if not self.world.grid.is_walkable(tx, ty):
-                return last, (tx, ty)
+            if not g.is_walkable_point(pt.x, pt.y):
+                return last, self._mag_wall_tile(pt.x, pt.y)
             last = pt
         return None
+
+    def _mag_wall_tile(self, px, py):
+        """Tile-muro a cui appartiene il punto bloccato (px, py): il suo tile se e'
+        un muro, altrimenti (sagoma disegnata che sporge oltre il tile, o cima
+        estrusa verso l'alto) il tile-muro piu' vicino entro 2 tile."""
+        tx, ty = int(math.floor(px)), int(math.floor(py))
+        g = self.world.grid
+        if g.tile_at(tx, ty) in WALL_TILES:
+            return tx, ty
+        best, bd = (tx, ty), 1e9
+        for y in range(ty - 1, ty + 3):
+            for x in range(tx - 2, tx + 3):
+                if g.tile_at(x, y) in WALL_TILES:
+                    dd = (x + 0.5 - px) ** 2 + (y + 0.5 - py) ** 2
+                    if dd < bd:
+                        best, bd = (x, y), dd
+        return best
 
     # --- utilità ------------------------------------------------------------------
     def _mag_foes(self, p, c, r, champs_only=False):

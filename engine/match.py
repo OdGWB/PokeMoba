@@ -24,7 +24,7 @@ from .grid import TILE_BUSH, TILE_PILLAR, TILE_RIVER
 from .moves import Move
 from .items import ITEM_SLOTS, ItemCatalog
 from .jungle import JungleSystem
-from .pathfinding import find_path, smooth_path
+from .pathfinding import find_path, plan_move, smooth_path
 from .spatial import SpatialHash
 from .noivern import ECHO_ID
 from .mienshao import PROJ_SHAPES
@@ -195,6 +195,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         self._spawn_queue: list[tuple[float, int, str]] = []  # (due, team, lane)
         self._combat_hash = SpatialHash(cell_size=3.0)
         self._ai: dict[int, dict] = {}  # stato IA per unità (indice waypoint, cooldown A*)
+        self._move_resume: dict[int, tuple] = {}  # ultimo ricalcolo di un ordine di movimento (dest, pos)
         data_dir = Path(__file__).resolve().parent.parent / "data"
         self.types = TypeChart.load(data_dir / "types.json")
         self.item_catalog = ItemCatalog.load(data_dir / "items.json")
@@ -490,17 +491,25 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
     def _ai_player(self, p: Pokemon, dt: float) -> None:
         """Il Pokémon del giocatore è guidato dagli ORDINI (non da un'IA autonoma)."""
         if self._immobile(p):
-            p.stop()
+            p.stop()                    # l'ordine resta: move_dest lo fa riprendere
+            self._move_resume.pop(p.id, None)
             return
-        if p.recalling:                 # fermo durante il richiamo
-            p.target_id = None
-            p.stop()
-            return
+        if p.recalling:
+            if p.order in ("move", "attack", "attackmove"):
+                p.recalling = False     # un nuovo ordine interrompe il richiamo e si esegue
+            else:                       # fermo durante il richiamo
+                p.target_id = None
+                p.stop()
+                return
         if p.order == "move":
             if p.path:
                 p.target_id = None   # in movimento puro non attacca
                 return
+            if self._resume_move(p):
+                p.target_id = None
+                return
             p.order = "idle"         # arrivato: passa a idle (auto-attacco di prossimità)
+            p.move_dest = None
 
         if p.order == "attack":
             # Clic su un nemico: lo insegue finché non è a portata, poi attacca.
@@ -1512,6 +1521,24 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
             p.hp = min(p.max_hp, old_hp)
 
     # --- richiamo ------------------------------------------------------------
+    def _resume_move(self, p: Pokemon) -> bool:
+        """Percorso vuoto ma destinazione dell'ordine non raggiunta (un CC o uno
+        spostamento l'ha svuotato): ricalcola il percorso fin li'. Non riprova dal
+        punto in cui aveva gia' riprovato senza progressi (es. destinazione dentro
+        una torre), cosi' non resta incastrato in un ciclo."""
+        d = p.move_dest
+        if d is None or p.pos.dist(d) <= 0.25:
+            return False
+        last = self._move_resume.get(p.id)
+        if last is not None and last[0] is d and last[1].dist(p.pos) < 0.3:
+            return False
+        self._move_resume[p.id] = (d, Vec2(p.pos.x, p.pos.y))
+        pts = plan_move(self.world.grid, (p.pos.x, p.pos.y), (d.x, d.y))
+        if not pts:
+            return False
+        p.set_path([Vec2(x, y) for (x, y) in pts])
+        return True
+
     def _update_recall(self, dt: float) -> None:
         for p in self.world.pokemons():
             if not p.recalling:
@@ -1526,6 +1553,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                 p.pos = Vec2(p.spawn_pos.x, p.spawn_pos.y)
                 p.hp = min(p.max_hp, p.hp + p.max_hp * config.RECALL_HEAL)
                 p.stop()
+                p.move_dest = None
 
     # --- oro / negozio -------------------------------------------------------
     def _update_gold(self, dt: float) -> None:
@@ -4260,6 +4288,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                     p.stop()
                     p.target_id = None
                     p.idle_anchor = None   # l'ancora d'inseguimento riparte dalla base
+                    p.move_dest = None     # niente ordini di movimento di prima della morte
                     p.aa_active = False
 
     def _check_win(self) -> None:

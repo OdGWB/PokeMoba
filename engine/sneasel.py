@@ -334,6 +334,16 @@ class SneaselMixin:
                     return True
         return False
 
+    def _near_border_wall(self, c) -> bool:
+        """Vero se un tile del muro di CONFINE e' entro 2 tile da `c`: un punto
+        della sagoma disegnata fuori dal suo tile puo' appartenere a lui."""
+        g = self.world.grid
+        for ty in range(int(c.y) - 1, int(c.y) + 3):
+            for tx in range(int(c.x) - 2, int(c.x) + 3):
+                if g.tile_at(tx, ty) == TILE_WALL:
+                    return True
+        return False
+
     def _cast_cliffambush(self, p, mv, rank, origin, tgt, dirv):
         """Balzo dalla parete su un nemico entro 10 tile: lo insegue in volo e
         all'atterraggio lo colpisce e lo stordisce."""
@@ -420,7 +430,9 @@ class SneaselMixin:
             pt = pos + d * s
             if g.is_walkable_point(pt.x, pt.y):
                 break
-            if g.tile_at(int(pt.x), int(pt.y)) != TILE_JUNGLE_WALL:
+            t = g.tile_at(int(pt.x), int(pt.y))
+            if t != TILE_JUNGLE_WALL and not (t != TILE_WALL and g.shape_blocked(pt.x, pt.y)
+                                              and not self._near_border_wall(pt)):
                 return None   # muro di confine, fiume, pilastro...: niente
             s += step
             if s - d0 > CLIMB_MAX:

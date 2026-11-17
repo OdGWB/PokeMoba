@@ -5,7 +5,7 @@ usa direttamente il client.
 """
 from __future__ import annotations
 
-from engine.pathfinding import find_path, smooth_path
+from engine.pathfinding import plan_move
 from engine.vec import Vec2
 from engine.world import World
 
@@ -108,39 +108,18 @@ class Simulation:
             unit.order_point = point
             unit.idle_anchor = None     # nuovo ordine: nuova ancora d'inseguimento
             unit.champs_only = False
+            if hasattr(unit, "move_dest"):
+                unit.move_dest = None   # lo imposta _apply_move per gli ordini di movimento
 
     def _apply_move(self, unit, tx: float, ty: float) -> None:
         if not getattr(unit, "alive", True):
             return
-        grid = self.world.grid
-        start = (int(unit.pos.x), int(unit.pos.y))
-        goal = (int(tx), int(ty))
-        # Se il tile cliccato è un muro, prova a trovare il tile libero più
-        # vicino (semplice ricerca a spirale) per non ignorare il click.
-        if not grid.is_walkable(*goal):
-            goal = _nearest_walkable(grid, goal)
-            if goal is None:
-                return
-        tile_path = find_path(grid, start, goal)
-        if not tile_path:
+        # Punto esatto del clic (anche nel proprio tile); clic su un muro o in
+        # una zona irraggiungibile -> tile raggiungibile piu' vicino al clic.
+        pts = plan_move(self.world.grid, (unit.pos.x, unit.pos.y), (tx, ty))
+        if not pts:
             return
-        points = smooth_path(grid, tile_path)
-        # I waypoint dopo il primo (il centro del tile di partenza) sono il
-        # percorso vero. Se non ce ne sono, il click era nel tile corrente.
-        waypoints = [Vec2(px, py) for (px, py) in points[1:]]
-        if not waypoints:
-            unit.stop()
-            return
-        unit.set_path(waypoints)
-
-
-def _nearest_walkable(grid, goal: tuple[int, int], max_r: int = 6):
-    gx, gy = goal
-    for r in range(1, max_r + 1):
-        for dy in range(-r, r + 1):
-            for dx in range(-r, r + 1):
-                if max(abs(dx), abs(dy)) != r:
-                    continue
-                if grid.is_walkable(gx + dx, gy + dy):
-                    return (gx + dx, gy + dy)
-    return None
+        unit.set_path([Vec2(px, py) for (px, py) in pts])
+        if hasattr(unit, "move_dest"):
+            # Destinazione ricordata: dopo un CC o un richiamo l'ordine riprende.
+            unit.move_dest = Vec2(*pts[-1])

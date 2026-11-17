@@ -576,6 +576,9 @@ class Pokemon(Unit):
     order: str = "idle"
     order_target_id: int | None = None
     order_point: Vec2 | None = None
+    # Destinazione dell'ultimo ordine di movimento (punto esatto o tile vicino):
+    # se un CC o un richiamo svuotano il percorso, l'IA lo ricalcola fin li'.
+    move_dest: Vec2 | None = None
 
 
 @dataclass

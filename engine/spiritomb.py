@@ -13,7 +13,7 @@ import math
 import random
 
 from .entities import Minion, Pokemon, Spirit, Structure, Wild
-from .grid import BLOCKING, TILE_BUSH, TILE_FLOOR, TILE_LANE, TILE_RIVER
+from .grid import TILE_BUSH, TILE_FLOOR, TILE_LANE, TILE_RIVER
 from .vec import Vec2
 
 PASSIVE_ID = "108spiriti"
@@ -71,8 +71,7 @@ class SpiritombMixin:
             return self._spirit_spots
         g = self.world.grid
         bases = [Vec2(*v) for k, v in self.map.spawns.items() if k.startswith("team")]
-        walk = lambda x, y: (0 <= x < g.width and 0 <= y < g.height
-                             and g.tiles[y][x] not in BLOCKING)
+        walk = lambda x, y: g.is_walkable(x, y)
         seen, stack = set(), []
         for b in bases:
             st = (int(b.x), int(b.y))

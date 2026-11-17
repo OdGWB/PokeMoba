@@ -7,7 +7,7 @@ from __future__ import annotations
 import math
 
 from .entities import Unit
-from .grid import TILE_PILLAR, Grid
+from .grid import TILE_BUSH, TILE_PILLAR, Grid
 from .spatial import SpatialHash
 from .vec import Vec2, direction_index
 
@@ -166,19 +166,33 @@ def advance_unit(unit: Unit, dt: float, grid: Grid | None = None) -> None:
 _WALL_R_MAX = 0.42
 
 
+# Direzioni e frazioni del raggio con cui si campiona la sagoma disegnata dei
+# muri attorno al corpo (dal bordo verso il centro).
+_SHAPE_DIRS = tuple((math.cos(i * math.pi / 8), math.sin(i * math.pi / 8))
+                    for i in range(16))
+_SHAPE_FRACS = (0.2, 0.4, 0.6, 0.8, 1.0)
+
+
 def _keep_off_walls(unit: Unit, grid: Grid, block_bush: bool) -> None:
-    """Il corpo (cerchio) non entra nei tile bloccanti: la collisione col solo
-    centro faceva sporgere lo sprite dentro i muri e incastrare negli spigoli.
-    Spinge il centro fuori dai tile bloccanti adiacenti (cerchio contro
-    rettangolo), accettando solo posizioni calpestabili."""
+    """Il corpo (cerchio) non entra nei muri: la collisione col solo centro
+    faceva sporgere lo sprite dentro i muri e incastrare negli spigoli. Spinge il
+    centro fuori, accettando solo posizioni calpestabili. Con la sagoma dei muri
+    attiva (mappe di partita) i muri contano dove sono DISEGNATI; i tile
+    (cerchio contro rettangolo) restano per pilastri, cespugli e bordo mappa."""
     r = min(getattr(unit, "radius", 0.35), _WALL_R_MAX)
     px, py = unit.pos.x, unit.pos.y
+    shape = grid._shape_on
     cx, cy = math.floor(px), math.floor(py)
     for _ in range(2):
         moved = False
         for ty in range(cy - 1, cy + 2):
             for tx in range(cx - 1, cx + 2):
-                if grid.is_walkable(tx, ty, block_bush):
+                if shape:
+                    if grid.in_bounds(tx, ty):
+                        t = grid.tiles[ty][tx]
+                        if not (t == TILE_PILLAR or (block_bush and t == TILE_BUSH)):
+                            continue
+                elif grid.is_walkable(tx, ty, block_bush):
                     continue
                 qx = min(max(px, tx), tx + 1)
                 qy = min(max(py, ty), ty + 1)
@@ -192,10 +206,42 @@ def _keep_off_walls(unit: Unit, grid: Grid, block_bush: bool) -> None:
                 if grid.is_walkable_point(nx, ny, block_bush):
                     px, py = nx, ny
                     moved = True
+        if shape and grid.shape_near(px, py, r):
+            p = _shape_push(grid, px, py, r)
+            if p is not None and grid.is_walkable_point(p[0], p[1], block_bush):
+                px, py = p
+                moved = True
         if not moved:
             break
     if px != unit.pos.x or py != unit.pos.y:
         unit.pos = Vec2(px, py)
+
+
+def _shape_push(grid: Grid, px: float, py: float, r: float):
+    """Spinta che porta il cerchio (px, py, r) fuori dalla sagoma disegnata dei
+    muri: per ogni direzione la frazione di raggio piu' interna dentro il muro
+    da' la profondita'; si spinge all'opposto della somma pesata, di quanto
+    entra il punto piu' profondo. None se il cerchio non tocca la sagoma o se il
+    centro e' gia' dentro (ci pensa l'anti-incastro di advance_unit)."""
+    if grid.shape_blocked(px, py):
+        return None
+    sx = sy = 0.0
+    deep = 0.0
+    for c, s in _SHAPE_DIRS:
+        for f in _SHAPE_FRACS:
+            if grid.shape_blocked(px + c * r * f, py + s * r * f):
+                d = r * (1.0 - f) + 0.2 * r
+                sx -= c * d
+                sy -= s * d
+                if d > deep:
+                    deep = d
+                break
+    if deep <= 0.0:
+        return None
+    n = math.hypot(sx, sy)
+    if n < 1e-9:
+        return None
+    return px + sx / n * deep, py + sy / n * deep
 
 
 def resolve_collisions(units: list[Unit], grid: Grid, iterations: int = 2,
@@ -208,6 +254,9 @@ def resolve_collisions(units: list[Unit], grid: Grid, iterations: int = 2,
     """
     if spatial is None:
         spatial = SpatialHash(cell_size=2.0)
+    # Chi e' in volo (air_z > 0: lanciato in aria, salti, Taxi Volante) passa
+    # sopra le altre unita': non spinge e non viene spinto.
+    units = [u for u in units if getattr(u, "air_z", 0.0) <= 0.0]
     for _ in range(iterations):
         spatial.rebuild(units)
         seen: set[tuple[int, int]] = set()
@@ -246,6 +295,9 @@ def resolve_obstacles(units: list[Unit], obstacles: list, grid: Grid) -> None:
     considera raggiunto appena lo si tocca.
     """
     for u in units:
+        if getattr(u, "air_z", 0.0) > 0.0:
+            continue                    # in volo passa sopra la torre; atterrando viene spinto fuori
+        bb = getattr(u, "bush_blocks", False)
         for ox, oy, r in obstacles:
             dx, dy = u.pos.x - ox, u.pos.y - oy
             min_d = r + u.radius
@@ -267,9 +319,32 @@ def resolve_obstacles(units: list[Unit], obstacles: list, grid: Grid) -> None:
                     if tl > 1e-6 and abs(side) < 0.3 * tl and tx * nx + ty * ny < 0:
                         sgn = 1.0 if side > 0 or (abs(side) < 1e-6 and u.id % 2) else -1.0
                         new = Vec2(new.x + px * 0.04 * sgn, new.y + py * 0.04 * sgn)
-            if grid.is_walkable_point(new.x, new.y,
-                                      block_bush=getattr(u, "bush_blocks", False)):
+            if not grid.is_walkable_point(new.x, new.y, bb):
+                # Torre accanto a un muro: la spinta radiale finirebbe nel muro.
+                # Il punto libero piu' vicino FUORI dall'ostacolo (prima sul bordo,
+                # poi un po' piu' lontano), cosi' nessuno resta dentro la torre.
+                new = _free_outside(grid, ox, oy, min_d, math.atan2(ny, nx), bb,
+                                    [o for o in obstacles if o[0] != ox or o[1] != oy])
+            if new is not None:
                 u.pos = new
+
+
+def _free_outside(grid: Grid, ox: float, oy: float, min_d: float, ang: float,
+                  bb: bool, others: list) -> Vec2 | None:
+    """Punto calpestabile a distanza >= min_d da (ox, oy), il piu' vicino
+    all'angolo `ang` (direzione della spinta radiale), fuori dagli altri ostacoli."""
+    for extra in (0.0, 0.2, 0.45, 0.75, 1.1, 1.5):
+        rr = min_d + extra
+        for k in range(13):                         # 0, +-15, +-30 ... +-180 gradi
+            for sgn in ((1,) if k in (0, 12) else (1, -1)):
+                a = ang + sgn * k * (math.pi / 12)
+                x, y = ox + math.cos(a) * rr, oy + math.sin(a) * rr
+                if not grid.is_walkable_point(x, y, bb):
+                    continue
+                if any((x - qx) ** 2 + (y - qy) ** 2 < qr * qr for qx, qy, qr in others):
+                    continue
+                return Vec2(x, y)
+    return None
 
 
 def _move_out(unit: Unit, offset: Vec2, grid: Grid) -> None:

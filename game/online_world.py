@@ -18,12 +18,11 @@ from types import SimpleNamespace
 import config
 from engine import movement
 from engine.entities import Core, Minion, Pillar, Pokemon, Spirit, Structure, Unit, Wild
-from engine.pathfinding import find_path, smooth_path
+from engine.pathfinding import plan_move
 from engine.vec import Vec2
 from net import protocol as P
 from net.interp import INTERP_DELAY, InterpBuffer
 from net.visual import ALL_LISTS, MOVING, UNIT_FLAGS, timer_fields
-from sim.simulation import _nearest_walkable
 
 from .networld import NetWorld
 
@@ -46,17 +45,8 @@ class MovementModel:
             return ()
         if kind not in (P.CMD_MOVE, P.CMD_ATTACKMOVE) or target is None:
             return None              # attacco/mossa/richiamo: lo decide l'host
-        g = self.grid
-        start = (int(pos[0]), int(pos[1]))
-        goal = (int(target[0]), int(target[1]))
-        if not g.is_walkable(*goal):
-            goal = _nearest_walkable(g, goal)
-            if goal is None:
-                return ()
-        tile_path = find_path(g, start, goal)
-        if not tile_path:
-            return ()
-        return tuple(smooth_path(g, tile_path)[1:])
+        # Stessa pianificazione dell'host (Simulation._apply_move).
+        return tuple(plan_move(self.grid, pos, target))
 
     def advance(self, pos, path, speed, dt):
         u = self._u

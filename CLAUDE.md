@@ -1469,6 +1469,28 @@ Passaggi completati:
   forma generica hexshell. Verifica: ogni stile e i due disegni persistenti resi
   con lo stesso seme su 12/8 fotogrammi, hash dei pixel IDENTICI al codice vecchio.
   468 test OK. Screenshot: screenshots/step_72.png (banco di prova degli effetti).
+- MOVIMENTO e HITBOX DEI MURI sulla SAGOMA DISEGNATA (step_73, grafica INVARIATA).
+  (1) Nuovo engine/wall_shape.py: rifa' in numpy (niente pygame) lo stesso calcolo
+  di MapRenderer._jungle_solid (dischi -> blur -> soglia + rumore al bordo, clamp
+  mezzo tile, scavo dei cespugli) piu' l'estrusione della cima (RELIEF), a RES=8
+  celle per tile. Grid.enable_wall_shape(keep) (chiamato da content.load_map sulle
+  mappe di partita) lo usa per is_walkable_point/line_of_sight/is_walkable: un tile
+  e' bloccante se il suo CENTRO sta nella sagoma (o e' un pilastro). Si sbatte dove
+  il muro e' disegnato (sporgenze comprese), si passa negli angoli arrotondati, non
+  si cammina sopra la cima. Zone sempre libere (keep): campi, tane, strutture, basi.
+  Col meteo si rifa' solo la finestra cambiata (margine 4 tile), identica alla mappa
+  intera. movement._keep_off_walls spinge il corpo fuori dalla sagoma (_shape_push,
+  16 direzioni, Grid.shape_near come uscita rapida). Magnezone (muri carichi),
+  Sneasel (scalata) e Spiritomb (flood fill) usano la stessa hitbox.
+  (2) pathfinding.plan_move: il clic porta al PUNTO ESATTO (non al centro del tile);
+  clic su un muro -> punto raggiungibile piu' vicino dal lato dell'unita' (componenti
+  connesse), mai un tile chiuso. (3) Ordine di movimento (move_dest) che RIPRENDE
+  dopo CC o richiamo (Match._resume_move). (4) Torre accanto a un muro: se la spinta
+  radiale finisce nel muro si cerca il punto libero fuori da torre e muro. (5) Unita'
+  in volo (air_z > 0) escluse da resolve_collisions/resolve_obstacles.
+  Prestazioni: tick 5v5 non piu' lento (misure rumorose 6-11 ms contro 10-13 con i
+  tile). Test: tests/test_movement_walls.py (12). Screenshot: screenshots/step_73.png
+  (a sinistra la grafica, a destra hitbox azzurra e tile-muro tratteggiati in rosso).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

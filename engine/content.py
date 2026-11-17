@@ -56,6 +56,14 @@ def load_map(path: str | Path) -> MapData:
     lanes = {k: [tuple(p) for p in v] for k, v in data.get("lanes", {}).items()}
     dens = {k: tuple(v) for k, v in data.get("dens", {}).items()}
     teams = {int(k): v for k, v in data.get("teams", {}).items()}
+    if data.get("structures") or data.get("camps"):
+        # Collisione dei muri sulla sagoma disegnata (mappe di partita). Zone
+        # sempre libere anche se la sagoma ci sporge: campi, tane, strutture, basi.
+        keep = [(c["pos"][0] + 0.5, c["pos"][1] + 0.5, 1.0) for c in data.get("camps", [])]
+        keep += [(p[0] + 0.5, p[1] + 0.5, 1.5) for p in dens.values()]
+        keep += [(s["pos"][0], s["pos"][1], 1.2) for s in data.get("structures", [])]
+        keep += [(p[0] + 0.5, p[1] + 0.5, 2.5) for p in spawns.values()]
+        grid.enable_wall_shape(keep)
     return MapData(name=data.get("name", "senza nome"), grid=grid, spawns=spawns,
                    lanes=lanes, structures=list(data.get("structures", [])),
                    dens=dens, teams=teams,
