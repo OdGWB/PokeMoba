@@ -110,6 +110,33 @@ class SlotView:
 
 
 @dataclass
+class SpellView:
+    """Incantesimo dell'evocatore (per ora solo lo Smite, tasto D)."""
+    key: str = "smite"           # azione di keybinds
+    name: str = "Punizione"
+    charges: int = 2
+    max_charges: int = 2
+    cd_left: float = 0.0         # secondi prima di poterlo usare (blocco o ricarica)
+    cd_frac: float = 0.0         # 1 = appena usato
+    regen_frac: float = 1.0      # avanzamento della prossima carica (1 = piene)
+
+
+def smite_view(charges, ready_at, regen_at, now, max_charges=2, lock=15.0,
+               recharge=90.0) -> SpellView:
+    """SpellView dello Smite dai campi del Pokemon (stessi nomi offline e online)."""
+    charges = int(charges)
+    if charges > 0:
+        left = max(0.0, ready_at - now)
+        frac = left / lock if lock > 0 else 0.0
+    else:
+        left = max(0.0, regen_at - now, ready_at - now)
+        frac = left / recharge if recharge > 0 else 0.0
+    regen = 1.0 if regen_at < 0 or charges >= max_charges else         1.0 - max(0.0, regen_at - now) / recharge
+    return SpellView(charges=charges, max_charges=max_charges, cd_left=left,
+                     cd_frac=min(1.0, frac), regen_frac=max(0.0, min(1.0, regen)))
+
+
+@dataclass
 class PlayerView:
     name: str
     level: int
@@ -127,6 +154,7 @@ class PlayerView:
     points: int = 0
     rank_hint: str = "clic sul + o Ctrl+tasto"
     team: int = 0
+    spell: SpellView | None = None
 
 
 @dataclass
@@ -156,12 +184,14 @@ PORT = 62
 PASSIVE_W = 84                   # la piu larga (Armature) e bh + 30
 ITEM = 27
 ITEM_GAP = 3
+SPELL = 38                       # casella dell'incantesimo (Smite), a destra degli oggetti
+SPELL_W = SPELL + 14
 BAR_H = 120
 
 
 def bar_rect(W: int, H: int, right_limit: int | None = None) -> pygame.Rect:
     skills_w = 4 * SLOT_W + 3 * SLOT_GAP
-    w = 8 + STATS_W + 8 + PORT + 10 + PASSIVE_W + skills_w + 10 + 3 * ITEM + 2 * ITEM_GAP + 8
+    w = 8 + STATS_W + 8 + PORT + 10 + PASSIVE_W + skills_w + 10 + 3 * ITEM + 2 * ITEM_GAP + 8 + SPELL_W
     x = (W - w) // 2
     if right_limit is not None and x + w > right_limit - 8:
         x = max(4, right_limit - 8 - w)
@@ -315,6 +345,89 @@ def _draw_slot_name(surface, r: pygame.Rect, s: SlotView, size: int) -> None:
         y += lh
 
 
+# fulmine dello Smite, pixel art (13x18): o = contorno, d = ombra, y = corpo, w = luce
+_BOLT = (
+    "......oooooo.",
+    ".....owwyyyo.",
+    ".....owyyydo.",
+    "....owyyydo..",
+    "....owyyyo...",
+    "...owyyydo...",
+    "...owyyyoooo.",
+    "..owyyyyyyyo.",
+    "..owwwyyyydo.",
+    "..oooooyyydo.",
+    "......oyyyo..",
+    ".....owyydo..",
+    ".....owyyo...",
+    "....owyydo...",
+    "....owydo....",
+    "...owydo.....",
+    "...oydo......",
+    "...ooo.......",
+)
+_BOLT_COLS = {"o": (40, 22, 6), "d": (214, 128, 24), "y": (255, 206, 60), "w": (255, 250, 214)}
+_BOLT_CACHE: dict = {}
+
+
+def bolt_icon(scale: int = 2, grey: bool = False):
+    """Fulmine dello Smite in cache (scalato NEAREST, versione spenta in grigio)."""
+    key = (scale, grey)
+    img = _BOLT_CACHE.get(key)
+    if img is None:
+        h, w = len(_BOLT), len(_BOLT[0])
+        base = pygame.Surface((w, h), pygame.SRCALPHA)
+        for y, row in enumerate(_BOLT):
+            for x, ch in enumerate(row):
+                c = _BOLT_COLS.get(ch)
+                if c is not None:
+                    if grey and ch != "o":
+                        g = (c[0] + c[1] + c[2]) // 3
+                        c = (g * 3 // 4, g * 3 // 4, g * 3 // 4 + 8)
+                    base.set_at((x, y), c)
+        img = pygame.transform.scale(base, (w * scale, h * scale))
+        _BOLT_CACHE[key] = img
+    return img
+
+
+def draw_spell(surface, r: pygame.Rect, sp: SpellView) -> None:
+    """Casella dello Smite: fulmine, tasto, ricarica, pallini delle cariche."""
+    ready = sp.cd_left <= 0 and sp.charges > 0
+    pygame.draw.rect(surface, (52, 34, 14) if ready else (30, 28, 30), r, border_radius=5)
+    pygame.draw.rect(surface, (92, 60, 22) if ready else (44, 42, 46),
+                     (r.x + 2, r.y + 2, r.w - 4, r.h // 3), border_radius=4)
+    img = bolt_icon(2, grey=not ready)
+    surface.blit(img, (r.centerx - img.get_width() // 2 + 1, r.centery - img.get_height() // 2))
+    if sp.cd_left > 0:
+        hh = int(r.h * max(0.0, min(1.0, sp.cd_frac)))
+        if hh > 0:
+            ov = pygame.Surface((r.w, hh), pygame.SRCALPHA)
+            ov.fill((6, 8, 12, 150))
+            surface.blit(ov, (r.x, r.bottom - hh))
+        t = f"{sp.cd_left:.0f}" if sp.cd_left >= 1.0 else f"{sp.cd_left:.1f}"
+        text(surface, t, (r.centerx, r.centery - 8), 15, (255, 255, 255), bold=True, center=True)
+    pygame.draw.rect(surface, TRIM_HI if ready else (0, 0, 0), r, 2 if ready else 1,
+                     border_radius=5)
+    from . import keybinds
+    lab = keybinds.key_name(sp.key)[:4]
+    ksz = 11 if len(lab) == 1 else 9
+    kr = pygame.Rect(r.x - 3, r.y - 3, max(13, font(ksz, True).size(lab)[0] + 5), 13)
+    pygame.draw.rect(surface, (10, 12, 16), kr, border_radius=3)
+    pygame.draw.rect(surface, TRIM, kr, 1, border_radius=3)
+    text(surface, lab, (kr.centerx, kr.y + 1), ksz, GOLD, bold=True, center=True, shadow=False)
+    # cariche: pallini sotto (pieni = pronte), barretta della prossima che si ricarica
+    n = max(1, sp.max_charges)
+    for k in range(n):
+        c = (r.centerx - (n - 1) * 6 + k * 12, r.bottom + 6)
+        pygame.draw.circle(surface, (0, 0, 0), c, 4)
+        pygame.draw.circle(surface, (255, 200, 70) if k < sp.charges else (58, 58, 66), c, 3)
+    if sp.charges < sp.max_charges:
+        pr = pygame.Rect(r.x + 3, r.bottom + 12, r.w - 6, 3)
+        pygame.draw.rect(surface, (22, 24, 30), pr)
+        pygame.draw.rect(surface, (230, 160, 50), (pr.x, pr.y, int(pr.w * sp.regen_frac), pr.h))
+    text(surface, sp.name, (r.centerx, r.bottom + 17), 10, DIM, center=True, shadow=False)
+
+
 def draw_bar(surface, pv: PlayerView, slots: list, type_color, item_icon=None,
              right_limit=None) -> BarLayout:
     """Barra in basso. `item_icon(iid, size)` -> Surface (icone del negozio)."""
@@ -418,6 +531,10 @@ def draw_bar(surface, pv: PlayerView, slots: list, type_color, item_icon=None,
     iy2 = iy + 2 * (ITEM + ITEM_GAP) + 4
     text(surface, "P: negozio", (icx, iy2), 11, DIM, center=True)
     text(surface, "B: richiamo", (icx, iy2 + 14), 11, DIM, center=True)
+    # --- incantesimo (Smite) ------------------------------------------------------
+    if pv.spell is not None:
+        sx = ix + 3 * ITEM + 2 * ITEM_GAP + 10
+        draw_spell(surface, pygame.Rect(sx + 2, R.y + 14, SPELL, SPELL), pv.spell)
     # punti mossa da spendere: targhetta sopra la barra
     if pv.points > 0:
         msg = f"+{pv.points} punto mossa" if pv.points == 1 else f"+{pv.points} punti mossa"

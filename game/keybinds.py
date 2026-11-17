@@ -16,7 +16,7 @@ ACTIONS = [
     ("R", "Mossa R (ultimate)", pygame.K_r),
     ("stop", "Fermati", pygame.K_s),
     ("recall", "Richiamo in base", pygame.K_b),
-    ("smite", "Punizione (solo offline)", pygame.K_d),
+    ("smite", "Punizione", pygame.K_d),
     ("shop", "Negozio", pygame.K_p),
     ("camera", "Blocca la camera", pygame.K_y),
     ("score", "Tabellone (tieni premuto)", pygame.K_TAB),

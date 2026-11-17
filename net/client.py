@@ -275,6 +275,7 @@ class ClientSession:
             self._cmd(P.CMD_CAST, slot=slot, x=x, y=y)
     def send_stop(self): self._cmd(P.CMD_STOP)
     def send_recall(self): self._cmd(P.CMD_RECALL)
+    def send_smite(self): self._cmd(P.CMD_SMITE)
 
     # --- invio: azioni critiche (canale reliable) ----------------------------------------------
     def _act(self, kind, **f) -> None:

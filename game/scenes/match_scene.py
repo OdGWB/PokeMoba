@@ -596,7 +596,9 @@ class MatchScene:
             portrait=self._portrait(sd, hud.PORT - 14) if sd else None,
             gold=int(p.gold), items=list(p.items), stats=stats, alive=p.alive,
             respawn_left=max(0.0, p.respawn_timer),
-            points=skills.available_points(p), team=p.team)
+            points=skills.available_points(p), team=p.team,
+            spell=hud.smite_view(p.smite_charges, p.smite_ready_at, p.smite_regen_at,
+                                 self.match.time))
 
     def _slot_views(self) -> list:
         p = self.player

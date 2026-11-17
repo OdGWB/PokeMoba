@@ -29,7 +29,7 @@ from __future__ import annotations
 import math
 import struct
 
-PROTO_VERSION = 4       # 2: avatar; 3: draft (R_DRAFT/R_PICK); 4: stato visivo (R_VIS)
+PROTO_VERSION = 5       # 2: avatar; 3: draft (R_DRAFT/R_PICK); 4: stato visivo (R_VIS); 5: Smite
 
 # --- data channel -------------------------------------------------------------
 CH_STATE = 0
@@ -70,8 +70,9 @@ CMD_CAST = 3
 CMD_STOP = 6
 CMD_RECALL = 9
 CMD_ATTACKMOVE_CHAMP = 10   # attacco-movimento col tasto "solo Pokémon"
+CMD_SMITE = 11              # Smite sul neutrale migliore a portata (deciso dall'host)
 STATE_CMDS = (CMD_MOVE, CMD_ATTACK, CMD_ATTACKMOVE, CMD_CAST, CMD_STOP, CMD_RECALL,
-              CMD_ATTACKMOVE_CHAMP)
+              CMD_ATTACKMOVE_CHAMP, CMD_SMITE)
 MAX_CMDS_PER_INPUT = 16      # comandi ridondanti al massimo per pacchetto
 SLOTS_QWER = ["Q", "W", "E", "R"]   # indice di slot mossa 0..3 nei comandi
 # Nel byte dello slot di CMD_CAST i 6 bit alti portano la pressione del tasto
@@ -284,7 +285,7 @@ def enc_input(ack_snap, cmds) -> bytes:
             w.u16(c["target_id"])
         elif k == CMD_CAST:
             w.u8(pack_cast_slot(c["slot"], c.get("hold", 0.0))).pos(c["x"]).pos(c["y"])
-        elif k in (CMD_STOP, CMD_RECALL):
+        elif k in (CMD_STOP, CMD_RECALL, CMD_SMITE):
             pass
         else:
             raise ValueError(f"comando sconosciuto {k}")
@@ -311,7 +312,7 @@ def dec_input(data) -> dict:
             c["slot"] = b & 3; c["x"] = r.pos(); c["y"] = r.pos()
             if b >> 2:
                 c["hold"] = (b >> 2) * CAST_HOLD_STEP
-        elif k in (CMD_STOP, CMD_RECALL):
+        elif k in (CMD_STOP, CMD_RECALL, CMD_SMITE):
             pass
         else:
             raise ProtocolError(f"comando sconosciuto {k}")

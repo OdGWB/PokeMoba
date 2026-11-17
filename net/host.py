@@ -608,7 +608,7 @@ class HostSession:
 
     def _validate_cmd(self, s, p, c):
         from sim.commands import (AttackCommand, AttackMoveCommand, CastMoveCommand,
-                                  MoveCommand, RecallCommand, StopCommand)
+                                  MoveCommand, RecallCommand, SmiteCommand, StopCommand)
         g = self.world.grid
         k, eid, seq = c["kind"], s.entity_id, c["seq"]   # entità SEMPRE dallo slot
         if k in (P.CMD_MOVE, P.CMD_ATTACKMOVE, P.CMD_ATTACKMOVE_CHAMP, P.CMD_CAST):
@@ -638,6 +638,8 @@ class HostSession:
             return StopCommand(seq=seq, entity_id=eid)
         if k == P.CMD_RECALL:
             return RecallCommand(seq=seq, entity_id=eid)
+        if k == P.CMD_SMITE:
+            return SmiteCommand(seq=seq, entity_id=eid)
         return None
 
     def _on_action(self, s, a):

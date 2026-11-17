@@ -50,12 +50,12 @@ SKIP = {"mv", "hit", "touched", "since", "rank", "explode", "first", "caught", "
 # Stati sulle unità che non sono timer *_until (valore "spento" a destra).
 UNIT_FLAGS = {"air_z": 0.0, "sand_radius": 0.0, "invisible": False, "submerged": False,
               "heat_stacks": 0, "soul_charges": 0, "inversion_stacks": 0,
-              "smoke_hidden": False, **net_table("unit_flags")}
+              "smoke_hidden": False, "sleep_arm_at": -1.0, **net_table("unit_flags")}
 # Il proprio Pokémon: passive e ricariche mostrate nell'interfaccia.
 ME_FIELDS = tuple(dict.fromkeys((
     "passive_id", "soul_charges", "inversion_stacks", "muta_cd_until", "muta_cd_max",
     "form_until", "sandstorm_boost_until", "sand_radius", "recalling", "recall_until",
-    "respawn_timer", *net_table("me"))))
+    "respawn_timer", "smite_charges", "smite_regen_at", "smite_ready_at", *net_table("me"))))
 
 _timer_fields: dict = {}
 
@@ -188,6 +188,11 @@ def capture_me_visual(match, p) -> dict:
         me["fausta"], me["infausta"] = round(p.fausta), round(p.infausta)
     if p.passive_id == "soleluna":   # Sneasel: oro dai minion e dai neutrali
         me["gold_minion"], me["gold_wild"] = round(p.gold_minion), round(p.gold_wild)
+    # statistiche per l'HUD (barra in basso): arrotondate, cambiano di rado
+    me["stats"] = (int(p.eff_attack()), int(p.eff_defense()), int(p.eff_sp_defense()),
+                   int(p.eff_sp_attack()), round(p.ability_mult, 2),
+                   "+" if p.atk_mult > 1.0 else "",
+                   "+" if p.def_buff_active else ("-" if p.def_debuff_active else ""))
     me["item_cd"] = {k: float(v) for k, v in p.item_cd.items() if v > match.time}
     charges = {}
     for s in SLOTS:

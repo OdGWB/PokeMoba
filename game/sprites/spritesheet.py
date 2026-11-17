@@ -125,7 +125,7 @@ _WILD_LEGEND_SPRITES = {
 _ARCEUS_SPRITE = ("assets/pokemon/0493", 1.3)
 
 
-# Campi della giungla lato BLU con sprite (tile del campo -> (cartella, scala)),
+# Campi della giungla (lato BLU, il ROSSO e' speculare) con sprite (tile del campo -> (cartella, scala)),
 # 3v3 e 5v5: settore alto = Slowbro (blue buff, grosso) + Carnivine (piccolo a
 # nord-ovest); settore basso = Magmortar (red buff, grosso).
 _P = "assets/pokemon/"
@@ -135,14 +135,28 @@ _SPIDERS = [(_P + "0168", 1.0, 0, 0), (_P + "0167", 0.6, -22, 8),
             (_P + "0167", 0.6, 22, 7), (_P + "0167", 0.6, 1, 16)]
 # Ogni membro: (cartella, scala, dx, dy in px dal punto del campo); il primo ancora
 # l'unita'. Stessa disposizione su 3v3 e 5v5 (piccoli: tile del campo).
-_CAMP_SPRITES = {
-    (29, 43): [(_P + "0080", 1.0, 0, 0)], (44, 64): [(_P + "0080", 1.0, 0, 0)],
-    (18, 37): [(_P + "0455", 1.0, 0, 0)], (27, 56): [(_P + "0455", 1.0, 0, 0)],
-    (57, 72): [(_P + "0467", 1.0, 0, 0)], (86, 108): [(_P + "0467", 1.0, 0, 0)],
-    (25, 53): _TANGELA, (38, 80): _TANGELA,
-    (63, 81): _HOPPIP, (94, 122): _HOPPIP,
-    (47, 61): _SPIDERS, (70, 92): _SPIDERS,
+_BLUE_3V3 = {
+    (29, 43): [(_P + "0080", 1.0, 0, 0)], (18, 37): [(_P + "0455", 1.0, 0, 0)],
+    (57, 72): [(_P + "0467", 1.0, 0, 0)], (25, 53): _TANGELA,
+    (63, 81): _HOPPIP, (47, 61): _SPIDERS,
 }
+_BLUE_5V5 = {
+    (44, 64): [(_P + "0080", 1.0, 0, 0)], (27, 56): [(_P + "0455", 1.0, 0, 0)],
+    (86, 108): [(_P + "0467", 1.0, 0, 0)], (38, 80): _TANGELA,
+    (94, 122): _HOPPIP, (70, 92): _SPIDERS,
+}
+
+
+def _mirrored(blue: dict, size: int) -> dict:
+    """Lato ROSSO: la mappa e' simmetrica rispetto al centro, (x, y) -> (W-x, H-y).
+    Stessi Pokemon, e la disposizione del gruppo ruota di 180 gradi, cosi' ogni
+    membro resta dallo stesso lato rispetto ai muri del suo campo."""
+    return {(size - x, size - y): [(d, sc, -dx, -dy) for d, sc, dx, dy in g]
+            for (x, y), g in blue.items()}
+
+
+_CAMP_SPRITES = {**_BLUE_3V3, **_mirrored(_BLUE_3V3, 100),
+                 **_BLUE_5V5, **_mirrored(_BLUE_5V5, 150)}
 
 
 def wild_sprite_group(unit):

@@ -132,6 +132,8 @@ class NetMatchScene:
                 self.camera_locked = not self.camera_locked
             elif ev.type == pygame.KEYDOWN and ev.key == keybinds.key("recall"):
                 self.client.send_recall()
+            elif ev.type == pygame.KEYDOWN and ev.key == keybinds.key("smite"):
+                self.client.send_smite()
             elif ev.type == pygame.KEYDOWN and ev.key in (pygame.K_1, pygame.K_2) \
                     and self._pending() and self._near_base():
                 slot = self._pending()[0]
@@ -388,11 +390,26 @@ class NetMatchScene:
             portrait=port(sd, hud.PORT - 14) if (port and sd) else None,
             gold=int(h.get("gold", 0)), items=list(h.get("items", [])),
             stats=self._info_rows(h, me), alive=not dead, points=h["points"],
-            rank_hint="Ctrl+Q/W/E/R", team=self.team)
+            rank_hint="Ctrl+Q/W/E/R", team=self.team, spell=self._spell_view())
+
+    def _spell_view(self):
+        """Smite dal "me" dello stato visivo (LAN senza stato visivo: niente casella)."""
+        mv = self._me_vis()
+        if "smite_charges" not in mv:
+            return None
+        return hud.smite_view(mv["smite_charges"], mv.get("smite_ready_at", -1.0),
+                              mv.get("smite_regen_at", -1.0),
+                              getattr(self.world, "match_time", 0.0))
 
     def _info_rows(self, h, me) -> list:
-        """Online le statistiche non viaggiano nello snapshot: al loro posto ruolo,
-        tipi e oggetti (righe senza etichetta: ("", testo, colore))."""
+        """Statistiche dallo stato visivo ("me" -> "stats", come offline); senza
+        (LAN) ruolo, tipi e oggetti (righe senza etichetta: ("", testo, colore))."""
+        st = self._me_vis().get("stats")
+        if st and len(st) >= 7:
+            atk, df, sdf, spa, abil, atkm, difm = st[:7]
+            return [("Attacco", int(atk), atkm), ("Difesa", int(df), difm),
+                    ("Dif. Sp.", int(sdf), ""), ("Att. Sp.", int(spa), ""),
+                    ("Abilità", f"x{float(abil):.2f}", "")]
         role, types = self.pdef.role, self.pdef.types
         dex = getattr(me, "dex", None)
         for e in self.pdef.evolutions or ():   # ruolo e tipi della forma attuale

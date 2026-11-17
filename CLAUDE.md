@@ -1395,6 +1395,28 @@ Passaggi completati:
   speculmossa/_colpo, pioggia/_dopo, panciamburo/_dopo, acquanello/_dopo,
   colpodifango_volo/_colpo, vitaltiro/_dopo, mulinello/_dopo, dinamipugno/_dopo,
   zuffa/_dopo, rimbalzo/_atterraggio, ultimocanto/_conto/_scoppio).
+- CAMPI ROSSI, PUNIZIONE ONLINE e HUD ONLINE completo (step_67). (1) Campi della
+  giungla ROSSA con gli stessi sprite dei blu: la mappa e' simmetrica rispetto al
+  centro ((x,y) -> (W-x,H-y)), quindi spritesheet._mirrored ricava _CAMP_SPRITES
+  rosso da _BLUE_3V3/_BLUE_5V5 ribaltando tile e offset (stesso muro, stessa
+  disposizione). (2) PUNIZIONE online: nuovo comando di stato CMD_SMITE (11,
+  PROTO_VERSION 5) in C_INPUT senza payload; l'host lo valida in SmiteCommand,
+  il client lo manda col tasto "smite" (keybinds, etichetta "Punizione", D).
+  smite_charges/smite_ready_at/smite_regen_at in net/visual.ME_FIELDS. (3) CASELLA
+  DEGLI INCANTESIMI nella barra in basso (hud.SpellView/smite_view/draw_spell),
+  tra oggetti e minimappa (barra +SPELL_W): FULMINE pixel art 13x18 (_BOLT, in
+  cache, NEAREST) su fondo bruno con cornice d'oro quando e' pronta, grigio col
+  velo e i secondi in ricarica (blocco di 15 s se resta una carica, altrimenti
+  il tempo alla prossima carica), tasto in alto a sinistra, 2 pallini delle
+  cariche e barra della ricarica sotto, nome "Punizione". Offline e online
+  (online si legge l'ora da world.match_time; LAN senza dati = niente casella).
+  NB: nel motore TUTTI i Pokemon hanno la Punizione, quindi la casella c'e' per
+  tutti. (4) Sonnolenza di Ipnosi online: sleep_arm_at in UNIT_FLAGS (la spirale
+  di gastly_fx ora si vede anche in rete). (5) Statistiche online: "stats" in "me"
+  (Att, Dif, Dif.Sp, Att.Sp, Abilita' e i segni +/-) -> l'HUD online mostra le
+  stesse righe dell'offline invece di ruolo e tipi. Screenshot: step_67_blu_*/
+  rosso_* (campi), step_67_hud_smite/_cd/_vuoto/_zoom, step_67_online_hud,
+  step_67_online_ipnosi/_zoom, step_67_online_smite.
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul
