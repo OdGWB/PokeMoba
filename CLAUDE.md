@@ -1224,8 +1224,8 @@ Passaggi completati:
   e +690 B su R_VIS al piu' una volta al secondo (SCORE_EVERY).
   Screenshot: step_59_opzioni, step_59_tasti.
 - LINEE VECCHIE portate al livello delle nuove (punto 24), una per passo. Eevee
-  (eevee_fx) e Spiritomb (spirit_fx) avevano gia' un modulo; Roggenrola ha effetti
-  su misura in fx.py. Tutte le linee vecchie sono fatte.
+  (eevee_fx) e Spiritomb (spirit_fx) avevano gia' un modulo; Roggenrola ora ha il suo
+  game/roggen_fx.py (step_72). Tutte le linee vecchie sono fatte.
   Registro: fx_lines.FX_LINES; ogni modulo puo' esporre anche AA_TRAVEL
   (forma -> frazione del volo, per gli attacchi base a ricerca: fx._AA_TRAVEL).
 - LINEA CHARMANDER > CHARMELEON > CHARIZARD (step_60), nuovo game/char_fx.py.
@@ -1457,6 +1457,18 @@ Passaggi completati:
   Verifica: hash dello stato (id/pos/hp ogni 30 tick, PYTHONHASHSEED=0, 150 s)
   IDENTICO al codice vecchio; tick medio ~11 -> ~7-9 ms, p99 ~34-42 -> ~15-25 ms
   (misure rumorose). 468 test OK.
+- EFFETTI di ROGGENROLA spostati da fx.py a game/roggen_fx.py (step_72, nessuna
+  modifica visiva). Il modulo e' registrato in fx_lines.FX_LINES (PRIMO della lista,
+  cosi' su un nome in conflitto vincono gli altri moduli, come prima) ed espone
+  STYLES (15 stili: rockspike, pillar, pillarbreak, shockwave, rockburst, chargedust,
+  knockup, smackdown, smackzone, spikefield, sandburst, ironshell, avalanchewarn,
+  explodecharge, explosion; handler fx_<nome>(fx, e, col)), SHAPES + draw_shape (7
+  forme: rockspike, crack, fallrock, smackzone, spikefield, avwarn, chargeglow),
+  la palette ROCK_*/SAND*/DUST/EMBER e draw_sandstorm/draw_avalanche (importati da
+  world_fx e renderer). fx.py tiene solo DUST/ROCK_MID per _dust/_debris e la
+  forma generica hexshell. Verifica: ogni stile e i due disegni persistenti resi
+  con lo stesso seme su 12/8 fotogrammi, hash dei pixel IDENTICI al codice vecchio.
+  468 test OK. Screenshot: screenshots/step_72.png (banco di prova degli effetti).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

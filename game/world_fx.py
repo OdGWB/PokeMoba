@@ -21,7 +21,8 @@ import config
 
 from . import (arch_fx, char_fx, charcadet_fx, corvi_fx, eevee_fx, gastly_fx, hatt_fx, mag_fx, mien_fx, noivern_fx,
                flor_fx, moth_fx, octi_fx, poli_fx, scy_fx, sneasel_fx, spirit_fx, swine_fx, totodile_fx, ursa_fx)
-from .fx import draw_avalanche, draw_sandstorm, type_color
+from .fx import type_color
+from .roggen_fx import draw_avalanche, draw_sandstorm
 
 
 def draw_world_effects(surface, camera, world, m, team, vision, now, player_id,

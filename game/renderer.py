@@ -24,7 +24,8 @@ from . import (arch_fx, eevee_fx, hatt_fx, mag_fx, mien_fx, noivern_fx,
                sneasel_fx, ursa_fx)
 from . import structure_gfx
 from .fx_lines import UNIT_OVERLAYS
-from .fx import EMBER, ROCK_HI, ROCK_MID, ROCK_OUT, ROCK_SH, type_color
+from .fx import type_color
+from .roggen_fx import EMBER, ROCK_HI, ROCK_MID, ROCK_OUT, ROCK_SH
 from .map_renderer import MapRenderer
 from .sprites.animator import SpriteAnimator
 
