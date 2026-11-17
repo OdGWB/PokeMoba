@@ -393,9 +393,10 @@ class NetMatchScene:
             rank_hint="Ctrl+Q/W/E/R", team=self.team, spell=self._spell_view())
 
     def _spell_view(self):
-        """Smite dal "me" dello stato visivo (LAN senza stato visivo: niente casella)."""
+        """Smite dal "me" dello stato visivo (LAN senza stato visivo o non jungler:
+        niente casella)."""
         mv = self._me_vis()
-        if "smite_charges" not in mv:
+        if "smite_charges" not in mv or not mv.get("is_jungler", False):
             return None
         return hud.smite_view(mv["smite_charges"], mv.get("smite_ready_at", -1.0),
                               mv.get("smite_regen_at", -1.0),

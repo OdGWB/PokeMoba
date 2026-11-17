@@ -55,7 +55,7 @@ UNIT_FLAGS = {"air_z": 0.0, "sand_radius": 0.0, "invisible": False, "submerged":
 ME_FIELDS = tuple(dict.fromkeys((
     "passive_id", "soul_charges", "inversion_stacks", "muta_cd_until", "muta_cd_max",
     "form_until", "sandstorm_boost_until", "sand_radius", "recalling", "recall_until",
-    "respawn_timer", "smite_charges", "smite_regen_at", "smite_ready_at", *net_table("me"))))
+    "respawn_timer", "is_jungler", "smite_charges", "smite_regen_at", "smite_ready_at", *net_table("me"))))
 
 _timer_fields: dict = {}
 

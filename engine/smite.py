@@ -19,6 +19,15 @@ SMITE_RANGE = 4.0          # tile
 SMITE_CHARGES = 2
 SMITE_RECHARGE = 90.0      # s per ricaricare UNA carica
 SMITE_LOCK = 15.0          # s minimi tra due Smite
+# Linee da jungler (dex di tutte le forme): un GIOCATORE che ne sceglie una fa il
+# jungler della squadra (Smite); altrimenti il jungler e' un bot.
+JUNGLE_DEX = frozenset({
+    290, 291, 292,          # Nincada > Ninjask / Shedinja
+    215, 461, 903,          # Sneasel > Weavile / Sneasler
+    216, 217, 901,          # Teddiursa > Ursaring > Ursaluna
+    220, 221, 473,          # Swinub > Piloswine > Mamoswine
+    158, 159, 160,          # Totodile > Croconaw > Feraligatr
+})
 
 LANE_LEASH_EARLY = 7.0     # tile dalla lane: primi minuti
 LANE_LEASH = 14.0
@@ -59,8 +68,9 @@ class SmiteMixin:
         return best
 
     def use_smite(self, p, target=None) -> bool:
-        """Usa lo Smite su `target` (o sul neutrale migliore a portata)."""
-        if (not p.alive or p.smite_charges <= 0 or self.time < p.smite_ready_at
+        """Usa lo Smite su `target` (o sul neutrale migliore a portata).
+        Solo il jungler della squadra ha la Punizione."""
+        if (not p.is_jungler or not p.alive or p.smite_charges <= 0 or self.time < p.smite_ready_at
                 or self._immobile(p)):
             return False
         w = target if target is not None else self.smite_target(p)

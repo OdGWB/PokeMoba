@@ -189,9 +189,12 @@ SPELL_W = SPELL + 14
 BAR_H = 120
 
 
-def bar_rect(W: int, H: int, right_limit: int | None = None) -> pygame.Rect:
+def bar_rect(W: int, H: int, right_limit: int | None = None,
+             spell: bool = True) -> pygame.Rect:
+    """`spell` = False (non jungler: niente Punizione) -> barra senza la casella."""
     skills_w = 4 * SLOT_W + 3 * SLOT_GAP
-    w = 8 + STATS_W + 8 + PORT + 10 + PASSIVE_W + skills_w + 10 + 3 * ITEM + 2 * ITEM_GAP + 8 + SPELL_W
+    w = (8 + STATS_W + 8 + PORT + 10 + PASSIVE_W + skills_w + 10 + 3 * ITEM + 2 * ITEM_GAP + 8
+         + (SPELL_W if spell else 0))
     x = (W - w) // 2
     if right_limit is not None and x + w > right_limit - 8:
         x = max(4, right_limit - 8 - w)
@@ -432,7 +435,7 @@ def draw_bar(surface, pv: PlayerView, slots: list, type_color, item_icon=None,
              right_limit=None) -> BarLayout:
     """Barra in basso. `item_icon(iid, size)` -> Surface (icone del negozio)."""
     W, H = surface.get_size()
-    R = bar_rect(W, H, right_limit)
+    R = bar_rect(W, H, right_limit, spell=pv.spell is not None)
     panel(surface, R)
     x = R.x + 8
     # --- statistiche --------------------------------------------------------------

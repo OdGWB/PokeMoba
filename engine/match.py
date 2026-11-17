@@ -4130,10 +4130,17 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
 
     # --- IA del jungler ------------------------------------------------------
     def assign_junglers(self):
-        """Designa un bot per squadra come jungler (va in giungla a farmare)."""
+        """Un jungler per squadra (l'unico con la Punizione): il primo GIOCATORE
+        che ha scelto una linea da jungler (smite.JUNGLE_DEX); se nessuno, un bot
+        (va in giungla a farmare)."""
+        from .smite import JUNGLE_DEX
         for team in (0, 1):
-            bots = [p for p in self.world.pokemons() if p.team == team and p.is_bot]
-            if bots:
+            mates = [p for p in self.world.pokemons() if p.team == team]
+            humans = [p for p in mates if not p.is_bot and p.dex in JUNGLE_DEX]
+            bots = [p for p in mates if p.is_bot]
+            if humans:
+                humans[0].is_jungler = True
+            elif bots:
                 bots[len(bots) // 2].is_jungler = True
 
     def _ai_jungler(self, p, dt):

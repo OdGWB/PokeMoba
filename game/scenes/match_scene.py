@@ -598,7 +598,7 @@ class MatchScene:
             respawn_left=max(0.0, p.respawn_timer),
             points=skills.available_points(p), team=p.team,
             spell=hud.smite_view(p.smite_charges, p.smite_ready_at, p.smite_regen_at,
-                                 self.match.time))
+                                 self.match.time) if p.is_jungler else None)
 
     def _slot_views(self) -> list:
         p = self.player

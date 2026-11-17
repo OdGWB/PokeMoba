@@ -1417,6 +1417,14 @@ Passaggi completati:
   stesse righe dell'offline invece di ruolo e tipi. Screenshot: step_67_blu_*/
   rosso_* (campi), step_67_hud_smite/_cd/_vuoto/_zoom, step_67_online_hud,
   step_67_online_ipnosi/_zoom, step_67_online_smite.
+- PUNIZIONE SOLO AL JUNGLER (step_68). engine/smite.py: use_smite rifiuta chi non e'
+  is_jungler; JUNGLE_DEX = dex di tutte le forme delle linee da jungler (Nincada,
+  Sneasel, Teddiursa, Swinub, Totodile). Match.assign_junglers: per squadra il jungler e'
+  il primo GIOCATORE che ha scelto una di quelle linee; se nessuno, un bot come prima.
+  HUD: casella del fulmine solo se il proprio Pokemon e' jungler (offline p.is_jungler,
+  online "is_jungler" in net/visual.ME_FIELDS); senza casella hud.bar_rect(spell=False)
+  accorcia la barra (niente colonna vuota). Test: tests/test_smite.py.
+  Screenshot: step_68_jungler/_zoom (Sneasel), step_68_lane/_zoom (Charmander).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul
