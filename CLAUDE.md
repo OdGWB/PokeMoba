@@ -1446,6 +1446,17 @@ Passaggi completati:
   basso-destra della finestra (match_scene e net_match_scene). Camera.update non
   scorre piu' se il mouse e' fuori dalla finestra (pygame.mouse.get_focused):
   get_pos() restava all'ultima posizione sul bordo e la camera andava avanti.
+- PRESTAZIONI del tick di logica 5v5 (step_71, nessuna modifica visiva). Profilo
+  headless (MatchScene, bot ovunque, 150 s): i picchi da 70-800 ms NON sono codice
+  (cambiano di posto da un'esecuzione all'altra, cProfile di quei tick = pochi ms,
+  GC 0): rumore di sistema/CPU. Le scaramucce danno tick reali di 35-45 ms. Ridotti:
+  (1) World: liste per tipo in CACHE (_by_type/_of_type), invalidate in add/remove;
+  pokemons()/structures()/combatants()/... ritornano una copia (stesso ordine di
+  prima) invece di rifiltrare tutte le entita' con isinstance decine di volte a
+  tick. (2) SpatialHash.query_radius con variabili locali (stesso ordine d'uscita).
+  Verifica: hash dello stato (id/pos/hp ogni 30 tick, PYTHONHASHSEED=0, 150 s)
+  IDENTICO al codice vecchio; tick medio ~11 -> ~7-9 ms, p99 ~34-42 -> ~15-25 ms
+  (misure rumorose). 468 test OK.
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

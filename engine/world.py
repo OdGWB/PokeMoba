@@ -27,6 +27,10 @@ class World:
         # letti dal renderer. Lista mutata sul posto (mai riassegnata).
         self.pillars: list = []
         self.spirits: list = []   # spiriti della passiva di Spiritomb (entities.Spirit)
+        # Liste per tipo in cache (stesso ordine di self.entities), rifatte solo
+        # quando si aggiunge o toglie un'entita': pokemons()/structures()/... si
+        # chiamano decine di volte a tick e il filtro con isinstance costava.
+        self._by_type: dict = {}
 
     # --- gestione entità -----------------------------------------------------
     def _alloc_id(self) -> int:
@@ -38,9 +42,20 @@ class World:
         if entity.id == 0:
             entity.id = self._alloc_id()
         self.entities[entity.id] = entity
+        self._by_type.clear()
 
     def remove(self, entity_id: int) -> None:
-        self.entities.pop(entity_id, None)
+        if self.entities.pop(entity_id, None) is not None:
+            self._by_type.clear()
+
+    def _of_type(self, cls) -> list:
+        """Entita' di quel tipo (o tupla di tipi), in ordine di inserimento. NON
+        modificare la lista restituita: e' quella in cache."""
+        lst = self._by_type.get(cls)
+        if lst is None:
+            lst = [e for e in self.entities.values() if isinstance(e, cls)]
+            self._by_type[cls] = lst
+        return lst
 
     def get(self, entity_id: int):
         return self.entities.get(entity_id)
@@ -116,7 +131,7 @@ class World:
         return w
 
     def wilds(self) -> list:
-        return [e for e in self.entities.values() if isinstance(e, Wild)]
+        return list(self._of_type(Wild))
 
     def spawn_core(self, pos: Vec2, team: int, hp: float = 6000.0) -> Core:
         t = Core(pos=pos, team=team, kind="core", hp=hp, max_hp=hp,
@@ -126,30 +141,26 @@ class World:
 
     # --- accessori per tipo --------------------------------------------------
     def units(self) -> list:
-        return [e for e in self.entities.values() if isinstance(e, Unit)]
+        return list(self._of_type(Unit))
 
     def alive_units(self) -> list:
-        return [e for e in self.entities.values() if isinstance(e, Unit) and e.alive]
+        return [e for e in self._of_type(Unit) if e.alive]
 
     def pokemons(self) -> list:
-        return [e for e in self.entities.values() if isinstance(e, Pokemon)]
+        return list(self._of_type(Pokemon))
 
     def minions(self) -> list:
-        return [e for e in self.entities.values() if isinstance(e, Minion)]
+        return list(self._of_type(Minion))
 
     def structures(self) -> list:
-        return [e for e in self.entities.values() if isinstance(e, Structure)]
+        return list(self._of_type(Structure))
 
     def cores(self) -> list:
-        return [e for e in self.entities.values() if isinstance(e, Core)]
+        return list(self._of_type(Core))
 
     def combatants(self) -> list:
         """Tutto ciò che ha hp ed è vivo (unità + strutture)."""
-        out = []
-        for e in self.entities.values():
-            if isinstance(e, (Unit, Structure)) and getattr(e, "alive", True):
-                out.append(e)
-        return out
+        return [e for e in self._of_type((Unit, Structure)) if getattr(e, "alive", True)]
 
     # --- avanzamento ---------------------------------------------------------
     def tick(self, dt: float) -> None:
@@ -161,7 +172,7 @@ class World:
         # Le torri vive sono ostacoli fisici: chi ci finisce dentro (passo,
         # spinta, scatto) viene spinto fuori lungo il bordo.
         towers = [(s.pos.x, s.pos.y, config.TOWER_BLOCK_RADIUS)
-                  for s in self.entities.values()
-                  if isinstance(s, Structure) and s.kind == "tower" and s.alive]
+                  for s in self._of_type(Structure)
+                  if s.kind == "tower" and s.alive]
         if towers:
             movement.resolve_obstacles(movers, towers, self.grid)

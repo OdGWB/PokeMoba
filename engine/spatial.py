@@ -27,16 +27,19 @@ class SpatialHash:
     def query_radius(self, x: float, y: float, radius: float) -> list:
         """Entità in tutte le celle che intersecano il cerchio (x,y,radius)."""
         inv = 1.0 / self.cell_size
-        cx0 = int(math.floor((x - radius) * inv))
-        cy0 = int(math.floor((y - radius) * inv))
-        cx1 = int(math.floor((x + radius) * inv))
-        cy1 = int(math.floor((y + radius) * inv))
+        floor = math.floor
+        cx0 = int(floor((x - radius) * inv))
+        cy0 = int(floor((y - radius) * inv))
+        cx1 = int(floor((x + radius) * inv))
+        cy1 = int(floor((y + radius) * inv))
         out = []
+        get, ext = self._cells.get, out.extend
+        xs = range(cx0, cx1 + 1)
         for cy in range(cy0, cy1 + 1):
-            for cx in range(cx0, cx1 + 1):
-                bucket = self._cells.get((cx, cy))
+            for cx in xs:
+                bucket = get((cx, cy))
                 if bucket:
-                    out.extend(bucket)
+                    ext(bucket)
         return out
 
     def neighbors(self, entity) -> list:
