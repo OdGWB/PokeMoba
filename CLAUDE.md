@@ -1491,6 +1491,25 @@ Passaggi completati:
   Prestazioni: tick 5v5 non piu' lento (misure rumorose 6-11 ms contro 10-13 con i
   tile). Test: tests/test_movement_walls.py (12). Screenshot: screenshots/step_73.png
   (a sinistra la grafica, a destra hitbox azzurra e tile-muro tratteggiati in rosso).
+- REDESIGN DEI MENU (step_74), dal pacchetto "Menu PokeMoba UI Redesign". Nuovo
+  game/ui_theme.py (stile comune: colori BG/PANEL/GOLD + toni nuovi CARD/SEL/LINE/
+  GREEN, font Consolas, title_font = assets/ui/fonts/PixelifySans.ttf se presente
+  altrimenti Consolas grassetto; widget title/keycap/hints/back_button/
+  primary_button/profile_chip; sfondi cover/menu_shade/top_glow in cache per
+  dimensione). Menu principale (menu_scene) su assets/ui/menu_bg.png a tutto
+  schermo ("cover") con velo scuro a sinistra, voci a sinistra, profilo in alto a
+  destra, tasti in basso. Selezione offline (char_select_scene) e draft online
+  (online_draft_scene) con FILTRO PER RUOLO a pastiglie (Tab / Maiusc+Tab; ROLES,
+  JUNGLERS = linee da jungler); corretto role_matches: il ruolo si confronta per
+  PAROLA ("mago mobile" passa il filtro "mago"). Esc nella selezione torna a Mappe.
+  PRESTAZIONI: menu_backdrop fonde immagine + velo UNA volta in una Surface opaca
+  (un solo blit pieno a frame). draw_fullres mediano (headless, 200 frame): menu
+  720p 5,0 -> 1,2 ms, 1080p 41 -> 1,7 ms; selezione 1080p 9,1 -> 5,3 ms; draft
+  1080p 13,2 -> 3,5 ms; selezione 720p 2,3 -> 3,9 ms (piu' sprite/pastiglie). Primo
+  frame del menu ~100-200 ms (caricamento e smoothscale dell'immagine, una volta).
+  Limite noto: profilo e tasti del menu non scalano con la risoluzione (piccoli a
+  1080p). Screenshot: step_74_menu_720/_1080, step_74_char_720/_1080/_jungler/
+  _flabebe, step_74_draft_720/_1080.
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

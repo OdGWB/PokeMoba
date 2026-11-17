@@ -8,9 +8,10 @@ manda e, quando tocca a te, ti fa scegliere:
 I turni dei bot si saltano: quando tutti gli umani hanno scelto, i bot prendono
 insieme un Pokémon a caso fra i rimasti. Nessun Pokémon si ripete.
 
-Comandi: frecce / mouse per guardare, INVIO o doppio clic per confermare
-(solo al tuo turno; prima di confermare gli altri vedono la tua anteprima),
-ESC per uscire (l'host chiude la partita per tutti).
+Comandi: frecce / mouse per guardare, Tab (o clic sulle pillole) per filtrare
+per ruolo (anche "jungler"), INVIO o doppio clic per confermare (solo al tuo
+turno; prima di confermare gli altri vedono la tua anteprima), ESC per uscire
+(l'host chiude la partita per tutti).
 """
 from __future__ import annotations
 
@@ -22,7 +23,8 @@ from net import client as C
 
 from .. import avatars as A
 from .. import flor_fx
-from .char_select_scene import PANEL, PANEL_HI, TYPE_COLORS, load_idle, scale_nearest
+from .char_select_scene import (PANEL, PANEL_HI, ROLES, TYPE_COLORS, draw_role_chips,
+                                load_idle, role_matches, scale_nearest)
 from .online_lobby_scene import BG, BORDER, DIM, GOLD, RED, TEXT, Buttons, font
 
 COLS = 5
@@ -38,33 +40,51 @@ class OnlineDraftScene:
         self.defs = [load_pokemon_def(str(app.root / rel)) for rel in config.ROSTER]
         self.idle = [load_idle(d.sprite_dir) for d in self.defs]
         self.sel = 0
+        self.role = None             # filtro per ruolo (None = tutti)
         self.t = 0.0
         self.buttons = Buttons()
         self._cards: list = []
+        self._chips: list = []       # (rect, ruolo)
         self._sent_hover = None
         self._was_turn = False
         self._loading_drawn = False
         self.flower_color = "red"    # Flabébé: colore dei fiori
         self._color_rects: list = []
 
+    # --- filtro -----------------------------------------------------------------------
+    def _visible(self):
+        return [i for i, d in enumerate(self.defs) if role_matches(d, self.role)]
+
+    def _set_role(self, role):
+        self.role = role
+        vis = self._visible()
+        if vis and self.sel not in vis:
+            taken = self.session.draft_taken() if self.session.draft else set()
+            self.sel = next((i for i in vis if i not in taken), vis[0])
+
     # --- input ------------------------------------------------------------------------
     def handle_events(self, events):
-        n = len(self.defs)
         for ev in events:
+            vis = self._visible() or list(range(len(self.defs)))
+            pos = vis.index(self.sel) if self.sel in vis else 0
             if ev.type == pygame.KEYDOWN:
                 if ev.key in flor_fx.COLOR_KEYS and self.defs[self.sel].passive == "giardino":
                     self.flower_color = flor_fx.COLORS[flor_fx.COLOR_KEYS[ev.key]]
                     continue
                 if ev.key == pygame.K_ESCAPE:
                     self._leave()
+                elif ev.key == pygame.K_TAB:
+                    opts = [None] + ROLES
+                    step = -1 if ev.mod & pygame.KMOD_SHIFT else 1
+                    self._set_role(opts[(opts.index(self.role) + step) % len(opts)])
                 elif ev.key in (pygame.K_RIGHT, pygame.K_d):
-                    self.sel = (self.sel + 1) % n
+                    self.sel = vis[(pos + 1) % len(vis)]
                 elif ev.key in (pygame.K_LEFT, pygame.K_a):
-                    self.sel = (self.sel - 1) % n
+                    self.sel = vis[(pos - 1) % len(vis)]
                 elif ev.key in (pygame.K_DOWN, pygame.K_s):
-                    self.sel = min(n - 1, self.sel + COLS)
+                    self.sel = vis[min(len(vis) - 1, pos + COLS)]
                 elif ev.key in (pygame.K_UP, pygame.K_w):
-                    self.sel = max(0, self.sel - COLS)
+                    self.sel = vis[max(0, pos - COLS)]
                 elif ev.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_SPACE):
                     self._lock()
             elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
@@ -73,6 +93,10 @@ class OnlineDraftScene:
                 hit = next((c for r, c in self._color_rects if r.collidepoint(ev.pos)), None)
                 if hit is not None:
                     self.flower_color = hit
+                    continue
+                chip = next((ro for r, ro in self._chips if r.collidepoint(ev.pos)), "none")
+                if chip != "none":
+                    self._set_role(chip)
                     continue
                 for r, i in self._cards:
                     if r.collidepoint(ev.pos):
@@ -113,10 +137,13 @@ class OnlineDraftScene:
             return
         turn = s.phase == C.DRAFT and s.draft_my_turn()
         if turn and not self._was_turn:
-            # Tocca a me: parto da un Pokémon ancora libero.
+            # Tocca a me: parto da un Pokémon ancora libero (meglio se nel filtro).
             taken = s.draft_taken()
             if self.sel in taken:
-                self.sel = next((i for i in range(len(self.defs)) if i not in taken), self.sel)
+                vis = self._visible()
+                self.sel = next((i for i in vis if i not in taken),
+                                next((i for i in range(len(self.defs)) if i not in taken),
+                                     self.sel))
             self._sent_hover = None
         self._was_turn = turn
         if turn and self.sel != self._sent_hover and self.sel not in s.draft_taken():
@@ -179,9 +206,9 @@ class OnlineDraftScene:
         self._draw_team(surface, entries, d, 1,
                         pygame.Rect(W - 16 - side_w, y, side_w, H - y - 60), mid, sm)
         gx, gw = 16 + side_w + 20, W - 2 * (16 + side_w + 20)
-        self._draw_grid(surface, d, pygame.Rect(gx, y, gw, H - y - 60), mid, sm)
-        hint = sm.render("Frecce/mouse: guarda  -  INVIO o doppio clic: conferma (al tuo turno)"
-                         "  -  ESC: esci", True, DIM)
+        self._draw_grid(surface, d, pygame.Rect(gx, y, gw, H - y - 60), mid, sm, H)
+        hint = sm.render("Frecce/mouse: guarda  -  Tab: ruolo  -  INVIO o doppio clic: conferma"
+                         " (al tuo turno)  -  ESC: esci", True, DIM)
         surface.blit(hint, (W // 2 - hint.get_width() // 2, H - hint.get_height() - 14))
 
     def _status(self, d, f, W, y):
@@ -265,19 +292,29 @@ class OnlineDraftScene:
                                        r.centery - pic.get_height() // 2))
             y += row
 
-    def _draw_grid(self, surface, d, rect, mid, sm):
+    def _draw_grid(self, surface, d, rect, mid, sm, H):
         taken = {}
         for e in d["entries"]:
             if e["poke"] is not None:
                 taken[e["poke"]] = e["team"]
+        # Pillole del filtro sopra le carte.
+        k = H / 720
+        self._chips = draw_role_chips(surface, rect.x, rect.y, self.role, self.defs, k * 0.9,
+                                      max_w=rect.w)
+        chips_h = (self._chips[-1][0].bottom - rect.y if self._chips else 0) + 10
         gap = 8
-        n = len(self.defs)
-        rows = (n + COLS - 1) // COLS
+        # Misure calcolate sul roster intero: filtrando le carte non cambiano taglia.
+        rows = (len(self.defs) + COLS - 1) // COLS
         cw = (rect.w - gap * (COLS - 1)) // COLS
-        ch = min(int(cw * 1.3), (rect.h - 110) // rows - gap)
+        # Spazio sotto le carte per info + pulsante (+ colori di Flabébé): così le
+        # carte non finiscono mai sopra la barra.
+        reserve = 6 + mid.get_height() + 12 + (mid.get_height() + 16) + 34 + 8
+        ch = min(int(cw * 1.3), (rect.h - reserve - chips_h) // rows - gap)
+        gy = rect.y + chips_h
         self._cards = []
-        for i, pd in enumerate(self.defs):
-            r = pygame.Rect(rect.x + (i % COLS) * (cw + gap), rect.y + (i // COLS) * (ch + gap),
+        for n_, i in enumerate(self._visible()):
+            pd = self.defs[i]
+            r = pygame.Rect(rect.x + (n_ % COLS) * (cw + gap), gy + (n_ // COLS) * (ch + gap),
                             cw, ch)
             self._cards.append((r, i))
             on = i == self.sel
@@ -302,7 +339,7 @@ class OnlineDraftScene:
             pygame.draw.rect(surface, GOLD if on else BORDER, r, 3 if on else 1, border_radius=6)
 
         # Sotto le carte: dettagli del Pokémon guardato + pulsante di conferma.
-        y = rect.y + rows * (ch + gap) + 6
+        y = gy + rows * (ch + gap) + 6
         pd = self.defs[self.sel]
         nm = mid.render(pd.name, True, GOLD)
         surface.blit(nm, (rect.x, y))

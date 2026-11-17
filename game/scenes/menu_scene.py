@@ -1,29 +1,32 @@
-"""Menu principale di PokéMoba: titolo e sei voci.
+"""Menu principale di PokéMoba: titolo e sette voci (redesign).
 
 Gioca (mappa, offline / online / LAN: play_scene.py), Personalizzazione
 (nickname e immagine profilo), Crediti, Tier list, Animazioni (editor delle
-animazioni, anim_editor_scene.py) ed Esci. Frecce + Invio o
-clic. In alto a destra il profilo. Qui restano anche i colori e la miniatura
-delle mappe, usati dalla schermata Gioca.
+animazioni, anim_editor_scene.py), Opzioni ed Esci. Frecce + Invio o
+clic. In alto a destra il profilo (clic = Personalizzazione). Sfondo:
+assets/ui/menu_bg.png con un velo scuro a sinistra, dove sta il menu.
+Qui restano anche i colori e la miniatura delle mappe, usati dalla
+schermata Gioca.
 """
 from __future__ import annotations
-
-import math
 
 import pygame
 
 import config
 from engine import grid as G
-from .. import avatars as A
 from engine.content import load_map
+from .. import ui_theme as UI
 
-BG = (14, 20, 17)
-PANEL = (24, 34, 29)
-PANEL_HI = (38, 56, 44)
-BORDER = (60, 84, 66)
-GOLD = (235, 210, 90)
-TEXT = (230, 232, 225)
-DIM = (150, 160, 150)
+# Colori storici: li importano anche le altre schermate.
+BG = UI.BG
+PANEL = UI.PANEL
+PANEL_HI = UI.PANEL_HI
+BORDER = UI.BORDER
+GOLD = UI.GOLD
+TEXT = UI.TEXT
+DIM = UI.DIM
+
+MENU_BG = "assets/ui/menu_bg.png"
 
 # Colori della miniatura della mappa (stessa palette cupa della giungla).
 THUMB = {
@@ -31,7 +34,7 @@ THUMB = {
     G.TILE_RIVER: (52, 98, 120), G.TILE_BUSH: (47, 125, 91),
     G.TILE_JUNGLE_WALL: (24, 52, 32),
 }
-MAP_INFO = {"3v3": "3 lane, squadre da 3", "5v5": "3 lane, squadre da 5, mappa più grande"}
+MAP_INFO = {"3v3": "3 lane · squadre da 3", "5v5": "3 lane · squadre da 5 · mappa grande"}
 
 
 def map_thumbnail(path):
@@ -57,6 +60,7 @@ def map_thumbnail(path):
 ENTRIES = [("Gioca", "play"), ("Personalizzazione", "profile"), ("Crediti", "credits"),
            ("Tier list", "tier"), ("Animazioni", "anims"), ("Opzioni", "options"),
            ("Esci", "quit")]
+NOTES = {"anims": "editor"}
 
 
 class MenuScene:
@@ -66,7 +70,7 @@ class MenuScene:
         self.sel = 0
         self.t = 0.0
         self._rects: list = []
-        self._fonts = {}
+        self._profile_rect = None
 
     # --- input -----------------------------------------------------------------
     def handle_events(self, events):
@@ -76,6 +80,9 @@ class MenuScene:
                     if r.collidepoint(ev.pos):
                         self.sel = i
             elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+                if self._profile_rect and self._profile_rect.collidepoint(ev.pos):
+                    self._activate("profile")
+                    continue
                 for r, i in self._rects:
                     if r.collidepoint(ev.pos):
                         self.sel = i
@@ -124,68 +131,52 @@ class MenuScene:
     def hud_lines(self):
         return []
 
-    def _font(self, size, bold=False):
-        key = (size, bold)
-        if key not in self._fonts:
-            self._fonts[key] = pygame.font.SysFont("consolas", size, bold=bold)
-        return self._fonts[key]
-
     # --- disegno ------------------------------------------------------------------
     def draw_fullres(self, surface, font):
         W, H = surface.get_size()
-        surface.fill(BG)
-        # Fascia di luce calda dietro il titolo (luce alto-sinistra, giungla cupa).
-        glow = pygame.Surface((W, int(H * 0.42)), pygame.SRCALPHA)
-        for i in range(glow.get_height()):
-            a = int(60 * (1 - i / glow.get_height()) ** 2)
-            pygame.draw.line(glow, (60, 90, 60, a), (0, i), (W, i))
-        surface.blit(glow, (0, 0))
+        k = H / 720                       # tutto è pensato a 1280x720 e scalato
+        if not UI.menu_backdrop(surface, MENU_BG, W, H, 0.6, 0.72):
+            surface.fill(BG)
+            UI.top_glow(surface, W, H)
 
-        title_f = self._font(max(48, H // 7), bold=True)
-        tx = W // 2
-        ty = int(H * 0.10)
-        title = "PokéMoba"
-        sh = title_f.render(title, True, (8, 12, 10))
-        for dx, dy in ((6, 6), (4, 4), (2, 2)):
-            surface.blit(sh, (tx - sh.get_width() // 2 + dx, ty + dy))
-        out = title_f.render(title, True, (60, 46, 10))
-        for dx, dy in ((-2, 0), (2, 0), (0, -2), (0, 2)):
-            surface.blit(out, (tx - out.get_width() // 2 + dx, ty + dy))
-        surface.blit(title_f.render(title, True, GOLD), (tx - sh.get_width() // 2, ty))
-        sub = self._font(max(14, H // 48)).render(
-            "il MOBA dei Pokémon  -  giungla, lane e campi neutrali", True, DIM)
-        surface.blit(sub, (tx - sub.get_width() // 2, ty + sh.get_height() + 4))
+        x0 = int(96 * k)
+        r = UI.title(surface, "PokéMoba", x0, int(92 * k), max(48, int(80 * k)), shadow=max(2, int(4 * k)))
+        sub = UI.font(max(12, int(14 * k))).render(
+            "il MOBA dei Pokémon · giungla, lane e campi neutrali", True, DIM)
+        surface.blit(sub, (x0 + 4, r.bottom + int(8 * k)))
 
-        bf = self._font(max(22, H // 26), bold=True)
-        bw, bh = min(int(W * 0.34), 460), max(40, H // 14)
-        gap = max(8, H // 80)
-        y0 = int(H * 0.33)
+        # Voci: "Gioca" più grande, poi le altre; Esci separata da una linea.
+        bw = int(340 * k)
+        y = int(262 * k)
+        mx = int(92 * k)
         self._rects = []
         for i, (label, key) in enumerate(ENTRIES):
-            r = pygame.Rect(tx - bw // 2, y0 + i * (bh + gap), bw, bh)
-            self._rects.append((r, i))
+            if key == "quit":
+                y += int(10 * k)
+                pygame.draw.line(surface, UI.LINE, (mx + int(18 * k), y), (mx + bw - int(18 * k), y))
+                y += int(11 * k)
+            bh = int((56 if i == 0 else 40 if key == "quit" else 44) * k)
+            rr = pygame.Rect(mx, y, bw, bh)
+            self._rects.append((rr, i))
             on = i == self.sel
-            pygame.draw.rect(surface, PANEL_HI if on else PANEL, r, border_radius=8)
-            pygame.draw.rect(surface, GOLD if on else BORDER, r, 3 if on else 1, border_radius=8)
-            txt = bf.render(label, True, GOLD if on else TEXT)
-            surface.blit(txt, (r.centerx - txt.get_width() // 2,
-                               r.centery - txt.get_height() // 2))
-            if on:      # frecce che pulsano ai lati
-                k = 4 + int(3 * (1 + math.sin(self.t * 5)))
-                cy = r.centery
-                lx, rx = r.x - 24 - k, r.right + 24 + k
-                pygame.draw.polygon(surface, GOLD, [(lx, cy - 8), (lx + 12, cy), (lx, cy + 8)])
-                pygame.draw.polygon(surface, GOLD, [(rx, cy - 8), (rx - 12, cy), (rx, cy + 8)])
-        small = self._font(max(13, H // 56))
-        self._draw_profile(surface, W, H, small)
-        hint = small.render("frecce + Invio, oppure clic        F11: schermo intero", True, DIM)
-        surface.blit(hint, (W // 2 - hint.get_width() // 2, H - hint.get_height() - 12))
+            if on:
+                UI.alpha_rect(surface, (*GOLD, 26), rr, radius=8)
+            size = 22 if i == 0 else 15 if key == "quit" else 16
+            col = GOLD if on else (DIM if key == "quit" else TEXT if i == 0 else UI.SOFT)
+            t = UI.font(max(13, int(size * k)), bold=True).render(label, True, col)
+            tx = rr.x + int(40 * k)
+            surface.blit(t, (tx, rr.centery - t.get_height() // 2))
+            if on:      # piccolo triangolo fermo, niente animazione
+                cy = rr.centery
+                ax = rr.x + int(18 * k)
+                s = max(4, int(5 * k))
+                pygame.draw.polygon(surface, GOLD, [(ax, cy - s), (ax + s + 1, cy), (ax, cy + s)])
+            note = NOTES.get(key)
+            if note:
+                n = UI.font(max(10, int(11 * k))).render(note, True, DIM)
+                surface.blit(n, (rr.right - int(18 * k) - n.get_width(), rr.centery - n.get_height() // 2))
+            y += bh + int(4 * k)
 
-    def _draw_profile(self, surface, W, H, small):
-        """In alto a destra: immagine profilo + nickname."""
-        prof = getattr(self.app, "profile", None) or {}
-        side = max(40, (H // 12) // 40 * 40)
-        r = pygame.Rect(W - side - 24, 20, side, side)
-        A.draw_avatar(surface, prof.get("avatar", 0), r, GOLD)
-        nm = small.render(prof.get("name", "?"), True, TEXT)
-        surface.blit(nm, (r.x - nm.get_width() - 12, r.centery - nm.get_height() // 2))
+        self._profile_rect = UI.profile_chip(surface, self.app, W, y=int(28 * k), right=int(40 * k))
+        UI.hints(surface, [("↑↓", "scegli"), ("Invio", "apri"), ("F11", "schermo intero")],
+                 x0, H - int(32 * k) - 22)

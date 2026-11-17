@@ -1,11 +1,12 @@
-"""Selezione del personaggio (giocatore singolo).
+"""Selezione del personaggio (giocatore singolo) — redesign.
 
 Si arriva qui dal menu dopo aver scelto la mappa. Il giocatore sceglie il suo
 Pokémon dal roster; tutti gli altri slot (alleati e avversari) ricevono un
 Pokémon CASUALE dal pool, senza ripetizioni (lo fa MatchScene._bot_defs).
 
-Comandi: frecce / clic per scegliere, INVIO o doppio clic / pulsante GIOCA per
-iniziare, ESC per tornare alla scelta della mappa.
+Comandi: frecce / clic per scegliere, Tab (o clic sulle pillole) per filtrare
+per ruolo, INVIO o doppio clic / pulsante GIOCA per iniziare, ESC per tornare
+alla scelta della mappa.
 """
 from __future__ import annotations
 
@@ -15,16 +16,76 @@ import config
 from engine.content import load_pokemon_def
 from .. import avatars as A
 from .. import flor_fx
+from .. import ui_theme as UI
 from ..sprites.animdata import parse_anim_data
 
-COLS = 5
-BG = (14, 20, 17)
-PANEL = (24, 34, 29)
-PANEL_HI = (38, 56, 44)
-BORDER = (60, 84, 66)
-GOLD = (235, 210, 90)
-TEXT = (230, 232, 225)
-DIM = (150, 160, 150)
+COLS = 6
+# Colori storici: li importano anche altre schermate (draft, tier list).
+BG = UI.BG
+PANEL = UI.PANEL
+PANEL_HI = UI.PANEL_HI
+BORDER = UI.BORDER
+GOLD = UI.GOLD
+TEXT = UI.TEXT
+DIM = UI.DIM
+
+ROLES = ["combattente", "mago", "tiratore", "assassino", "tank", "supporto", "jungler"]
+# "jungler" non è un ruolo dei JSON: è un filtro in più, per nome della linea.
+JUNGLERS = {"Nincada", "Totodile", "Swinub", "Sneasel", "Teddiursa"}
+
+
+def role_matches(d, role) -> bool:
+    """Il Pokémon `d` passa il filtro `role` (None = tutti)?"""
+    if role is None:
+        return True
+    if role == "jungler":
+        return d.name in JUNGLERS
+    return role in (d.role or "").split()      # "mago mobile" passa anche "mago"
+
+
+def draw_role_chips(surface, x, y, role, defs, k=1.0, max_w=None):
+    """Pillole del filtro per ruolo; ritorna [(rect, ruolo)] (ruolo None = Tutti).
+    Con max_w vanno a capo se non ci stanno in una riga."""
+    S = lambda v: int(v * k)                      # noqa: E731
+    x0 = x
+    cf = UI.font(max(11, S(12)))
+    nf = UI.font(max(9, S(10)))
+    out = []
+    for ro in [None] + ROLES:
+        label = "Tutti" if ro is None else ro
+        cnt = sum(role_matches(d, ro) for d in defs)
+        on = ro == role
+        t = cf.render(label, True, GOLD if on else UI.SOFT)
+        n = nf.render(str(cnt), True, GOLD if on else DIM)
+        r = pygame.Rect(x, y, S(9) * 2 + t.get_width() + S(5) + n.get_width(), S(28))
+        if max_w and r.right > x0 + max_w and x > x0:
+            x, y = x0, y + S(28) + S(6)
+            r.topleft = (x, y)
+        if on:
+            UI.alpha_rect(surface, (*GOLD, 30), r, radius=r.h // 2)
+        pygame.draw.rect(surface, (150, 135, 70) if on else UI.LINE, r, 1, border_radius=r.h // 2)
+        surface.blit(t, (r.x + S(9), r.centery - t.get_height() // 2))
+        surface.blit(n, (r.x + S(9) + t.get_width() + S(5), r.centery - n.get_height() // 2 + 1))
+        out.append((r, ro))
+        x = r.right + S(6)
+    return out
+
+
+def evo_line(d) -> str:
+    """"Totodile → Croconaw → Feraligatr" (rami: "Weavile o Sneasler")."""
+    stages: dict = {}
+    for e in d.evolutions:
+        stages.setdefault(e.get("stage", 0), [])
+        if e.get("name") and e["name"] not in stages[e.get("stage", 0)]:
+            stages[e.get("stage", 0)].append(e["name"])
+    stages.setdefault(0, [d.name])
+    if len(stages) <= 1:
+        return "Non si evolve"
+    parts = []
+    for st in sorted(stages):
+        names = stages[st] or [d.name]
+        parts.append(f"{len(names)} evoluzioni a scelta" if len(names) > 3 else " o ".join(names))
+    return " → ".join(parts)
 
 TYPE_COLORS = {
     "Normal": (168, 168, 120), "Fire": (240, 128, 48), "Water": (104, 144, 240),
@@ -81,45 +142,82 @@ def scale_nearest(img, side):
                                         max(1, int(img.get_height() * k))))
 
 
+_glow_cache: dict = {}
+
+
+def _glow(color, w, h):
+    """Alone ellittico morbido del colore del tipo (dietro lo sprite grande)."""
+    key = (color, w, h)
+    if key not in _glow_cache:
+        s = pygame.Surface((w, h), pygame.SRCALPHA)
+        steps = 24
+        for i in range(steps):
+            f = 1 - i / steps
+            a = int(56 * (i / steps) ** 1.5)
+            r = pygame.Rect(0, 0, int(w * f), int(h * f))
+            r.center = (w // 2, h // 2)
+            pygame.draw.ellipse(s, (*color, a), r)
+        _glow_cache[key] = s
+    return _glow_cache[key]
+
+
 class CharSelectScene:
     def __init__(self, app, map_index: int):
         self.app = app
         self.map_index = map_index
         self.next_scene = None
         self.sel = 0
+        self.role = None             # filtro per ruolo (None = tutti)
         self.t = 0.0
         self.loading = False
         self._drawn_loading = False
         self.defs = [load_pokemon_def(str(app.root / rel)) for rel in config.ROSTER]
         self.idle = [load_idle(d.sprite_dir) for d in self.defs]
         self._evo_idle: dict = {}
+        self._scaled: dict = {}
         self._cards: list = []       # (rect, indice) dell'ultimo frame disegnato
+        self._chips: list = []       # (rect, ruolo)
         self._play_rect = None
         self._back_rect = None
         self.flower_color = "red"    # Flabébé: colore dei fiori
         self._color_rects: list = []
-        self._fonts = {}
+
+    # --- filtro -------------------------------------------------------------
+    def _visible(self):
+        return [i for i, d in enumerate(self.defs) if role_matches(d, self.role)]
+
+    def _set_role(self, role):
+        self.role = role
+        vis = self._visible()
+        if vis and self.sel not in vis:
+            self.sel = vis[0]
+
+    def _back(self):
+        from .play_scene import PlayScene
+        self.next_scene = PlayScene(self.app, self.map_index)
 
     # --- input ---------------------------------------------------------------
     def handle_events(self, events):
         if self.loading:
             return
-        n = len(self.defs)
         for ev in events:
+            vis = self._visible()
+            pos = vis.index(self.sel) if self.sel in vis else 0
             if ev.type == pygame.KEYDOWN:
                 if ev.key == pygame.K_ESCAPE:
-                    from .menu_scene import MenuScene
-                    m = MenuScene(self.app)
-                    m.map_index = self.map_index
-                    self.next_scene = m
+                    self._back()
+                elif ev.key == pygame.K_TAB:
+                    opts = [None] + ROLES
+                    step = -1 if ev.mod & pygame.KMOD_SHIFT else 1
+                    self._set_role(opts[(opts.index(self.role) + step) % len(opts)])
                 elif ev.key in (pygame.K_RIGHT, pygame.K_d):
-                    self.sel = (self.sel + 1) % n
+                    self.sel = vis[(pos + 1) % len(vis)]
                 elif ev.key in (pygame.K_LEFT, pygame.K_a):
-                    self.sel = (self.sel - 1) % n
+                    self.sel = vis[(pos - 1) % len(vis)]
                 elif ev.key in (pygame.K_DOWN, pygame.K_s):
-                    self.sel = min(n - 1, self.sel + COLS)
+                    self.sel = vis[min(len(vis) - 1, pos + COLS)]
                 elif ev.key in (pygame.K_UP, pygame.K_w):
-                    self.sel = max(0, self.sel - COLS)
+                    self.sel = vis[max(0, pos - COLS)]
                 elif ev.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_SPACE):
                     self._start()
                 elif ev.key in flor_fx.COLOR_KEYS and self._has_colors():
@@ -133,13 +231,14 @@ class CharSelectScene:
                 if hit is not None and self._has_colors():
                     self.flower_color = hit
                     continue
+                chip = next((ro for r, ro in self._chips if r.collidepoint(ev.pos)), "none")
+                if chip != "none":
+                    self._set_role(chip)
+                    continue
                 if self._play_rect and self._play_rect.collidepoint(ev.pos):
                     self._start()
                 elif self._back_rect and self._back_rect.collidepoint(ev.pos):
-                    from .menu_scene import MenuScene
-                    m = MenuScene(self.app)
-                    m.map_index = self.map_index
-                    self.next_scene = m
+                    self._back()
                 for r, i in self._cards:
                     if r.collidepoint(ev.pos):
                         if i == self.sel and getattr(ev, "clicks", 1) >= 2:
@@ -175,12 +274,6 @@ class CharSelectScene:
     def hud_lines(self):
         return []
 
-    def _font(self, size, bold=False):
-        key = (size, bold)
-        if key not in self._fonts:
-            self._fonts[key] = pygame.font.SysFont("consolas", size, bold=bold)
-        return self._fonts[key]
-
     def _frame(self, frames, speed=1.0):
         """Frame corrente di un'animazione Idle (durate PMD in 1/60 s)."""
         if not frames:
@@ -198,137 +291,156 @@ class CharSelectScene:
             self._evo_idle[sprite_dir] = load_idle(sprite_dir)
         return self._evo_idle[sprite_dir]
 
+    def _sc(self, img, side):
+        key = (id(img), side)
+        if key not in self._scaled:
+            self._scaled[key] = scale_nearest(img, side)
+        return self._scaled[key]
+
     def draw_fullres(self, surface, font):
         W, H = surface.get_size()
         surface.fill(BG)
         if self.loading:
             self._draw_loading(surface, W, H)
             return
-        big = self._font(max(22, H // 24), bold=True)
-        small = self._font(max(13, H // 50))
-        mid = self._font(max(15, H // 40), bold=True)
+        k = min(W / 1280, H / 720)
+        ox = (W - int(1280 * k)) // 2
+        S = lambda v: int(v * k)                      # noqa: E731
+        mouse = pygame.mouse.get_pos()
+        UI.top_glow(surface, W, H)
 
-        title = big.render("Scegli il tuo Pokémon", True, GOLD)
-        surface.blit(title, (W // 2 - title.get_width() // 2, H // 28))
+        # Intestazione: indietro + titolo + sottotitolo.
+        self._back_rect = UI.back_button(surface, "Mappe", ox + S(48), S(28),
+                                         hover=self._back_rect is not None
+                                         and self._back_rect.collidepoint(mouse))
+        tx = self._back_rect.right + S(22)
+        tr = UI.title(surface, "Scegli il tuo Pokémon", tx, S(20), max(22, S(30)))
         mname = config.MAPS[self.map_index][0]
         ts = 3 if mname == "3v3" else 5
-        sub = small.render(f"Mappa {mname}  -  gli altri {2 * ts - 1} sono bot: Pokémon a caso "
-                           f"dal pool, senza ripetizioni, col nome del loro Pokémon", True, DIM)
-        surface.blit(sub, (W // 2 - sub.get_width() // 2, H // 28 + title.get_height() + 6))
+        sub = UI.font(max(11, S(12))).render(
+            f"Mappa {mname} · gli altri {2 * ts - 1} sono bot con un Pokémon a caso", True, DIM)
+        surface.blit(sub, (tx, tr.bottom + 2))
 
-        # Griglia delle carte (a sinistra) + anteprima (a destra).
-        top = H // 6
-        grid_w = int(W * 0.56)
-        gx = int(W * 0.04)
-        gap = max(6, W // 160)
-        cw = (grid_w - gap * (COLS - 1)) // COLS
-        rows = (len(self.defs) + COLS - 1) // COLS
-        ch = min(int(cw * 1.45), (H - top - H // 5) // rows - gap)
-        self._grid_h = rows * (ch + gap) - gap
+        # Pillole dei ruoli (filtro).
+        gx, gy = ox + S(48), S(100)
+        self._chips = draw_role_chips(surface, gx, gy, self.role, self.defs, k, max_w=S(700))
+
+        # Griglia delle carte (6 colonne).
+        top = self._chips[-1][0].bottom + S(12)
+        gap = S(8)
+        cw = (S(700) - gap * (COLS - 1)) // COLS
+        ch = S(86)
+        mid = UI.font(max(10, S(12)), bold=True)
         self._cards = []
-        for i, d in enumerate(self.defs):
-            r = pygame.Rect(gx + (i % COLS) * (cw + gap), top + (i // COLS) * (ch + gap), cw, ch)
+        for n_, i in enumerate(self._visible()):
+            d = self.defs[i]
+            r = pygame.Rect(gx + (n_ % COLS) * (cw + gap), top + (n_ // COLS) * (ch + gap), cw, ch)
             self._cards.append((r, i))
             on = i == self.sel
-            pygame.draw.rect(surface, PANEL_HI if on else PANEL, r, border_radius=6)
-            pygame.draw.rect(surface, GOLD if on else BORDER, r, 3 if on else 1, border_radius=6)
+            pygame.draw.rect(surface, UI.SEL if on else UI.CARD, r, border_radius=S(9))
+            pygame.draw.rect(surface, GOLD if on else UI.CARD_LINE, r, 2 if on else 1,
+                             border_radius=S(9))
+            dot = pygame.Rect(r.x + S(7), r.y + S(7), max(5, S(7)), max(5, S(7)))
+            pygame.draw.rect(surface, TYPE_COLORS.get(d.types[0], DIM), dot, border_radius=2)
             frames = self.idle[i]
             img = self._frame(frames) if on else (frames[0][0] if frames else None)
+            nm = mid.render(d.name, True, GOLD if on else UI.SOFT)
             if img is not None:
-                pic = scale_nearest(img, int(min(cw, ch) * 0.62))
+                pic = self._sc(img, S(46))
+                area_h = r.h - nm.get_height() - S(12)
                 surface.blit(pic, (r.centerx - pic.get_width() // 2,
-                                   r.y + int(ch * 0.42) - pic.get_height() // 2))
-            nm = mid.render(d.name, True, TEXT if on else (200, 205, 198))
-            surface.blit(nm, (r.centerx - nm.get_width() // 2, r.bottom - int(ch * 0.27)))
-            role = small.render(d.role or "", True, DIM)
-            surface.blit(role, (r.centerx - role.get_width() // 2, r.bottom - int(ch * 0.13)))
+                                   r.y + S(4) + area_h // 2 - pic.get_height() // 2))
+            surface.blit(nm, (r.centerx - nm.get_width() // 2, r.bottom - S(9) - nm.get_height()))
 
-        self._draw_preview(surface, W, H, top, big, mid, small)
-        hint = small.render("Frecce/mouse: scegli  -  Invio o doppio clic: gioca  -  "
-                            "Esc: mappe", True, DIM)
-        surface.blit(hint, (gx, top + self._grid_h + 22))
+        self._draw_preview(surface, ox, S, mouse)
+        UI.hints(surface, [("frecce", "scegli"), ("Tab", "ruolo"), ("doppio clic", "gioca subito")],
+                 gx, H - S(24) - 22)
 
-    def _draw_preview(self, surface, W, H, top, big, mid, small):
+    def _draw_preview(self, surface, ox, S, mouse):
         d = self.defs[self.sel]
-        px = int(W * 0.63)
-        pw = int(W * 0.33)
-        panel = pygame.Rect(px, top, pw, self._grid_h)
-        pygame.draw.rect(surface, PANEL, panel, border_radius=8)
-        pygame.draw.rect(surface, BORDER, panel, 1, border_radius=8)
+        panel = pygame.Rect(ox + S(780), S(100), S(452), S(540))
+        pygame.draw.rect(surface, UI.CARD, panel, border_radius=S(14))
+        pygame.draw.rect(surface, UI.CARD_LINE, panel, 1, border_radius=S(14))
+        colors = d.passive == "giardino"
+        stage_h = S(210 if colors else 260)
 
-        # Tu: immagine profilo + nickname (i bot non ne hanno).
-        prof = getattr(self.app, "profile", None) or {}
-        side = 40 if panel.h < 520 else 80
-        A.draw_avatar(surface, prof.get("avatar", 0), (panel.x + 12, panel.y + 12, side, side), GOLD)
-        you = mid.render(prof.get("name", "Tu"), True, TEXT)
-        surface.blit(you, (panel.x + 20 + side, panel.y + 12))
-        surface.blit(small.render("sei tu", True, DIM),
-                     (panel.x + 20 + side, panel.y + 16 + you.get_height()))
-
+        # Alone del tipo + ombra a terra + sprite grande animato.
+        tc = TYPE_COLORS.get(d.types[0], (180, 180, 180))
+        g = _glow(tc, int(panel.w * 0.9), int(stage_h * 0.95))
+        surface.blit(g, (panel.centerx - g.get_width() // 2, panel.y + stage_h // 2 - g.get_height() // 2 + S(14)))
         img = self._frame(self.idle[self.sel])
+        foot = panel.y + stage_h - S(30)
+        sh = pygame.Rect(0, 0, S(150), S(18))
+        sh.center = (panel.centerx, foot)
+        UI.alpha_rect(surface, (0, 0, 0, 90), sh, radius=sh.h // 2)
         if img is not None:
-            pic = scale_nearest(img, int(min(pw, panel.h) * 0.42))
-            surface.blit(pic, (panel.centerx - pic.get_width() // 2,
-                               panel.y + int(panel.h * 0.25) - pic.get_height() // 2))
-        y = panel.y + int(panel.h * 0.48)
-        nm = big.render(d.name, True, GOLD)
-        surface.blit(nm, (panel.centerx - nm.get_width() // 2, y))
-        y += nm.get_height() + 6
+            pic = self._sc(img, S(130 if colors else 150))
+            surface.blit(pic, (panel.centerx - pic.get_width() // 2, foot - pic.get_height() + S(4)))
 
-        # Tipi come pillole colorate.
-        pills = [small.render(t, True, (20, 20, 20)) for t in d.types]
-        tw = sum(p.get_width() + 16 for p in pills) + 8 * (len(pills) - 1)
+        # Tu: immagine profilo + nickname.
+        prof = getattr(self.app, "profile", None) or {}
+        f12 = UI.font(max(10, S(12)), bold=True)
+        f11 = UI.font(max(10, S(11)))
+        you = f12.render(prof.get("name", "Tu"), True, TEXT)
+        st = f11.render("sei tu", True, DIM)
+        chip = pygame.Rect(panel.x + S(14), panel.y + S(14), S(4) + S(26) + S(8) + you.get_width()
+                           + S(8) + st.get_width() + S(10), S(34))
+        UI.alpha_rect(surface, (*BG, 150), chip, radius=S(8))
+        A.draw_avatar(surface, prof.get("avatar", 0), (chip.x + S(4), chip.y + S(4), S(26), S(26)), GOLD)
+        surface.blit(you, (chip.x + S(38), chip.centery - you.get_height() // 2))
+        surface.blit(st, (chip.x + S(46) + you.get_width(), chip.centery - st.get_height() // 2))
+
+        # Nome, tipi, ruolo.
+        y = panel.y + stage_h + S(4)
+        nr = UI.title(surface, d.name, panel.centerx, y, max(24, S(36)), center=True, shadow=0)
+        y = nr.bottom + S(10)
+        pf = UI.font(max(10, S(11)), bold=True)
+        pills = [pf.render(t, True, (20, 20, 20)) for t in d.types]
+        tw = sum(p.get_width() + S(20) for p in pills) + S(6) * (len(pills) - 1)
         x = panel.centerx - tw // 2
         for t, p in zip(d.types, pills):
-            r = pygame.Rect(x, y, p.get_width() + 16, p.get_height() + 6)
-            pygame.draw.rect(surface, TYPE_COLORS.get(t, (180, 180, 180)), r, border_radius=9)
-            surface.blit(p, (r.x + 8, r.y + 3))
-            x = r.right + 8
-        y += (pills[0].get_height() + 14) if pills else 0
-        role = mid.render(f"Ruolo: {d.role}", True, TEXT)
-        surface.blit(role, (panel.centerx - role.get_width() // 2, y))
-        y += role.get_height() + 12
+            r = pygame.Rect(x, y, p.get_width() + S(20), S(22))
+            pygame.draw.rect(surface, TYPE_COLORS.get(t, (180, 180, 180)), r, border_radius=r.h // 2)
+            surface.blit(p, (r.centerx - p.get_width() // 2, r.centery - p.get_height() // 2))
+            x = r.right + S(6)
+        y += S(22) + S(10)
+        rf = UI.font(max(11, S(13)))
+        a = rf.render("Ruolo · ", True, UI.SOFT)
+        b = UI.font(max(11, S(13)), bold=True).render(d.role or "-", True, TEXT)
+        rx = panel.centerx - (a.get_width() + b.get_width()) // 2
+        surface.blit(a, (rx, y))
+        surface.blit(b, (rx + a.get_width(), y))
+        y += a.get_height() + S(14)
 
-        # Linea evolutiva (tutte le forme; Eevee ne ha 8 a scelta).
+        # Linea evolutiva (sprite fermi, centrati).
         evos = [e for e in d.evolutions if e.get("sprite_dir")
                 and e.get("sprite_dir") != d.sprite_dir]
         if evos:
-            lab = small.render("Evoluzioni:", True, DIM)
-            surface.blit(lab, (panel.x + 14, y))
-            y += lab.get_height() + 4
-            side = max(24, min(56, (pw - 28) // max(1, len(evos)) - 6))
-            x = panel.x + 14
+            side = max(22, min(S(40), (panel.w - S(40)) // len(evos) - S(8)))
+            total = len(evos) * side + (len(evos) - 1) * S(8)
+            x = panel.centerx - total // 2
             for e in evos:
                 fr = self._evo_frames(e["sprite_dir"])
                 if fr:
-                    pic = scale_nearest(fr[0][0], side)
-                    surface.blit(pic, (x + (side - pic.get_width()) // 2,
-                                       y + side - pic.get_height()))
-                x += side + 6
-                if x + side > panel.right - 8:
-                    x = panel.x + 14
-                    y += side + 4
-            y += side + 6
+                    pic = self._sc(fr[0][0], side)
+                    surface.blit(pic, (x + (side - pic.get_width()) // 2, y + side - pic.get_height()))
+                x += side + S(8)
+            y += side + S(6)
+        ev = UI.font(max(10, S(12))).render(evo_line(d), True, DIM)
+        surface.blit(ev, (panel.centerx - ev.get_width() // 2, y))
+        y += ev.get_height() + S(12)
 
         # Flabébé: scelta del colore dei fiori (resta per tutta la partita).
         self._color_rects = []
-        if d.passive == "giardino":
+        if colors:
             self._color_rects = flor_fx.draw_color_picker(
-                surface, panel.x + 14, y, pw - 28, self.flower_color, small, small)
+                surface, panel.x + S(20), y, panel.w - S(40), self.flower_color,
+                UI.font(max(11, S(12))), UI.font(max(11, S(12))))
 
-        # Pulsanti.
-        bh = max(40, H // 14)
-        self._play_rect = pygame.Rect(panel.x, panel.bottom + 14, int(pw * 0.62), bh)
-        self._back_rect = pygame.Rect(self._play_rect.right + 10, panel.bottom + 14,
-                                      pw - int(pw * 0.62) - 10, bh)
-        hover = pygame.mouse.get_pos()
-        for r, label, col in ((self._play_rect, "GIOCA  (Invio)", (70, 150, 80)),
-                              (self._back_rect, "Indietro (Esc)", (70, 70, 80))):
-            c = tuple(min(255, v + 25) for v in col) if r.collidepoint(hover) else col
-            pygame.draw.rect(surface, c, r, border_radius=8)
-            pygame.draw.rect(surface, (20, 20, 20), r, 2, border_radius=8)
-            t = mid.render(label, True, TEXT)
-            surface.blit(t, (r.centerx - t.get_width() // 2, r.centery - t.get_height() // 2))
+        # Pulsante Gioca in fondo al pannello.
+        br = pygame.Rect(panel.x + S(20), panel.bottom - S(20) - S(52), panel.w - S(40), S(52))
+        self._play_rect = UI.primary_button(surface, br, "Gioca", "Invio",
+                                            hover=br.collidepoint(mouse), size=max(14, S(17)))
 
     def _draw_loading(self, surface, W, H):
         from .. import loading_screen
