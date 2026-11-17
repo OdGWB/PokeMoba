@@ -105,9 +105,21 @@ class TestScyther(unittest.TestCase):
     def test_no_evolution_without_item(self):
         self.level(4)
         self.assertEqual(self.u.name, "Scyther")
+        self.assertFalse(self.u.moveset["R"].unlocked)
         self.level(9)
         self.assertEqual(self.u.name, "Scyther")
-        self.assertIsNone(self.u.moveset.get("R"))
+        # R fissa al liv.8 anche senza oggetto: Forbice X, nessuna scelta.
+        r = self.u.moveset["R"]
+        self.assertTrue(r.unlocked)
+        self.assertEqual(r.chosen.id, "scyther_xscissor")
+        self.assertNotIn("R", self.u.pending_choices)
+        self.assertGreaterEqual(r.rank, 1)
+
+    def test_scyther_ultimate_hits(self):
+        self.level(8)
+        before = self.e.hp
+        self.cast("R", self.u.pos.x, self.u.pos.y)
+        self.assertGreater(self.lost(before), 0)
 
     def test_metal_coat_gives_scizor_at_8(self):
         self.buy("metal_coat")
@@ -122,10 +134,19 @@ class TestScyther(unittest.TestCase):
     def test_buy_after_level_8_evolves_at_once(self):
         self.level(8)
         self.assertEqual(self.u.name, "Scyther")
+        rank = self.u.moveset["R"].rank
         self.buy("black_augurite")
         self.assertEqual(self.u.name, "Kleavor")
         self.assertEqual(self.u.types, ["Bug", "Rock"])
         self.assertEqual(self.u.moveset["Q"].chosen.id, "kleavor_stoneaxe")
+        # Forbice X lascia il posto alla R di Kleavor, da scegliere (grado tenuto).
+        r = self.u.moveset["R"]
+        self.assertIsNone(r.chosen)
+        self.assertIn("R", self.u.pending_choices)
+        self.assertEqual(r.rank, rank)
+        self.choose("R", 1)
+        self.assertIs(self.u.moveset["R"].chosen, self.u.moveset["R"].upgrades[1])
+        self.assertTrue(self.u.moveset["R"].unlocked)
 
     def test_first_bought_wins_and_selling_after_is_harmless(self):
         self.buy("black_augurite")

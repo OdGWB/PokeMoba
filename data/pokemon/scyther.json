@@ -128,6 +128,15 @@
          "charges": 2, "charge_time": 8.5, "refund_on_hit": false,
          "cooldown": [0.6, 0.6, 0.6, 0.6], "range": 4.0, "radius": 0.6}
       ]
+    },
+    "R": {
+      "_comment": "Ultimate fissa di Scyther (liv.8, nessuna scelta): con l'evoluzione tramite oggetto diventa la R di Scizor/Kleavor da scegliere.",
+      "upgrades": [
+        {"id": "scyther_xscissor", "name": "Forbice X", "type": "Bug", "category": "physical",
+         "shape": "area", "fx": "ninxscissor", "high_crit": true, "target": "self",
+         "power": [150, 250, 350], "ratio": 1.2,
+         "cooldown": [60, 50, 40], "range": 0, "radius": 2.4}
+      ]
     }
   }
 }

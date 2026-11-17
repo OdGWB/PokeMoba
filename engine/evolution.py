@@ -112,6 +112,11 @@ def check_evolution(p) -> bool:
                 slot_obj.rank = old.rank
                 slot_obj.unlocked = old.unlocked
                 slot_obj.cooldown_remaining = old.cooldown_remaining
+                # La vecchia variante era gia' scelta (es. la R fissa di Scyther
+                # al liv.8) ma la forma nuova ha solo varianti: si sceglie di nuovo.
+                if (old.chosen is not None and slot_obj.chosen is None
+                        and slot_obj.upgrades and slot not in p.pending_choices):
+                    p.pending_choices.append(slot)
             p.moveset[slot] = slot_obj
     # Il tipo può cambiare con l'evoluzione (es. Poliwhirl Acqua -> Poliwrath
     # Acqua/Lotta): aggiorna debolezze, STAB ed effetti del meteo.

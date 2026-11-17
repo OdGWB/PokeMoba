@@ -1425,6 +1425,18 @@ Passaggi completati:
   online "is_jungler" in net/visual.ME_FIELDS); senza casella hud.bar_rect(spell=False)
   accorcia la barra (niente colonna vuota). Test: tests/test_smite.py.
   Screenshot: step_68_jungler/_zoom (Sneasel), step_68_lane/_zoom (Charmander).
+- HUD di Sneasel e R FISSA di Scyther (step_69). (1) Sole e Luna: i contatori
+  "Minion N / Neutr. N" finivano sopra la casella Q; ora nella colonna di ~30 px
+  a destra del riquadro ci sono icona piccola (luna = minion, sole = neutrali) e
+  SOTTO l'oro compatto (hud.font(11), "2.6k" oltre 1000). (2) Scyther ha una R
+  propria al liv.8 anche senza oggetto: slot R con UNA sola variante (Forbice X,
+  area attorno a se', Coleottero fisico, brutto colpo facile; fx ninxscissor di
+  Nincada), applicata subito dalla regola delle ultimate fisse. Comprando
+  Metalcoperta/Augite Nera si evolve come prima; evolution.apply ora rimette in
+  pending_choices uno slot ricostruito che prima aveva una variante scelta e ora
+  ne ha solo da scegliere (grado e sblocco conservati): si sceglie la R di
+  Scizor/Kleavor. Test in tests/test_scizor.py. Screenshot: step_69_sneasel/_zoom,
+  step_69_scyther/_zoom.
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

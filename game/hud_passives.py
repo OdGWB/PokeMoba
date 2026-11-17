@@ -413,11 +413,25 @@ def _draw_sunmoon(surface, font, p, bx, y0, bh, ctx) -> None:
         frame, name = sneasel_fx.MOON, "Weavile"
     pygame.draw.rect(surface, frame, box, 2)
     surface.blit(font.render(f"Sole e Luna -> {name}", True, frame), (bx - 4, y0 - 18))
-    rows = ((f"Minion {gm:0.0f}", sneasel_fx.MOON, not sun),
-            (f"Neutr. {gw:0.0f}", sneasel_fx.SUN, sun))
-    for i, (txt, col, lead) in enumerate(rows):
-        t = font.render(txt, True, col if lead else (120, 116, 128))
-        surface.blit(t, (box.right + 5, y0 + 2 + i * (t.get_height() + 2)))
+    # Contatori nella colonna stretta a destra del riquadro (~30 px, poi c'e' la
+    # casella Q): per ognuno l'icona piccola (luna = minion, sole = neutrali) e
+    # SOTTO l'oro compatto in carattere piccolo, centrati nella colonna.
+    from .hud import font as _hud_font
+    small = _hud_font(11)
+
+    def _short(g):
+        return f"{g:0.0f}" if g < 1000 else f"{g / 1000:.1f}k"
+    rows = ((_short(gm), sneasel_fx.MOON, not sun, False),
+            (_short(gw), sneasel_fx.SUN, sun, True))
+    cx = box.right + 16
+    for i, (txt, col, lead, is_sun) in enumerate(rows):
+        iy = y0 + 5 + i * 26
+        if is_sun:
+            sneasel_fx.draw_sun_icon(surface, cx, iy, 2, ctx.now)
+        else:
+            sneasel_fx.draw_moon_icon(surface, cx, iy, 4)
+        t = small.render(txt, True, col if lead else (120, 116, 128))
+        surface.blit(t, (cx - t.get_width() // 2, iy + 5))
 
 
 def _draw_sneasel_form(surface, font, p, bx, y0, bh, ctx) -> None:
