@@ -55,7 +55,9 @@ class Camera:
         # Sbloccata: edge-scrolling in base alla posizione del mouse nella finestra
         # REALE (non quella di default: in schermo intero o ridimensionata no).
         # edge_ok=False (mouse sopra la minimappa) sospende lo scorrimento.
-        if edge_ok:
+        # Mouse fuori dalla finestra: get_pos() resta all'ultima posizione (spesso
+        # proprio sul bordo da cui e' uscito) e la camera scorrerebbe all'infinito.
+        if edge_ok and pygame.mouse.get_focused():
             mx, my = mouse_win
             surf = pygame.display.get_surface()
             ww, wh = surf.get_size() if surf is not None else (config.WINDOW_WIDTH,

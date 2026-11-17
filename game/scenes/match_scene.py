@@ -399,7 +399,7 @@ class MatchScene:
         mouse_win = pygame.mouse.get_pos()
         tx = self.player.pos.x * config.TILE_SIZE
         ty = self.player.pos.y * config.TILE_SIZE
-        over_map = self.minimap is not None and self.minimap.contains(mouse_win)
+        over_map = self.minimap is not None and self.minimap.blocks_edge_scroll(mouse_win)
         self.camera.update(dt, self.camera_locked, tx, ty, mouse_win, space_held,
                            edge_ok=not over_map)
 

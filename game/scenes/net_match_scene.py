@@ -281,7 +281,7 @@ class NetMatchScene:
                                me.pos.y * config.TILE_SIZE, pygame.mouse.get_pos(),
                                pygame.key.get_pressed()[pygame.K_SPACE],
                                edge_ok=not (self.minimap is not None
-                                            and self.minimap.contains(pygame.mouse.get_pos())))
+                                            and self.minimap.blocks_edge_scroll(pygame.mouse.get_pos())))
         for u in self.world.units():
             from engine.entities import Pokemon
             # Ricrea l'animatore se il dex cambia (es. forma Shedinja: 291 -> 292).

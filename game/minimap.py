@@ -73,6 +73,19 @@ class Minimap:
     def contains(self, pos) -> bool:
         return self.rect.collidepoint(pos)
 
+    def blocks_edge_scroll(self, pos) -> bool:
+        """Mouse sopra la minimappa O nella cornice tra lei e l'angolo basso-destra
+        della finestra: niente scorrimento della camera ai bordi. La cornice
+        (MARGIN) e' piu' stretta della fascia di scorrimento, quindi dopo un clic
+        sulla minimappa bastava uscirne di poco perche' la camera scivolasse
+        da sola verso l'angolo in basso a destra."""
+        surf = pygame.display.get_surface()
+        if surf is None:
+            return self.contains(pos)
+        W, H = surf.get_size()
+        r = self.rect
+        return r.x <= pos[0] < W and r.y <= pos[1] < H
+
     def to_world_tile(self, pos):
         lx = (pos[0] - self.rect.x) / self.scale
         ly = (pos[1] - self.rect.y) / self.scale

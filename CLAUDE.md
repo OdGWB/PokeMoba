@@ -1437,6 +1437,15 @@ Passaggi completati:
   ne ha solo da scegliere (grado e sblocco conservati): si sceglie la R di
   Scizor/Kleavor. Test in tests/test_scizor.py. Screenshot: step_69_sneasel/_zoom,
   step_69_scyther/_zoom.
+- CAMERA LIBERA che scivolava da sola (step_70, nessuna modifica visiva). Dopo
+  aver sbloccato la camera e cliccato la minimappa, bastava spostare il mouse di
+  pochi px fuori da lei: la cornice della minimappa (Minimap.MARGIN 12 px) e' piu'
+  stretta della fascia di scorrimento ai bordi (EDGE_SCROLL_MARGIN 20 px), quindi
+  la camera scorreva verso l'angolo in basso a destra. Nuovo
+  Minimap.blocks_edge_scroll: niente scorrimento dalla minimappa fino all'angolo
+  basso-destra della finestra (match_scene e net_match_scene). Camera.update non
+  scorre piu' se il mouse e' fuori dalla finestra (pygame.mouse.get_focused):
+  get_pos() restava all'ultima posizione sul bordo e la camera andava avanti.
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul
