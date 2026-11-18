@@ -1536,6 +1536,31 @@ Passaggi completati:
   mostrati ai nemici): i suoni nascono dai cambi di stato nell'HUD. Test:
   tests/test_team_comm.py (13). Screenshot: step_75_ping, _ruota, _chat, _icone, _resa,
   _resa_votato, _tasti.
+- ALLENAMENTO, TUTORIAL ed ENCICLOPEDIA (step_76). (1) MAPPA PICCOLA
+  data/maps/map_training.json (48x32, generata da tools/gen_map_training.py): una sola
+  lane con due torri ((15,16) e (32,16)), radura a nord con TRE MANICHINI, campi
+  piccolo/grande a sud. engine/training.py: TrainingMatch (sottoclasse di Match, solo
+  regole della prova): manichini che non attaccano, torri e nucleo indistruttibili,
+  leggendari spenti, nessun vincitore, misuratore del danno ai manichini (dmg_hits).
+  game/scenes/training_scene.py: pannello (F4 mostra/nasconde) con PagSu/PagGiu
+  livello, F7 ricariche azzerate, F8 oro, F9 ondate on/off, F10 reset, Home torna in
+  base; danno al secondo/totale sui manichini. (2) TUTORIAL (game/scenes/
+  tutorial_scene.py): 11 passi guidati con Charmander dal liv.1 sulla stessa mappa
+  (movimento, attacco base, mosse, livelli, negozio, campi, torri...), riquadro
+  dell'obiettivo con avanzamento. (3) SCELTA: game/scenes/training_select_scene.py
+  (TrainingSelectScene, sottoclasse di CharSelectScene): stessa griglia della
+  selezione, a destra del titolo livello di partenza [-] N [+] (tasti - +) e pulsante
+  "Tutorial" (F1); ricorda l'ultima scelta; Esc da allenamento/tutorial torna qui.
+  CharSelectScene ha ora degli AGGANCI (PLAY_LABEL, HINTS, _header, _build_scene,
+  _extra_key, _extra_click, _draw_extra) senza cambiare il comportamento della
+  selezione offline. (4) ENCICLOPEDIA (game/scenes/encyclopedia_scene.py, testi in
+  data/encyclopedia.json): griglia delle 25 linee con filtro per ruolo e ricerca;
+  dettaglio su tela scorrevole in cache con forme ed evoluzioni (requisiti compresi,
+  Eevee dalla combinazione Q/W/E), passive e mosse per slot con varianti. (5) MENU
+  principale a NOVE voci: Allenamento ("e tutorial") ed Enciclopedia ("mosse e
+  passive") dopo Gioca. Screenshot: step_76_menu, _allenamento_scelta, _allenamento,
+  _tutorial_0/_2/_4/_7/_8/_fine, _enciclopedia/_jungler, _enc_charmander_0/_900/
+  _1800, _enc_eevee_0/_700.
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

@@ -196,6 +196,33 @@ class CharSelectScene:
         from .play_scene import PlayScene
         self.next_scene = PlayScene(self.app, self.map_index)
 
+    # Ganci per le sottoclassi (Allenamento): testi dell'intestazione, scena da
+    # costruire, controlli in piu' a destra del titolo.
+    PLAY_LABEL = "Gioca"
+    HINTS = [("frecce", "scegli"), ("Tab", "ruolo"), ("doppio clic", "gioca subito")]
+
+    def _header(self):
+        mname = config.MAPS[self.map_index][0]
+        ts = 3 if mname == "3v3" else 5
+        return ("Mappe", "Scegli il tuo Pokémon",
+                f"Mappa {mname} · gli altri {2 * ts - 1} sono bot con un Pokémon a caso")
+
+    def _build_scene(self):
+        from .match_scene import MatchScene
+        return MatchScene(
+            str(self.app.root / config.MAPS[self.map_index][1]),
+            str(self.app.root / config.ROSTER[self.sel]),
+            flower_color=self.flower_color if self._has_colors() else None)
+
+    def _extra_key(self, ev) -> bool:
+        return False
+
+    def _extra_click(self, pos) -> bool:
+        return False
+
+    def _draw_extra(self, surface, ox, S, mouse):
+        pass
+
     # --- input ---------------------------------------------------------------
     def handle_events(self, events):
         if self.loading:
@@ -204,6 +231,8 @@ class CharSelectScene:
             vis = self._visible()
             pos = vis.index(self.sel) if self.sel in vis else 0
             if ev.type == pygame.KEYDOWN:
+                if self._extra_key(ev):
+                    continue
                 if ev.key == pygame.K_ESCAPE:
                     self._back()
                 elif ev.key == pygame.K_TAB:
@@ -227,6 +256,8 @@ class CharSelectScene:
                     if r.collidepoint(ev.pos):
                         self.sel = i
             elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+                if self._extra_click(ev.pos):
+                    continue
                 hit = next((c for r, c in self._color_rects if r.collidepoint(ev.pos)), None)
                 if hit is not None and self._has_colors():
                     self.flower_color = hit
@@ -260,11 +291,7 @@ class CharSelectScene:
     def update(self, dt):
         self.t += dt
         if self.loading and self._drawn_loading and self.next_scene is None:
-            from .match_scene import MatchScene
-            self.next_scene = MatchScene(
-                str(self.app.root / config.MAPS[self.map_index][1]),
-                str(self.app.root / config.ROSTER[self.sel]),
-                flower_color=self.flower_color if self._has_colors() else None)
+            self.next_scene = self._build_scene()
             self.next_scene.app = self.app   # "Torna al menu" a fine partita
 
     # --- disegno -------------------------------------------------------------
@@ -310,16 +337,15 @@ class CharSelectScene:
         UI.top_glow(surface, W, H)
 
         # Intestazione: indietro + titolo + sottotitolo.
-        self._back_rect = UI.back_button(surface, "Mappe", ox + S(48), S(28),
+        back_label, title, subtitle = self._header()
+        self._back_rect = UI.back_button(surface, back_label, ox + S(48), S(28),
                                          hover=self._back_rect is not None
                                          and self._back_rect.collidepoint(mouse))
         tx = self._back_rect.right + S(22)
-        tr = UI.title(surface, "Scegli il tuo Pokémon", tx, S(20), max(22, S(30)))
-        mname = config.MAPS[self.map_index][0]
-        ts = 3 if mname == "3v3" else 5
-        sub = UI.font(max(11, S(12))).render(
-            f"Mappa {mname} · gli altri {2 * ts - 1} sono bot con un Pokémon a caso", True, DIM)
+        tr = UI.title(surface, title, tx, S(20), max(22, S(30)))
+        sub = UI.font(max(11, S(12))).render(subtitle, True, DIM)
         surface.blit(sub, (tx, tr.bottom + 2))
+        self._draw_extra(surface, ox, S, mouse)
 
         # Pillole dei ruoli (filtro).
         gx, gy = ox + S(48), S(100)
@@ -353,7 +379,7 @@ class CharSelectScene:
             surface.blit(nm, (r.centerx - nm.get_width() // 2, r.bottom - S(9) - nm.get_height()))
 
         self._draw_preview(surface, ox, S, mouse)
-        UI.hints(surface, [("frecce", "scegli"), ("Tab", "ruolo"), ("doppio clic", "gioca subito")],
+        UI.hints(surface, self.HINTS,
                  gx, H - S(24) - 22)
 
     def _draw_preview(self, surface, ox, S, mouse):
@@ -439,7 +465,7 @@ class CharSelectScene:
 
         # Pulsante Gioca in fondo al pannello.
         br = pygame.Rect(panel.x + S(20), panel.bottom - S(20) - S(52), panel.w - S(40), S(52))
-        self._play_rect = UI.primary_button(surface, br, "Gioca", "Invio",
+        self._play_rect = UI.primary_button(surface, br, self.PLAY_LABEL, "Invio",
                                             hover=br.collidepoint(mouse), size=max(14, S(17)))
 
     def _draw_loading(self, surface, W, H):

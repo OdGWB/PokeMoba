@@ -1,0 +1,203 @@
+{
+  "_comment": "Testi dell'Enciclopedia in gioco (game/scenes/encyclopedia_scene.py). Per ogni linea (nome del file in data/pokemon senza .json): 'summary' = come si gioca, 'tips' = consigli brevi, 'passives' = id passiva -> {name, text}. Le mosse NON stanno qui: la scheda le legge dai JSON del roster (numeri sempre aggiornati).",
+  "lines": {
+    "charmander": {
+      "summary": "Mago mobile del fuoco: danno speciale ad area, scatti e coni di fiamme. Charizard diventa Fuoco/Volante e puo' volare sopra la mappa con la R.",
+      "tips": ["Colpisci lo stesso nemico con tre mosse Fuoco di fila per accendere la Scottatura.", "Dragartigli e' l'unica opzione fisica: utile contro chi ha molta Difesa Speciale."],
+      "passives": {
+        "fiammacoda": {"name": "Fiammacoda", "text": "Ogni colpo di una mossa Fuoco da' al nemico una carica di Calore (max 3, durano 4 s e si rinnovano). A 3 cariche scatta la Scottatura: danno nel tempo e -25% di Attacco per 4 s."}
+      }
+    },
+    "gastly": {
+      "summary": "Mago/assassino Spettro/Veleno con danno speciale: veleni, sonno, maledizioni e portali per entrare e uscire dagli scontri. Si rafforza a ogni uccisione.",
+      "tips": ["Ipnosi + Mangiasogni: prima addormenta, poi colpisci chi dorme.", "Le cariche d'anima restano anche dopo la morte: partecipa alle uccisioni."],
+      "passives": {
+        "corpofunesto": {"name": "Corpofunesto", "text": "Accumula cariche d'anima: +10 per uccisione e +5 per assist, fino a 100. Ogni carica da' +1 Difesa e +1 Difesa Speciale. Le fiammelle sopra la barra della vita mostrano quante ne ha."}
+      }
+    },
+    "totodile": {
+      "summary": "Jungler combattente d'Acqua: morsi in mischia, getti d'acqua e Sub per sparire sotto terra e riemergere sul bersaglio. Feraligatr con Oltraggio diventa una furia.",
+      "tips": ["Piu' controlli subisci, piu' picchi forte: non temere di entrare per primo.", "Ripulisci i campi presto: il bonus ai neutrali accelera i livelli."],
+      "passives": {
+        "forzabruta": {"name": "Forza Bruta", "text": "+50% di Attacco mentre e' sotto un effetto di controllo (stordito, rallentato, immobilizzato...). +30% di danno ai Pokemon neutrali."}
+      }
+    },
+    "rowlet": {
+      "summary": "Tiratore fisico con gittata molto lunga e corpo fragile. Vive nei cespugli: da nascosto il primo colpo arriva piu' lontano e fa molto piu' male. Decidueye diventa Erba/Spettro.",
+      "tips": ["Entra in un cespuglio prima di aprire lo scontro.", "Retromarcia e Danzadipiume ti tengono a distanza: usale prima di essere raggiunto."],
+      "passives": {
+        "distacco": {"name": "Distacco", "text": "Quando e' nascosto (cespuglio o invisibilita') la gittata dell'attacco base cresce di 2,5 tile e il primo colpo furtivo fa x1,6. Dopo il colpo resta nascosto ancora 1 s. Si ricarica una volta tornato allo scoperto."}
+      }
+    },
+    "snivy": {
+      "summary": "Combattente d'Erba veloce che scala nello scontro: ogni mossa a segno lo rende piu' forte. Liane, fruste e campi d'erba; Serperior con la R spinge il potenziamento oltre il limite.",
+      "tips": ["Tieni le cariche alte colpendo spesso: svaniscono dopo 10 s senza colpi.", "Lancia la VerdeBufera all'inizio dello scontro per raddoppiare il tetto."],
+      "passives": {
+        "inversione": {"name": "Inversione", "text": "Ogni mossa che colpisce da' 5 cariche; ogni carica vale +1% di Attacco e +1% di Attacco Speciale. Tetto 50 cariche, 100 dentro la VerdeBufera (foglie dorate). Senza colpire per 10 s le cariche calano."}
+      }
+    },
+    "nincada": {
+      "summary": "Jungler assassino fisico. Nincada fa molto danno ai campi; Ninjask e' rapidissimo e, quando cade, diventa Shedinja invece di morire.",
+      "tips": ["Shedinja e' immune quasi a tutto: temi solo Fuoco, Volante, Roccia, Spettro e Buio.", "Rancore punisce chi ti uccide: gli blocca le mosse."],
+      "passives": {
+        "muta": {"name": "Muta", "text": "Nincada fa +70% di danno ai Pokemon neutrali e prende +25% di esperienza da loro. Ninjask, quando dovrebbe morire, diventa Shedinja: immune alle mosse con tipo tranne Fuoco, Volante, Roccia, Spettro e Buio. Con la R Rancore, alla morte di Shedinja le mosse dell'uccisore vanno in ricarica e torna Ninjask col 10% degli HP."}
+      }
+    },
+    "poliwag": {
+      "summary": "Combattente d'Acqua con evoluzione ramificata al liv.8: con la Roccia di Re nell'inventario diventa Politoad (supporto che porta la pioggia), altrimenti Poliwrath (lottatore di prima linea Acqua/Lotta).",
+      "tips": ["Decidi presto il ramo: la Roccia di Re va comprata prima del liv.8.", "Nella pioggia e nel fiume e' piu' veloce."],
+      "passives": {
+        "nuotovelox": {"name": "Nuotovelox", "text": "+20% di velocita' nell'acqua o sotto la pioggia."},
+        "assorbacqua": {"name": "Assorbacqua (Poliwrath)", "text": "Le mosse Acqua nemiche lo curano invece di ferirlo."},
+        "piovischio": {"name": "Piovischio (Politoad)", "text": "Porta sempre con se' un'aura di pioggia: gli alleati dentro fanno +20% con le mosse Acqua e subiscono -20% dalle mosse Fuoco."}
+      }
+    },
+    "roggenrola": {
+      "summary": "Tank d'ingaggio di Roccia: crea pilastri, carica e lancia in aria i nemici. Tutte le sue mosse scalano con la DIFESA, quindi gli oggetti difensivi lo rendono anche pericoloso.",
+      "tips": ["Compra Difesa: aumenta sia la resistenza sia il danno delle mosse.", "I pilastri bloccano il passaggio: chiudi le vie di fuga."],
+      "passives": {
+        "sabbiafiume": {"name": "Sabbiafiume", "text": "Il danno delle mosse scala con la Difesa invece che con l'Attacco. Da Gigalith: tempesta di sabbia permanente di 3 tile attorno a se' che danneggia i nemici, e +30% di Difesa Speciale."}
+      }
+    },
+    "spiritomb": {
+      "summary": "Supporto roamer Spettro/Buio senza evoluzione: gira per la mappa raccogliendo spiriti che lo rendono sempre piu' forte. I potenziamenti delle mosse arrivano ai livelli 5, 6, 7 e 8.",
+      "tips": ["Raccogli gli spiriti tra una lane e l'altra: solo tu li vedi.", "Ai risvegli 36, 72 e 108 le mosse migliorano."],
+      "passives": {
+        "108spiriti": {"name": "I 108 Spiriti", "text": "Ogni 20 s compare uno spirito in giungla o nel fiume (max 6, visibili solo alla sua squadra). Raccoglierlo da' esperienza, +30% di velocita' per 3 s e +1 carica permanente (max 108). Risvegli a 36, 72 e 108 cariche. Spirito Vagante: ogni 6 s un attacco base libera gli spiriti sul bersaglio."}
+      }
+    },
+    "eevee": {
+      "summary": "Il Pokemon dalle mille strade: al liv.8 si evolve in una delle 8 forme a seconda dei potenziamenti scelti per Q, W ed E. Ogni forma ha ruolo, passiva e R proprie.",
+      "tips": ["Q: Offensivo o Protettivo. W: Ravvicinato o A distanza. E: Rapido o Solido.", "Offensivo: Jolteon (ravv.+rapido), Flareon (ravv.+solido), Espeon (dist.+rapido), Glaceon (dist.+solido).", "Protettivo: Leafeon (ravv.+rapido), Umbreon (ravv.+solido), Sylveon (dist.+rapido), Vaporeon (dist.+solido)."],
+      "passives": {
+        "adattabilita": {"name": "Adattabilita'", "text": "Ogni scelta di potenziamento (Q al liv.5, W al 6, E al 7) e' un asse: la combinazione delle tre decide l'evoluzione al liv.8."},
+        "assorbivolt": {"name": "Assorbivolt (Jolteon)", "text": "Una mossa Elettro nemica lo cura invece di ferirlo (una volta ogni 40 s)."},
+        "fuocardore": {"name": "Fuocardore (Flareon)", "text": "Dopo essere stato colpito da una mossa Fuoco, le sue mosse Fuoco fanno +30%."},
+        "sincronismo": {"name": "Sincronismo (Espeon)", "text": "Chi gli infligge uno stato lo subisce a sua volta."},
+        "mantelneve": {"name": "Mantelneve (Glaceon)", "text": "-10% di danno dagli attacchi base nemici."},
+        "fogliamanto": {"name": "Fogliamanto (Leafeon)", "text": "Sotto il sole gli stati durano il 10% in meno."},
+        "forzainteriore": {"name": "Forza Interiore (Umbreon)", "text": "Gli effetti di controllo durano il 30% in meno."},
+        "incantevole": {"name": "Incantevole (Sylveon)", "text": "25% di probabilita' di affascinare chi lo attacca in mischia."},
+        "idratazione": {"name": "Idratazione (Vaporeon)", "text": "Sotto la pioggia si libera dagli stati ogni 3 s."}
+      }
+    },
+    "rookidee": {
+      "summary": "Tank di supporto Volante (Corviknight Volante/Acciaio): provoca i nemici, protegge gli alleati e li trasporta in volo con la R Taxi Volante. Fa poco danno: il suo valore e' il controllo.",
+      "tips": ["Provocazione costringe i nemici ad attaccare te: usala sul loro tiratore.", "Taxi Volante porta un alleato dall'altra parte della mappa."],
+      "passives": {
+        "sguardofermo": {"name": "Sguardofermo", "text": "+30% di raggio visivo."},
+        "specchiarmatura": {"name": "Specchiarmatura (Corviknight)", "text": "Rimanda al nemico i rallentamenti e i cali di statistiche che riceve (una volta ogni 12 s per nemico)."}
+      }
+    },
+    "charcadet": {
+      "summary": "Combattente di Fuoco con evoluzione ramificata dallo STILE di gioco: se al liv.8 ha incassato piu' danni di quanti ne ha fatti diventa Armarouge (mago corazzato Fuoco/Psico), altrimenti Ceruledge (spadaccino Fuoco/Spettro).",
+      "tips": ["Le due barre nell'HUD mostrano verso quale forma stai andando.", "Contano solo i danni tra Pokemon: minion, neutrali e torri no."],
+      "passives": {
+        "armature": {"name": "Armature", "text": "L'Armatura Fausta si riempie col danno subito dai Pokemon nemici, l'Armatura Infausta col danno inflitto ai Pokemon nemici. Al liv.8 Fausta piu' alta -> Armarouge, altrimenti Ceruledge."},
+        "guardia": {"name": "Guardia (Armarouge)", "text": "Quando un alleato entro 6 tile scende sotto il 30% degli HP riceve uno scudo per 3 s (ricarica 30 s)."},
+        "doppialama": {"name": "Doppia Lama (Ceruledge)", "text": "Ogni attacco base colpisce due volte: il secondo colpo fa il 50% ed e' di tipo Spettro."}
+      }
+    },
+    "noibat": {
+      "summary": "Tiratore mobile Volante/Drago con danno speciale e controllo della visione: i suoi attacchi base sono onde sonore che a ogni terzo colpo rivelano i nemici nascosti.",
+      "tips": ["Il ping rivela anche chi e' nei cespugli o invisibile.", "Compra Attacco Speciale: l'Attacco degli oggetti si converte."],
+      "passives": {
+        "ecolocalizzazione": {"name": "Ecolocalizzazione", "text": "Gli attacchi base fanno danno speciale; l'Attacco bonus degli oggetti diventa Attacco Speciale. Ogni terzo attacco base lancia un ping di 2 s che rivela i nemici nascosti entro 6 tile."}
+      }
+    },
+    "teddiursa": {
+      "summary": "Jungler combattente: ripulisce la giungla, contende gli obiettivi e resiste negli scontri grazie al miele. Ursaluna con Luna Piena diventa enorme.",
+      "tips": ["Ogni campo ripulito vale un vasetto di miele: tienine sempre uno.", "Sotto uno stato (anche scottato) picchia di piu'."],
+      "passives": {
+        "miele": {"name": "Miele", "text": "Ogni campo neutrale ripulito da' un vasetto (max 3). Sotto il 40% degli HP ne consuma uno e cura il 15% degli HP max (una volta ogni 10 s). +30% di danno ai Pokemon neutrali."},
+        "dentistretti": {"name": "Dentistretti (Ursaring, Ursaluna)", "text": "+50% di Attacco mentre e' sotto uno stato; la scottatura non gli riduce l'Attacco. Il Miele resta attivo."}
+      }
+    },
+    "sneasel": {
+      "summary": "Assassino Buio/Ghiaccio con evoluzione ramificata da DOVE guadagna l'oro: se al liv.8 ha preso piu' oro dai neutrali diventa Sneasler (jungler che scavalca i muri), altrimenti Weavile (assassino di lane).",
+      "tips": ["In jungla porta a Sneasler, in lane a Weavile.", "Weavile ruba statistiche ai nemici isolati: cerca chi e' solo."],
+      "passives": {
+        "soleluna": {"name": "Sole e Luna", "text": "Conta l'oro preso dai minion (luna) e dai Pokemon neutrali (sole). Al liv.8: neutrali piu' alti -> Sneasler, altrimenti Weavile."},
+        "arraffalesto": {"name": "Arraffalesto (Weavile)", "text": "I colpi su un nemico isolato (nessun suo alleato entro 5 tile) gli rubano il 5% di Attacco e Attacco Speciale per 4 s, fino al 25%."},
+        "scalaroccia": {"name": "Scalaroccia (Sneasler)", "text": "Scavalca i muri della giungla spessi fino a 3 tile in 1 s (ricarica 6 s). +30% di danno ai Pokemon neutrali."}
+      }
+    },
+    "mienfoo": {
+      "summary": "Assassino Lotta da combo, difficile: le maniche colpiscono piu' forte al limite della portata. Parate, calci volanti e la Danza delle Maniche per finire il bersaglio.",
+      "tips": ["Tieniti a distanza: il punto dolce e' la fascia esterna della portata.", "Stai fuori dagli scontri per qualche secondo per rigenerarti."],
+      "passives": {
+        "manichefrusta": {"name": "Maniche a Frusta + Rigenergia", "text": "Il 30% piu' esterno della portata degli attacchi base e di Bruciapelo e' un punto dolce: +40% di danno e -1 s alla ricarica di Calcinvolo. Rigenergia: dopo 4 s senza subire ne' infliggere danni rigenera il 3% degli HP max al secondo."}
+      }
+    },
+    "duraludon": {
+      "summary": "Supporto Acciaio/Drago che bersaglia da lontano: tiri caricati, fulmini e un raggio enorme. Sotto la pioggia diventa molto piu' rapido.",
+      "tips": ["Tieni premuto Tiro Lungo per caricarlo: piu' a lungo, piu' lontano.", "Gioca accanto a Politoad o con Pioggiadanza."],
+      "passives": {
+        "conduzione": {"name": "Conduzione", "text": "Sotto la pioggia (meteo, aura di Politoad o Pioggiadanza) i tempi di carica e i ritardi delle sue mosse sono dimezzati, e le sue mosse Elettro rallentano del 25% per 1,5 s."}
+      }
+    },
+    "hatenna": {
+      "summary": "Mago di controllo Psico (Hatterene Psico/Folletto) da mid lane: lento e senza scatti, ma punisce chi lancia mosse vicino a lui.",
+      "tips": ["Gli agitati restano visibili anche nei cespugli: usali per stanarli.", "Distortozona cambia il ritmo dello scontro: lanciala sul gruppo nemico."],
+      "passives": {
+        "quiete": {"name": "Quiete", "text": "Un nemico che lancia una mossa entro 10 tile diventa agitato per 3 s: resta visibile nei cespugli e subisce +10% di danno dalla linea."}
+      }
+    },
+    "magnemite": {
+      "summary": "Mago di controllo Elettro/Acciaio, difficile: le mosse mettono cariche + o - su nemici, alleati e muri. Cariche opposte si attraggono, uguali si respingono.",
+      "tips": ["Carica un muro e un nemico con lo stesso segno per sbalzarlo via.", "Mentre miri la R, rotella o Tab cambiano la polarita'."],
+      "passives": {
+        "magnetismo": {"name": "Magnetismo", "text": "Le mosse applicano una carica + o - per 4 s (8 s sui nemici Acciaio). Due cariche entro 5 tile interagiscono: opposte si attraggono, uguali si respingono. Alleati e muri fanno da ancora (non si muovono)."}
+      }
+    },
+    "swinub": {
+      "summary": "Jungler tank d'ingaggio Ghiaccio/Terra: segue le impronte nemiche, apre gli scontri e congela. Le passive si sommano evolvendo.",
+      "tips": ["Le impronte viola mostrano dove sono passati i nemici negli ultimi 8 s.", "A 4 accumuli di Gelo il prossimo attacco base congela."],
+      "passives": {
+        "fiuto": {"name": "Fiuto", "text": "Nella giungla vede le impronte dei Pokemon nemici anche nella nebbia. +30% di danno ai Pokemon neutrali."},
+        "grassospesso": {"name": "Grassospesso (Piloswine)", "text": "-50% di danno da Fuoco e Ghiaccio e uno scudo del 10% degli HP max che si ricarica dopo 8 s."},
+        "gelo": {"name": "Gelo (Mamoswine)", "text": "I colpi danno accumuli di Gelo (max 4); a 4 il prossimo attacco base congela il bersaglio per 1 s. Fiuto e Grassospesso restano."}
+      }
+    },
+    "venonat": {
+      "summary": "Tiratore di logoramento Coleottero/Veleno con danno speciale: il veleno si accumula a ogni colpo. Polveri che avvelenano, paralizzano e addormentano.",
+      "tips": ["A 6 accumuli il veleno e' al massimo: gocce verdi sotto la barra.", "Non avvelena i Pokemon Acciaio."],
+      "passives": {
+        "scaglievelenose": {"name": "Scaglie Velenose", "text": "Attacchi base a distanza con danno speciale; ognuno da' un accumulo di veleno (max 6, durano 4 s; niente sui Pokemon Acciaio)."},
+        "lentifume": {"name": "Lentifume' (Venomoth)", "text": "Le mosse poco efficaci fanno danno normale. Scaglie Velenose resta."}
+      }
+    },
+    "remoraid": {
+      "summary": "Tiratore d'Acqua da duello con danno fisico e munizioni da cambiare: il tipo della munizione decide il tipo dell'attacco base e della Q.",
+      "tips": ["Cambia munizione (W) per colpire la debolezza del bersaglio.", "Il bersaglio agganciato prende solo brutti colpi: concentrati su di lui."],
+      "passives": {
+        "cecchino": {"name": "Cecchino + Prendimira", "text": "I brutti colpi fanno +125%. Ogni 10 s il prossimo attacco base aggancia il bersaglio per 4 s: attacchi e mosse su di lui sono sempre brutti colpi. L'Attacco Speciale degli oggetti diventa Attacco. Munizioni: Acqua e Ghiaccio, dal liv.6 anche Fuoco ed Erba."},
+        "ventose": {"name": "Ventose (Octillery)", "text": "Spinte, trascinamenti e lanci in aria subiti hanno effetto dimezzato. Cecchino e Prendimira restano."}
+      }
+    },
+    "flabebe": {
+      "summary": "Supporto Folletto 'giardiniere': pianta fiori sulla mappa che gli alleati raccolgono per curarsi. Il colore dei fiori si sceglie in selezione.",
+      "tips": ["Pianta i fiori dove gli alleati combatteranno, non dove sono gia'.", "I nemici che calpestano un fiore lo distruggono."],
+      "passives": {
+        "giardino": {"name": "Giardino", "text": "I fiori crescono: germoglio (0-2 s), bocciolo (2-4 s), poi sbocciati; durano 60 s, max 2/3/4 a seconda della forma. Un alleato che raccoglie un fiore sbocciato si cura e riceve l'effetto del colore: Rosso +15% di danno, Giallo +25% di velocita', Arancione scudo del 10% degli HP, Blu -1,5 s alle ricariche, Bianco toglie gli stati."}
+      }
+    },
+    "scyther": {
+      "summary": "Combattente Coleottero da top lane con evoluzione TRAMITE OGGETTO dal liv.8: Metalcoperta -> Scizor (Coleottero/Acciaio, mosse rapide), Augite Nera -> Kleavor (Coleottero/Roccia, asce lente e pesanti).",
+      "tips": ["Senza oggetto resta Scyther con la sua R (Forbice X).", "Vale il primo dei due oggetti comprato."],
+      "passives": {
+        "cuordeciso": {"name": "Cuordeciso", "text": "+30% di velocita' per 2 s quando finisce uno stordimento, una paralisi, il sonno, il congelamento o un lancio in aria."},
+        "tecnico": {"name": "Tecnico (Scizor)", "text": "Le mosse con ricarica base sotto i 4 s fanno +40%."},
+        "ascedipietra": {"name": "Asce di Pietra (Kleavor)", "text": "Attacchi base -20% di velocita' d'attacco ma +40% di danno, e colpiscono tutto in un piccolo arco."}
+      }
+    },
+    "litten": {
+      "summary": "Combattente lottatore di Fuoco (Incineroar Fuoco/Buio) da top lane: provoca, trascina i nemici contro i muri come contro le corde del ring, poi afferra e scaglia.",
+      "tips": ["Aspetta 5 s di calma prima di aprire lo scontro: Prepotenza indebolisce tutti.", "Corsa alle Corde rimbalza sui muri e sui pilastri."],
+      "passives": {
+        "prepotenza": {"name": "Prepotenza", "text": "Dopo 5 s senza fare ne' subire danni, il primo danno a un Pokemon nemico da' -20% di Attacco ai Pokemon nemici entro 4 tile per 4 s."},
+        "cattivodelring": {"name": "Cattivo del Ring (Incineroar)", "text": "+5% di danno per ogni Pokemon nemico entro 5 tile, fino a +15%. Prepotenza resta."}
+      }
+    }
+  }
+}

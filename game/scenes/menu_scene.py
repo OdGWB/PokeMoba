@@ -1,6 +1,8 @@
-"""Menu principale di PokéMoba: titolo e sette voci (redesign).
+"""Menu principale di PokéMoba: titolo e nove voci (redesign).
 
-Gioca (mappa, offline / online / LAN: play_scene.py), Personalizzazione
+Gioca (mappa, offline / online / LAN: play_scene.py), Allenamento (mappa
+piccola coi manichini + Tutorial: training_select_scene.py), Enciclopedia
+(mosse e passive di ogni linea: encyclopedia_scene.py), Personalizzazione
 (nickname e immagine profilo), Crediti, Tier list, Animazioni (editor delle
 animazioni, anim_editor_scene.py), Opzioni ed Esci. Frecce + Invio o
 clic. In alto a destra il profilo (clic = Personalizzazione). Sfondo:
@@ -57,10 +59,11 @@ def map_thumbnail(path):
     return img
 
 
-ENTRIES = [("Gioca", "play"), ("Personalizzazione", "profile"), ("Crediti", "credits"),
+ENTRIES = [("Gioca", "play"), ("Allenamento", "train"), ("Enciclopedia", "encyclopedia"),
+           ("Personalizzazione", "profile"), ("Crediti", "credits"),
            ("Tier list", "tier"), ("Animazioni", "anims"), ("Opzioni", "options"),
            ("Esci", "quit")]
-NOTES = {"anims": "editor"}
+NOTES = {"train": "e tutorial", "encyclopedia": "mosse e passive", "anims": "editor"}
 
 
 class MenuScene:
@@ -101,6 +104,12 @@ class MenuScene:
         if key == "play":
             from .play_scene import PlayScene
             self.next_scene = PlayScene(self.app)
+        elif key == "train":
+            from .training_select_scene import TrainingSelectScene
+            self.next_scene = TrainingSelectScene(self.app)
+        elif key == "encyclopedia":
+            from .encyclopedia_scene import EncyclopediaScene
+            self.next_scene = EncyclopediaScene(self.app)
         elif key == "profile":
             from .profile_scene import ProfileScene
             self.next_scene = ProfileScene(self.app)
@@ -147,7 +156,7 @@ class MenuScene:
 
         # Voci: "Gioca" più grande, poi le altre; Esci separata da una linea.
         bw = int(340 * k)
-        y = int(262 * k)
+        y = int(236 * k)
         mx = int(92 * k)
         self._rects = []
         for i, (label, key) in enumerate(ENTRIES):
@@ -155,7 +164,7 @@ class MenuScene:
                 y += int(10 * k)
                 pygame.draw.line(surface, UI.LINE, (mx + int(18 * k), y), (mx + bw - int(18 * k), y))
                 y += int(11 * k)
-            bh = int((56 if i == 0 else 40 if key == "quit" else 44) * k)
+            bh = int((56 if i == 0 else 38) * k)
             rr = pygame.Rect(mx, y, bw, bh)
             self._rects.append((rr, i))
             on = i == self.sel
