@@ -1606,6 +1606,18 @@ Passaggi completati:
   BLEND_* costa ~2,5 ms a 648x360 (non vettorizzato), blittare una Surface piena con
   lo stesso blend ~0,07 ms: usare sempre il blit. Screenshot:
   step_78_meteo_clear/_rain/_sun/_wind.
+- RICHIAMO VISIBILE, R AUTOMATICA e CLIC ONLINE (step_79). (1) Nuovo game/recall_fx.py
+  (renderer._draw_entities, a tutti, offline e online): sotto lo sprite anello azzurro
+  schiacciato che si CHIUDE verso il corpo + colonna di luce a 6 bande che sale con la
+  carica (sprite in cache per dimensione); sopra, scintille pixel art 2x2/1x1 che salgono
+  (posizioni dal tempo, niente stato). Online: "recalling" in net/visual.UNIT_FLAGS
+  (recall_until passa da solo come timer) + avviso "RICHIAMO Ns" nella scena di rete.
+  (2) evolution.apply_choice: scegliere la R le da' il 1° grado GRATIS (non serve
+  alzarla a mano; vale per giocatore, bot, R fisse e rete via ACT_CHOOSE). (3) Online il
+  CLIC sulle caselle Q/W/E/R alza il grado (send_rank) e sulle righe dei popup sceglie
+  l'evoluzione (send_choose), come offline; prima solo Ctrl+tasto. Meteo, varianti di
+  mappa ed effetti a schermo verificati anche online (loopback). Screenshot:
+  step_79_richiamo_a/_b (+ _zoom).
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

@@ -19,7 +19,7 @@ from engine.entities import Core, Pillar, Pokemon, Structure, Unit
 from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
                          TILE_PUDDLE, TILE_RIVER, TILE_WALL)
 from . import char_fx, spirit_fx
-from . import (arch_fx, eevee_fx, hatt_fx, mag_fx, mien_fx, noivern_fx,
+from . import (arch_fx, recall_fx, eevee_fx, hatt_fx, mag_fx, mien_fx, noivern_fx,
                flor_fx, incin_fx, moth_fx, octi_fx, scy_fx, swine_fx,
                sneasel_fx, ursa_fx)
 from . import structure_gfx
@@ -933,6 +933,7 @@ class Renderer:
                     ursa_fx.draw_unit_under(surface, e, gx, gy, now, ts)
                     sneasel_fx.draw_unit_under(surface, e, gx, gy, now, ts)   # Notte Fonda
                     mien_fx.draw_unit_under(surface, e, gx, gy, now, ts)   # Individua, Danza
+                    recall_fx.draw_under(surface, e, gx, gy, now, ts)   # richiamo in base
                 if anim is not None:
                     if grow != 1.0 and isinstance(anim, SpriteAnimator):
                         anim.draw(surface, gx, gy, alpha=95 if ghost else 255, grow=grow)
@@ -947,6 +948,7 @@ class Renderer:
                 if isinstance(e, Pokemon):   # ghiaccio, cuori, sabbia, Resistenza
                     for draw_overlay in UNIT_OVERLAYS:   # game/fx_lines.py
                         draw_overlay(surface, e, gx, gy, now, ts)
+                    recall_fx.draw_over(surface, e, gx, gy, now, ts)
                 if in_bush:
                     self._draw_hidden_hint(surface, e, gx, gy, now)
                 self._draw_unit_hp(surface, e, gx, gy, grow)

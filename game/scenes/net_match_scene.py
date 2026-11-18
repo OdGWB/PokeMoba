@@ -95,6 +95,7 @@ class NetMatchScene:
         self.renderer.map.set_terrain(self._base_tiles, self._seal, self.map_data)
         self._applied_weather = None
         self._applied_open = False
+        self._choice_rects = []   # righe cliccabili dei popup delle evoluzioni
         client.on_snapshot = self._on_snapshot
 
     def _sync_terrain(self):
@@ -170,7 +171,7 @@ class NetMatchScene:
             elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
                 if self.aiming_slot is not None:
                     self._cast(self.aiming_slot, ev.pos); self.aiming_slot = None
-                else:
+                elif not self._skillbar_click(ev.pos):
                     self._left_click(ev.pos)
             elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 3:
                 if self.aiming_slot is not None:
@@ -185,6 +186,21 @@ class NetMatchScene:
                   and self.aiming_slot is not None
                   and mag_fx.has_polarity(self._aim_move(self.aiming_slot))):
                 mag_fx.toggle_polarity()   # Bombagnete / Campo Elettrico: + <-> -
+
+    def _skillbar_click(self, pos) -> bool:
+        """Clic sui popup delle evoluzioni (sceglie) o su una casella (alza il grado),
+        come offline. True se il clic e' stato usato dall'HUD."""
+        for r, slot, idx in self._choice_rects:
+            if r.collidepoint(pos):
+                self.client.send_choose(slot, idx)
+                return True
+        bar = getattr(self, "_bar", None)
+        if bar is not None:
+            for sl, r in bar.slot_rects.items():
+                if r.collidepoint(pos):
+                    self.client.send_rank("QWER".index(sl))
+                    return True
+        return False
 
     def _tile(self, pos):
         wx, wy = self.camera.screen_window_to_world(*pos)
@@ -382,7 +398,7 @@ class NetMatchScene:
         # L'HUD vero e' in draw_fullres (game/hud.py); qui solo messaggi temporanei.
         return []
 
-    HELP = "ONLINE  Dx muovi  Sx attacca  Q/W/E/R mosse  Ctrl+tasto grado  ESC esci"
+    HELP = "ONLINE  Dx muovi  Sx attacca  Q/W/E/R mosse  clic o Ctrl+tasto grado  ESC esci"
 
     # --- HUD a piena risoluzione (game/hud.py, uguale alla partita locale) -------------
     def _my_form(self, me):
@@ -491,7 +507,8 @@ class NetMatchScene:
         icon = lambda iid, size: self.shop._icon(self.item_catalog, iid, size, font)
         self._bar = hud.draw_bar(surface, self._player_view(h, me), self._slot_views(h),
                                  type_color, icon, right_limit=right)
-        # Popup delle evoluzioni (online si sceglie con 1/2 la prima in coda).
+        # Popup delle evoluzioni: clic su una riga, o 1/2 per la prima in coda.
+        self._choice_rects = []
         pend = [["Q", "W", "E", "R"][i] for i in self._pending()]
         pend = [sl for sl in pend if self.disp_moveset.get(sl) and self.disp_moveset[sl].upgrades]
         if pend:
@@ -504,11 +521,13 @@ class NetMatchScene:
                 if not near:
                     title, col = f"Evolvi {sl} - torna in BASE", (236, 170, 110)
                 elif k == 0:
-                    title, col = f"Evolvi {sl} - premi 1 / 2", hud.GOLD
+                    title, col = f"Evolvi {sl} - clic o 1/2", hud.GOLD
                 else:
-                    title, col = f"Evolvi {sl} - dopo {pend[0]}", hud.DIM
-                hud.draw_choice(surface, r, title, self.disp_moveset[sl].upgrades[:2],
-                                type_color, False, col)
+                    title, col = f"Evolvi {sl} - clic", hud.GOLD
+                rows = hud.draw_choice(surface, r, title, self.disp_moveset[sl].upgrades[:2],
+                                       type_color, near, col)
+                slot = "QWER".index(sl)
+                self._choice_rects += [(rr, slot, i) for i, rr in enumerate(rows)]
         if self.world.winner is not None:
             if self._score_rows() is None:      # LAN: avviso semplice
                 win = self.world.winner == self.team
@@ -524,6 +543,11 @@ class NetMatchScene:
                             (240, 120, 110))
             match_ui.draw_death_recap(surface, self._death_recap(),
                                       self._bar.rect.y - (34 if h.get("points", 0) > 0 else 10))
+        elif self._me_vis().get("recalling"):
+            left = max(0.0, self._me_vis().get("recall_until", 0.0) - self.world.match_time)
+            hud.draw_banner(surface, f"RICHIAMO  {left:.1f}s",
+                            "muoviti o subisci danno per annullare", (150, 200, 255),
+                            frac=1.0 - min(1.0, left / config.RECALL_TIME))
 
         self.comm.draw_minimap(surface, self.minimap)
         self.comm.draw_overlay(surface, self._bar.rect.y)
