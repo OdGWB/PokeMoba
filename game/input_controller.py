@@ -19,6 +19,7 @@ from __future__ import annotations
 import pygame
 
 import config
+from . import target_pick
 from engine.entities import Pokemon, Structure, Unit
 from game import keybinds, mag_fx
 from sim.commands import (AttackCommand, AttackMoveCommand, CastMoveCommand,
@@ -38,7 +39,7 @@ def needs_aim(mv) -> bool:
     if mv is None:
         return False
     return bool(mv.effects.get("hold")) or mag_fx.has_polarity(mv)
-PICK_RADIUS = 1.4
+
 
 
 class InputController:
@@ -118,7 +119,11 @@ class InputController:
     def _left_click(self, pos, camera, world, me):
         tx, ty = self._world_tile(camera, pos)
         champs = champs_only_held()
-        target = self._pick_enemy(world, me, tx, ty, champs)
+        target = None
+        if world is not None and me is not None:
+            wx, wy = camera.screen_window_to_world(*pos)
+            # sullo sprite disegnato, non sui piedi (game/target_pick.py)
+            target = target_pick.pick(world, me.team, wx, wy, champs)
         if target is not None:
             return AttackCommand(seq=self._next_seq(), entity_id=self.controlled_id,
                                  target_id=target.id)
@@ -132,15 +137,5 @@ class InputController:
     def _pick_enemy(self, world, me, tx: float, ty: float, champs_only: bool = False):
         if world is None or me is None:
             return None
-        best, best_d = None, 1e9
-        for e in world.combatants():
-            if e.team == me.team or not getattr(e, "alive", False):
-                continue
-            if not isinstance(e, (Unit, Structure)):
-                continue
-            if champs_only and not isinstance(e, Pokemon):
-                continue
-            d = ((e.pos.x - tx) ** 2 + (e.pos.y - ty) ** 2) ** 0.5
-            if d <= PICK_RADIUS + getattr(e, "radius", 0.0) and d < best_d:
-                best, best_d = e, d
-        return best
+        ts = config.TILE_SIZE
+        return target_pick.pick(world, me.team, tx * ts, ty * ts, champs_only)

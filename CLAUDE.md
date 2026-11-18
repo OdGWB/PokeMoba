@@ -1562,6 +1562,25 @@ Passaggi completati:
   _tutorial_0/_2/_4/_7/_8/_fine, _enciclopedia/_jungler, _enc_charmander_0/_900/
   _1800, _enc_eevee_0/_700.
 
+- CLIC SUL BERSAGLIO PRECISO, MURO DELLA MID CHIUSO e PASSAGGI ALLARGATI (step_77).
+  (1) Nuovo game/target_pick.py: il clic sinistro sceglie il nemico sullo SPRITE
+  DISEGNATO, non piu' sui piedi piu' vicini (sui minion ammassati il clic finiva su
+  quello dietro). _draw_entities registra a ogni frame dove ha disegnato ogni unita'
+  (SpriteAnimator.hit_parts: superficie, posizione, riquadro in px mondo); pick() in
+  tre livelli: pixel OPACO sotto il mouse (vince quello davanti), riquadro dello
+  sprite allargato (PAD 3 px, min 0,9 tile), poi il vecchio raggio di 1,4 tile.
+  Usato da input_controller e net_match_scene; il motore riceve lo stesso
+  AttackCommand. Prova sui minion ammassati: 59,7% -> 100% di clic sul giusto.
+  (2) data/maps/map_3v3.json (modificato A MANO, non rigenerare): chiusa la FESSURA
+  diagonale nei muri della lane mid (tile 0 -> 5 in (45..51, 39..45) e speculare
+  (49..54, 55..60)) dove si entrava nel muro; allargati a ~2 tile la "scaletta" a
+  (40,30)/(41,31)/(42,32) e speculare e i corridoi alle righe 16-17 e 83-84 (il
+  blocco di muro sotto spostato di una riga: la parete 2.5D della cima ne mangiava
+  uno). Controllo: nessun passaggio che costringa a un giro lungo (detour 0) su 3v3
+  e 5v5; la mid del 5v5 non aveva fessure. I corridoi vicino al bordo a (7-17,95) e
+  (84-94,4) non sono raggiungibili: lasciati cosi'. Screenshot: step_77_minion/_zoom,
+  step_77_mid_prima/_mid, step_77_scaletta, step_77_passaggio_nord/_sud.
+
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul
   bordo sud (sopra le unita, vedi passo rilievi pseudo-3D). lighting_overlay

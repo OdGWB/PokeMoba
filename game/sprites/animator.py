@@ -29,6 +29,10 @@ class SpriteAnimator:
         self.scale = scale          # <1 per rimpicciolire (es. minion)
         self._scaled: dict = {}     # cache dei frame scalati
         self._bboxes: dict = {}     # cache del riquadro del contenuto (pixel non trasparenti)
+        # Dove e' stato disegnato l'ultimo fotogramma: [(surface, x, y, riquadro)]
+        # in coordinate dello schermo low-res. Serve SOLO alla scelta del bersaglio
+        # al clic (game/target_pick.py): si clicca sullo sprite, non sui piedi.
+        self.hit_parts: list = []
         self.state = "Idle"
         self.frame = 0
         self.timer = 0.0
@@ -280,6 +284,8 @@ class SpriteAnimator:
             bb = self._bboxes[gkey]
             if bb.width == 0:
                 return
+            self.hit_parts = [(big, sx - bb.centerx, sy - bb.bottom,
+                               bb.move(sx - bb.centerx, sy - bb.bottom))]
             if alpha < 255:
                 big = big.copy()
                 big.fill((255, 255, 255, max(0, alpha)), None, pygame.BLEND_RGBA_MULT)
@@ -296,6 +302,8 @@ class SpriteAnimator:
             self._bboxes[key] = bb
         if bb.width == 0:
             return
+        self.hit_parts = [(frame, sx - bb.centerx, sy - bb.bottom,
+                           bb.move(sx - bb.centerx, sy - bb.bottom))]
         if alpha < 255:   # dissolvenza (morte): moltiplica il canale alpha
             frame = frame.copy()
             frame.fill((255, 255, 255, max(0, alpha)), None, pygame.BLEND_RGBA_MULT)
@@ -362,11 +370,15 @@ class GroupAnimator(SpriteAnimator):
     def draw(self, surface, sx, sy, alpha=255):
         # Dal fondo al davanti: chi sta piu' in alto sullo schermo si disegna prima.
         items = [(dy, c, dx) for c, dx, dy in self.companions] + [(0, self, 0)]
+        parts = []
         for dy, c, dx in sorted(items, key=lambda it: it[0]):
             if c is self:
                 SpriteAnimator.draw(self, surface, sx, sy, alpha)
+                parts += self.hit_parts
             else:
                 c.draw(surface, sx + dx, sy + dy, alpha)
+                parts += c.hit_parts
+        self.hit_parts = parts   # tutto il gruppo e' cliccabile (l'unita' e' una)
 
 
 class FallbackAnimator:
@@ -376,6 +388,7 @@ class FallbackAnimator:
         self.color = color
         self.radius = max(4, radius_px)
         self.facing = 0
+        self.hit_parts: list = []
 
     def play_once(self, name: str, speed: float = 1.0, action=None) -> None:
         pass
@@ -403,6 +416,8 @@ class FallbackAnimator:
 
     def draw(self, surface: pygame.Surface, sx: int, sy: int, alpha: int = 255) -> None:
         cy = sy - self.radius  # centra il cerchio sopra il punto a terra
+        self.hit_parts = [(None, 0, 0, pygame.Rect(sx - self.radius, cy - self.radius,
+                                                   self.radius * 2, self.radius * 2))]
         # Ombra.
         shadow = pygame.Surface((self.radius * 2, self.radius), pygame.SRCALPHA)
         pygame.draw.ellipse(shadow, (0, 0, 0, 90), shadow.get_rect())

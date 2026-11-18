@@ -22,7 +22,7 @@ from engine.vision import VisionSystem
 from .. import hud, mag_fx, scy_fx
 from ..camera import Camera
 from ..fx import type_color
-from .. import keybinds, match_ui
+from .. import keybinds, match_ui, target_pick
 from ..input_controller import champs_only_held, needs_aim
 from ..minimap import Minimap
 from ..networld import NetWorld
@@ -37,7 +37,7 @@ ROOT = Path(__file__).resolve().parents[2]
 ABILITY_KEYS = {pygame.K_q: 0, pygame.K_w: 1, pygame.K_e: 2, pygame.K_r: 3}
 ITEM_KEYS = {k: i for i, k in enumerate((pygame.K_1, pygame.K_2, pygame.K_3,
                                          pygame.K_4, pygame.K_5, pygame.K_6))}
-PICK_RADIUS = 1.4
+
 
 
 class NetMatchScene:
@@ -204,25 +204,16 @@ class NetMatchScene:
     def _left_click(self, pos):
         tx, ty = self._tile(pos)
         champs = champs_only_held()   # Maiusc: "solo Pokémon"
-        tgt = self._pick_enemy(tx, ty, champs)
+        wx, wy = self.camera.screen_window_to_world(*pos)
+        tgt = target_pick.pick(self.world, self.team, wx, wy, champs)   # sullo sprite
         if tgt is not None:
             self.client.send_attack(tgt.id)
         else:
             self.client.send_attackmove(tx, ty, champs_only=champs)
 
     def _pick_enemy(self, tx, ty, champs_only=False):
-        best, bd = None, 1e9
-        for e in self.world.combatants():
-            if e.team == self.team or not getattr(e, "alive", False):
-                continue
-            if not isinstance(e, (Unit, Structure)):
-                continue
-            if champs_only and not isinstance(e, Pokemon):
-                continue
-            d = ((e.pos.x - tx) ** 2 + (e.pos.y - ty) ** 2) ** 0.5
-            if d <= PICK_RADIUS + getattr(e, "radius", 0.0) and d < bd:
-                best, bd = e, d
-        return best
+        ts = config.TILE_SIZE
+        return target_pick.pick(self.world, self.team, tx * ts, ty * ts, champs_only)
 
     def _minimap_click(self, ev):
         tx, ty = self.minimap.to_world_tile(ev.pos)

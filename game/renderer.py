@@ -23,6 +23,7 @@ from . import (arch_fx, eevee_fx, hatt_fx, mag_fx, mien_fx, noivern_fx,
                flor_fx, incin_fx, moth_fx, octi_fx, scy_fx, swine_fx,
                sneasel_fx, ursa_fx)
 from . import structure_gfx
+from . import target_pick
 from .fx_lines import UNIT_OVERLAYS
 from .fx import type_color
 from .roggen_fx import EMBER, ROCK_HI, ROCK_MID, ROCK_OUT, ROCK_SH
@@ -843,6 +844,8 @@ class Renderer:
         x0, y0, x1, y1 = camera.visible_tile_bounds(ts, world.grid.width, world.grid.height)
 
         drawables = []
+        target_pick.begin()       # dove si disegna ogni unita': clic sullo sprite
+        pox, poy = camera.ox, camera.oy
         for s in world.structures():
             if not (x0 - 4 <= s.pos.x <= x1 + 4 and y0 - 4 <= s.pos.y <= y1 + 6):
                 continue
@@ -851,6 +854,10 @@ class Renderer:
                 # cosi' chi ci sta sopra (respawn, negozio) resta visibile.
                 gx, gy = camera.world_to_screen(s.pos.x * ts, s.pos.y * ts)
                 structure_gfx.draw_base(surface, s, gx, gy, now, ts)
+                if s.alive:
+                    rb = structure_gfx.base_radius_px(ts)
+                    target_pick.record(s.id, s.pos.y, [(None, 0, 0, pygame.Rect(
+                        gx - rb, gy - rb // 2, 2 * rb, rb))], pox, poy)
                 if s.alive and config.SHOW_HP_BARS and s.hp < s.max_hp:
                     r = structure_gfx.base_radius_px(ts)
                     self._hp_bar(surface, gx, gy - r - 6, s.hp / s.max_hp,
@@ -884,6 +891,11 @@ class Renderer:
                 self._draw_pillar(surface, e, gx, gy, now)
             elif isinstance(e, Structure):
                 self._draw_structure(surface, e, gx, gy, now)
+                if e.alive:
+                    spr, fx_, foot, _g = structure_gfx.tower_sprite(ts, e.team)
+                    target_pick.record(e.id, e.pos.y, [(spr, gx - fx_, gy - foot,
+                                       spr.get_bounding_rect().move(gx - fx_, gy - foot))],
+                                       pox, poy)
             else:
                 if e.id == selected_id:
                     r = int(e.radius * ts)
@@ -907,6 +919,9 @@ class Renderer:
                 # Acidarmatura (Vaporeon): al posto dello sprite, una pozza.
                 if isinstance(e, Pokemon) and e.puddle_until > now:
                     eevee_fx.draw_puddle(surface, e, gx, gy, now, ts)
+                    r = int(e.radius * ts) + 4
+                    target_pick.record(e.id, e.pos.y, [(None, 0, 0, pygame.Rect(
+                        gx - r, gy - r, 2 * r, 2 * r))], pox, poy)
                     self._draw_unit_hp(surface, e, gx, gy)
                     continue
                 anim = animators.get(e.id)
@@ -925,6 +940,8 @@ class Renderer:
                         anim.draw(surface, gx, gy, alpha=95)
                     else:
                         anim.draw(surface, gx, gy)
+                    target_pick.record(e.id, e.pos.y, getattr(anim, "hit_parts", None),
+                                       pox, poy)
                 if isinstance(e, Pokemon) and getattr(e, "spirit_awaken", 0) > 0:
                     spirit_fx.draw_aura(surface, camera, e, now, 110 if ghost else 255)
                 if isinstance(e, Pokemon):   # ghiaccio, cuori, sabbia, Resistenza
