@@ -1510,6 +1510,32 @@ Passaggi completati:
   Limite noto: profilo e tasti del menu non scalano con la risoluzione (piccoli a
   1080p). Screenshot: step_74_menu_720/_1080, step_74_char_720/_1080/_jungler/
   _flabebe, step_74_draft_720/_1080.
+- EFFETTI SONORI, PING, CHAT RAPIDA e RESA (step_75), offline e online. (1) game/sfx.py:
+  suoni SINTETIZZATI con numpy (nessun file audio, niente crediti), ricette di onde con
+  inviluppo, in cache alla prima riproduzione; play (interfaccia), play_at (nel mondo:
+  volume dalla distanza dal centro camera e stereo, muto oltre HEAR_TILES), play_events
+  (eventi fx del motore); THROTTLE per suono (in una mischia se ne sente uno); no-op senza
+  mixer. Clic/scorrimento nei menu da App._ui_sounds. (2) game/team_comm.py (TeamComm,
+  condiviso da MatchScene e NetMatchScene/OnlineMatchScene): PING con ICONE pixel art 7x7
+  autoesplicative su uno spillo (scalate NEAREST, in cache): "!" attenzione, teschio
+  pericolo, freccia "arrivo", "?" sparito, croce aiuto, X attacca. G tenuto + clic = ping
+  rapido, trascinando = RUOTA a 5 spicchi, Alt+clic = pericolo; anche sulla minimappa;
+  fuori schermo una freccia sul bordo (sopra l'HUD). Durata PING_LIFE 3,2 s. CHAT RAPIDA
+  (T, poi 1-8 o clic) con feed a sinistra; limite 5 ping/frasi ogni 4 s (SPAM_N/T, anche
+  l'host taglia). Tasti in keybinds (Ping G, Chat T: 12 azioni nella pagina Tasti).
+  (3) RESA (engine/surrender.py, SurrenderMixin in Match): dal minuto 10, voto di 30 s,
+  votano solo gli umani (bot e sostituti esclusi), servono tutti se <=3 altrimenti tutti
+  meno uno; se fallisce attesa di 120 s; se passa vince l'altra squadra. Proposta dalla
+  voce 9 della chat rapida, voto con F5/F6 o clic. Pannello in alto a destra (caselle
+  verdi/rosse/grigie per votante, "servono N su M", barra del tempo, pulsanti o "Hai
+  votato"). OFFLINE c'e' un solo umano: proporre la resa chiude subito la partita.
+  (4) Rete: PROTO_VERSION 6, pacchetto R_TEAM (0x50: ping/frase, inoltrato dall'host SOLO
+  alla propria squadra), ACT_SURRENDER (10) -> SurrenderVoteCommand; lo stato del voto
+  (surrender_state, istanti ASSOLUTI: il pacchetto R_VIS non riparte a ogni tick) va solo
+  alla propria squadra in net/visual. Niente eventi fx per la resa (fx_visible li avrebbe
+  mostrati ai nemici): i suoni nascono dai cambi di stato nell'HUD. Test:
+  tests/test_team_comm.py (13). Screenshot: step_75_ping, _ruota, _chat, _icone, _resa,
+  _resa_votato, _tasti.
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

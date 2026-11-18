@@ -155,6 +155,8 @@ def capture_visual(match, team: int, player=None) -> dict:
                            round(1.0 - max(0.0, p.respawn_timer) / max(0.1, p.respawn_max), 2))
                           for p in dead]
     out["score"] = capture_score(match)
+    if hasattr(match, "surrender_state"):
+        out["surrender"] = match.surrender_state(team)   # voto di resa della squadra
     if isinstance(player, Pokemon):
         out["me"] = capture_me_visual(match, player)
         if not player.alive and player.death_recap:

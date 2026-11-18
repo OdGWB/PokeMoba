@@ -139,6 +139,25 @@ class App:
         else:
             audio.stop_music()
 
+    _NAV_KEYS = (pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT, pygame.K_TAB)
+
+    def _ui_sounds(self, events):
+        """Suoni generici dei menu (scene senza camera): clic, frecce, Invio, Esc.
+        Nelle partite i suoni li gestisce la scena (game/sfx.py)."""
+        if getattr(self.scene, "camera", None) is not None:
+            return
+        from . import sfx
+        for ev in events:
+            if ev.type == pygame.MOUSEBUTTONDOWN and ev.button in (1, 3):
+                sfx.play("ui_click")
+            elif ev.type == pygame.KEYDOWN:
+                if ev.key in self._NAV_KEYS:
+                    sfx.play("ui_move")
+                elif ev.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                    sfx.play("ui_confirm")
+                elif ev.key == pygame.K_ESCAPE:
+                    sfx.play("ui_back")
+
     def run(self):
         self._sync_music()
         while self.running:
@@ -152,6 +171,7 @@ class App:
                     self.window = pygame.display.set_mode(self.windowed_size, pygame.RESIZABLE)
                 elif ev.type == pygame.KEYDOWN and ev.key in (pygame.K_F11, pygame.K_f):
                     self._toggle_fullscreen()
+            self._ui_sounds(events)
             self.scene.handle_events(events)
 
             self.accumulator += dt

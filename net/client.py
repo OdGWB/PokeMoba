@@ -51,6 +51,7 @@ class ClientSession:
         self.lost_reason = ""
         self.events = collections.deque(maxlen=8)    # (tempo, testo) per la UI
         self.chat = collections.deque(maxlen=8)      # (nome, testo)
+        self.team_msgs = collections.deque(maxlen=32)  # dict di dec_team + "t" (ping/chat rapida)
         self.frames: collections.OrderedDict = collections.OrderedDict()
         self.latest = None
         self.fx_queue: list = []
@@ -168,6 +169,11 @@ class ClientSession:
         elif t == P.R_CHAT:
             c = P.dec_chat(data)
             self.chat.append((self._name_of(c["slot"]), c["text"]))
+        elif t == P.R_TEAM:
+            m = P.dec_team(data)
+            m["t"] = now
+            m["name"] = self._name_of(m["slot"])
+            self.team_msgs.append(m)
         elif t == P.R_END:
             self.end_info = P.dec_end(data)
             self.phase = ENDED
@@ -246,6 +252,10 @@ class ClientSession:
         if text.strip():
             self.transport.send_reliable(P.enc_chat(0, text))
 
+    def send_team(self, kind, code, x=0.0, y=0.0) -> None:
+        if self.phase == MATCH:
+            self.transport.send_reliable(P.enc_team(0, kind, code, x, y))
+
     # --- invio: comandi (canale state, ridondanti) ------------------------------------------------
     def _cmd(self, kind, **f) -> None:
         if self.phase != MATCH:
@@ -287,6 +297,7 @@ class ClientSession:
     def send_buy(self, item_id): self._act(P.ACT_BUY, item_id=item_id)
     def send_sell(self, slot): self._act(P.ACT_SELL, slot=slot)
     def send_use_item(self, slot): self._act(P.ACT_USE, slot=slot)
+    def send_surrender(self, yes=True): self._act(P.ACT_SURRENDER, yes=yes)
 
     def close(self) -> None:
         try:

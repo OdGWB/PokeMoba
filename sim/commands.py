@@ -91,3 +91,9 @@ class RecallCommand(Command):
 @dataclass
 class SmiteCommand(Command):
     """Usa lo Smite sul neutrale piu' vicino a portata (tasto D; online CMD_SMITE)."""
+
+
+@dataclass
+class SurrenderVoteCommand(Command):
+    """Voto di resa (il primo si' apre la votazione; online ACT_SURRENDER)."""
+    yes: bool = True

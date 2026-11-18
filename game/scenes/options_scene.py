@@ -1,6 +1,6 @@
 """Opzioni (menu principale): schermo, audio, controlli.
 
-Righe: schermo intero, volume della musica, limite FPS, velocità della camera,
+Righe: schermo intero, volume della musica e degli effetti, limite FPS, velocità della camera,
 lancio rapido (smart cast) e la pagina dei tasti. Frecce su/giù per scegliere,
 sinistra/destra (o clic sulle frecce) per cambiare il valore, Invio/clic per
 attivare. Tutto si salva subito in %APPDATA%/PokeMoba/options.json.
@@ -43,7 +43,7 @@ def _row_box(surface, r, on, label, value=None, arrows=False, t=None):
 
 
 class OptionsScene:
-    ROWS = ("fullscreen", "music", "fps", "camera", "smart", "keys", "back")
+    ROWS = ("fullscreen", "music", "sfx", "fps", "camera", "smart", "keys", "back")
 
     def __init__(self, app):
         self.app = app
@@ -61,6 +61,8 @@ class OptionsScene:
             return "SÌ" if self.app.fullscreen else "NO"
         if key == "music":
             return f"{round(audio.music_volume() * 100)}%"
+        if key == "sfx":
+            return f"{round(audio.sfx_volume() * 100)}%"
         if key == "fps":
             cap = getattr(self.app, "fps_cap", 120)
             return "senza limite" if not cap else f"{cap}"
@@ -80,6 +82,15 @@ class OptionsScene:
                 v = 0.0                                   # Invio: giro completo
             audio.set_music_volume(v)
             _save_options({"music_volume": audio.music_volume()})
+        elif key == "sfx":
+            d = delta or 1
+            v = round(audio.sfx_volume() + d * VOL_STEP, 2)
+            if delta == 0 and v > 1.0:
+                v = 0.0
+            audio.set_sfx_volume(v)
+            _save_options({"sfx_volume": audio.sfx_volume()})
+            from .. import sfx
+            sfx.play("ui_confirm")                        # prova del volume
         elif key == "fps":
             caps = keybinds.FPS_CAPS
             cur = getattr(self.app, "fps_cap", 120)
@@ -151,6 +162,7 @@ class OptionsScene:
         title = big.render("Opzioni", True, GOLD)
         surface.blit(title, (W // 2 - title.get_width() // 2, int(H * 0.06)))
         labels = {"fullscreen": "Schermo intero", "music": "Volume musica",
+                  "sfx": "Volume effetti",
                   "fps": "Limite FPS", "camera": "Velocità camera (bordi)",
                   "smart": "Lancio rapido (smart cast)", "keys": "Tasti...",
                   "back": "Indietro"}
@@ -161,7 +173,7 @@ class OptionsScene:
             r = pygame.Rect(W // 2 - bw // 2, y0 + i * (bh + 10), bw, bh)
             on = i == self.sel
             val = self._value(key)
-            arrows = key in ("music", "fps", "camera")
+            arrows = key in ("music", "sfx", "fps", "camera")
             left, right = _row_box(surface, r, on, labels[key], val, arrows, t)
             if left is not None:
                 self._rects += [(left, key, -1), (right, key, 1)]
@@ -170,7 +182,8 @@ class OptionsScene:
                           "(Tiro Lungo e la R di Magnezone restano a mira).",
                  "fps": "Limite FPS: più basso = meno lavoro per la CPU (portatili).",
                  "camera": "Velocità dello scorrimento quando il mouse tocca il bordo.",
-                 "music": "Musica del menu (in partita non suona)."}
+                 "music": "Musica del menu (in partita non suona).",
+                 "sfx": "Effetti sonori: clic dei menu, colpi, mosse, ping e chat."}
         note = notes.get(self.ROWS[self.sel])
         if note:
             n = small.render(note, True, DIM)

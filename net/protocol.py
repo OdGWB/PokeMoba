@@ -29,7 +29,8 @@ from __future__ import annotations
 import math
 import struct
 
-PROTO_VERSION = 5       # 2: avatar; 3: draft (R_DRAFT/R_PICK); 4: stato visivo (R_VIS); 5: Smite
+PROTO_VERSION = 6       # 2: avatar; 3: draft (R_DRAFT/R_PICK); 4: stato visivo (R_VIS); 5: Smite
+                        # 6: ping e chat rapida di squadra (R_TEAM), resa (ACT_SURRENDER)
 
 # --- data channel -------------------------------------------------------------
 CH_STATE = 0
@@ -61,6 +62,12 @@ R_DRAFT = 0x4D          # host -> client: stato del draft (ordine, scelte, turno
 R_PICK = 0x4E           # client -> host: Pokémon in anteprima o confermato nel draft
 R_VIS = 0x4F            # host -> client: STATO VISIVO (stati sulle unità, effetti che
                         # durano, pilastri, spiriti, ricariche): vedi net/visual.py
+R_TEAM = 0x50           # entrambi i versi: ping sulla mappa o frase di chat rapida, SOLO alla
+                        # propria squadra (slot, tipo, codice, x, y)
+
+TEAM_PING = 0           # codice = tipo di ping (game/team_comm.PINGS)
+TEAM_CHAT = 1           # codice = frase della chat rapida (game/team_comm.QUICK_CHAT)
+TEAM_CODES = 16         # codici ammessi: 0..15
 
 # --- comandi sul canale state (dentro C_INPUT) -----------------------------------
 CMD_MOVE = 0
@@ -90,7 +97,8 @@ ACT_CHOOSE = 5
 ACT_BUY = 7
 ACT_SELL = 8
 ACT_USE = 9             # attiva l'oggetto di uno slot (Mentalerba, Palla Fumo)
-ACTIONS = (ACT_RANK, ACT_CHOOSE, ACT_BUY, ACT_SELL, ACT_USE)
+ACT_SURRENDER = 10      # voto di resa (1 = sì, 0 = no); il primo sì apre la votazione
+ACTIONS = (ACT_RANK, ACT_CHOOSE, ACT_BUY, ACT_SELL, ACT_USE, ACT_SURRENDER)
 
 # --- tipi di entità --------------------------------------------------------------
 K_POKEMON = 0
@@ -792,6 +800,8 @@ def enc_action(seq, kind, **f) -> bytes:
         w.s(f["item_id"], 48)
     elif kind in (ACT_SELL, ACT_USE):
         w.u8(f["slot"])
+    elif kind == ACT_SURRENDER:
+        w.u8(1 if f["yes"] else 0)
     else:
         raise ValueError(f"azione sconosciuta {kind}")
     return w.bytes()
@@ -809,6 +819,8 @@ def dec_action(data) -> dict:
         out["item_id"] = r.s()
     elif k in (ACT_SELL, ACT_USE):
         out["slot"] = r.u8()
+    elif k == ACT_SURRENDER:
+        out["yes"] = bool(r.u8())
     else:
         raise ProtocolError(f"azione sconosciuta {k}")
     return out
@@ -822,6 +834,21 @@ def enc_chat(slot, text) -> bytes:
 def dec_chat(data) -> dict:
     r = Reader(data); r.u8()
     return {"slot": r.u8(), "text": r.s()}
+
+
+def enc_team(slot, kind, code, x=0.0, y=0.0) -> bytes:
+    """Ping o chat rapida. Dal client lo slot è ignorato (lo mette l'host)."""
+    return (Writer().u8(R_TEAM).u8(slot).u8(kind).u8(code)
+            .i16(q_pos(x)).i16(q_pos(y)).bytes())
+
+
+def dec_team(data) -> dict:
+    r = Reader(data); r.u8()
+    out = {"slot": r.u8(), "kind": r.u8(), "code": r.u8()}
+    out["x"] = dq_pos(r.i16()); out["y"] = dq_pos(r.i16())
+    if out["kind"] not in (TEAM_PING, TEAM_CHAT) or out["code"] >= TEAM_CODES:
+        raise ProtocolError("messaggio di squadra non valido")
+    return out
 
 
 def enc_event(kind, slot, name="") -> bytes:

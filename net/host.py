@@ -521,6 +521,8 @@ class HostSession:
                 self._strike(s)
             elif text:
                 self._broadcast(P.enc_chat(s.index, text))
+        elif t == P.R_TEAM:
+            self._on_team(s, P.dec_team(data))
         elif t == P.R_PING:
             self._send(s, P.enc_pong(P.dec_ping(data), self.host_clock(now),
                                      self.sim.tick_count if self.sim else 0))
@@ -642,9 +644,20 @@ class HostSession:
             return SmiteCommand(seq=seq, entity_id=eid)
         return None
 
+    def _on_team(self, s, m):
+        """Ping o chat rapida: solo in partita, solo alla squadra di chi lo manda."""
+        if self.phase != "match" or not s.entity_id:
+            return
+        if not s.guard.team.take():
+            return                      # troppi ping: scartati (non e' un attacco)
+        data = P.enc_team(s.index, m["kind"], m["code"], m["x"], m["y"])
+        for o in self.slots:
+            if o.joined and o.team == s.team:
+                self._send(o, data)
+
     def _on_action(self, s, a):
         from sim.commands import (BuyItemCommand, ChooseUpgradeCommand, RankMoveCommand,
-                                  SellItemCommand, UseItemCommand)
+                                  SellItemCommand, SurrenderVoteCommand, UseItemCommand)
         if not s.guard.actions.take():
             self._strike(s)
             return
@@ -663,6 +676,8 @@ class HostSession:
             cmd = SellItemCommand(seq=seq, entity_id=eid, slot=a["slot"])
         elif k == P.ACT_USE and V.valid_item_slot(a["slot"]):
             cmd = UseItemCommand(seq=seq, entity_id=eid, slot=a["slot"])
+        elif k == P.ACT_SURRENDER:
+            cmd = SurrenderVoteCommand(seq=seq, entity_id=eid, yes=a["yes"])
         if cmd is None:
             self._strike(s)
         else:

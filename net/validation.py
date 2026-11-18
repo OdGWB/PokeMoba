@@ -42,6 +42,7 @@ INPUT_PACKETS = (120.0, 40.0)    # pacchetti C_INPUT/s (il client ne manda ~60)
 COMMANDS = (20.0, 12.0)          # comandi NUOVI/s (click, mosse)
 ACTIONS = (10.0, 10.0)           # acquisti, gradi, scelte
 CHAT = (2.0, 5.0)
+TEAM = (3.0, 8.0)                # ping e chat rapida (oltre: scartati in silenzio)
 KICK_STRIKES = 200               # violazioni prima dell'espulsione
 
 
@@ -53,6 +54,7 @@ class ClientGuard:
         self.commands = TokenBucket(*COMMANDS)
         self.actions = TokenBucket(*ACTIONS)
         self.chat = TokenBucket(*CHAT)
+        self.team = TokenBucket(*TEAM)
         self.strikes = 0
         self.rejected = 0
 

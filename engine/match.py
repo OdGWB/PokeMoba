@@ -31,6 +31,7 @@ from .mienshao import PROJ_SHAPES
 from .venomoth import MOTH_PASSIVES
 from .item_effects import ItemEffectsMixin, cdr_to_haste
 from .bot_plan import BotPlanMixin
+from .surrender import SurrenderMixin
 from .lines import LINE_MIXINS, bot_cast_table, hook_names
 from .smite import (GANK_COOLDOWN, GANK_DURATION, SmiteMixin, smite_damage)
 from .basic_attack import (ACQUIRE_EXTRA, AMOVE_DROP_EXTRA, AMOVE_EXTRA, AS_CAP,
@@ -182,7 +183,8 @@ CAST_ANIMS = {"projectile": "Shoot", "bubble": "Shoot",
             "incinbully": "Charge", "incinropes": "Hop", "incinlariat": "Rotate",
             "incingrab": "Swing"}
 
-class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPlanMixin):
+class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPlanMixin,
+            SurrenderMixin):
     def __init__(self, world, map_data):
         self.world = world
         self.map = map_data
@@ -254,6 +256,9 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         if self.winner is not None:
             return
         self.time += dt
+        self._surrender_tick()
+        if self.winner is not None:
+            return
         self._combat_hash.rebuild(self.world.combatants())
         # Visione per entrambe le squadre (ricalcolo solo al cambio tile): la usano
         # i bot per ingaggiare solo nemici realmente visibili, e il client per la

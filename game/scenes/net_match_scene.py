@@ -29,6 +29,7 @@ from ..networld import NetWorld
 from ..particles import ParticleSystem
 from ..renderer import Renderer
 from ..shop_ui import ShopUI
+from ..team_comm import TeamComm
 from ..sprites.animator import FallbackAnimator, SpriteAnimator
 from ..sprites.spritesheet import load_pokemon_animations, make_wild_animator
 
@@ -40,6 +41,7 @@ PICK_RADIUS = 1.4
 
 
 class NetMatchScene:
+    _comm_first = False      # OnlineMatchScene passa gli eventi a TeamComm prima di ESC
     def __init__(self, app, client, start_info):
         self.app = app
         self.client = client
@@ -69,6 +71,9 @@ class NetMatchScene:
         # solo dentro la camera, al massimo ~60 a schermo. Stesse della partita
         # locale: la grafica della giungla e' identica anche online.
         self.particles = ParticleSystem()
+        # Ping sulla mappa e chat rapida di squadra (relay dell'host; LAN: niente).
+        self.comm = TeamComm(getattr(client, "send_team", None),
+                             getattr(client, "name", None) or "Tu")
         self.animators = {}
         self._unit_dex = {}   # dex per unità (per ricreare lo sprite al cambio forma)
         self.camera_locked = True
@@ -114,6 +119,8 @@ class NetMatchScene:
     # --- ciclo ---------------------------------------------------------------
     def handle_events(self, events):
         for ev in events:
+            if not self._comm_first and self.comm.handle_event(ev, self.camera, self.minimap):
+                continue
             if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
                 self.client.close()
                 self.quit_app = True
@@ -273,6 +280,17 @@ class NetMatchScene:
         import time
         self.client.poll()
         now = time.monotonic()
+        self.comm.update(now)
+        msgs = getattr(self.client, "team_msgs", None)
+        while msgs:
+            self.comm.receive(msgs.popleft())
+        send_surr = getattr(self.client, "send_surrender", None)
+        if send_surr is not None:
+            self.comm.on_surrender = send_surr
+            names = getattr(self, "_names", {})
+            self.comm.set_vote((getattr(self.client, "visual", None) or {}).get("surrender"),
+                               self.world.match_time, self.your_id,
+                               lambda i: names.get(i, "?"))
         self.world.interpolate(now)
         self._sync_terrain()
         me = self.world.get(self.your_id)
@@ -330,6 +348,7 @@ class NetMatchScene:
         # Particelle d'atmosfera della giungla (sopra mappa e unita, sotto la UI).
         self.particles.draw(surface, self.camera)
         self._draw_after_particles(surface)
+        self.comm.draw_world(surface, self.camera)
         if self.aiming_slot is not None and me is not None:
             s = self.world.hud["slots"][["Q", "W", "E", "R"][self.aiming_slot]]
             ms = self.disp_moveset.get(["Q", "W", "E", "R"][self.aiming_slot])
@@ -511,6 +530,8 @@ class NetMatchScene:
             match_ui.draw_death_recap(surface, self._death_recap(),
                                       self._bar.rect.y - (34 if h.get("points", 0) > 0 else 10))
 
+        self.comm.draw_minimap(surface, self.minimap)
+        self.comm.draw_overlay(surface, self._bar.rect.y)
         if self.shop.open:
             near = me is not None and me.pos.dist(self.base) <= config.SHOP_RANGE
             self.shop.draw(surface, font, self.item_catalog, h.get("gold", 0),

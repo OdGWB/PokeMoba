@@ -22,6 +22,7 @@ from engine.eevee import CHOICE_SLOTS, chosen_index, eevee_candidates, eevee_for
 from engine.world import World
 from sim.commands import (BuyItemCommand, ChooseUpgradeCommand, MoveCommand,
                           RankMoveCommand, RecallCommand, SellItemCommand, SmiteCommand,
+                          SurrenderVoteCommand,
                           UseItemCommand)
 from sim.simulation import Simulation
 
@@ -37,7 +38,8 @@ from ..sprites.animator import FallbackAnimator, SpriteAnimator
 from ..sprites.spritesheet import load_pokemon_animations, make_wild_animator
 from .. import hud
 from ..fx import type_color
-from .. import keybinds, match_ui
+from .. import keybinds, match_ui, sfx
+from ..team_comm import TeamComm
 from ..hud_passives import PassiveCtx, draw_passive
 from ..world_fx import draw_projectiles, draw_world_effects, update_world_fx
 
@@ -117,6 +119,11 @@ class MatchScene:
             self.renderer.flower_source = lambda: self.match.flowers
         self.renderer.map.set_camps(map_data.camps)   # sentieri di terra verso le lane
         self.fx = FXSystem()
+        self._sfx = sfx.Watcher()
+        # Ping sulla mappa e chat rapida (offline: i messaggi restano qui).
+        from game.avatars import load_profile
+        self.comm = TeamComm(None, (load_profile() or {}).get("name", "Tu"))
+        self.comm.on_surrender = self._send_surrender
         self.fx.pos_of = self._unit_pos   # proiettili dell attacco base che seguono il bersaglio
         self.fx.me = self.player.id       # "+oro" dell'ultimo colpo: solo il proprio
         # Regolazioni visive dell'editor delle animazioni (partenza proiettili).
@@ -290,6 +297,8 @@ class MatchScene:
                             and self._end_btn is not None and self._end_btn.collidepoint(ev.pos))):
                     self._back_to_menu()
                 continue
+            if self.comm.handle_event(ev, self.camera, self.minimap):
+                continue   # ping (ruota) o chat rapida
             if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
                 self.quit_app = True
             elif ev.type == pygame.KEYDOWN and ev.key == keybinds.key("shop") and self.match is not None:
@@ -380,7 +389,18 @@ class MatchScene:
     def fixed_update(self) -> None:
         self.sim.step()
 
+    def _send_surrender(self, yes):
+        if self.match is None or self.player is None:
+            return
+        self._menu_seq += 1
+        self.sim.queue_command(SurrenderVoteCommand(seq=50_000 + self._menu_seq,
+                                                    entity_id=self.player.id, yes=yes))
+
     def update(self, dt: float) -> None:
+        self.comm.update(self.match.time if self.match is not None else 0.0)
+        if self.match is not None and self.player is not None:
+            self.comm.set_vote(self.match.surrender_state(self.player.team), self.match.time,
+                               self.player.id, lambda i: self.comm.my_name)
         for u in self.world.units():
             if u.id not in self.animators:
                 self.animators[u.id] = self._make_animator(u)
@@ -443,6 +463,7 @@ class MatchScene:
         # Effetti visivi delle mosse (cosmetici): consuma gli eventi della sim.
         if self.match is not None and self.match.fx_events:
             self._trigger_anims(self.match.fx_events)
+            sfx.play_events(self.match.fx_events, self.camera, self.player.id)
             self.fx.spawn_events(self._fx_tuner.process(
                 self.match.fx_events, self.animators, self._unit_pos))
             self.match.fx_events.clear()
@@ -454,6 +475,7 @@ class MatchScene:
         if self.match is not None:
             update_world_fx(self.fx, self.match, self.match.time)
         self.fx.update(dt)
+        self._sound_state()
         # Particelle d'atmosfera: aggiornate solo nel rettangolo visibile.
         self.particles.update(dt, self.camera, self.map_data.grid)
 
@@ -464,6 +486,17 @@ class MatchScene:
             if v != self._mm_version:
                 self._mm_version = v
                 self.minimap.rebuild_fog(self.vision, self.player.team)
+
+    def _sound_state(self) -> None:
+        """Suoni dei cambi di stato (livello, evoluzione, morte, acquisti, torri, esito)."""
+        if self.match is None:
+            return
+        p = self.player
+        w = self.match.winner
+        self._sfx.update(level=p.level, form=p.dex, alive=p.alive, items=p.items,
+                         gold=int(p.gold), kills=p.stat_kills,
+                         structures=sum(1 for s in self.world.structures() if s.alive),
+                         result=None if w is None else ("win" if w == p.team else "lose"))
 
     def _trigger_anims(self, events) -> None:
         """Avvia le animazioni una-tantum (Attack/Shoot) dagli eventi FX, rilascio
@@ -501,6 +534,7 @@ class MatchScene:
         # Particelle d'atmosfera della giungla (ambientali, sopra mappa e unita,
         # sotto gli effetti delle mosse e la UI).
         self.particles.draw(surface, self.camera)
+        self.comm.draw_world(surface, self.camera)   # ping della squadra
         # Unità in morte: Hurt che svanisce (sopra la mappa).
         ts = config.TILE_SIZE
         for d in self._dying.values():
@@ -711,6 +745,9 @@ class MatchScene:
                             "muoviti o subisci danno per annullare", (150, 200, 255),
                             frac=1.0 - left / config.RECALL_TIME)
 
+        if self.minimap is not None:
+            self.comm.draw_minimap(surface, self.minimap)
+        self.comm.draw_overlay(surface, lay.rect.y)
         if self.shop.open:
             self.shop.draw(surface, font, self.match.item_catalog, p.gold, p.items,
                            p.rec_items or self.pdef.role, near_base, p.item_cd, self.match.time,

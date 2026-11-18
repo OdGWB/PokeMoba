@@ -20,6 +20,8 @@ ACTIONS = [
     ("shop", "Negozio", pygame.K_p),
     ("camera", "Blocca la camera", pygame.K_y),
     ("score", "Tabellone (tieni premuto)", pygame.K_TAB),
+    ("ping", "Ping (tieni + clic, trascina)", pygame.K_g),
+    ("chat", "Chat rapida", pygame.K_t),
 ]
 DEFAULTS = {a: k for a, _l, k in ACTIONS}
 LABELS = {a: l for a, l, _k in ACTIONS}

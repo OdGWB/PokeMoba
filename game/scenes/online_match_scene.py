@@ -22,7 +22,7 @@ import config
 from net import client as C
 from net.prediction import Predictor
 
-from .. import anim_tuning, arch_fx, hatt_fx, hud, mag_fx, match_ui, moth_fx, swine_fx
+from .. import anim_tuning, arch_fx, hatt_fx, hud, mag_fx, match_ui, moth_fx, sfx, swine_fx
 from ..fx import FXSystem
 from ..hud_passives import PassiveCtx, draw_passive
 from ..online_world import MovementModel, OnlineWorld
@@ -36,6 +36,7 @@ GONE_WAIT = 0.4      # s: un Pokémon sparito è morto se lo stato visivo lo dà
 
 
 class OnlineMatchScene(NetMatchScene):
+    _comm_first = True
     def __init__(self, app, session, host=None):
         # NetMatchScene carica mappa, minimappa, negozio; la mappa grafica del
         # renderer si costruisce invece al PRIMO draw (10-20 s). R_LOADED parte
@@ -49,6 +50,7 @@ class OnlineMatchScene(NetMatchScene):
         session.on_frame = self.world.push_frame
         session.on_command = self._on_command
         self.fx = FXSystem()
+        self._sfx = sfx.Watcher()
         self.fx.pos_of = self._unit_pos   # proiettili dell attacco base che seguono il bersaglio
         self.fx.me = self.your_id         # "+oro" dell'ultimo colpo: solo il proprio
         # Regolazioni visive dell'editor delle animazioni (partenza proiettili).
@@ -74,6 +76,9 @@ class OnlineMatchScene(NetMatchScene):
         rest = []
         for ev in events:
             if self.slot_panel is not None and self.slot_panel.handle_event(ev):
+                continue
+            if (self.world.winner is None and self.slot_panel is None
+                    and self.comm.handle_event(ev, self.camera, self.minimap)):
                 continue
             if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
                 if self.slot_panel is not None:
@@ -151,6 +156,10 @@ class OnlineMatchScene(NetMatchScene):
             except Exception:
                 pass
             try:
+                sfx.play_events(events, self.camera, self.your_id)
+            except Exception:
+                pass
+            try:
                 anim_tuning.apply_unit_events(self.animators, events)
             except Exception:       # evento cosmetico incompleto: si salta
                 pass
@@ -168,10 +177,32 @@ class OnlineMatchScene(NetMatchScene):
         update_world_fx(self.fx, self.world.fxs, self.world.match_time)
         self._update_deaths(dt)
         self.fx.update(dt)
+        self._sound_state()
         if self.slot_panel is not None:
             self.slot_panel.update()
         if self.host is not None and self.session.phase == C.MATCH:
             self._auto_reopen()
+
+    def _sound_state(self):
+        """Suoni dei cambi di stato del proprio Pokemon e della partita (come offline)."""
+        h = getattr(self.world, "hud", None) or {}
+        if not h:
+            return
+        me = self.world.get(self.your_id)
+        alive = me is not None and me.id not in getattr(self.world, "dead", ())
+        kills = None
+        for r in (self.session.visual or {}).get("score") or ():
+            if r and r[0] == self.your_id:
+                kills = r[4]
+                break
+        w = self.world.winner
+        if w is None and self.session.phase == C.ENDED and self.session.end_info:
+            w = self.session.end_info.get("winner")
+        self._sfx.update(level=h.get("level"), form=getattr(me, "dex", None) if me else None,
+                         alive=alive, items=h.get("items"), gold=int(h.get("gold", 0)),
+                         kills=kills,
+                         structures=sum(1 for s in self.world.structures() if s.alive),
+                         result=None if w is None else ("win" if w == self.team else "lose"))
 
     def _update_deaths(self, dt):
         """Morte: posa Hurt + dissolvenza come offline. Lo snapshot toglie il
