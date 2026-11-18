@@ -7,12 +7,17 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 
 
 def main() -> None:
+    if len(sys.argv) >= 3 and sys.argv[1] == "--terrain-worker":
+        # Processo delle varianti della mappa col meteo (game/terrain_variants.py).
+        from game import terrain_variants
+        sys.exit(terrain_variants.worker_main(sys.argv[2]))
     parser = argparse.ArgumentParser(description="PokéMoba - client")
     parser.add_argument("--single", action="store_true",
                         help="avvia subito una partita in locale contro i bot")

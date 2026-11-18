@@ -32,6 +32,7 @@ from ..input_controller import InputController
 from ..minimap import Minimap
 from .. import anim_tuning, arch_fx, eevee_fx, hatt_fx, mag_fx, moth_fx, scy_fx, spirit_fx, swine_fx
 from ..particles import ParticleSystem
+from ..weather_fx import WeatherFx
 from ..renderer import Renderer
 from ..shop_ui import ShopUI
 from ..sprites.animator import FallbackAnimator, SpriteAnimator
@@ -131,6 +132,8 @@ class MatchScene:
         # Particelle d'atmosfera (lucciole/polline/foglie): cosmetiche, aggiornate
         # solo dentro la camera, al massimo ~60 a schermo.
         self.particles = ParticleSystem()
+        # Atmosfera a schermo del meteo (pioggia/sole/vento): solo grafica.
+        self.weather_fx = WeatherFx()
         self._menu_seq = 0
         # Nebbia di guerra + minimappa solo nelle mappe MOBA. La visione è
         # calcolata dal Match (motore), così la condividono bot e client.
@@ -192,6 +195,10 @@ class MatchScene:
 
     def _setup_moba(self):
         self.match = Match(self.world, self.map_data)
+        # Mappa disegnata che segue il meteo (pozze, cespugli secchi, varchi, tana).
+        jg = getattr(self.match, "jungle", None)
+        if jg is not None and getattr(jg, "base_tiles", None):
+            self.renderer.map.set_terrain(jg.base_tiles, jg._seal_tiles, self.map_data)
         # team_size Pokémon per squadra (3v3 o 5v5), lane a rotazione. Il giocatore
         # prende il primo slot in mid; il resto della squadra 0 e tutta la 1 sono bot.
         self.player = None
@@ -534,6 +541,8 @@ class MatchScene:
         # Particelle d'atmosfera della giungla (ambientali, sopra mappa e unita,
         # sotto gli effetti delle mosse e la UI).
         self.particles.draw(surface, self.camera)
+        jg = getattr(self.match, "jungle", None)
+        self.weather_fx.draw(surface, self.camera, getattr(jg, "weather", "clear"))
         self.comm.draw_world(surface, self.camera)   # ping della squadra
         # Unità in morte: Hurt che svanisce (sopra la mappa).
         ts = config.TILE_SIZE

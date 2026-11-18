@@ -27,6 +27,7 @@ from ..input_controller import champs_only_held, needs_aim
 from ..minimap import Minimap
 from ..networld import NetWorld
 from ..particles import ParticleSystem
+from ..weather_fx import WeatherFx
 from ..renderer import Renderer
 from ..shop_ui import ShopUI
 from ..team_comm import TeamComm
@@ -71,6 +72,7 @@ class NetMatchScene:
         # solo dentro la camera, al massimo ~60 a schermo. Stesse della partita
         # locale: la grafica della giungla e' identica anche online.
         self.particles = ParticleSystem()
+        self.weather_fx = WeatherFx()      # atmosfera a schermo del meteo
         # Ping sulla mappa e chat rapida di squadra (relay dell'host; LAN: niente).
         self.comm = TeamComm(getattr(client, "send_team", None),
                              getattr(client, "name", None) or "Tu")
@@ -90,6 +92,7 @@ class NetMatchScene:
         for (x, y) in self._seal:
             g.tiles[y][x] = TILE_WALL
         self._base_tiles = [row[:] for row in g.tiles]
+        self.renderer.map.set_terrain(self._base_tiles, self._seal, self.map_data)
         self._applied_weather = None
         self._applied_open = False
         client.on_snapshot = self._on_snapshot
@@ -338,6 +341,7 @@ class NetMatchScene:
         self._draw_world_extras(surface)
         # Particelle d'atmosfera della giungla (sopra mappa e unita, sotto la UI).
         self.particles.draw(surface, self.camera)
+        self.weather_fx.draw(surface, self.camera, self._applied_weather or "clear")
         self._draw_after_particles(surface)
         self.comm.draw_world(surface, self.camera)
         if self.aiming_slot is not None and me is not None:

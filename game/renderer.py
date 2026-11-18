@@ -406,7 +406,7 @@ class Renderer:
         # Il FIUME (TILE_RIVER) e' ora reso a livello mappa (MapRenderer._build_river:
         # silhouette smussata + riva sfumata), quindi qui NON genera piu' la riva
         # per-tile. Resta la pozza (TILE_PUDDLE, dinamica con la Pioggia).
-        water = (TILE_PUDDLE,)
+        water = ()  # anche le pozze sono ora a livello mappa (_water_solid)
         is_water = t in water
         land_ground = ground in (TILE_FLOOR, TILE_LANE)
         if not (is_water or land_ground):

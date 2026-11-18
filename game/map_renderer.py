@@ -36,7 +36,7 @@ import pygame.surfarray
 import config
 
 from . import map_cache
-from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
+from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE, TILE_PUDDLE,
                          TILE_RIVER, TILE_WALL)
 
 COL_GRID = (0, 0, 0)
@@ -261,6 +261,22 @@ class _Layer:
                    for s in self.chunks.values())
 
 
+class _RefGrid:
+    """Vista minima (width/height/tiles) su una copia dei tile di riferimento."""
+    __slots__ = ("width", "height", "tiles")
+
+    def __init__(self, w, h, tiles):
+        self.width, self.height, self.tiles = w, h, tiles
+
+    def in_bounds(self, x, y):
+        return 0 <= x < self.width and 0 <= y < self.height
+
+    def tile_at(self, x, y):
+        if 0 <= x < self.width and 0 <= y < self.height:
+            return self.tiles[y][x]
+        return TILE_WALL
+
+
 class MapRenderer:
     LAYER_NAMES = ("ground", "ground_decor", "shadows", "walls_base",
                    "canopy", "lighting_overlay")
@@ -281,6 +297,8 @@ class MapRenderer:
         self._tree_cache: dict = {}  # sprite albero per (R quantizzato, variante, palette)
         self._grass_cache: dict = {} # sprite ciuffo d'erba per (tier, variante)
         self._foam: list = []        # schiuma animata: [(ax, ay_layer, [surf per frame])]
+        self._owner = None           # griglia di gioco servita dai layer attuali
+        self._tp = None              # TerrainPatcher (varianti del meteo), se impostato
 
     def set_camps(self, camps) -> None:
         """Posizioni dei campi della giungla (da MapData): servono SOLO a tracciare
@@ -292,17 +310,52 @@ class MapRenderer:
             self.layers = {}         # forza ensure_built a ricostruire
 
     # --- costruzione (una volta) --------------------------------------------
-    def ensure_built(self, grid) -> None:
-        """Costruisce i layer se mancano o se la griglia e cambiata."""
-        if self._grid is not grid or not self.layers:
-            # Cache su disco (game/map_cache.py): la stessa mappa con lo stesso
-            # codice di disegno si ricarica in ~1 s invece di ricostruirla.
-            if not map_cache.load(self, grid, _Layer):
-                self.build(grid)
-                map_cache.save(self, grid, self.LAYER_NAMES)
+    def set_terrain(self, base_tiles, seal, map_data) -> None:
+        """Terreno di BASE (senza meteo, tana chiusa) + anello della tana + MapData
+        (pozze/varchi): da qui si ricavano le poche varianti che il meteo puo'
+        produrre (game/terrain_variants.py). I layer si costruiscono SEMPRE dalla
+        base e le varianti si applicano a blocchi quando grid._ver cambia."""
+        from game import terrain_variants
+        tp = terrain_variants.TerrainPatcher(self, base_tiles, seal, map_data)
+        old = self._tp
+        self._tp = tp
+        if old is None or old.base_vh != tp.base_vh:
+            self.layers = {}         # ricostruzione (o cache) dalla nuova base
+        else:                        # stessa base: i layer (forse gia' patchati) restano
+            tp.adopt(old)
 
-    def build(self, grid) -> None:
+    def ensure_built(self, grid) -> None:
+        """Costruisce i layer se mancano o se la griglia e cambiata; poi tiene la
+        mappa allineata al meteo (solo un confronto di grid._ver a frame)."""
+        tp = self._tp
+        if self._owner is not grid or not self.layers:
+            src = tp.ref_grid() if tp is not None and tp.fits(grid) else grid
+            if src is not grid:
+                fresh = (not self.layers or self._grid is None
+                         or getattr(self._grid, "tiles", None) != tp.base)
+                if fresh:
+                    self._load_or_build(src)
+                tp.attach(src, fresh)
+            else:
+                self._load_or_build(grid)
+            self._owner = grid
+        if tp is not None and tp.fits(grid):
+            tp.sync(grid)
+
+    def _load_or_build(self, grid) -> None:
+        # Cache su disco (game/map_cache.py): la stessa mappa con lo stesso
+        # codice di disegno si ricarica in ~1 s invece di ricostruirla.
+        if not map_cache.load(self, grid, _Layer):
+            self.build(grid)
+            map_cache.save(self, grid, self.LAYER_NAMES)
+
+    def build(self, grid, ref=None) -> None:
+        """`ref` = tile di RIFERIMENTO (la mappa senza meteo): le parti GLOBALI
+        (sentieri, anello delle lane, etichette dei muri) si calcolano da li', cosi'
+        una variante col meteo differisce dalla base solo vicino ai tile cambiati."""
         ts = self.tile_size
+        rg = _RefGrid(grid.width, grid.height, ref) if ref is not None else grid
+        self._ref_grid = rg
         H = max(6, int(ts * 0.5))        # altezza di estrusione dei rilievi (cespugli)
         # Margine superiore: deve contenere l'estrusione piu alta, ovvero la
         # parete ~1 tile dei muri vegetati (RELIEF in _build_jungle_walls) -> cosi
@@ -332,14 +385,14 @@ class MapRenderer:
 
         # --- Sentieri: calcolati PRIMA del suolo, così i fili d'erba non si
         #     disegnano sul tracciato (set dei tile coperti dai sentieri).
-        routes, path_tiles = self._compute_paths(grid)
+        routes, path_tiles = self._compute_paths(rg)
 
         # --- Passata 1a: suolo di giungla ORGANICO, calcolato per pixel in
         #     coordinate mondo (maschera a bassa risoluzione + smoothscale):
         #     un'unica immagine continua, senza cuciture di tile. I dettagli
         #     (ciuffi d'erba, fiocchi di muschio, granelli di fango) si disegnano
         #     sopra, saltando i tile dei sentieri.
-        inner = self._inner_mask(grid)   # dentro l'anello delle lane (no fango fuori)
+        inner = self._inner_mask(rg)   # dentro l'anello delle lane (no fango fuori)
         floor_img = self._build_floor(grid, p, inner)
         self._scatter_detail(grid, floor_img, p, path_tiles, inner)
         ground.blit(floor_img, (0, top))
@@ -358,7 +411,7 @@ class MapRenderer:
                 # muri/cespugli si estrudono dopo (walls_base), il fiume si disegna
                 # a livello mappa (_build_river) con bordi smussati e alfa che
                 # sfuma sulla riva, cosi l'erba traspare al contatto con l'acqua.
-                g = TILE_FLOOR if (t in TALL_TILES or t == TILE_RIVER) else t
+                g = TILE_FLOOR if (t in TALL_TILES or t in (TILE_RIVER, TILE_PUDDLE)) else t
                 if g != TILE_FLOOR:
                     variant = (h >> 4) & 3
                     ground.blit(p._tile_surf(g, variant), (ax, ay))
@@ -716,7 +769,7 @@ class MapRenderer:
         for ty in range(Ht):
             row = tiles[ty]
             for tx in range(Wt):
-                if row[tx] == TILE_RIVER:
+                if row[tx] in (TILE_RIVER, TILE_PUDDLE):
                     tm[ty, tx] = True
         if not tm.any():
             return None
@@ -986,7 +1039,17 @@ class MapRenderer:
             dlo = np.full((hl, wl), Rc + 2.0, np.float32)
         # --- Maschera dei tile su cui si PUO decorare: solo terreno aperto, mai
         #     lane, acqua, muri, cespugli ne i tile dei sentieri. ----------------
-        ok = (np.array(grid.tiles, dtype=np.int32) == TILE_FLOOR)
+        tarr = np.array(grid.tiles, dtype=np.int32)
+        ok = (tarr == TILE_FLOOR)
+        # L'acqua (fiume e pozze) sborda ~mezzo tile oltre i suoi tile: niente
+        # decorazioni a meno di un tile dall'acqua (tronchi a cavallo della riva).
+        wet = (tarr == TILE_RIVER) | (tarr == TILE_PUDDLE)
+        if wet.any():
+            wd = wet.copy()
+            wd[1:] |= wet[:-1]; wd[:-1] |= wet[1:]
+            w2 = wd.copy()
+            w2[:, 1:] |= wd[:, :-1]; w2[:, :-1] |= wd[:, 1:]
+            ok &= ~w2
         for (tx, ty) in path_tiles:
             if 0 <= tx < Wt and 0 <= ty < Ht:
                 ok[ty, tx] = False
@@ -1017,6 +1080,9 @@ class MapRenderer:
         rng.shuffle(cells)
         deco = pygame.Surface((W, H), pygame.SRCALPHA)
         for gx, gy in cells:
+            # Generatore PER CELLA (seme dalla posizione): una modifica locale
+            # del terreno (meteo) cambia solo le decorazioni vicine, non tutte.
+            rng = random.Random((gx * 73856093) ^ (gy * 19349663) ^ 0xDEC0DE)
             x = gx + rng.randint(0, step - 1)
             y = gy + rng.randint(0, step - 1)
             if x >= W or y >= H:
@@ -1485,7 +1551,7 @@ class MapRenderer:
         H, W = solid.shape
         RELIEF = max(self._H, int(ts * 1.12))   # parete frontale ~1 tile alta
         Hf = H + RELIEF
-        comp = self._jungle_components(grid)     # etichette dei muri (per seed)
+        comp = self._jungle_components(getattr(self, '_ref_grid', grid))     # etichette dei muri (per seed)
         up = np.zeros_like(solid); up[1:, :] = ~solid[:-1, :]; up[0, :] = True
         dn = np.zeros_like(solid); dn[:-1, :] = ~solid[1:, :]; dn[-1, :] = True
         lf = np.zeros_like(solid); lf[:, 1:] = ~solid[:, :-1]; lf[:, 0] = True
@@ -1537,11 +1603,15 @@ class MapRenderer:
         ys_c, xs_c = np.where(south)
         ROOT = (40, 44, 30); ROOT_D = (26, 30, 20)
         if len(xs_c):
-            crng = random.Random(0xC1FF ^ (len(xs_c) & 0xFFFFFFFF))
             crack = tuple(int(v) for v in CLdk)
-            for _ in range(min(3500, max(4, len(xs_c) // 13))):
-                j = crng.randrange(len(xs_c))
+            # Dettagli scelti per POSIZIONE (hash del pixel), ognuno col suo
+            # generatore: un cambio di terreno locale (meteo) cambia solo i
+            # dettagli vicini, non tutta la mappa.
+            hsel = ((xs_c.astype(np.int64) * 73856093) ^ (ys_c.astype(np.int64) * 19349663)) & 0x7FFFFFFF
+            pick = np.nonzero(hsel % 13 == 0)[0]
+            for j in pick.tolist():
                 x = int(xs_c[j]); y0 = int(ys_c[j])
+                crng = random.Random(int(hsel[j]) ^ 0xC1FF)
                 k = crng.random()
                 if k < 0.4:                               # crepa corta spezzata
                     yy = y0 + 1 + crng.randint(0, max(1, RELIEF // 2)); xx = x
@@ -1617,7 +1687,9 @@ class MapRenderer:
         over = pygame.Surface((W, Hf), pygame.SRCALPHA)
         if len(xs_c):
             step_o = max(3, ts // 3)
-            for j in range(0, len(xs_c), step_o):
+            # centri scelti per POSIZIONE (colonna), non per indice nella lista
+            # dei pixel: restano fermi se il terreno cambia altrove.
+            for j in np.nonzero(xs_c % step_o == 0)[0].tolist():
                 x = int(xs_c[j]); yb = int(ys_c[j])
                 cid = int(comp_px[min(H - 1, yb), x])
                 sseed = (cid * 2654435761) & 0xFFFFFFFF

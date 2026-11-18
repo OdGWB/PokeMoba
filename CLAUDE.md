@@ -1580,6 +1580,32 @@ Passaggi completati:
   e 5v5; la mid del 5v5 non aveva fessure. I corridoi vicino al bordo a (7-17,95) e
   (84-94,4) non sono raggiungibili: lasciati cosi'. Screenshot: step_77_minion/_zoom,
   step_77_mid_prima/_mid, step_77_scaletta, step_77_passaggio_nord/_sud.
+- MAPPA che SEGUE IL METEO + EFFETTI A SCHERMO del meteo (step_78). (1) Prima la
+  mappa pre-renderizzata restava quella di base: col meteo la griglia cambiava
+  (pozze, cespugli che spariscono, muri che si aprono, tana di Arceus) ma non si
+  vedeva, e sembrava di attraversare i muri. Nuovo game/terrain_variants.py: un
+  thread in background costruisce le 7 varianti non di base come PATCH (blocchi da
+  64 px che differiscono, zlib) in %APPDATA%/PokeMoba/cache (chiave = hash dei
+  sorgenti di disegno, come map_cache); in gioco TerrainPatcher.sync le applica ai
+  layer con un BUDGET di 3 ms a frame (niente scatti al cambio meteo). Le pozze
+  usano la sagoma del fiume (_water_solid), il sottobosco resta a 1 tile
+  dall'acqua; la minimappa si riallinea (Minimap._sync_base). Screenshot:
+  step_78_rain/_sun/_wind/_open_clear (+ _mini: prima | dopo).
+  (2) Nuovo game/weather_fx.py (WeatherFx, in MatchScene e NetMatchScene dopo le
+  particelle, sopra mappa e unita', sotto UI): PIOGGIA = velo che scurisce/raffredda
+  (BLEND_RGB_MULT) + due strati di gocce a parallasse (tile 96x96 in cache, colorkey
+  + RLEACCEL) + schizzi ancorati al mondo; SOLE = alone caldo dall'alto a sinistra
+  con 4 raggi diagonali (BLEND_RGB_ADD, ondeggia appena); VENTO = alone bianco
+  ellittico ai bordi + folate a nastro ondulato che attraversano lo schermo. Cambio
+  meteo con dissolvenza (FADE_S 1,6 s) a LEVELS=6 gradini: ogni gradino e' una
+  Surface in cache (il campo float si calcola UNA volta, a meta' risoluzione q=2,
+  poi scala NEAREST), quindi a frame solo blit. Bande nette senza dithering (col
+  Bayer sembrava una scacchiera). PRESTAZIONI (648x360): sereno 0,001 ms, pioggia
+  ~0,19, sole ~0,05, vento ~0,11 ms a frame; unico picco 10-16 ms la PRIMA volta che
+  compare sole/vento (costruzione dell'alone). NB: surface.fill con special_flags
+  BLEND_* costa ~2,5 ms a 648x360 (non vettorizzato), blittare una Surface piena con
+  lo stesso blend ~0,07 ms: usare sempre il blit. Screenshot:
+  step_78_meteo_clear/_rain/_sun/_wind.
 
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul

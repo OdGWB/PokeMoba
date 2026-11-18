@@ -37,16 +37,21 @@ class Minimap:
         self.rect = pygame.Rect(0, 0, self.mw, self.mh)  # aggiornato al draw
 
     def _render_base(self):
-        surf = pygame.Surface((self.mw, self.mh))
-        surf.fill((18, 20, 24))
-        s = self.scale
-        cell = max(1, int(s + 0.999))
-        for ty in range(self.grid.height):
-            row = self.grid.tiles[ty]
-            for tx in range(self.grid.width):
-                col = _TILE_COL.get(row[tx], _TILE_COL[0])
-                surf.fill(col, pygame.Rect(int(tx * s), int(ty * s), cell, cell))
-        return surf
+        """Terreno a risoluzione di tile (numpy, tabella dei colori) scalato
+        NEAREST: pochi ms, quindi si rifa' quando il meteo cambia la griglia."""
+        self._base_ver = getattr(self.grid, "_ver", None)
+        lut = np.empty((256, 3), np.uint8)
+        lut[:] = _TILE_COL[0]
+        for k, c in _TILE_COL.items():
+            lut[k] = c
+        idx = np.asarray(self.grid.tiles, np.int64).clip(0, 255)
+        img = np.ascontiguousarray(lut[idx].transpose(1, 0, 2))       # (w, h, 3)
+        small = pygame.surfarray.make_surface(img)
+        return pygame.transform.scale(small, (self.mw, self.mh))
+
+    def _sync_base(self) -> None:
+        if getattr(self.grid, "_ver", None) != self._base_ver:
+            self.base = self._render_base()
 
     def rebuild_fog(self, vision, team):
         """Ricostruisce l'overlay di nebbia (solo quando la visione cambia).
@@ -95,6 +100,7 @@ class Minimap:
     def draw(self, surface, world, camera, vision, player_team, dens, player=None):
         W, H = surface.get_size()
         self.rect.topleft = (W - self.mw - MARGIN, H - self.mh - MARGIN)
+        self._sync_base()
         surface.blit(self.base, self.rect)
         if self._fog is not None:
             surface.blit(self._fog, self.rect)
