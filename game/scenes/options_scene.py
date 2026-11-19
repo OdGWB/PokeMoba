@@ -1,6 +1,7 @@
 """Opzioni (menu principale): schermo, audio, controlli.
 
-Righe: schermo intero, volume della musica e degli effetti, limite FPS, velocità della camera,
+Righe: schermo intero, volumi (generale, musica, combattimento, interfaccia,
+avvisi: barre da trascinare), limite FPS, velocità della camera,
 lancio rapido (smart cast) e la pagina dei tasti. Frecce su/giù per scegliere,
 sinistra/destra (o clic sulle frecce) per cambiare il valore, Invio/clic per
 attivare. Tutto si salva subito in %APPDATA%/PokeMoba/options.json.
@@ -14,7 +15,15 @@ from ..app import _save_options
 from .online_lobby_scene import BG, DIM, GOLD, TEXT, font
 from .menu_scene import PANEL, PANEL_HI, BORDER
 
-VOL_STEP = 0.1
+VOL_STEP = 0.05
+
+# Righe del volume: chiave -> (etichetta, categoria audio o None = musica/generale,
+# suono di prova).
+VOLUMES = {"master": ("Volume generale", None, "ui_confirm"),
+           "music": ("Musica", None, None),
+           "combat": ("Effetti di combattimento", "combat", "hit_melee"),
+           "ui": ("Interfaccia e menu", "ui", "ui_confirm"),
+           "alert": ("Avvisi, ping e chat", "alert", "ping")}
 
 
 def _row_box(surface, r, on, label, value=None, arrows=False, t=None):
@@ -29,9 +38,9 @@ def _row_box(surface, r, on, label, value=None, arrows=False, t=None):
     left = right = None
     if arrows:
         aw = 30
-        right = pygame.Rect(r.right - 12 - aw, r.y + 6, aw, r.h - 12)
+        right = pygame.Rect(r.right - 12 - aw, r.y + 5, aw, r.h - 10)
         vx = right.x - 10 - val.get_width()
-        left = pygame.Rect(vx - 10 - aw, r.y + 6, aw, r.h - 12)
+        left = pygame.Rect(vx - 10 - aw, r.y + 5, aw, r.h - 10)
         for a, ch in ((left, "<"), (right, ">")):
             pygame.draw.rect(surface, (40, 44, 56), a, border_radius=5)
             g = t.render(ch, True, TEXT)
@@ -42,27 +51,110 @@ def _row_box(surface, r, on, label, value=None, arrows=False, t=None):
     return left, right
 
 
+def _speaker(surface, x, y, s, col, muted):
+    """Altoparlante pixel art (s = lato del pixel) con le onde, o la X se muto."""
+    def px(cx, cy, w=1, h=1):
+        pygame.draw.rect(surface, col, (x + cx * s, y + cy * s, w * s, h * s))
+    px(0, 3, 2, 3)
+    px(2, 2, 1, 5)
+    px(3, 1, 1, 7)
+    px(4, 0, 1, 9)
+    if muted:
+        for i in range(4):
+            px(6 + i, 3 + i)
+            px(9 - i, 3 + i)
+    else:
+        px(6, 3, 1, 3)
+        px(8, 1, 1, 7)
+
+
+def _slider_row(surface, r, on, label, vol, t, small):
+    """Riga con la barra del volume: ritorna il rettangolo della barra."""
+    pygame.draw.rect(surface, PANEL_HI if on else PANEL, r, border_radius=8)
+    pygame.draw.rect(surface, GOLD if on else BORDER, r, 2, border_radius=8)
+    txt = t.render(label, True, GOLD if on else TEXT)
+    surface.blit(txt, (r.x + 18, r.centery - txt.get_height() // 2))
+    pct = small.render(f"{round(vol * 100)}%", True, GOLD if on else TEXT)
+    pw = small.size("100%")[0]
+    surface.blit(pct, (r.right - 14 - pct.get_width(), r.centery - pct.get_height() // 2))
+    ps = max(2, r.h // 16)
+    sx = r.right - 14 - pw - 12 - 10 * ps
+    _speaker(surface, sx, r.centery - 9 * ps // 2, ps, GOLD if on else DIM, vol <= 0.001)
+    bh = max(4, r.h // 9)
+    room = sx - 18 - (r.x + 18 + txt.get_width() + 24)   # mai sopra l'etichetta
+    bw = max(60, min(int(r.w * 0.40), 340, room))
+    bar = pygame.Rect(sx - 18 - bw, r.centery - bh, bw, 2 * bh)
+    pygame.draw.rect(surface, (22, 24, 32), bar, border_radius=bh)
+    fw = int(bar.w * vol)
+    if fw > 0:
+        fill = pygame.Rect(bar.x, bar.y, max(bar.h, fw), bar.h)
+        pygame.draw.rect(surface, GOLD if on else (150, 128, 70), fill, border_radius=bh)
+        hi = pygame.Rect(fill.x + 3, fill.y + 2, max(0, fill.w - 6), max(1, bar.h // 4))
+        pygame.draw.rect(surface, (255, 236, 170) if on else (190, 170, 110), hi)
+    for i in range(1, 10):                       # tacche ogni 10%
+        tx = bar.x + bar.w * i // 10
+        pygame.draw.line(surface, (70, 72, 86), (tx, bar.bottom + 2),
+                         (tx, bar.bottom + 3 + (2 if i == 5 else 0)))
+    pygame.draw.rect(surface, BORDER, bar, 1, border_radius=bh)
+    kx = bar.x + fw                              # manopola
+    kr = bh + 4
+    pygame.draw.circle(surface, (14, 14, 20), (kx + 1, bar.centery + 2), kr)
+    pygame.draw.circle(surface, (240, 230, 200) if on else (176, 172, 158), (kx, bar.centery), kr)
+    pygame.draw.circle(surface, GOLD if on else BORDER, (kx, bar.centery), kr, 2)
+    return bar
+
+
 class OptionsScene:
-    ROWS = ("fullscreen", "music", "sfx", "fps", "camera", "smart", "keys", "back")
+    ROWS = ("fullscreen", "master", "music", "combat", "ui", "alert", "fps", "camera",
+            "smart", "keys", "back")
 
     def __init__(self, app):
         self.app = app
         self.next_scene = None
         self.sel = 0
         self._rects: list = []       # (rect, key, delta) delta 0 = attiva
+        self._bars: dict = {}        # chiave del volume -> rettangolo della barra
+        self._drag = None            # volume che si sta trascinando
 
     def _back(self):
         from .menu_scene import MenuScene
         self.next_scene = MenuScene(self.app)
 
+    # --- volumi ----------------------------------------------------------------------
+    @staticmethod
+    def _vol(key):
+        if key == "master":
+            return audio.master_volume()
+        if key == "music":
+            return audio.music_volume()
+        return audio.category_volume(VOLUMES[key][1])
+
+    @staticmethod
+    def _set_vol(key, v, test=True):
+        v = max(0.0, min(1.0, round(v / VOL_STEP) * VOL_STEP))
+        if key == "master":
+            audio.set_master_volume(v)
+        elif key == "music":
+            audio.set_music_volume(v)
+        else:
+            audio.set_category_volume(VOLUMES[key][1], v)
+        _save_options({f"{key}_volume": round(OptionsScene._vol(key), 3)})
+        snd = VOLUMES[key][2]
+        if test and snd:
+            from .. import sfx
+            sfx.play(snd)                            # prova del volume
+
+    def _drag_to(self, key, x, test=False):
+        bar = self._bars.get(key)
+        if bar is not None:
+            self._set_vol(key, (x - bar.x) / max(1, bar.w), test)
+
     # --- valori ----------------------------------------------------------------------
     def _value(self, key):
         if key == "fullscreen":
             return "SÌ" if self.app.fullscreen else "NO"
-        if key == "music":
-            return f"{round(audio.music_volume() * 100)}%"
-        if key == "sfx":
-            return f"{round(audio.sfx_volume() * 100)}%"
+        if key in VOLUMES:
+            return f"{round(self._vol(key) * 100)}%"
         if key == "fps":
             cap = getattr(self.app, "fps_cap", 120)
             return "senza limite" if not cap else f"{cap}"
@@ -75,22 +167,13 @@ class OptionsScene:
     def _change(self, key, delta):
         if key == "fullscreen":
             self.app.set_fullscreen(not self.app.fullscreen)
-        elif key == "music":
-            d = delta or 1
-            v = round(audio.music_volume() + d * VOL_STEP, 2)
-            if delta == 0 and v > 1.0:
-                v = 0.0                                   # Invio: giro completo
-            audio.set_music_volume(v)
-            _save_options({"music_volume": audio.music_volume()})
-        elif key == "sfx":
-            d = delta or 1
-            v = round(audio.sfx_volume() + d * VOL_STEP, 2)
-            if delta == 0 and v > 1.0:
-                v = 0.0
-            audio.set_sfx_volume(v)
-            _save_options({"sfx_volume": audio.sfx_volume()})
-            from .. import sfx
-            sfx.play("ui_confirm")                        # prova del volume
+        elif key in VOLUMES:
+            v = self._vol(key)
+            if delta == 0:                                # Invio: muto <-> 100%
+                v = 1.0 if v <= 0.001 else 0.0
+            else:
+                v += delta * VOL_STEP
+            self._set_vol(key, v)
         elif key == "fps":
             caps = keybinds.FPS_CAPS
             cur = getattr(self.app, "fps_cap", 120)
@@ -114,13 +197,33 @@ class OptionsScene:
     # --- ciclo -----------------------------------------------------------------------
     def handle_events(self, events):
         for ev in events:
+            if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+                hit = next((k for k, b in self._bars.items()
+                            if b.inflate(16, 20).collidepoint(ev.pos)), None)
+                if hit is not None:
+                    self._drag = hit
+                    self.sel = self.ROWS.index(hit)
+                    self._drag_to(hit, ev.pos[0])
+                    continue
+            if ev.type == pygame.MOUSEBUTTONUP and ev.button == 1 and self._drag:
+                self._drag_to(self._drag, ev.pos[0], test=True)
+                self._drag = None
+                continue
             if ev.type == pygame.MOUSEBUTTONDOWN and ev.button in (1, 3):
                 for r, key, delta in self._rects:
                     if r.collidepoint(ev.pos):
+                        if key in VOLUMES and delta == 0:
+                            if ev.button == 3:            # destro: muto <-> 100%
+                                self._change(key, 0)
+                            break
                         if delta == 0 and ev.button == 3:
                             delta = -1
                         self._change(key, delta)
                         break
+            elif ev.type == pygame.MOUSEWHEEL:
+                key = self.ROWS[self.sel]
+                if key in VOLUMES:
+                    self._change(key, 1 if ev.y > 0 else -1)
             elif ev.type == pygame.KEYDOWN:
                 key = self.ROWS[self.sel]
                 if ev.key == pygame.K_ESCAPE:
@@ -136,10 +239,13 @@ class OptionsScene:
                 elif ev.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_SPACE):
                     self._change(key, 0)
             elif ev.type == pygame.MOUSEMOTION:
-                for i, k in enumerate(self.ROWS):
-                    for r, key, _d in self._rects:
-                        if key == k and r.collidepoint(ev.pos):
-                            self.sel = i
+                if self._drag:
+                    self._drag_to(self._drag, ev.pos[0])
+                    continue
+                for r, key, _d in self._rects:
+                    if r.collidepoint(ev.pos):
+                        self.sel = self.ROWS.index(key)
+                        break
 
     def fixed_update(self):
         pass
@@ -157,23 +263,43 @@ class OptionsScene:
         W, H = surface.get_size()
         surface.fill(BG)
         big = font(max(26, H // 22), True)
-        t = font(max(15, H // 42), True)
+        t = font(max(15, H // 46), True)
         small = font(max(13, H // 54))
+        ty = int(H * 0.035)
         title = big.render("Opzioni", True, GOLD)
-        surface.blit(title, (W // 2 - title.get_width() // 2, int(H * 0.06)))
-        labels = {"fullscreen": "Schermo intero", "music": "Volume musica",
-                  "sfx": "Volume effetti",
+        surface.blit(title, (W // 2 - title.get_width() // 2, ty))
+        labels = {"fullscreen": "Schermo intero",
                   "fps": "Limite FPS", "camera": "Velocità camera (bordi)",
                   "smart": "Lancio rapido (smart cast)", "keys": "Tasti...",
                   "back": "Indietro"}
-        bw, bh = min(int(W * 0.6), 640), max(40, H // 15)
+        gap = 6
+        sec = small.get_height() + 6                 # spazio per l'intestazione "AUDIO"/"GIOCO"
+        y0 = ty + title.get_height() + 12
+        n = len(self.ROWS)
+        foot = small.get_height() * 2 + 34
+        bh = max(28, min(H // 15, (H - y0 - foot - 2 * sec) // n - gap))
+        bw = min(int(W * 0.7), max(720, int(H * 0.85)))
+        x0 = W // 2 - bw // 2
         self._rects = []
-        y0 = int(H * 0.18)
+        self._bars = {}
+        y = y0
         for i, key in enumerate(self.ROWS):
-            r = pygame.Rect(W // 2 - bw // 2, y0 + i * (bh + 10), bw, bh)
-            on = i == self.sel
+            if key in ("master", "fps"):                 # intestazione del gruppo
+                h = small.render("AUDIO" if key == "master" else "GIOCO", True, DIM)
+                surface.blit(h, (x0 + 4, y + 2))
+                pygame.draw.line(surface, BORDER, (x0 + h.get_width() + 12, y + 2 + h.get_height() // 2),
+                                 (x0 + bw, y + 2 + h.get_height() // 2))
+                y += sec
+            r = pygame.Rect(x0, y, bw, bh)
+            y += bh + gap
+            on = i == self.sel or key == self._drag
+            if key in VOLUMES:
+                self._bars[key] = _slider_row(surface, r, on, VOLUMES[key][0],
+                                              self._vol(key), t, small)
+                self._rects.append((r, key, 0))
+                continue
             val = self._value(key)
-            arrows = key in ("music", "sfx", "fps", "camera")
+            arrows = key in ("fps", "camera")
             left, right = _row_box(surface, r, on, labels[key], val, arrows, t)
             if left is not None:
                 self._rects += [(left, key, -1), (right, key, 1)]
@@ -182,14 +308,17 @@ class OptionsScene:
                           "(Tiro Lungo e la R di Magnezone restano a mira).",
                  "fps": "Limite FPS: più basso = meno lavoro per la CPU (portatili).",
                  "camera": "Velocità dello scorrimento quando il mouse tocca il bordo.",
-                 "music": "Musica del menu (in partita non suona).",
-                 "sfx": "Effetti sonori: clic dei menu, colpi, mosse, ping e chat."}
+                 "master": "Volume generale: moltiplica musica ed effetti.",
+                 "music": "Musica dei menu (in partita non suona).",
+                 "combat": "Colpi, mosse, proiettili, torri e morti delle unità.",
+                 "ui": "Clic e scorrimento dei menu, acquisti e vendite nel negozio.",
+                 "alert": "Ping, chat rapida, voto di resa, livelli, evoluzioni, uccisioni, oro."}
         note = notes.get(self.ROWS[self.sel])
         if note:
-            n = small.render(note, True, DIM)
-            surface.blit(n, (W // 2 - n.get_width() // 2, y0 + len(self.ROWS) * (bh + 10) + 6))
-        hint = small.render("frecce: scegli e cambia     Invio/clic: attiva     "
-                            "clic destro: indietro di un valore     ESC: menu", True, DIM)
+            nn = small.render(note, True, DIM)
+            surface.blit(nn, (W // 2 - nn.get_width() // 2, y + 4))
+        hint = small.render("frecce: scegli e cambia    trascina la barra o rotella: volume    "
+                            "Invio / clic destro: muto    ESC: menu", True, DIM)
         surface.blit(hint, (W // 2 - hint.get_width() // 2, H - hint.get_height() - 12))
 
 

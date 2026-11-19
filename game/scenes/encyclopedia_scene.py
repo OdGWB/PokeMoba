@@ -22,6 +22,7 @@ import pygame
 
 import config
 from .. import ui_theme as UI
+from ..move_preview import CYCLE, MovePreview, describe_move
 from .char_select_scene import (TYPE_COLORS, draw_role_chips, evo_line, load_idle, role_matches,
                                 scale_nearest, ROLES, config_root)
 
@@ -282,6 +283,12 @@ class EncyclopediaScene:
         self._cards = []
         self._chips = []
         self._back_rect = None
+        self.move_text = _load_json("data/encyclopedia.json").get("moves", {}) or {}
+        self._move_rects = []       # (Rect sulla tela, mossa, cartella sprite)
+        self._mouse = None
+        self._hover = None          # id della mossa sotto il mouse
+        self._hover_t0 = 0
+        self._preview = MovePreview()
 
     # --- elenco filtrato -----------------------------------------------------------------
     def _shown(self):
@@ -323,6 +330,8 @@ class EncyclopediaScene:
                         if r.collidepoint(ev.pos) and i < len(shown):
                             self.sel = i
                             self._open(shown[i])
+            elif ev.type == pygame.MOUSEMOTION and self.open is not None:
+                self._mouse = ev.pos
             elif ev.type == pygame.MOUSEMOTION and self.open is None:
                 for r, i in self._cards:
                     if r.collidepoint(ev.pos):
@@ -480,12 +489,40 @@ class EncyclopediaScene:
         if end > view_h and self.scroll < end - view_h - 4:
             t = UI.font(12).render("▼ scorri per altre informazioni", True, DIM)
             surface.blit(t, (W - t.get_width() - 24, H - bar + (bar - t.get_height()) // 2))
+        self._draw_hover(surface, view_h, k)
+
+    def _draw_hover(self, surface, view_h, k):
+        """Mossa sotto il mouse: bordo d'oro + finestrella con mira e lancio."""
+        hit = None
+        if self._mouse is not None and self._mouse[1] < view_h:
+            mx, my = self._mouse[0], self._mouse[1] + self.scroll
+            for r, m, sd in self._move_rects:
+                if r.collidepoint(mx, my):
+                    hit = (r, m, sd)
+                    break
+        if hit is None:
+            self._hover = None
+            return
+        r, m, sd = hit
+        now = pygame.time.get_ticks()
+        hid = (m.get("id"), id(m))
+        if hid != self._hover:
+            self._hover = hid
+            self._hover_t0 = now
+            self._hover_m = dict(m, _col=TYPE_COLORS.get(m.get("type"), (200, 200, 200)))
+        on = r.move(0, -self.scroll).clip(pygame.Rect(0, 0, surface.get_width(), view_h))
+        pygame.draw.rect(surface, GOLD, on, 2, border_radius=6)
+        self._preview.draw(surface, self._hover_m, portrait(sd, 24), (now - self._hover_t0) % CYCLE,
+                           self._mouse, view_h, k,
+                           (UI.font(max(13, int(15 * k)), bold=True), UI.font(max(11, int(12 * k)))),
+                           (GOLD, TEXT, DIM, UI.PANEL, UI.LINE), avoid=on)
 
     def _paint(self, cv, ln, W, H):
         """Dipinge la scheda sulla tela; ritorna l'altezza usata."""
         k = H / 720
         S = lambda v: int(v * k)                    # noqa: E731
         raw, enc = ln.raw, ln.enc
+        self._move_rects = []
         x0 = S(48)
         inner = W - 2 * x0
         f_h = UI.font(max(15, S(19)), bold=True)
@@ -585,24 +622,25 @@ class EncyclopediaScene:
         # mosse
         y = section("Mosse", y)
         note = ("Ogni casella parte dalla mossa iniziale; salendo di livello scegli UNO dei "
-                "potenziamenti. I numeri sono per grado (1/2/3/4; la R ha 3 gradi).")
+                "potenziamenti. I numeri sono per grado (1/2/3/4; la R ha 3 gradi). "
+                "Passa il mouse su una mossa per vedere come si mira e come parte.")
         y = para(note, y, col=DIM, f=f_s) + S(10)
         base_moves = raw.get("moves", {})
         for slot in ("Q", "W", "E", "R"):
             groups = []
             s = base_moves.get(slot) or {}
             if s.get("base"):
-                groups.append(("Iniziale", [s["base"]]))
+                groups.append(("Iniziale", [s["base"]], ln.sprite_dir))
             if s.get("upgrades"):
-                groups.append(("Potenziamenti (a scelta)", s["upgrades"]))
-            seen = {m.get("id") for _, ms in groups for m in ms}
+                groups.append(("Potenziamenti (a scelta)", s["upgrades"], ln.sprite_dir))
+            seen = {m.get("id") for _, ms, _ in groups for m in ms}
             for e in raw.get("evolutions", []):
                 es = (e.get("moves") or {}).get(slot) or {}
                 own = [m for m in ([es.get("base")] if es.get("base") else []) + es.get("upgrades", [])
                        if m and m.get("id") not in seen]
                 if own:
                     seen |= {m.get("id") for m in own}
-                    groups.append((f"Solo {e.get('name')}", own))
+                    groups.append((f"Solo {e.get('name')}", own, e.get("sprite_dir") or ln.sprite_dir))
             if not groups:
                 continue
             # casella del tasto
@@ -615,17 +653,17 @@ class EncyclopediaScene:
             if st:
                 cv.blit(st, (kr.right + S(10), kr.centery - st.get_height() // 2))
             y = kr.bottom + S(8)
-            for label, ms in groups:
+            for label, ms, sd in groups:
                 cv.blit(f_s.render(label.upper(), True, UI.FAINT), (x0 + S(46), y))
                 y += f_s.get_linesize() + S(4)
                 for m in ms:
-                    y = self._paint_move(cv, m, x0 + S(46), y, inner - S(46), S, f_b, f_s, f_c)
+                    y = self._paint_move(cv, m, x0 + S(46), y, inner - S(46), S, f_b, f_s, f_c, sd)
             y += S(12)
         return y + S(30)
 
-    def _paint_move(self, cv, m, x, y, width, S, f_b, f_s, f_c):
-        """Una mossa: nome, tipo, categoria, poi le righe delle statistiche."""
-        lines = move_lines(m)
+    def _paint_move(self, cv, m, x, y, width, S, f_b, f_s, f_c, sprite_dir=None):
+        """Una mossa: nome, tipo, categoria, cosa fa, poi le righe delle statistiche."""
+        lines = [(describe_move(m, self.move_text), TEXT)] + move_lines(m)
         wrapped = []
         for txt, col in lines:
             for ln in _wrap(f_s, txt, width - S(24)):
@@ -649,4 +687,5 @@ class EncyclopediaScene:
         for txt, c in wrapped:
             cv.blit(f_s.render(txt, True, c), (tx, yy))
             yy += f_s.get_linesize()
+        self._move_rects.append((rr.copy(), m, sprite_dir))
         return rr.bottom + S(6)

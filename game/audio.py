@@ -2,7 +2,10 @@
 
 La musica va in streaming da disco (pygame.mixer.music): niente decodifica del
 file intero in RAM e costo per frame nullo (la riproduce il thread di SDL).
-Volumi in [0, 1] salvati nelle opzioni ("music_volume", "sfx_volume").
+Volumi in [0, 1] salvati nelle opzioni: "master_volume" (generale), "music_volume",
+e tre categorie di effetti: "combat_volume" (colpi, mosse, strutture), "ui_volume"
+(clic dei menu, negozio) e "alert_volume" (ping, chat, livelli, uccisioni, esito).
+Il vecchio "sfx_volume" fa da valore iniziale delle tre categorie se mancano.
 Se l'audio non e' disponibile (nessuna scheda, headless) tutto diventa no-op.
 """
 from __future__ import annotations
@@ -18,14 +21,22 @@ FADE_MS = 800
 _ok = None            # None = non ancora inizializzato
 _current = None       # percorso della musica in corso
 _music_vol = 0.6
-_sfx_vol = 0.8
+_master_vol = 1.0
+# categorie degli effetti sonori -> volume
+CATEGORIES = ("combat", "ui", "alert")
+_cat_vol = {"combat": 0.8, "ui": 0.8, "alert": 0.8}
 
 
 def init(options: dict | None = None) -> bool:
-    global _ok, _music_vol, _sfx_vol
+    global _ok, _music_vol, _master_vol
     if options:
         _music_vol = _clamp(options.get("music_volume", _music_vol))
-        _sfx_vol = _clamp(options.get("sfx_volume", _sfx_vol))
+        _master_vol = _clamp(options.get("master_volume", _master_vol))
+        old = options.get("sfx_volume")
+        for c in CATEGORIES:
+            v = options.get(f"{c}_volume", old)
+            if v is not None:
+                _cat_vol[c] = _clamp(v)
     if _ok is None:
         try:
             if not pygame.mixer.get_init():
@@ -50,7 +61,7 @@ def play_music(path: Path = MENU_MUSIC, loop: bool = True) -> None:
         return
     try:
         pygame.mixer.music.load(str(path))
-        pygame.mixer.music.set_volume(_music_vol)
+        pygame.mixer.music.set_volume(_music_vol * _master_vol)
         pygame.mixer.music.play(-1 if loop else 0, fade_ms=FADE_MS)
         _current = path
     except (pygame.error, FileNotFoundError):
@@ -72,23 +83,44 @@ def music_volume() -> float:
     return _music_vol
 
 
-def sfx_volume() -> float:
-    return _sfx_vol
+def master_volume() -> float:
+    return _master_vol
+
+
+def category_volume(cat: str) -> float:
+    return _cat_vol.get(cat, 0.8)
+
+
+def sfx_volume(cat: str | None = None) -> float:
+    """Volume effettivo degli effetti: generale x categoria (senza categoria: la
+    piu' alta, usata solo per uscire presto quando e' tutto muto)."""
+    c = _cat_vol.get(cat) if cat else max(_cat_vol.values())
+    return _master_vol * (0.8 if c is None else c)
+
+
+def _apply_music() -> None:
+    if _ok:
+        try:
+            pygame.mixer.music.set_volume(_music_vol * _master_vol)
+        except pygame.error:
+            pass
 
 
 def set_music_volume(v: float) -> None:
     global _music_vol
     _music_vol = _clamp(v)
-    if _ok:
-        try:
-            pygame.mixer.music.set_volume(_music_vol)
-        except pygame.error:
-            pass
+    _apply_music()
 
 
-def set_sfx_volume(v: float) -> None:
-    global _sfx_vol
-    _sfx_vol = _clamp(v)
+def set_master_volume(v: float) -> None:
+    global _master_vol
+    _master_vol = _clamp(v)
+    _apply_music()
+
+
+def set_category_volume(cat: str, v: float) -> None:
+    if cat in _cat_vol:
+        _cat_vol[cat] = _clamp(v)
 
 
 def scene_wants_menu_music(scene) -> bool:

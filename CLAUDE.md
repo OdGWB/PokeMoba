@@ -1619,6 +1619,23 @@ Passaggi completati:
   mappa ed effetti a schermo verificati anche online (loopback). Screenshot:
   step_79_richiamo_a/_b (+ _zoom).
 
+- VOLUMI A CATEGORIE ed ENCICLOPEDIA con DESCRIZIONI e ANTEPRIMA delle mosse (step_80).
+  (1) game/audio.py: volume generale, musica e tre categorie di effetti (combattimento,
+  interfaccia, avvisi) salvati in options.json; game/sfx.py moltiplica ogni suono per
+  generale x categoria. Opzioni (options_scene) con CURSORI trascinabili (clic o
+  trascinamento sulla barra, frecce sinistra/destra). (2) game/move_preview.py:
+  describe_move(m) scrive una frase su cosa fa la mossa dai dati del JSON (forma, gittata,
+  raggio, angolo, ritardo/carica, danno, stati, cure, scudi, potenziamenti); un testo a
+  mano in data/encyclopedia.json vince. E' la prima riga di ogni scheda. (3) Passando il
+  mouse su una scheda: bordo d'oro + POPUP con una scenetta pixel art 176x104 scalata
+  NEAREST (MovePreview, ciclo 2,5 s): fase "1 · MIRA" (indicatore della forma vero: corsia,
+  cono, cerchio d'area, gittata + cursore che punta) e "2 · LANCIO" (proiettile, ventaglio
+  pieno del cono con particelle, area che cade, scatto, balzo ad arco, potenziamento,
+  cura sull'alleato) con lampo sul bersaglio. classify() riconosce 9 tipi (linea, cono,
+  punto, area su di se', potenziamento, scatto, balzo, su unita', su alleato). Il popup sta
+  A FIANCO della scheda (a destra, sotto o sopra, allineato a destra) e non copre mai il
+  testo che si legge. Screenshot: step_80_opzioni/_1080, step_80_enciclopedia,
+  step_80_popup_mira/_lancio/_linea/_area/_volo/_scatto/_buff/_alleato/_punto.
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul
   bordo sud (sopra le unita, vedi passo rilievi pseudo-3D). lighting_overlay

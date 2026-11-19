@@ -243,6 +243,20 @@ NAMES = ("ui_click", "ui_move", "ui_confirm", "ui_back", "ui_error", "buy", "sel
          "my_death", "kill", "structure_down", "victory", "defeat", "ping", "ping_danger",
          "ping_omw", "ping_help", "ping_missing", "chat", "vote")
 
+# Categoria di volume di ogni suono (audio.CATEGORIES): il resto e' "combat".
+_UI = {"ui_click", "ui_move", "ui_confirm", "ui_back", "ui_error", "buy", "sell"}
+_ALERT = {"gold", "level_up", "evolve", "my_death", "kill", "structure_down", "victory",
+          "defeat", "ping", "ping_danger", "ping_omw", "ping_help", "ping_missing", "chat",
+          "vote"}
+
+
+def category(name: str) -> str:
+    if name in _UI:
+        return "ui"
+    if name in _ALERT:
+        return "alert"
+    return "combat"
+
 
 def samples(name):
     """Campioni float (mono, -1..1) del suono: usato dai test e da _sound."""
@@ -279,7 +293,7 @@ def _now():
 def play(name: str, vol: float = 1.0, pan: float = 0.0) -> None:
     if not _init():
         return
-    v = audio.sfx_volume() * vol
+    v = audio.sfx_volume(category(name)) * vol
     if v <= 0.01:
         return
     now = _now()
