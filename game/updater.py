@@ -10,6 +10,11 @@ il file nuovo sopra quello vecchio finche' il gioco non si e' chiuso, poi lo
 riavvia. App la lancia subito se si e' nel menu principale, altrimenti alla
 chiusura del gioco (mai a meta' partita o nel draft online).
 
+Se l'API non risponde (limite di 60 richieste/ora per indirizzo IP, condiviso da
+tutta la rete di casa) si ripiega su github.com/<repo>/releases/latest, che non ha
+quel limite: il tag si legge dall'indirizzo finale del redirect. Esito ed errori
+finiscono in %APPDATA%/PokeMoba/updater.log.
+
 POKEMOBA_NO_UPDATE=1 disattiva tutto; POKEMOBA_UPDATE_URL sostituisce l'indirizzo
 dell'API (solo per provare l'aggiornamento con un server locale).
 """
@@ -21,12 +26,16 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
+import traceback
 import urllib.request
 from pathlib import Path
 
 from . import version
 
 API = "https://api.github.com/repos/{repo}/releases/latest"
+LATEST_PAGE = "https://github.com/{repo}/releases/latest"
+DOWNLOAD = "https://github.com/{repo}/releases/download/{tag}/{asset}"
 TIMEOUT = 15
 
 
@@ -45,6 +54,20 @@ def _exe_path() -> Path | None:
 def enabled() -> bool:
     return (version.BUILD > 0 and "/" in version.REPO and "OWNER" not in version.REPO
             and _exe_path() is not None and not os.environ.get("POKEMOBA_NO_UPDATE"))
+
+
+def _log(msg: str) -> None:
+    """Riga in %APPDATA%/PokeMoba/updater.log (per capire perche' non si aggiorna)."""
+    try:
+        base = Path(os.environ.get("APPDATA") or Path.home()) / "PokeMoba"
+        base.mkdir(parents=True, exist_ok=True)
+        f = base / "updater.log"
+        if f.exists() and f.stat().st_size > 64 * 1024:
+            f.unlink()
+        with open(f, "a", encoding="utf-8") as fh:
+            fh.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} v{version.BUILD} {msg}\n")
+    except OSError:
+        pass
 
 
 class Updater:
@@ -80,28 +103,27 @@ class Updater:
 
     def _run(self) -> None:
         try:
-            url = os.environ.get("POKEMOBA_UPDATE_URL") or API.format(repo=version.REPO)
-            with self._get(url, "application/vnd.github+json") as r:
-                data = json.loads(r.read().decode("utf-8"))
-            build = tag_build(data.get("tag_name", ""))
+            found = self._latest()
+            if found is None:
+                self.state = "none"
+                _log("nessuna release trovata")
+                return
+            build, dl_url, total, notes = found
             if build <= version.BUILD:
                 self.state = "none"
-                return
-            asset = next((a for a in data.get("assets", [])
-                          if a.get("name") == version.ASSET), None)
-            if asset is None:
-                self.state = "none"
+                _log(f"gia' aggiornato (ultima v{build})")
                 return
             self.new_build = build
-            self.notes = (data.get("body") or "").strip()
+            self.notes = notes
             self.state = "downloading"
+            _log(f"scarico v{build} da {dl_url}")
             exe = _exe_path()
             dst = exe.with_name(exe.name + ".new")
             tmp = exe.with_name(exe.name + ".part")
-            total = int(asset.get("size") or 0)
             got = 0
-            with self._get(asset["browser_download_url"], "application/octet-stream") as r, \
-                    open(tmp, "wb") as f:
+            with self._get(dl_url, "application/octet-stream") as r, open(tmp, "wb") as f:
+                if not total:
+                    total = int(r.headers.get("Content-Length") or 0)
                 while True:
                     chunk = r.read(256 * 1024)
                     if not chunk:
@@ -116,9 +138,37 @@ class Updater:
             self._new_file = dst
             self.progress = 1.0
             self.state = "ready"
+            _log(f"v{build} pronta ({got} byte)")
         except Exception as e:      # rete assente, GitHub giu', cartella non scrivibile...
             self.error = str(e)
             self.state = "error"
+            _log("errore: " + traceback.format_exc().strip().replace("\n", " | "))
+
+    def _latest(self):
+        """(build, url dell'exe, dimensione o 0, note) dell'ultima Release, o None."""
+        override = os.environ.get("POKEMOBA_UPDATE_URL")
+        try:
+            url = override or API.format(repo=version.REPO)
+            with self._get(url, "application/vnd.github+json") as r:
+                data = json.loads(r.read().decode("utf-8"))
+            asset = next((a for a in data.get("assets", [])
+                          if a.get("name") == version.ASSET), None)
+            if asset is None:
+                return None
+            return (tag_build(data.get("tag_name", "")), asset["browser_download_url"],
+                    int(asset.get("size") or 0), (data.get("body") or "").strip())
+        except Exception as e:
+            if override:
+                raise
+            _log(f"API non disponibile ({e}), uso github.com")
+        # Ripiego senza limiti: github.com/<repo>/releases/latest -> .../tag/v<N>
+        with self._get(LATEST_PAGE.format(repo=version.REPO), "text/html") as r:
+            final = r.geturl()
+        tag = final.rstrip("/").rsplit("/", 1)[-1]
+        if "/tag/" not in final or not tag_build(tag):
+            return None
+        return (tag_build(tag), DOWNLOAD.format(repo=version.REPO, tag=tag,
+                                                 asset=version.ASSET), 0, "")
 
     # ---------------------------------------------------------------- applica
     def apply(self, relaunch: bool) -> bool:
