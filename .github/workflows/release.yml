@@ -1,0 +1,77 @@
+# Ogni push sul ramo main: test, exe Windows con PyInstaller e nuova GitHub Release
+# "v<numero build>" con PokeMoba.exe allegato. Gli exe gia' distribuiti la vedono
+# all'avvio (game/updater.py) e si aggiornano da soli.
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      SDL_VIDEODRIVER: dummy
+      SDL_AUDIODRIVER: dummy
+      PYTHONUTF8: "1"
+      BUILD: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Dipendenze
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-build.txt
+
+      - name: Test
+        run: python -m pytest -q -x
+
+      - name: Numero di versione
+        shell: python
+        run: |
+          import os, re, pathlib
+          p = pathlib.Path("game/version.py")
+          s = p.read_text(encoding="utf-8")
+          s = re.sub(r"^BUILD = \d+", f"BUILD = {os.environ['BUILD']}", s, flags=re.M)
+          s = re.sub(r'^REPO = ".*?"', f'REPO = "{os.environ["GITHUB_REPOSITORY"]}"', s, flags=re.M)
+          p.write_text(s, encoding="utf-8")
+          print(s)
+
+      - name: Exe
+        run: >
+          python -m PyInstaller --noconfirm --clean --onefile --windowed
+          --name PokeMoba
+          --icon assets/ui/icon.ico
+          --add-data "assets;assets"
+          --add-data "data;data"
+          --collect-submodules game --collect-submodules engine
+          --collect-submodules net --collect-submodules sim
+          --collect-all aiortc
+          --distpath dist --workpath build/pyinstaller
+          run_client.py
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: PokéMoba v${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          body: |
+            ${{ github.event.head_commit.message }}
+
+            Scarica **PokeMoba.exe**. Chi ha già il gioco lo riceve da solo all'avvio.
+          files: dist/PokeMoba.exe
+          make_latest: true

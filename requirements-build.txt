@@ -1,0 +1,8 @@
+# PokéMoba - versioni ESATTE usate per l'exe delle GitHub Releases
+# (.github/workflows/release.yml): le stesse del PC di sviluppo, cosi' l'exe
+# pubblicato si comporta come quello provato in casa.
+pygame==2.6.1
+numpy==2.3.4
+aiortc==1.15.0
+pyinstaller==6.16.0
+pytest==9.2.0

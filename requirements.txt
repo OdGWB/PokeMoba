@@ -3,6 +3,9 @@
 # Rendering, input, finestra.
 pygame-ce>=2.4
 
+# Rendering della mappa, visione, pathfinding (array).
+numpy>=2
+
 # Serializzazione compatta per i messaggi di rete (Fase 5).
 # Opzionale: se assente, net/protocol.py ripiegherà su struct.
 # msgpack>=1.0

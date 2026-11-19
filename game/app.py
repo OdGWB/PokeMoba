@@ -99,6 +99,11 @@ class App:
         self.accumulator = 0.0
         # Trasformazione corrente lowres->finestra (scale + scostamento lettera-box).
         self._vp = (config.RENDER_SCALE, 0, 0)
+        # Aggiornamento automatico dalle GitHub Releases (solo exe pubblicato).
+        from .updater import Updater
+        self.updater = Updater()
+        self.updater.start()
+        self._restart_at = 0
 
         if initial == "match":
             from .scenes.match_scene import MatchScene
@@ -190,10 +195,50 @@ class App:
                 self.scene.next_scene = None
                 self.scene = nxt
                 self._sync_music()
+            self._check_update()
 
+        # Aggiornamento scaricato durante una partita: si installa ora (senza riavvio).
+        self.updater.apply(relaunch=False)
         if self.server is not None:
             self.server.stop()
         pygame.quit()
+
+    def _check_update(self):
+        """Aggiornamento pronto e si e' nel menu principale: avviso per ~2 s, poi
+        lo script sostituisce l'exe e lo riavvia. Altrove (partita, draft online,
+        selezione) si aspetta: verra' installato alla chiusura del gioco."""
+        if self.updater.state != "ready":
+            return
+        now = pygame.time.get_ticks()
+        if self._restart_at == 0:
+            if type(self.scene).__name__ == "MenuScene":
+                self._restart_at = now + 2000
+            return
+        if now >= self._restart_at and self.updater.apply(relaunch=True):
+            self.running = False
+
+    def _draw_update(self):
+        """Riga dell'aggiornamento in alto al centro e versione in basso a destra (menu)."""
+        from . import version
+        up = self.updater
+        text = up.banner()
+        if text and self._restart_at:
+            text = f"Aggiornamento v{up.new_build} pronto: riavvio..."
+        ww, wh = self.window.get_size()
+        if getattr(self.scene, "camera", None) is not None:
+            return          # in partita niente scritte sopra l'HUD
+        if text:
+            img = self.font.render(text, True, (240, 220, 150))
+            r = img.get_rect(midtop=(ww // 2, 8))
+            bg = r.inflate(20, 10)
+            pygame.draw.rect(self.window, (20, 24, 22), bg, border_radius=6)
+            pygame.draw.rect(self.window, (200, 165, 80), bg, 1, border_radius=6)
+            if up.state == "downloading":
+                bar = pygame.Rect(bg.x + 4, bg.bottom - 4, int((bg.w - 8) * up.progress), 2)
+                pygame.draw.rect(self.window, (200, 165, 80), bar)
+            self.window.blit(img, r)
+        img = self.font.render(version.label(), True, (120, 120, 110))
+        self.window.blit(img, img.get_rect(bottomright=(ww - 8, wh - 6)))
 
     def _present(self):
         """Scala la lowres nella finestra (aspect-fit + lettera-box) e disegna la UI."""
@@ -215,6 +260,7 @@ class App:
         if fullres is not None:
             self.scene.fps = self.clock.get_fps()   # mostrato dall'HUD della partita
             fullres(self.window, self.font)
+        self._draw_update()
         pygame.display.flip()
 
     def _draw_hud(self):
