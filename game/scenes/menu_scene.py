@@ -1,10 +1,10 @@
-"""Menu principale di PokéMoba: titolo e nove voci (redesign).
+"""Menu principale di PokéMoba: titolo e otto voci (redesign).
 
 Gioca (mappa, offline / online / LAN: play_scene.py), Allenamento (mappa
 piccola coi manichini + Tutorial: training_select_scene.py), Enciclopedia
 (mosse e passive di ogni linea: encyclopedia_scene.py), Personalizzazione
-(nickname e immagine profilo), Crediti, Tier list, Animazioni (editor delle
-animazioni, anim_editor_scene.py), Opzioni ed Esci. Frecce + Invio o
+(nickname e immagine profilo), Crediti, Tier list, Opzioni ed Esci. L'editor delle animazioni
+(anim_editor_scene.py) non e' piu' nel menu: data/anim_overrides.json resta. Frecce + Invio o
 clic. In alto a destra il profilo (clic = Personalizzazione). Sfondo:
 assets/ui/menu_bg.png con un velo scuro a sinistra, dove sta il menu.
 Qui restano anche i colori e la miniatura delle mappe, usati dalla
@@ -61,9 +61,9 @@ def map_thumbnail(path):
 
 ENTRIES = [("Gioca", "play"), ("Allenamento", "train"), ("Enciclopedia", "encyclopedia"),
            ("Personalizzazione", "profile"), ("Crediti", "credits"),
-           ("Tier list", "tier"), ("Animazioni", "anims"), ("Opzioni", "options"),
+           ("Tier list", "tier"), ("Opzioni", "options"),
            ("Esci", "quit")]
-NOTES = {"train": "e tutorial", "encyclopedia": "mosse e passive", "anims": "editor"}
+NOTES = {"train": "e tutorial", "encyclopedia": "mosse e passive"}
 
 
 class MenuScene:
@@ -119,9 +119,6 @@ class MenuScene:
         elif key == "tier":
             from .tier_scene import TierChoiceScene
             self.next_scene = TierChoiceScene(self.app)
-        elif key == "anims":
-            from .anim_editor_scene import AnimEditorScene
-            self.next_scene = AnimEditorScene(self.app, back=MenuScene(self.app))
         elif key == "options":
             from .options_scene import OptionsScene
             self.next_scene = OptionsScene(self.app)
