@@ -1,5 +1,15 @@
 [
   {
+    "version": "3.0.2",
+    "date": "2026-11-19",
+    "title": "Enciclopedia più completa e stati spiegati",
+    "items": [
+      "Enciclopedia: tutte le mosse hanno una descrizione nuova e più dettagliata, con i numeri (gittata, durata, percentuali) e a cosa serve la mossa.",
+      "In ogni mossa una riga arancio \"Sul bersaglio\" dice che effetti subisce il Pokémon colpito (es. Stordimento, Rallentato).",
+      "Nuova pagina \"Stati ed effetti\" (pulsante verde in alto a destra dell'enciclopedia o tasto F1): stordimento, congelamento, sonno, scottatura, veleno, rallentamento, paura, fascino, cali di statistiche e tutti gli altri, spiegati uno per uno."
+    ]
+  },
+  {
     "version": "3.0.1",
     "date": "2026-11-19",
     "title": "Codici online corti e pannello Novità",
