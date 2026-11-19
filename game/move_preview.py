@@ -495,11 +495,16 @@ def _dur_of(v):
     return f" per {_s(x)} s" if x > 0 else ""
 
 
-def describe_move(m, overrides=None) -> str:
-    """Frase che spiega cosa fa la mossa (testo a mano in encyclopedia.json se c'e')."""
-    if overrides and m.get("id") in overrides:
-        o = overrides[m["id"]]
-        return o if isinstance(o, str) else o.get("text", "")
+def describe_move(m, overrides=None, line=None) -> str:
+    """Frase che spiega cosa fa la mossa (testo a mano in encyclopedia.json se c'e').
+
+    Le chiavi del testo a mano sono "linea:id" (lo stesso id torna in linee diverse con
+    numeri diversi) oppure il solo id."""
+    if overrides:
+        for key in ((f"{line}:{m.get('id')}",) if line else ()) + (m.get("id"),):
+            if key in overrides:
+                o = overrides[key]
+                return o if isinstance(o, str) else o.get("text", "")
     kind = classify(m)
     eff = m.get("effects") or {}
     rng = _s(m.get("range", 5))

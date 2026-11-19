@@ -1652,6 +1652,21 @@ Passaggi completati:
   caratteri invece di ~156; net/rtc._patch_short_codes adatta aioice e il controllo
   dell'impronta. I codici vecchi non sono compatibili. Test: tests/test_news.py,
   tests/test_net.py. Screenshot: step_81_menu/_novita/_letto (+ _1080).
+- ENCICLOPEDIA: DESCRIZIONI delle MOSSE a mano, "SUL BERSAGLIO" e pagina STATI ED
+  EFFETTI (step_82). (1) data/encyclopedia.json["moves"]: 293 testi scritti a mano
+  (cosa fa la mossa, numeri, a cosa serve), chiave "linea:id" (stesse id in linee
+  diverse non si scontrano); move_preview.describe_move(m, overrides, line) cerca
+  prima "linea:id", poi l'id nudo, poi il testo generato. (2) Nuovo
+  game/status_glossary.py (solo testi e colori, nessuna logica): GLOSSARY a sezioni
+  (controlli forti, leggeri, danni nel tempo, indebolimenti, altri segni, difese) con
+  i numeri del motore; target_effects/target_line ricavano gli stati che la mossa fa
+  SUBIRE ai nemici dagli effetti del JSON e dalle parole del testo, SCARTANDO le
+  frasi che parlano del lanciatore (nomi delle forme della linea, "su di se'"): cosi'
+  Martelpugno da' "Stordimento" e non il rallentamento di Ursaring. Nella scheda di
+  ogni mossa una riga arancio "Sul bersaglio: ...". (3) Pagina "Stati ed effetti"
+  (pulsante verde in alto a destra della griglia o F1): schede con barra e nome nel
+  colore della categoria e spiegazione. Screenshot: step_82_griglia, _mossa/_mossa2,
+  _stati/_stati2/_stati3.
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul
   bordo sud (sopra le unita, vedi passo rilievi pseudo-3D). lighting_overlay

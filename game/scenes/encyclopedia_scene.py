@@ -23,6 +23,15 @@ import pygame
 import config
 from .. import ui_theme as UI
 from ..move_preview import CYCLE, MovePreview, describe_move
+from .. import status_glossary as SG
+
+
+class _StatusPage:
+    """Segnaposto per la pagina "Stati ed effetti" (al posto di una linea aperta)."""
+    stem = "_status"
+
+
+STATUS_PAGE = _StatusPage()
 from .char_select_scene import (TYPE_COLORS, draw_role_chips, evo_line, load_idle, role_matches,
                                 scale_nearest, ROLES, config_root)
 
@@ -283,6 +292,7 @@ class EncyclopediaScene:
         self._cards = []
         self._chips = []
         self._back_rect = None
+        self._status_btn = None     # pulsante "Stati ed effetti" nella griglia
         self.move_text = _load_json("data/encyclopedia.json").get("moves", {}) or {}
         self._move_rects = []       # (Rect sulla tela, mossa, cartella sprite)
         self._mouse = None
@@ -323,6 +333,9 @@ class EncyclopediaScene:
                     self._go_back()
                     continue
                 if self.open is None:
+                    if self._status_btn and self._status_btn.collidepoint(ev.pos):
+                        self._open(STATUS_PAGE)
+                        continue
                     for r, ro in self._chips:
                         if r.collidepoint(ev.pos):
                             self.role, self.sel = ro, 0
@@ -355,14 +368,17 @@ class EncyclopediaScene:
                         self.scroll = 0
                     elif ev.key == pygame.K_END:
                         self.scroll = 10 ** 6
-                    elif ev.key in (pygame.K_LEFT, pygame.K_RIGHT) and shown:
+                    elif (ev.key in (pygame.K_LEFT, pygame.K_RIGHT) and shown
+                          and self.open is not STATUS_PAGE):
                         # scorri tra le linee senza tornare alla griglia
                         i = next((j for j, ln in enumerate(shown) if ln is self.open), 0)
                         i = (i + (1 if ev.key == pygame.K_RIGHT else -1)) % len(shown)
                         self.sel = i
                         self._open(shown[i])
                 else:
-                    if ev.key == pygame.K_TAB:
+                    if ev.key == pygame.K_F1:
+                        self._open(STATUS_PAGE)
+                    elif ev.key == pygame.K_TAB:
                         opts = [None] + ROLES
                         d = -1 if ev.mod & pygame.KMOD_SHIFT else 1
                         self.role = opts[(opts.index(self.role) + d) % len(opts)]
@@ -411,6 +427,11 @@ class EncyclopediaScene:
         k = H / 720
         S = lambda v: int(v * k)                    # noqa: E731
         self._back_rect = UI.back_button(surface, "Menu", S(40), S(24))
+        mp = pygame.mouse.get_pos() if pygame.mouse.get_focused() else (-1, -1)
+        bw, bh = max(190, S(230)), max(34, S(38))
+        br = pygame.Rect(W - S(40) - bw, S(24), bw, bh)
+        self._status_btn = UI.primary_button(surface, br, "Stati ed effetti", key="F1",
+                                             hover=br.collidepoint(mp), size=max(13, S(15)))
         r = UI.title(surface, "Enciclopedia", S(40), S(70), max(30, S(40)), shadow=max(2, S(3)))
         sub = UI.font(max(12, S(13))).render(
             "mosse e passive di ogni linea · numeri presi dal gioco", True, DIM)
@@ -458,16 +479,21 @@ class EncyclopediaScene:
         if not shown:
             t = UI.font(max(13, S(15))).render("Nessuna linea trovata.", True, DIM)
             surface.blit(t, (x0, y0 + S(20)))
-        UI.hints(surface, [("Invio", "apri"), ("Tab", "ruolo"), ("Esc", "menu")],
+        UI.hints(surface, [("Invio", "apri"), ("Tab", "ruolo"), ("F1", "stati"), ("Esc", "menu")],
                  S(40), H - S(32) - 6)
 
     # --- scheda ----------------------------------------------------------------------------
     def _draw_detail(self, surface, W, H):
         key = (self.open.stem, W, H)
+        status = self.open is STATUS_PAGE
         if self._canvas is None or self._canvas[0] != key:
             canvas = pygame.Surface((W, H * 8))
             canvas.fill(UI.BG)
-            end = self._paint(canvas, self.open, W, H)
+            if status:
+                self._move_rects = []
+                end = self._paint_status(canvas, W, H)
+            else:
+                end = self._paint(canvas, self.open, W, H)
             self._canvas = (key, canvas, end)
         _, canvas, end = self._canvas
         k = H / 720
@@ -484,7 +510,8 @@ class EncyclopediaScene:
         pygame.draw.rect(surface, UI.PANEL, (0, H - bar, W, bar))
         pygame.draw.line(surface, UI.LINE, (0, H - bar), (W, H - bar))
         self._back_rect = UI.back_button(surface, "Elenco", int(40 * k), H - bar + (bar - 34) // 2)
-        UI.hints(surface, [("↑↓", "scorri"), ("←→", "linea"), ("Esc", "elenco")],
+        UI.hints(surface, [("↑↓", "scorri")] + ([] if status else [("←→", "linea")])
+                 + [("Esc", "elenco")],
                  self._back_rect.right + int(30 * k), H - bar + (bar - 22) // 2)
         if end > view_h and self.scroll < end - view_h - 4:
             t = UI.font(12).render("▼ scorri per altre informazioni", True, DIM)
@@ -661,9 +688,64 @@ class EncyclopediaScene:
             y += S(12)
         return y + S(30)
 
+    def _paint_status(self, cv, W, H):
+        """Pagina "Stati ed effetti": ogni stato con nome colorato e spiegazione."""
+        k = H / 720
+        S = lambda v: int(v * k)                    # noqa: E731
+        x0 = S(48)
+        inner = W - 2 * x0
+        f_h = UI.font(max(15, S(19)), bold=True)
+        f_b = UI.font(max(13, S(15)), bold=True)
+        f_t = UI.font(max(12, S(14)))
+        y = S(28)
+        r = UI.title(cv, "Stati ed effetti", x0, y, max(28, S(36)), shadow=max(2, S(3)))
+        y = r.bottom + S(8)
+        for line in _wrap(f_t, "Cosa subisce un Pokémon colpito. Nelle schede delle mosse la riga "
+                          "\"Sul bersaglio\" dice quali di questi stati infligge ogni mossa.",
+                          inner):
+            cv.blit(f_t.render(line, True, DIM), (x0, y))
+            y += f_t.get_linesize()
+        y += S(14)
+        name_w = S(300)
+        for key, name, col, text in SG.GLOSSARY:
+            if col is None:            # intestazione di gruppo
+                y += S(8)
+                t = f_h.render(name, True, GOLD)
+                cv.blit(t, (x0, y))
+                yb = y + t.get_height() + S(4)
+                pygame.draw.line(cv, UI.LINE, (x0, yb), (x0 + inner, yb))
+                y = yb + S(6)
+                for line in _wrap(f_t, text, inner):
+                    cv.blit(f_t.render(line, True, DIM), (x0, y))
+                    y += f_t.get_linesize()
+                y += S(8)
+                continue
+            body = _wrap(f_t, text, inner - name_w - S(28))
+            hh = max(f_b.get_linesize(), len(body) * f_t.get_linesize()) + S(16)
+            card = pygame.Rect(x0, y, inner, hh)
+            pygame.draw.rect(cv, UI.CARD, card, border_radius=6)
+            pygame.draw.rect(cv, col, (card.x, card.y, S(4), card.h),
+                             border_top_left_radius=6, border_bottom_left_radius=6)
+            pygame.draw.circle(cv, col, (card.x + S(20), card.y + S(8) + f_b.get_linesize() // 2),
+                               max(3, S(5)))
+            cv.blit(f_b.render(name, True, col), (card.x + S(34), card.y + S(8)))
+            ty = card.y + S(8)
+            for line in body:
+                cv.blit(f_t.render(line, True, TEXT), (card.x + name_w + S(14), ty))
+                ty += f_t.get_linesize()
+            y = card.bottom + S(6)
+        return y + S(30)
+
     def _paint_move(self, cv, m, x, y, width, S, f_b, f_s, f_c, sprite_dir=None):
         """Una mossa: nome, tipo, categoria, cosa fa, poi le righe delle statistiche."""
-        lines = [(describe_move(m, self.move_text), TEXT)] + move_lines(m)
+        desc = describe_move(m, self.move_text, getattr(self.open, "stem", None))
+        lines = [(desc, TEXT)]
+        raw = getattr(self.open, "raw", None) or {}
+        own = [raw.get("name", "")] + [e.get("name", "") for e in raw.get("evolutions", [])]
+        tgt = SG.target_line(m, desc, own)
+        if tgt:
+            lines.append(("Sul bersaglio: " + tgt, (235, 165, 120)))
+        lines += move_lines(m)
         wrapped = []
         for txt, col in lines:
             for ln in _wrap(f_s, txt, width - S(24)):
