@@ -16,7 +16,7 @@ BUILD = 0
 REPO = "OWNER/REPO"          # "utente/nome-repo" su github.com
 ASSET = "PokeMoba.exe"       # nome del file allegato a ogni Release
 SERIES = "3.0"
-SERIES_BASE = 3              # build 4 = 3.0.1, build 5 = 3.0.2, ...
+SERIES_BASE = 4              # build 4 = 3.0.1 (max 1), build 6 = 3.0.2: la run 5 e' fallita
 
 
 def name() -> str:

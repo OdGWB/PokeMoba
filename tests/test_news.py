@@ -46,4 +46,5 @@ def test_lette(tmp_path, monkeypatch):
 
 def test_file_del_gioco_valido():
     out = N.load()
-    assert out and out[0]["version"] == "3.0.1" and len(out) <= 10
+    assert out and len(out) <= 10
+    assert all(e.get("version") and e.get("title") for e in out)
