@@ -79,6 +79,7 @@ class RtcLoop:
         with cls._lock:
             if cls._inst is None:
                 _patch_aioice()
+                _patch_short_codes()
                 cls._inst = RtcLoop()
             return cls._inst
 
@@ -156,6 +157,50 @@ def _patch_aioice():
 
     patched._pokemoba = True
     ice.Connection.get_component_candidates = patched
+
+
+def _patch_short_codes():
+    """Supporto ai codici corti di net/signaling (formato 2):
+    - credenziali ICE ricavate da 9 byte casuali (signaling.creds_from_seed),
+      cosi' nel codice viaggiano 9 byte invece di 26 caratteri;
+    - impronta DTLS sha-256 troncata ai primi 16 byte: vale se e' il PREFISSO
+      dell'impronta del certificato dell'altro (128 bit restano impossibili da
+      falsificare)."""
+    import os
+
+    import aioice.ice as ice
+    from aiortc import rtcdtlstransport as dtls
+
+    from .signaling import FP_LEN, SEED_LEN, creds_from_seed
+
+    init = ice.Connection.__init__
+    if not getattr(init, "_pokemoba", False):
+        def seeded_init(self, *args, local_username=None, local_password=None, **kw):
+            if local_username is None and local_password is None:
+                local_username, local_password = creds_from_seed(os.urandom(SEED_LEN))
+            init(self, *args, local_username=local_username,
+                 local_password=local_password, **kw)
+        seeded_init._pokemoba = True
+        ice.Connection.__init__ = seeded_init
+
+    validate = dtls.RTCDtlsTransport._validate_peer_identity
+    if not getattr(validate, "_pokemoba", False):
+        short_len = FP_LEN * 3 - 1               # "AB:CD:..." di FP_LEN byte
+
+        def short_fp_validate(self, remoteParameters):
+            try:
+                cert = self._ssl.get_peer_certificate(as_cryptography=True)
+                full = dtls.certificate_digest(cert, "sha-256")
+                for f in remoteParameters.fingerprints:
+                    v = f.value.upper()
+                    if (f.algorithm.lower() == "sha-256" and len(v) == short_len
+                            and full.startswith(v)):
+                        f.value = full          # prefisso giusto: impronta intera
+            except Exception:
+                pass                            # decide il controllo originale
+            return validate(self, remoteParameters)
+        short_fp_validate._pokemoba = True
+        dtls.RTCDtlsTransport._validate_peer_identity = short_fp_validate
 
 
 def patient_answerer(retries: int = 8) -> None:

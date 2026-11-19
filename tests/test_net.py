@@ -10,7 +10,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from net import protocol as P
 from net.interp import InterpBuffer
 from net.prediction import Predictor
-from net.signaling import (ANSWER, OFFER, ManualSignaling, SignalingError, SignalMessage)
+from net.signaling import (ANSWER, OFFER, ManualSignaling, SignalingError, SignalMessage,
+                           creds_from_seed)
 from net.validation import TokenBucket, clamp_point
 
 # SDP reale prodotto da aiortc 1.15 (offerta con 3 candidati: 2 host + 1 srflx).
@@ -133,11 +134,32 @@ class TestSignaling(unittest.TestCase):
         self.assertEqual((msg.kind, msg.slot, msg.session), (OFFER, 3, 0xDEADBEEF))
         for field in ("a=ice-ufrag:wr6k", "a=ice-pwd:Gv4Vmj4XN8MHa0pdQ8aQRL",
                       "6A:30:93:5E:FE:EA:91:BD", "82.84.122.193 62543 typ srflx raddr "
-                      "192.168.1.217 rport 62543", "a=setup:actpass", "a=sctp-port:5000"):
+                      "0.0.0.0 rport 0", "a=setup:actpass", "a=sctp-port:5000"):
             self.assertIn(field, msg.sdp)
 
+    def test_seeded_code_is_short(self):
+        # credenziali da seme (rtc.py le fa generare cosi'): codice ~75 caratteri
+        ufrag, pwd = creds_from_seed(bytes(range(9)))
+        sdp = SDP.replace("wr6k", ufrag).replace("Gv4Vmj4XN8MHa0pdQ8aQRL", pwd)
+        code = ManualSignaling.encode(SignalMessage(OFFER, 1, 5, sdp))
+        self.assertLess(len(code), 100)
+        out = ManualSignaling.decode(code).sdp
+        self.assertIn(f"a=ice-ufrag:{ufrag}", out)
+        self.assertIn(f"a=ice-pwd:{pwd}", out)
+
+    def test_unsupported_candidates_skipped(self):
+        # TCP e mDNS non servono ad aiortc: si scartano, il codice resta compatto
+        nl = "\r\n"
+        extra = SDP.replace("a=end-of-candidates",
+                            "a=candidate:9 1 tcp 1 10.0.0.9 9 typ host tcptype passive" + nl
+                            + "a=candidate:8 1 udp 1 abc.local 7 typ host" + nl
+                            + "a=end-of-candidates")
+        code = ManualSignaling.encode(SignalMessage(OFFER, 1, 5, extra))
+        self.assertLess(len(code), 300)
+        self.assertNotIn("tcp", ManualSignaling.decode(code).sdp)
+
     def test_fallback_full_sdp(self):
-        weird = SDP.replace("typ host", "typ host tcptype passive").replace(" udp ", " tcp ")
+        weird = SDP + "m=audio 9 UDP/TLS/RTP/SAVPF 111\r\n"     # media: SDP intero
         code = ManualSignaling.encode(SignalMessage(ANSWER, 1, 7, weird))
         self.assertEqual(ManualSignaling.decode(code).sdp, weird)
 
@@ -147,7 +169,8 @@ class TestSignaling(unittest.TestCase):
                 ManualSignaling.decode(txt)
         code = ManualSignaling.encode(SignalMessage(OFFER, 2, 1, SDP))
         with self.assertRaises(SignalingError):
-            ManualSignaling.decode(code.replace("PKO2", "PKO5"))   # slot manomesso
+            ManualSignaling.decode(code[:-6])                      # troncato
+        # (slot sbagliato: lo rifiuta l'host, l'ID di sessione non torna)
 
 
 class TestValidation(unittest.TestCase):

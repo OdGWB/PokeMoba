@@ -223,7 +223,7 @@ class App:
         up = self.updater
         text = up.banner()
         if text and self._restart_at:
-            text = f"Aggiornamento v{up.new_build} pronto: riavvio..."
+            text = f"Aggiornamento {version.name_of(up.new_build)} pronto: riavvio..."
         ww, wh = self.window.get_size()
         if getattr(self.scene, "camera", None) is not None:
             return          # in partita niente scritte sopra l'HUD

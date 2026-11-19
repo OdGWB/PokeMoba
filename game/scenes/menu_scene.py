@@ -5,7 +5,9 @@ piccola coi manichini + Tutorial: training_select_scene.py), Enciclopedia
 (mosse e passive di ogni linea: encyclopedia_scene.py), Personalizzazione
 (nickname e immagine profilo), Crediti, Tier list, Opzioni ed Esci. L'editor delle animazioni
 (anim_editor_scene.py) non e' piu' nel menu: data/anim_overrides.json resta. Frecce + Invio o
-clic. In alto a destra il profilo (clic = Personalizzazione). Sfondo:
+clic. In alto a destra il profilo (clic = Personalizzazione), in alto a
+sinistra il pulsante "Novità" (tasto N) che apre le patch notes
+(news_panel.py, data/news.json: ultime 10 versioni). Sfondo:
 assets/ui/menu_bg.png con un velo scuro a sinistra, dove sta il menu.
 Qui restano anche i colori e la miniatura delle mappe, usati dalla
 schermata Gioca.
@@ -17,7 +19,9 @@ import pygame
 import config
 from engine import grid as G
 from engine.content import load_map
+from .. import news as NEWS
 from .. import ui_theme as UI
+from .news_panel import NewsPanel, news_button
 
 # Colori storici: li importano anche le altre schermate.
 BG = UI.BG
@@ -74,17 +78,33 @@ class MenuScene:
         self.t = 0.0
         self._rects: list = []
         self._profile_rect = None
+        self._news = NEWS.load()
+        self._news_unread = NEWS.is_unread(self._news)
+        self._news_rect = None
+        self._news_hover = False
+        self.panel = NewsPanel(self._news)
+
+    def _open_news(self):
+        self.panel.show()
+        self._news_unread = False
 
     # --- input -----------------------------------------------------------------
     def handle_events(self, events):
         for ev in events:
+            if self.panel.open:
+                self.panel.handle(ev)
+                continue
             if ev.type == pygame.MOUSEMOTION:
+                self._news_hover = bool(self._news_rect and self._news_rect.collidepoint(ev.pos))
                 for r, i in self._rects:
                     if r.collidepoint(ev.pos):
                         self.sel = i
             elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
                 if self._profile_rect and self._profile_rect.collidepoint(ev.pos):
                     self._activate("profile")
+                    continue
+                if self._news_rect and self._news_rect.collidepoint(ev.pos):
+                    self._open_news()
                     continue
                 for r, i in self._rects:
                     if r.collidepoint(ev.pos):
@@ -97,6 +117,8 @@ class MenuScene:
                     self.sel = (self.sel - 1) % len(ENTRIES)
                 elif ev.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_SPACE):
                     self._activate(ENTRIES[self.sel][1])
+                elif ev.key == pygame.K_n:
+                    self._open_news()
                 elif ev.key == pygame.K_ESCAPE:
                     self.quit_app = True
 
@@ -184,5 +206,8 @@ class MenuScene:
             y += bh + int(4 * k)
 
         self._profile_rect = UI.profile_chip(surface, self.app, W, y=int(28 * k), right=int(40 * k))
-        UI.hints(surface, [("↑↓", "scegli"), ("Invio", "apri"), ("F11", "schermo intero")],
-                 x0, H - int(32 * k) - 22)
+        self._news_rect = news_button(surface, int(40 * k), int(28 * k), self._news,
+                                      self._news_unread, self._news_hover)
+        UI.hints(surface, [("↑↓", "scegli"), ("Invio", "apri"), ("N", "novità"),
+                           ("F11", "schermo intero")], x0, H - int(32 * k) - 22)
+        self.panel.draw(surface)

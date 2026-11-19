@@ -1636,6 +1636,22 @@ Passaggi completati:
   A FIANCO della scheda (a destra, sotto o sopra, allineato a destra) e non copre mai il
   testo che si legge. Screenshot: step_80_opzioni/_1080, step_80_enciclopedia,
   step_80_popup_mira/_lancio/_linea/_area/_volo/_scatto/_buff/_alleato/_punto.
+- VERSIONE 3.0.x, PANNELLO NOVITA' e CODICI ONLINE CORTI (step_81). (1) game/version.py:
+  SERIES "3.0" + SERIES_BASE 3 -> nome = 3.0.(BUILD-3) (build 4 = 3.0.1); il tag della
+  release resta v<build> (lo usa l'updater), il NOME della release e gli avvisi di
+  aggiornamento usano version.name_of. (2) data/news.json + game/news.py: voci (versione,
+  data, titolo, punti) con la piu' recente in cima, MAX 10 (add_entry scarta la piu'
+  vecchia; CLI `python -m game.news 3.0.2 "Titolo" "punto"...`); "gia' letta" in
+  %APPDATA%/PokeMoba/news_seen.txt. game/scenes/news_panel.py: pulsante "Novita'" in alto
+  a sinistra del menu (gemello del profilo, stellina pixel art 9x9 NEAREST, pallino d'oro
+  finche' non si apre) e pannello modale (tasto N o clic): testo impaginato UNA volta su
+  una tela in cache (chiave larghezza+scala, caratteri scalati con la finestra), a frame
+  un blit della parte visibile; rotella/frecce/PagSu-PagGiu, Esc o clic fuori chiude.
+  (3) Codici online formato 0xC2 (net/signaling.py): seme ICE di 9 byte da cui si
+  ricavano ufrag/pwd, prefisso di 16 byte dell'impronta DTLS, max 6 candidati -> ~75
+  caratteri invece di ~156; net/rtc._patch_short_codes adatta aioice e il controllo
+  dell'impronta. I codici vecchi non sono compatibili. Test: tests/test_news.py,
+  tests/test_net.py. Screenshot: step_81_menu/_novita/_letto (+ _1080).
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul
   bordo sud (sopra le unita, vedi passo rilievi pseudo-3D). lighting_overlay

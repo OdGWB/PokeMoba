@@ -214,7 +214,7 @@ class Updater:
     # ---------------------------------------------------------------- testo
     def banner(self) -> str | None:
         if self.state == "downloading":
-            return f"Aggiornamento v{self.new_build}: download {int(self.progress * 100)}%"
+            return f"Aggiornamento {version.name_of(self.new_build)}: download {int(self.progress * 100)}%"
         if self.state == "ready":
-            return f"Aggiornamento v{self.new_build} pronto: si installa alla chiusura"
+            return f"Aggiornamento {version.name_of(self.new_build)} pronto: si installa alla chiusura"
         return None

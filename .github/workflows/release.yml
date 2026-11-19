@@ -1,5 +1,5 @@
 # Ogni push sul ramo main: test, exe Windows con PyInstaller e nuova GitHub Release
-# "v<numero build>" con PokeMoba.exe allegato. Gli exe gia' distribuiti la vedono
+# "v<numero build>" (nome "PokéMoba 3.0.N", vedi game/version.py) con PokeMoba.exe allegato. Gli exe gia' distribuiti la vedono
 # all'avvio (game/updater.py) e si aggiornano da soli.
 name: Release
 
@@ -49,6 +49,10 @@ jobs:
           s = re.sub(r'^REPO = ".*?"', f'REPO = "{os.environ["GITHUB_REPOSITORY"]}"', s, flags=re.M)
           p.write_text(s, encoding="utf-8")
           print(s)
+          ns = {}
+          exec(s, ns)
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as fh:
+              print(f"VERSION_NAME={ns['name']()}", file=fh)
 
       - name: Exe
         run: >
@@ -67,7 +71,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.run_number }}
-          name: PokéMoba v${{ github.run_number }}
+          name: PokéMoba ${{ env.VERSION_NAME }}
           target_commitish: ${{ github.sha }}
           body: |
             ${{ github.event.head_commit.message }}
