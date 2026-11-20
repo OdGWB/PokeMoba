@@ -19,6 +19,11 @@
   #define FileVersion AppVersion + ".0"
 #endif
 
+; Exe da impacchettare (di solito quello appena creato in dist).
+#ifndef SourceExe
+  #define SourceExe "..\dist\PokeMoba.exe"
+#endif
+
 #define AppName "PokéMoba"
 #define AppExe "PokeMoba.exe"
 
@@ -59,7 +64,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
-Source: "..\dist\{#AppExe}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceExe}"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExe}"
