@@ -29,14 +29,7 @@ JUNGLE_DEX = frozenset({
     158, 159, 160,          # Totodile > Croconaw > Feraligatr
 })
 
-LANE_LEASH_EARLY = 7.0     # tile dalla lane: primi minuti
-LANE_LEASH = 14.0
-EARLY_TIME = 150.0         # s: fino a qui i bot di lane restano stretti sulla lane
-GANK_MIN_TIME = 150.0      # s: prima i jungler farmano soltanto
-GANK_MIN_LEVEL = 3
-GANK_COOLDOWN = 75.0
-GANK_DURATION = 14.0
-GANK_MAX_DIST = 40.0
+# Le soglie dell'IA dei bot (guinzaglio, gank...) sono in engine/bot_params.py.
 
 
 def smite_damage(level: int) -> float:
@@ -97,7 +90,7 @@ class SmiteMixin:
     def _under_enemy_tower(self, p, pos) -> bool:
         for e in self.world.structures():
             if e.kind == "tower" and e.alive and e.team != p.team \
-                    and pos.dist(e.pos) <= e.attack_range + 0.8:
+                    and pos.dist(e.pos) <= e.attack_range + self._bp(p).tower_margin:
                 return True
         return False
 
@@ -113,14 +106,15 @@ class SmiteMixin:
     def _good_kill_chance(self, p, t) -> bool:
         """Ha senso inseguire `t` anche sotto torre? Solo se e' quasi morto e io sto
         bene, oppure se in zona siamo piu' numerosi e lui e' gia' ferito."""
-        if p.hp < p.max_hp * 0.5:
+        bp = self._bp(p)
+        if p.hp < p.max_hp * bp.kill_my_hp:
             return False
         hp_frac = t.hp / max(1.0, t.max_hp)
-        if hp_frac <= 0.25:
+        if hp_frac <= bp.kill_low_hp:
             return True
-        allies = self._count_champs(t.pos, 8.0, p.team, exclude=p)
-        foes = self._count_champs(t.pos, 8.0, t.team)
-        return hp_frac <= 0.5 and (allies + 1) - foes >= 2
+        allies = self._count_champs(t.pos, bp.kill_count_r, p.team, exclude=p)
+        foes = self._count_champs(t.pos, bp.kill_count_r, t.team)
+        return hp_frac <= bp.kill_mid_hp and (allies + 1) - foes >= bp.kill_adv
 
     def _dist_to_lane(self, lane: str, team: int, pos) -> float:
         pts = self.oriented_lane(lane, team)
@@ -133,9 +127,12 @@ class SmiteMixin:
         from .entities import Pokemon
         if t is None or not isinstance(t, Pokemon):
             return t
+        bp = self._bp(p)
+        if bp.utility and self._ai.get(p.id, {}).get("u_nofight"):
+            return None           # IA a punteggio: combattere ora non conviene
         if self._under_enemy_tower(p, t.pos) and not self._good_kill_chance(p, t):
             return None
-        limit = LANE_LEASH_EARLY if self.time < EARLY_TIME else LANE_LEASH
+        limit = bp.lane_leash_early if self.time < bp.early_time else bp.lane_leash
         if (not p.is_jungler and not self._ai.get(p.id, {}).get("roaming")
                 and self._dist_to_lane(p.assigned_lane, p.team, t.pos) > limit
                 and not self._good_kill_chance(p, t)):
@@ -144,26 +141,27 @@ class SmiteMixin:
 
     def _jungler_gank_target(self, p, st):
         """Nemico ferito da andare a prendere, solo se il gank sembra fruttuoso."""
-        if (self.time < GANK_MIN_TIME or p.level < GANK_MIN_LEVEL
-                or self.time < st.get("gank_cd", 0.0) or p.hp < p.max_hp * 0.7):
+        bp = self._bp(p)
+        if (self.time < bp.gank_min_time or p.level < bp.gank_min_level
+                or self.time < st.get("gank_cd", 0.0) or p.hp < p.max_hp * bp.gank_my_hp):
             return None
         best, bs = None, None
         for e in self.world.pokemons():
             if e.team == p.team or not e.alive or not self.vision.is_enemy_visible(p.team, e.id):
                 continue
             d = p.pos.dist(e.pos)
-            if d > GANK_MAX_DIST:
+            if d > bp.gank_max_dist:
                 continue
             hp_frac = e.hp / max(1.0, e.max_hp)
-            if hp_frac > self.bot_gank_hp:
+            if hp_frac > bp.gank_hp:
                 continue
             if self._under_enemy_tower(p, e.pos) and not self._good_kill_chance(p, e):
                 continue
-            allies = self._count_champs(e.pos, 9.0, p.team, exclude=p)
-            foes = self._count_champs(e.pos, 9.0, e.team)
-            if foes - (allies + 1) >= 2:
+            allies = self._count_champs(e.pos, bp.gank_count_r, p.team, exclude=p)
+            foes = self._count_champs(e.pos, bp.gank_count_r, e.team)
+            if foes - (allies + 1) >= bp.gank_max_disadv:
                 continue
-            score = (1.0 - hp_frac) * 10.0 + allies * 2.0 - d * 0.1
+            score = (1.0 - hp_frac) * bp.gank_w_hp + allies * bp.gank_w_ally - d * bp.gank_w_dist
             if bs is None or score > bs:
                 best, bs = e, score
         return best

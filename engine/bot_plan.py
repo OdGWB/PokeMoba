@@ -8,7 +8,8 @@ farm del jungler). Ordine di priorita':
   3. AIUTARE a buttare giu' una torre nemica quando e' fattibile (poco vita, o minion
      alleati vicini e non siamo in inferiorita');
   4. SUPPORT che gira per la mappa a dare una mano agli alleati nei guai.
-Il gank del jungler resta in engine/smite.py (soglie piu' larghe se bot_gank_hp > 0.6).
+Il gank del jungler resta in engine/smite.py. Soglie e pesi di tutta l'IA dei bot
+sono in engine/bot_params.py (Match.bot_params[team]).
 """
 from __future__ import annotations
 
@@ -16,22 +17,9 @@ import config
 from .items import ITEM_SLOTS
 from .vec import Vec2
 
-RECALL_GOLD = 850           # oro minimo per tornare a comprare
-RECALL_COOLDOWN = 110.0     # s tra due ritorni in base
-RECALL_MAX = 110.0          # s: oltre, il ritorno viene annullato
-SHOP_STAY = 14.0            # s massimi fermi in base (acquisti + cura)
-SIEGE_FROM = 300.0          # s: da qui si aiutano le torri
-CORE_FROM = 240.0
-ROAM_FROM = 180.0
-ROAM_TIME = 26.0
-ROAM_COOLDOWN = 70.0
-TOWER_NEAR = 28.0           # tile: torre raggiungibile
-TOWER_NEAR_LOW = 45.0       # tile: se e' quasi caduta si viene da piu' lontano
-
 
 class BotPlanMixin:
     bot_plan = True
-    bot_gank_hp = 0.6
 
     # --- statistiche (solo osservazione) ------------------------------------
     def _bps(self, p) -> dict:
@@ -44,11 +32,12 @@ class BotPlanMixin:
         if self._immobile(p):
             return False
         st = self._ai.setdefault(p.id, {})
-        if p.hp < p.max_hp * 0.28 and not st.get("recall"):
+        bp = self._bp(p)
+        if p.hp < p.max_hp * bp.retreat_hp and not st.get("recall"):
             return False                      # ritirata di base
         if not p.bot_standin and self._plan_shop(p, st, dt):
             return True
-        if self._acquire_enemy_champ(p, 4.5) is not None:
+        if self._acquire_enemy_champ(p, bp.plan_fight_r) is not None:
             return False                      # scontro in corso: combatte l'IA di base
         if self._plan_core(p, st, dt):
             return True
@@ -96,13 +85,14 @@ class BotPlanMixin:
 
     def _plan_shop(self, p, st, dt) -> bool:
         home = p.spawn_pos
+        bp = self._bp(p)
         if st.get("recall"):
             ps = self._bps(p)
             at_home = p.pos.dist(home) <= config.SHOP_RANGE
             if at_home:
                 st.setdefault("shop_at", self.time)
-                done = (self._bot_next_buy(p) is None and p.hp >= p.max_hp * 0.85)
-                if done or self.time - st["shop_at"] > SHOP_STAY:
+                done = (self._bot_next_buy(p) is None and p.hp >= p.max_hp * bp.shop_done_hp)
+                if done or self.time - st["shop_at"] > bp.shop_stay:
                     st["recall"] = False
                     st.pop("shop_at", None)
                     st["last_recall"] = self.time
@@ -110,17 +100,17 @@ class BotPlanMixin:
                 p.target_id = None
                 p.stop()
                 return True
-            if self.time - st["recall_t0"] > RECALL_MAX:
+            if self.time - st["recall_t0"] > bp.recall_max:
                 st["recall"] = False
                 st["last_recall"] = self.time
                 return False
             p.target_id = None
             self._move_towards(p, home, dt, use_astar=True)
             return True
-        if (self.time < 150.0 or self.time - st.get("last_recall", -999.0) < RECALL_COOLDOWN
-                or p.gold < RECALL_GOLD or p.pos.dist(home) <= config.SHOP_RANGE):
+        if (self.time < bp.shop_from or self.time - st.get("last_recall", -999.0) < bp.recall_cooldown
+                or p.gold < bp.recall_gold or p.pos.dist(home) <= config.SHOP_RANGE):
             return False
-        if self._acquire_enemy_champ(p, 9.0) is not None:
+        if self._acquire_enemy_champ(p, bp.recall_safe_r) is not None:
             return False                      # non mollare un combattimento
         if self._bot_next_buy(p) is None:
             return False
@@ -131,7 +121,8 @@ class BotPlanMixin:
 
     # --- 2. nexus scoperto ---------------------------------------------------
     def _plan_core(self, p, st, dt) -> bool:
-        if self.time < CORE_FROM or p.hp < p.max_hp * 0.4:
+        bp = self._bp(p)
+        if self.time < bp.core_from or p.hp < p.max_hp * bp.core_my_hp:
             return False
         enemy = 1 - p.team
         if self._alive_towers(enemy) > config.CORE_EXPOSE_TOWERS_LEFT:
@@ -152,9 +143,11 @@ class BotPlanMixin:
     # --- 3. aiuto alle torri -------------------------------------------------
     def _plan_tower(self, p, st, dt) -> bool:
         t = self.time
-        if t < SIEGE_FROM or p.hp < p.max_hp * 0.55:
+        bp = self._bp(p)
+        if t < bp.siege_from or p.hp < p.max_hp * bp.siege_my_hp:
             return False
-        if (p.is_jungler and t < 480.0) or (getattr(p, "bot_support", False) and t < 480.0):
+        if (p.is_jungler and t < bp.siege_late_roles) or (
+                getattr(p, "bot_support", False) and t < bp.siege_late_roles):
             return False
         best, bs = None, None
         for tw in self.world.structures():
@@ -162,18 +155,19 @@ class BotPlanMixin:
                 continue
             d = p.pos.dist(tw.pos)
             frac = tw.hp / max(1.0, tw.max_hp)
-            if d > (TOWER_NEAR_LOW if frac <= 0.5 else TOWER_NEAR):
+            if d > (bp.tower_near_low if frac <= bp.tower_low_frac else bp.tower_near):
                 continue
-            minions = self._has_allied_minion_near(p, tw.pos, 4.5)
-            if not minions and frac > 0.3:
+            minions = self._has_allied_minion_near(p, tw.pos, bp.tower_minion_r)
+            if not minions and frac > bp.tower_solo_frac:
                 continue
-            allies = self._count_champs(tw.pos, 12.0, p.team) + (0 if d <= 12.0 else 1)
+            cr = bp.tower_count_r
+            allies = self._count_champs(tw.pos, cr, p.team) + (0 if d <= cr else 1)
             foes = sum(1 for e in self.world.pokemons()
-                       if e.team != p.team and e.alive and tw.pos.dist(e.pos) <= 12.0
+                       if e.team != p.team and e.alive and tw.pos.dist(e.pos) <= cr
                        and self.vision.is_enemy_visible(p.team, e.id))
             if foes > allies:
                 continue
-            score = d * 0.5 + frac * 30.0 - (10.0 if minions else 0.0)
+            score = d * bp.tower_w_dist + frac * bp.tower_w_frac - (bp.tower_w_minion if minions else 0.0)
             if bs is None or score < bs:
                 best, bs = tw, score
         if best is None:
@@ -191,9 +185,10 @@ class BotPlanMixin:
     # --- 4. roam del support -------------------------------------------------
     def _plan_roam(self, p, st, dt) -> bool:
         from .spiritomb import PASSIVE_ID as SPIRIT
-        if self.time < ROAM_FROM or p.passive_id == SPIRIT:
+        bp = self._bp(p)
+        if self.time < bp.roam_from or p.passive_id == SPIRIT:
             return False
-        if p.hp < p.max_hp * 0.5:
+        if p.hp < p.max_hp * bp.roam_my_hp:
             st["roam_until"] = 0.0
         if st.get("roam_until", 0.0) > self.time:
             ally = self.world.get(st.get("roam_id"))
@@ -202,7 +197,7 @@ class BotPlanMixin:
                 st["roaming"] = False
                 return False
             st["roaming"] = True
-            if p.pos.dist(ally.pos) > 3.5:
+            if p.pos.dist(ally.pos) > bp.roam_follow_r:
                 p.target_id = None
                 self._move_towards(p, ally.pos, dt, use_astar=True)
                 return True
@@ -215,20 +210,20 @@ class BotPlanMixin:
             if a is p or a.team != p.team or not a.alive or getattr(a, "bot_support", False):
                 continue
             foes = sum(1 for e in self.world.pokemons()
-                       if e.team != p.team and e.alive and a.pos.dist(e.pos) <= 10.0
+                       if e.team != p.team and e.alive and a.pos.dist(e.pos) <= bp.roam_foe_r
                        and self.vision.is_enemy_visible(p.team, e.id))
             frac = a.hp / max(1.0, a.max_hp)
             other_lane = 1.0 if a.assigned_lane != p.assigned_lane else 0.0
             score = foes * 4.0 + (1.0 - frac) * 3.0 + other_lane * 2.0 - p.pos.dist(a.pos) * 0.05
-            if foes == 0 and frac > 0.7 and not other_lane:
+            if foes == 0 and frac > bp.roam_skip_hp and not other_lane:
                 continue
             if bs is None or score > bs:
                 best, bs = a, score
-        st["roam_cd"] = self.time + 15.0
+        st["roam_cd"] = self.time + bp.roam_recheck
         if best is None:
             return False
         st["roam_id"] = best.id
-        st["roam_until"] = self.time + ROAM_TIME
-        st["roam_cd"] = self.time + ROAM_COOLDOWN
+        st["roam_until"] = self.time + bp.roam_time
+        st["roam_cd"] = self.time + bp.roam_cooldown
         self._bps(p)["roams"] += 1
         return False
