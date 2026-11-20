@@ -70,6 +70,31 @@ def _log(msg: str) -> None:
         pass
 
 
+UNINSTALL_KEY = (r"Software\Microsoft\Windows\CurrentVersion\Uninstall"
+                 r"\{0C9E9176-62A4-451F-85CD-829548767599}_is1")   # AppId di installer/PokeMoba.iss
+
+
+def sync_installed_version() -> None:
+    """Se il gioco e' stato installato con PokeMoba-Setup.exe, tiene la versione
+    mostrata in "App installate" di Windows allineata all'exe (che si aggiorna da
+    solo senza ripassare dall'installer). Nessun effetto altrimenti."""
+    if os.name != "nt" or version.BUILD <= 0:
+        return
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, UNINSTALL_KEY, 0,
+                            winreg.KEY_READ | winreg.KEY_SET_VALUE) as k:
+            want = version.name()
+            try:
+                if winreg.QueryValueEx(k, "DisplayVersion")[0] == want:
+                    return
+            except OSError:
+                pass
+            winreg.SetValueEx(k, "DisplayVersion", 0, winreg.REG_SZ, want)
+    except OSError:      # non installato (exe portatile) o registro non scrivibile
+        pass
+
+
 class Updater:
     """Stato: idle -> checking -> (none | downloading -> ready) oppure error."""
 
@@ -91,6 +116,7 @@ class Updater:
                     p.unlink()
                 except OSError:
                     pass
+            sync_installed_version()
         if not enabled():
             return
         self.state = "checking"

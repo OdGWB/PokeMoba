@@ -1,6 +1,7 @@
-# Ogni push sul ramo main: test, exe Windows con PyInstaller e nuova GitHub Release
-# "v<numero build>" (nome "PokéMoba 3.0.N", vedi game/version.py) con PokeMoba.exe allegato. Gli exe gia' distribuiti la vedono
-# all'avvio (game/updater.py) e si aggiornano da soli.
+# Ogni push sul ramo main: test, exe Windows con PyInstaller, installer (Inno Setup) e nuova
+# GitHub Release "v<numero build>" (nome "PokéMoba 3.0.N", vedi game/version.py) con
+# PokeMoba-Setup.exe (da scaricare) e PokeMoba.exe allegati. Gli exe gia' installati vedono
+# la Release all'avvio (game/updater.py) e si aggiornano da soli scaricando PokeMoba.exe.
 name: Release
 
 on:
@@ -67,6 +68,20 @@ jobs:
           --distpath dist --workpath build/pyinstaller
           run_client.py
 
+      # Installer (Inno Setup 6) che mette PokeMoba.exe in %LOCALAPPDATA%\Programs\PokeMoba
+      # con menu Start, icona sul desktop e disinstallazione. PokeMoba.exe resta allegato
+      # anche da solo: e' quello che scarica l'aggiornamento automatico.
+      - name: Installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup --no-progress -y
+            if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          }
+          & $iscc "/DAppVersion=$env:VERSION_NAME" installer\PokeMoba.iss
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
@@ -76,6 +91,11 @@ jobs:
           body: |
             ${{ github.event.head_commit.message }}
 
-            Scarica **PokeMoba.exe**. Chi ha già il gioco lo riceve da solo all'avvio.
-          files: dist/PokeMoba.exe
+            **Download:** scarica ed esegui **PokeMoba-Setup.exe**. Chi ha già il gioco
+            riceve l'aggiornamento da solo all'avvio.
+
+            <sub>PokeMoba.exe è il file usato dall'aggiornamento automatico.</sub>
+          files: |
+            dist/PokeMoba-Setup.exe
+            dist/PokeMoba.exe
           make_latest: true

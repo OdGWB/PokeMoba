@@ -82,6 +82,9 @@ Altri strumenti:
 
 - Test online su un solo PC: `python tools/net_local_test.py`.
 - Exe unico da mandare agli amici: `crea_exe.bat` (crea `dist\PokeMoba.exe`).
+- Installer: `crea_installer.bat` (crea `dist\PokeMoba-Setup.exe` dall'exe, serve
+  Inno Setup 6). Le Release su GitHub pubblicano l'installer da sole; il gioco
+  installato si aggiorna poi da solo come prima.
 
 ## Comandi in partita
 
