@@ -1,0 +1,102 @@
+[
+ {
+  "native": true,
+  "seed": 90000000,
+  "wall": 29.879527600000074,
+  "cpu": 29.421875,
+  "import": 0.30591869999989285,
+  "peak_ws_mb": 113.09375,
+  "peak_commit_mb": 745.76171875,
+  "sim_time": 840.0,
+  "winner": 1,
+  "timeout": true,
+  "early": null,
+  "networth": [
+   22425,
+   30222
+  ],
+  "kills": [
+   3,
+   17
+  ],
+  "core_hp": [
+   9500,
+   9500
+  ]
+ },
+ {
+  "native": false,
+  "seed": 90000000,
+  "wall": 98.97928339999999,
+  "cpu": 97.546875,
+  "import": 0.2786433000001125,
+  "peak_ws_mb": 118.36328125,
+  "peak_commit_mb": 760.80859375,
+  "sim_time": 840.0,
+  "winner": 1,
+  "timeout": true,
+  "early": null,
+  "networth": [
+   22425,
+   30222
+  ],
+  "kills": [
+   3,
+   17
+  ],
+  "core_hp": [
+   9500,
+   9500
+  ]
+ },
+ {
+  "native": true,
+  "seed": 90000001,
+  "wall": 29.039942400000655,
+  "cpu": 28.765625,
+  "import": 0.292298700000174,
+  "peak_ws_mb": 113.37109375,
+  "peak_commit_mb": 746.1171875,
+  "sim_time": 840.0,
+  "winner": 0,
+  "timeout": true,
+  "early": null,
+  "networth": [
+   28835,
+   26787
+  ],
+  "kills": [
+   13,
+   12
+  ],
+  "core_hp": [
+   9500,
+   9500
+  ]
+ },
+ {
+  "native": false,
+  "seed": 90000001,
+  "wall": 100.99563279999984,
+  "cpu": 99.125,
+  "import": 0.27883960000053776,
+  "peak_ws_mb": 121.1015625,
+  "peak_commit_mb": 760.19140625,
+  "sim_time": 840.0,
+  "winner": 0,
+  "timeout": true,
+  "early": null,
+  "networth": [
+   28835,
+   26787
+  ],
+  "kills": [
+   13,
+   12
+  ],
+  "core_hp": [
+   9500,
+   9500
+  ]
+ }
+]

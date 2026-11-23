@@ -148,7 +148,8 @@ def main():
     ap.add_argument("--resume", action="store_true")
     ap.add_argument("--gens", type=int, default=30)
     ap.add_argument("--popsize", type=int, default=0, help="0 = default di CMA (4+3 ln d)")
-    ap.add_argument("--seeds", type=int, default=4, help="semi per generazione (x2 lati)")
+    ap.add_argument("--seeds", type=int, default=None,
+                    help="semi per generazione (x2 lati; default 4; con --resume sostituisce quello salvato)")
     ap.add_argument("--minutes", type=float, default=14.0, help="durata massima di gioco")
     ap.add_argument("--sigma", type=float, default=0.2)
     ap.add_argument("--groups", default=",".join(GROUPS))
@@ -178,9 +179,11 @@ def main():
     if a.resume and state_f.exists():
         st = pickle.loads(state_f.read_bytes())
         es, lay, gen, opp, best = st["es"], st["lay"], st["gen"], st["opp"], st["best"]
-        a.minutes, a.seeds, a.seed_base = st["minutes"], st["seeds"], st["seed_base"]
+        a.minutes, a.seed_base = st["minutes"], st["seed_base"]
+        a.seeds = a.seeds or st["seeds"]
         print(f"ripresa da generazione {gen}")
     else:
+        a.seeds = a.seeds or 4
         groups = [g for g in a.groups.split(",") if g]
         lay = layout(groups)
         start = json.loads(Path(a.start).read_text()) if a.start else None
