@@ -64,6 +64,8 @@ MINION_STATS = {
 
 _WAYPOINT_REACHED = 0.6
 _TOWER_AGGRO_WINDOW = 4.0   # s: finestra in cui una torre può colpire un Pokémon
+_UNIT_OR_STRUCT = (Unit, Structure)          # chiave della cache di World._of_type
+_CLEANUP_TYPES = (Minion, Wild, Structure)   # tipi tolti dal mondo alla morte
 _MINION_LEASH = 5.5         # tile: distanza max dalla lane prima di tornare indietro
 _MINION_AGGRO_WINDOW = 4.0  # s: i minion focalizzano il campione che attacca un alleato
 _MINION_RETALIATE = 2.5     # s: finestra per ritorsione contro chi li ha colpiti
@@ -855,8 +857,10 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
 
     # --- combattimento -------------------------------------------------------
     def _update_combat(self, dt: float) -> None:
-        for c in self.world.combatants():
-            if c.attack_timer > 0.0:
+        # Stesso effetto di "for c in world.combatants()" senza rifare la lista:
+        # Unit e Structure hanno sempre `alive` (Combatant).
+        for c in self.world._of_type(_UNIT_OR_STRUCT):
+            if c.attack_timer > 0.0 and c.alive:
                 c.attack_timer = max(0.0, c.attack_timer - dt)
         self._update_aa_projectiles(dt)   # attacchi base a distanza in volo
 
@@ -885,26 +889,43 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
     def _tower_fire(self, tower: Structure) -> None:
         enemy_minions = []
         enemy_pokes = []
-        for e in self._combat_hash.query_radius(tower.pos.x, tower.pos.y, tower.attack_range):
-            if e.team == tower.team or not getattr(e, "alive", False):
+        tp = tower.pos
+        tx, ty, team, rng = tp.x, tp.y, tower.team, tower.attack_range
+        now = self.time
+        for e in self._combat_hash.query_radius(tx, ty, rng):
+            if e.team == team or not getattr(e, "alive", False):
                 continue
-            if tower.pos.dist(e.pos) > tower.attack_range + getattr(e, "radius", 0.0):
+            if tp.dist(e.pos) > rng + getattr(e, "radius", 0.0):
                 continue
             if isinstance(e, Minion):
                 enemy_minions.append(e)
-            elif isinstance(e, Pokemon) and e.untargetable_until <= self.time:
+            elif isinstance(e, Pokemon) and e.untargetable_until <= now:
                 enemy_pokes.append(e)
-        cands ={e.id: e for e in enemy_minions}
-        cands.update((p.id, p) for p in enemy_pokes)
+        forced = getattr(tower, "_forced_id", None)
+        if not enemy_minions and not enemy_pokes:
+            # Caso comune: nessuno a tiro.
+            if forced is not None:
+                tower._forced_id = None
+            tower.target_id = None
+            return
+
+        def cand(i):
+            # Come un dict {id: e} di minion poi Pokemon (gli id sono unici).
+            for e in enemy_minions:
+                if e.id == i:
+                    return e
+            for e in enemy_pokes:
+                if e.id == i:
+                    return e
+            return None
         target = None
         # Richiesta d'aiuto: chi ha colpito un Pokémon alleato sotto la torre.
-        forced = getattr(tower, "_forced_id", None)
         if forced is not None:
-            target = cands.get(forced)
+            target = cand(forced)
             tower._forced_id = None
         # Il bersaglio resta lo stesso finché è vivo e a tiro (stile LoL).
         if target is None and tower.target_id is not None:
-            target = cands.get(tower.target_id)
+            target = cand(tower.target_id)
         if target is not None:
             pass
         elif enemy_minions:
@@ -1279,13 +1300,14 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                                        f"Torre {victim.lane} squadra {victim.team} distrutta!"))
 
     def _cleanup_dead(self) -> None:
-        for e in list(self.world.entities.values()):
-            if isinstance(e, Minion) and not e.alive:
+        # Solo i tipi che si tolgono (lista in cache, stesso ordine di
+        # world.entities); di solito non e' morto nessuno e non si fa altro.
+        dead = [e for e in self.world._of_type(_CLEANUP_TYPES) if not e.alive]
+        for e in dead:
+            if isinstance(e, Minion):
                 self.world.remove(e.id)
                 self._ai.pop(e.id, None)
-            elif isinstance(e, Wild) and not e.alive:
-                self.world.remove(e.id)
-            elif isinstance(e, Structure) and not isinstance(e, Core) and not e.alive:
+            elif not isinstance(e, Core):
                 self.world.remove(e.id)
 
     # --- passiva Muta / forma Shedinja (linea Nincada) -----------------------
