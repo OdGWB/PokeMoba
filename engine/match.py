@@ -206,6 +206,10 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
             self._minion_ai = _native.MinionAI(
                 Pokemon, Minion, Structure, Vec2, _WAYPOINT_REACHED, _MINION_LEASH,
                 _MINION_AGGRO_WINDOW, _MINION_RETALIATE, config.TICK_DT)
+        # Aiutanti dell'IA dei bot in Rust (stesse scansioni), solo con l'hash nativo.
+        self._bot_nat = None
+        if _native is not None and hasattr(_native, "BotHelpers")                 and isinstance(self._combat_hash, _native.SpatialHash):
+            self._bot_nat = _native.BotHelpers(Pokemon, Minion)
         # Parametri dell'IA dei bot, uno per squadra (engine/bot_params.py).
         self.bot_params: list[BotParams] = [BotParams(), BotParams()]
         self._move_resume: dict[int, tuple] = {}  # ultimo ricalcolo di un ordine di movimento (dest, pos)
@@ -696,6 +700,8 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         self._follow_bot_lane_safe(p, dt)
 
     def _has_allied_minion_near(self, p, pos, r: float) -> bool:
+        if self._bot_nat is not None:
+            return self._bot_nat.minion_near(self._combat_hash, p.team, pos.x, pos.y, r)
         for e in self._combat_hash.query_radius(pos.x, pos.y, r):
             if isinstance(e, Minion) and e.team == p.team and e.alive and pos.dist(e.pos) <= r:
                 return True
@@ -703,6 +709,9 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
 
     def _unsafe_dive(self, p, point) -> bool:
         bp = self._bp(p)
+        if self._bot_nat is not None:
+            return self._bot_nat.unsafe_dive(self.world.structures(), self._combat_hash, p.team,
+                                             point.x, point.y, bp.tower_margin, bp.struct_minion_r)
         for e in self.world.structures():
             if e.kind != "tower" or not e.alive or e.team == p.team:
                 continue
@@ -713,6 +722,9 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
 
     def _threatened_structure(self, p):
         bp = self._bp(p)
+        if self._bot_nat is not None:
+            return self._bot_nat.threatened(self.world.structures(), self._combat_hash, p.team,
+                                            p.pos.x, p.pos.y, bp.defend_enemy_r, bp.defend_max_dist)
         best, bestd = None, 1e9
         for e in self.world.structures():
             if e.team != p.team or not e.alive:

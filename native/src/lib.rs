@@ -1243,6 +1243,191 @@ impl MinionAI {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Aiutanti dell'IA dei bot (engine/match.py: _has_allied_minion_near,
+// _unsafe_dive, _threatened_structure; engine/smite.py: _under_enemy_tower,
+// _count_champs). Stesse letture e stesso risultato; nessuna scrittura.
+
+#[pyclass(module = "pokemoba_native")]
+struct BotHelpers {
+    poke_cls: Py<PyAny>,
+    minion_cls: Py<PyAny>,
+}
+
+impl BotHelpers {
+    fn minion_near_impl(&self, py: Python<'_>, hash: &SpatialHash, team: i64, x: f64, y: f64,
+                        r: f64) -> PyResult<bool> {
+        let (k_team, k_alive) = (intern!(py, "team"), intern!(py, "alive"));
+        let mcls = self.minion_cls.bind(py);
+        let inv = 1.0 / hash.cell_size;
+        let cx0 = ((x - r) * inv).floor() as i64;
+        let cy0 = ((y - r) * inv).floor() as i64;
+        let cx1 = ((x + r) * inv).floor() as i64;
+        let cy1 = ((y + r) * inv).floor() as i64;
+        for cy in cy0..=cy1 {
+            for cx in cx0..=cx1 {
+                if let Some(b) = hash.cells.get(&(cx, cy)) {
+                    for e in b {
+                        let e = e.bind(py);
+                        if !e.is_instance(mcls)? {
+                            continue;
+                        }
+                        let et: i64 = e.getattr(k_team)?.extract()?;
+                        if et != team || !e.getattr(k_alive)?.is_truthy()? {
+                            continue;
+                        }
+                        let (ex, ey) = pos_of(e)?;
+                        if hypot(x - ex, y - ey) <= r {
+                            return Ok(true);
+                        }
+                    }
+                }
+            }
+        }
+        Ok(false)
+    }
+}
+
+#[pymethods]
+impl BotHelpers {
+    #[new]
+    fn new(poke_cls: Py<PyAny>, minion_cls: Py<PyAny>) -> Self {
+        BotHelpers { poke_cls, minion_cls }
+    }
+
+    /// _has_allied_minion_near(p, pos, r) con team = p.team.
+    fn minion_near(&self, hash: PyRef<'_, SpatialHash>, team: i64, x: f64, y: f64, r: f64)
+                   -> PyResult<bool> {
+        self.minion_near_impl(hash.py(), &hash, team, x, y, r)
+    }
+
+    /// _unsafe_dive(p, point).
+    #[allow(clippy::too_many_arguments)]
+    fn unsafe_dive(&self, structures: &Bound<'_, PyList>, hash: PyRef<'_, SpatialHash>, team: i64,
+                   x: f64, y: f64, margin: f64, smr: f64) -> PyResult<bool> {
+        let py = structures.py();
+        let (k_kind, k_alive, k_team, k_range) =
+            (intern!(py, "kind"), intern!(py, "alive"), intern!(py, "team"), intern!(py, "attack_range"));
+        for e in structures.iter() {
+            if e.getattr(k_kind)?.extract::<&str>()? != "tower" || !e.getattr(k_alive)?.is_truthy()? {
+                continue;
+            }
+            let et: i64 = e.getattr(k_team)?.extract()?;
+            if et == team {
+                continue;
+            }
+            let (ex, ey) = pos_of(&e)?;
+            let ar: f64 = e.getattr(k_range)?.extract()?;
+            if hypot(x - ex, y - ey) <= ar + margin && !self.minion_near_impl(py, &hash, team, ex, ey, smr)? {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    /// _under_enemy_tower(p, pos).
+    fn under_tower(&self, structures: &Bound<'_, PyList>, team: i64, x: f64, y: f64, margin: f64)
+                   -> PyResult<bool> {
+        let py = structures.py();
+        let (k_kind, k_alive, k_team, k_range) =
+            (intern!(py, "kind"), intern!(py, "alive"), intern!(py, "team"), intern!(py, "attack_range"));
+        for e in structures.iter() {
+            if e.getattr(k_kind)?.extract::<&str>()? != "tower" || !e.getattr(k_alive)?.is_truthy()? {
+                continue;
+            }
+            let et: i64 = e.getattr(k_team)?.extract()?;
+            if et == team {
+                continue;
+            }
+            let (ex, ey) = pos_of(&e)?;
+            let ar: f64 = e.getattr(k_range)?.extract()?;
+            if hypot(x - ex, y - ey) <= ar + margin {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    /// _threatened_structure(p).
+    #[allow(clippy::too_many_arguments)]
+    fn threatened<'py>(&self, structures: &Bound<'py, PyList>, hash: PyRef<'_, SpatialHash>,
+                       team: i64, px: f64, py_: f64, r: f64, maxd: f64)
+                       -> PyResult<Option<Bound<'py, PyAny>>> {
+        let py = structures.py();
+        let (k_alive, k_team) = (intern!(py, "alive"), intern!(py, "team"));
+        let (pcls, mcls) = (self.poke_cls.bind(py), self.minion_cls.bind(py));
+        let inv = 1.0 / hash.cell_size;
+        let mut best: Option<Bound<'py, PyAny>> = None;
+        let mut bestd = 1e9_f64;
+        for e in structures.iter() {
+            let et: i64 = e.getattr(k_team)?.extract()?;
+            if et != team || !e.getattr(k_alive)?.is_truthy()? {
+                continue;
+            }
+            let (ex, ey) = pos_of(&e)?;
+            let cx0 = ((ex - r) * inv).floor() as i64;
+            let cy0 = ((ey - r) * inv).floor() as i64;
+            let cx1 = ((ex + r) * inv).floor() as i64;
+            let cy1 = ((ey + r) * inv).floor() as i64;
+            let mut found = false;
+            'scan: for cy in cy0..=cy1 {
+                for cx in cx0..=cx1 {
+                    if let Some(b) = hash.cells.get(&(cx, cy)) {
+                        for x in b {
+                            let x = x.bind(py);
+                            let xt: i64 = x.getattr(k_team)?.extract()?;
+                            if xt == team || !attr_truthy(x, k_alive) {
+                                continue;
+                            }
+                            if x.is_instance(pcls)? || x.is_instance(mcls)? {
+                                found = true;
+                                break 'scan;
+                            }
+                        }
+                    }
+                }
+            }
+            if !found {
+                continue;
+            }
+            let d = hypot(px - ex, py_ - ey);
+            if d < bestd {
+                bestd = d;
+                best = Some(e);
+            }
+        }
+        Ok(if best.is_some() && bestd < maxd { best } else { None })
+    }
+
+    /// _count_champs(pos, r, team, exclude).
+    #[pyo3(signature = (pokemons, x, y, r, team, exclude=None))]
+    fn count_champs(&self, pokemons: &Bound<'_, PyList>, x: f64, y: f64, r: f64, team: i64,
+                    exclude: Option<&Bound<'_, PyAny>>) -> PyResult<i64> {
+        let py = pokemons.py();
+        let (k_alive, k_team) = (intern!(py, "alive"), intern!(py, "team"));
+        let mut n = 0;
+        for e in pokemons.iter() {
+            if let Some(ex) = exclude {
+                if e.is(ex) {
+                    continue;
+                }
+            }
+            if !e.getattr(k_alive)?.is_truthy()? {
+                continue;
+            }
+            let et: i64 = e.getattr(k_team)?.extract()?;
+            if et != team {
+                continue;
+            }
+            let (ex, ey) = pos_of(&e)?;
+            if hypot(x - ex, y - ey) <= r {
+                n += 1;
+            }
+        }
+        Ok(n)
+    }
+}
+
 #[pymodule]
 fn pokemoba_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_hypot, m)?)?;
@@ -1251,6 +1436,7 @@ fn pokemoba_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<WalkGrid>()?;
     m.add_class::<VisionScan>()?;
     m.add_class::<MinionAI>()?;
+    m.add_class::<BotHelpers>()?;
     m.add_function(wrap_pyfunction!(obstacle_hits, m)?)?;
     Ok(())
 }
