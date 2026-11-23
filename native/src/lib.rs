@@ -5,7 +5,9 @@
 //! visiting order, same floating-point operations. The engine falls back to the
 //! Python code when this module is missing, so it must never change a result.
 
+use pyo3::intern;
 use pyo3::prelude::*;
+use pyo3::types::PyList;
 use std::collections::{HashMap, HashSet};
 
 const TILE_BUSH: u8 = 4;
@@ -13,6 +15,7 @@ const TILE_PILLAR: u8 = 7;
 const RES: usize = 8; // fine cells per tile (engine/wall_shape.RES)
 const WALL_R_MAX: f64 = 0.42; // movement._WALL_R_MAX
 const SHAPE_FRACS: [f64; 5] = [0.2, 0.4, 0.6, 0.8, 1.0];
+const ARRIVE_EPS: f64 = 0.02; // movement._ARRIVE_EPS
 
 // ---------------------------------------------------------------------------
 // math.hypot, exactly as CPython's vector_norm (Modules/mathmodule.c, 3.10+).
@@ -116,6 +119,15 @@ struct GridView {
     fine: Vec<u8>,      // _shape_b: (h*8) x (w*8)
     any_t: Vec<u8>,     // _shape_any_b: per tile
     dirs: Vec<(f64, f64)>, // movement._SHAPE_DIRS (computed in Python: same libm)
+    steer: Vec<(f64, f64)>, // cos/sin of movement._STEER_ANGLES (computed in Python)
+    dir_unit: [(f64, f64); 8], // vec._DIR_UNIT
+}
+
+/// Result of movement._slide.
+enum Slide {
+    Same,           // returned nxt itself (`moved is target`)
+    Axis(f64, f64), // slid along one axis
+    Blocked,        // None
 }
 
 impl GridView {
@@ -279,6 +291,63 @@ impl GridView {
         (px, py)
     }
 
+    /// movement._in_pillar (tile_at is TILE_WALL out of bounds).
+    #[inline]
+    fn in_pillar(&self, px: f64, py: f64) -> bool {
+        let (x, y) = (px.floor(), py.floor());
+        if !(x >= 0.0 && y >= 0.0 && x < self.w as f64 && y < self.h as f64) {
+            return false;
+        }
+        self.tile(x as usize, y as usize) == TILE_PILLAR
+    }
+
+    /// vec.direction_index.
+    fn direction_index(&self, dx: f64, dy: f64) -> i64 {
+        if dx == 0.0 && dy == 0.0 {
+            return 0;
+        }
+        let inv = 1.0 / hypot(dx, dy);
+        let (nx, ny) = (dx * inv, dy * inv);
+        let (mut best_i, mut best_dot) = (0i64, -2.0f64);
+        for (i, &(ux, uy)) in self.dir_unit.iter().enumerate() {
+            let d = nx * ux + ny * uy;
+            if d > best_dot {
+                best_dot = d;
+                best_i = i as i64;
+            }
+        }
+        best_i
+    }
+
+    /// movement._steer.
+    fn steer(&self, px: f64, py: f64, sx: f64, sy: f64) -> Option<(f64, f64)> {
+        for &(ca, sa) in self.steer.iter() {
+            let ax = px + (sx * ca - sy * sa);
+            let ay = py + (sx * sa + sy * ca);
+            if !self.in_pillar(ax, ay) && self.walkable_point(ax, ay, false) {
+                return Some((ax, ay));
+            }
+        }
+        None
+    }
+
+    /// movement._slide.
+    fn slide(&self, px: f64, py: f64, nx: f64, ny: f64, bb: bool) -> Slide {
+        if self.walkable_point(nx, ny, bb)
+            && (px.floor() == nx.floor() || py.floor() == ny.floor()
+                || self.walkable_point(nx, py, bb) || self.walkable_point(px, ny, bb)) {
+            return Slide::Same;
+        }
+        let (ax, ay) = ((nx, py), (px, ny));
+        let cand = if (nx - px).abs() >= (ny - py).abs() { [ax, ay] } else { [ay, ax] };
+        for (cx, cy) in cand {
+            if (cx != px || cy != py) && self.walkable_point(cx, cy, bb) {
+                return Slide::Axis(cx, cy);
+            }
+        }
+        Slide::Blocked
+    }
+
     /// movement._move_out (+ _keep_off_walls) on index i.
     #[inline]
     fn move_out(&self, xs: &mut [f64], ys: &mut [f64], i: usize, ox: f64, oy: f64,
@@ -303,11 +372,178 @@ fn cell_key(x: f64, y: f64) -> (i64, i64) {
 impl GridView {
     #[new]
     fn new(w: usize, h: usize, tiles: Vec<u8>, fine: Vec<u8>, any_t: Vec<u8>,
-           dirs: Vec<(f64, f64)>) -> PyResult<Self> {
+           dirs: Vec<(f64, f64)>, steer: Vec<(f64, f64)>) -> PyResult<Self> {
         if tiles.len() != w * h || any_t.len() != w * h || fine.len() != w * h * RES * RES {
             return Err(pyo3::exceptions::PyValueError::new_err("GridView: bad buffer sizes"));
         }
-        Ok(GridView { w, h, tiles, fine, any_t, dirs })
+        // vec._DIR_UNIT = [Vec2(dx, dy).normalized() for DIR_VECTORS]
+        let raw: [(f64, f64); 8] = [(0.0, 1.0), (1.0, 1.0), (1.0, 0.0), (1.0, -1.0),
+                                    (0.0, -1.0), (-1.0, -1.0), (-1.0, 0.0), (-1.0, 1.0)];
+        let mut dir_unit = [(0.0, 0.0); 8];
+        for (i, &(x, y)) in raw.iter().enumerate() {
+            let l = hypot(x, y);
+            dir_unit[i] = (x / l, y / l);
+        }
+        Ok(GridView { w, h, tiles, fine, any_t, dirs, steer, dir_unit })
+    }
+
+    /// direction_index (for tests against vec.direction_index).
+    fn direction_index_py(&self, dx: f64, dy: f64) -> i64 {
+        self.direction_index(dx, dy)
+    }
+
+    /// The waypoint loop of movement.advance_unit (grid present, shape on).
+    /// path: list of Vec2 (read, not modified). Returns (x, y, waypoints
+    /// consumed, last facing or -1). keep_r = min(radius, 0.42) for the final
+    /// _keep_off_walls (skipped in the air).
+    #[allow(clippy::too_many_arguments)]
+    fn advance(&self, px0: f64, py0: f64, path: &Bound<'_, PyList>, budget0: f64,
+               bb: bool, airborne: bool, keep_r: f64) -> PyResult<(f64, f64, usize, i64)> {
+        let pyh = path.py();
+        let (kx, ky) = (intern!(pyh, "x"), intern!(pyh, "y"));
+        let n = path.len();
+        let (mut px, mut py) = (px0, py0);
+        let mut budget = budget0;
+        let mut i = 0usize;
+        let mut facing = -1i64;
+        let blocked = |x: f64, y: f64| !airborne && !self.walkable_point(x, y, bb);
+        while budget > 1e-9 && i < n {
+            let t = path.get_item(i)?;
+            let tx: f64 = t.getattr(kx)?.extract()?;
+            let ty: f64 = t.getattr(ky)?.extract()?;
+            let (tox, toy) = (tx - px, ty - py);
+            let d = hypot(tox, toy);
+            // Vec2.normalized
+            let (ux, uy) = if d < 1e-9 { (0.0, 0.0) } else { (tox / d, toy / d) };
+            if d > ARRIVE_EPS {
+                let m = if d < budget { d } else { budget };
+                let (sx, sy) = (ux * m, uy * m);
+                let (qx, qy) = (px + sx, py + sy);
+                let step_in = self.in_pillar(qx, qy);
+                if step_in || self.in_pillar(tx, ty) {
+                    let alt = if step_in { self.steer(px, py, sx, sy) } else { Some((qx, qy)) };
+                    if let Some((ax, ay)) = alt {
+                        if !blocked(ax, ay) {
+                            px = ax;
+                            py = ay;
+                        }
+                    }
+                    facing = self.direction_index(tox, toy);
+                    break;
+                }
+            }
+            if d <= ARRIVE_EPS {
+                if blocked(tx, ty) {
+                    break;
+                }
+                px = tx;
+                py = ty;
+                i += 1;
+                continue;
+            }
+            if d <= budget {
+                if blocked(tx, ty) {
+                    break;
+                }
+                if !airborne {
+                    match self.slide(px, py, tx, ty, bb) {
+                        Slide::Blocked => break,
+                        Slide::Axis(mx, my) => {
+                            px = mx;
+                            py = my;
+                            facing = self.direction_index(tox, toy);
+                            break;
+                        }
+                        Slide::Same => {}
+                    }
+                }
+                px = tx;
+                py = ty;
+                budget -= d;
+                facing = self.direction_index(tox, toy);
+                i += 1;
+            } else {
+                let (mut nx, mut ny) = (px + ux * budget, py + uy * budget);
+                if !airborne {
+                    match self.slide(px, py, nx, ny, bb) {
+                        Slide::Blocked => {
+                            facing = self.direction_index(tox, toy);
+                            break;
+                        }
+                        Slide::Axis(mx, my) => {
+                            nx = mx;
+                            ny = my;
+                        }
+                        Slide::Same => {}
+                    }
+                }
+                px = nx;
+                py = ny;
+                facing = self.direction_index(tox, toy);
+                break;
+            }
+        }
+        if !airborne {
+            let (qx, qy) = self.keep_off(px, py, keep_r, bb);
+            px = qx;
+            py = qy;
+        }
+        Ok((px, py, i, facing))
+    }
+
+    /// The whole movement.advance_unit (grid present, shape on), reading and
+    /// writing the unit's attributes. Returns False (nothing changed) when the
+    /// unit stands inside a wall on the ground: Python then runs its own path
+    /// (anti-stuck search + loop).
+    fn step_unit(&self, unit: &Bound<'_, PyAny>, dt: f64, vec2: &Bound<'_, PyAny>) -> PyResult<bool> {
+        let py = unit.py();
+        let bb = attr_truthy(unit, intern!(py, "bush_blocks"));
+        let air_z: f64 = match unit.getattr(intern!(py, "air_z")) {
+            Ok(v) => v.extract()?,
+            Err(_) => 0.0,
+        };
+        let (px, py0) = pos_of(unit)?;
+        let ground = air_z <= 0.0;
+        if ground && !self.walkable_point(px, py0, bb) {
+            return Ok(false);
+        }
+        let path_any = unit.getattr(intern!(py, "path"))?;
+        let path = match path_any.cast::<PyList>() {
+            Ok(l) => l.clone(),
+            Err(_) => return Ok(false),
+        };
+        let keep_r: f64 = match unit.getattr(intern!(py, "radius")) {
+            Ok(v) => {
+                let r: f64 = v.extract()?;
+                if r < WALL_R_MAX { r } else { WALL_R_MAX }
+            }
+            Err(_) => 0.35,
+        };
+        let kpos = intern!(py, "pos");
+        if path.len() == 0 {
+            unit.setattr(intern!(py, "moving"), false)?;
+            if ground {
+                let (qx, qy) = self.keep_off(px, py0, keep_r, bb);
+                if qx != px || qy != py0 {
+                    unit.setattr(kpos, vec2.call1((qx, qy))?)?;
+                }
+            }
+            return Ok(true);
+        }
+        let airborne = air_z > 0.0;
+        let speed: f64 = unit.getattr(intern!(py, "speed"))?.extract()?;
+        let (x, y, n, f) = self.advance(px, py0, &path, speed * dt, bb, airborne, keep_r)?;
+        if n > 0 {
+            path.del_slice(0, n)?;
+        }
+        if f >= 0 {
+            unit.setattr(intern!(py, "facing"), f)?;
+        }
+        if x != px || y != py0 {
+            unit.setattr(kpos, vec2.call1((x, y))?)?;
+        }
+        unit.setattr(intern!(py, "moving"), path.len() > 0)?;
+        Ok(true)
     }
 
     #[pyo3(signature = (px, py, bb=false))]
@@ -395,9 +631,339 @@ impl GridView {
     }
 }
 
+// ---------------------------------------------------------------------------
+
+/// engine/spatial.SpatialHash: same cells, same bucket and visiting order.
+#[pyclass(module = "pokemoba_native")]
+struct SpatialHash {
+    #[pyo3(get)]
+    cell_size: f64,
+    cells: HashMap<(i64, i64), Vec<Py<PyAny>>>,
+}
+
+impl SpatialHash {
+    #[inline]
+    fn key(&self, x: f64, y: f64) -> (i64, i64) {
+        let inv = 1.0 / self.cell_size;
+        ((x * inv).floor() as i64, (y * inv).floor() as i64)
+    }
+}
+
+fn pos_of(e: &Bound<'_, PyAny>) -> PyResult<(f64, f64)> {
+    let py = e.py();
+    let p = e.getattr(intern!(py, "pos"))?;
+    Ok((p.getattr(intern!(py, "x"))?.extract()?, p.getattr(intern!(py, "y"))?.extract()?))
+}
+
+#[pymethods]
+impl SpatialHash {
+    #[new]
+    #[pyo3(signature = (cell_size=2.0))]
+    fn new(cell_size: f64) -> Self {
+        SpatialHash { cell_size, cells: HashMap::new() }
+    }
+
+    fn _key(&self, x: f64, y: f64) -> (i64, i64) {
+        self.key(x, y)
+    }
+
+    fn rebuild(&mut self, entities: &Bound<'_, PyAny>) -> PyResult<()> {
+        for v in self.cells.values_mut() {
+            v.clear();
+        }
+        for e in entities.try_iter()? {
+            let e = e?;
+            let (x, y) = pos_of(&e)?;
+            let k = self.key(x, y);
+            self.cells.entry(k).or_default().push(e.unbind());
+        }
+        Ok(())
+    }
+
+    fn query_radius<'py>(&self, py: Python<'py>, x: f64, y: f64, radius: f64)
+                         -> PyResult<Bound<'py, PyList>> {
+        let inv = 1.0 / self.cell_size;
+        let cx0 = ((x - radius) * inv).floor() as i64;
+        let cy0 = ((y - radius) * inv).floor() as i64;
+        let cx1 = ((x + radius) * inv).floor() as i64;
+        let cy1 = ((y + radius) * inv).floor() as i64;
+        let out = PyList::empty(py);
+        for cy in cy0..=cy1 {
+            for cx in cx0..=cx1 {
+                if let Some(b) = self.cells.get(&(cx, cy)) {
+                    for e in b {
+                        out.append(e.bind(py))?;
+                    }
+                }
+            }
+        }
+        Ok(out)
+    }
+
+    fn neighbors<'py>(&self, entity: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyList>> {
+        let py = entity.py();
+        let (x, y) = pos_of(entity)?;
+        let (kx, ky) = self.key(x, y);
+        let out = PyList::empty(py);
+        for dy in -1..=1i64 {
+            for dx in -1..=1i64 {
+                if let Some(b) = self.cells.get(&(kx + dx, ky + dy)) {
+                    for e in b {
+                        out.append(e.bind(py))?;
+                    }
+                }
+            }
+        }
+        Ok(out)
+    }
+}
+
+/// Prefilter of movement.resolve_obstacles: indices of the (non-flying) units whose
+/// body overlaps at least one obstacle circle, with the same float operations.
+/// Units not listed are left untouched by the Python loop, so it can skip them.
+#[pyfunction]
+fn obstacle_hits(units: &Bound<'_, PyList>, obstacles: Vec<(f64, f64, f64)>) -> PyResult<Vec<usize>> {
+    let py = units.py();
+    let mut out = Vec::new();
+    for (i, u) in units.iter().enumerate() {
+        if let Ok(z) = u.getattr(intern!(py, "air_z")) {
+            let z: f64 = z.extract().unwrap_or(0.0);
+            if z > 0.0 {
+                continue;
+            }
+        }
+        let (x, y) = pos_of(&u)?;
+        let rad: f64 = u.getattr(intern!(py, "radius"))?.extract()?;
+        for &(ox, oy, r) in &obstacles {
+            let dx = x - ox;
+            let dy = y - oy;
+            let min_d = r + rad;
+            let d2 = dx * dx + dy * dy;
+            if d2 < min_d * min_d {
+                out.push(i);
+                break;
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// Walkability grid of pathfinding.find_path (flat, with a non-walkable border).
+#[pyclass(module = "pokemoba_native")]
+struct WalkGrid {
+    walk: Vec<u8>,
+    stride: i64,
+}
+
+#[derive(PartialEq)]
+struct OpenNode {
+    f: f64,
+    counter: u64,
+    id: i64,
+    x: i64,
+    y: i64,
+}
+impl Eq for OpenNode {}
+impl PartialOrd for OpenNode {
+    fn partial_cmp(&self, o: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(o))
+    }
+}
+impl Ord for OpenNode {
+    // Reversed: BinaryHeap is a max-heap, heapq a min-heap on (f, counter).
+    fn cmp(&self, o: &Self) -> std::cmp::Ordering {
+        o.f.partial_cmp(&self.f).unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| o.counter.cmp(&self.counter))
+    }
+}
+
+#[pymethods]
+impl WalkGrid {
+    #[new]
+    fn new(walk: Vec<u8>, stride: i64) -> Self {
+        WalkGrid { walk, stride }
+    }
+
+    /// Same A* as pathfinding.find_path (neighbour order, costs, octile
+    /// heuristic, (f, counter) tie-break, no corner cutting). None = unreachable.
+    fn find_path(&self, sx: i64, sy: i64, gx: i64, gy: i64) -> Option<Vec<(i64, i64)>> {
+        let stride = self.stride;
+        let walk = &self.walk;
+        let n = walk.len();
+        let sq2 = 2.0f64.sqrt();
+        let sq2m2 = sq2 - 2.0;
+        let nbrs: [(i64, i64, f64); 8] = [
+            (1, 0, 1.0), (-1, 0, 1.0), (0, 1, 1.0), (0, -1, 1.0),
+            (1, 1, sq2), (1, -1, sq2), (-1, 1, sq2), (-1, -1, sq2),
+        ];
+        let s_id = (sy + 1) * stride + sx + 1;
+        let g_id = (gy + 1) * stride + gx + 1;
+        let mut g_score = vec![f64::INFINITY; n];
+        let mut came = vec![-1i64; n];
+        let mut closed = vec![false; n];
+        let mut heap = std::collections::BinaryHeap::new();
+        g_score[s_id as usize] = 0.0;
+        heap.push(OpenNode { f: 0.0, counter: 0, id: s_id, x: sx, y: sy });
+        let mut counter: u64 = 0;
+        while let Some(OpenNode { id: cur, x: cx, y: cy, .. }) = heap.pop() {
+            if cur == g_id {
+                let mut path = vec![(cx, cy)];
+                let mut c = cur;
+                while came[c as usize] >= 0 {
+                    c = came[c as usize];
+                    let (yy, xx) = (c.div_euclid(stride), c.rem_euclid(stride));
+                    path.push((xx - 1, yy - 1));
+                }
+                path.reverse();
+                return Some(path);
+            }
+            let cu = cur as usize;
+            if closed[cu] {
+                continue;
+            }
+            closed[cu] = true;
+            let g_cur = g_score[cu];
+            for &(dx, dy, cost) in &nbrs {
+                let nb = cur + dy * stride + dx;
+                let nbu = nb as usize;
+                if walk[nbu] == 0 {
+                    continue;
+                }
+                if dx != 0 && dy != 0
+                    && (walk[(cur + dx) as usize] == 0 || walk[(cur + dy * stride) as usize] == 0) {
+                    continue;
+                }
+                if closed[nbu] {
+                    continue;
+                }
+                let tentative = g_cur + cost;
+                if tentative < g_score[nbu] {
+                    came[nbu] = cur;
+                    g_score[nbu] = tentative;
+                    let nx = cx + dx;
+                    let ny = cy + dy;
+                    let hx = (nx - gx).abs();
+                    let hy = (ny - gy).abs();
+                    let m = if hx < hy { hx } else { hy };
+                    let f = tentative + (((hx + hy) as f64) + sq2m2 * (m as f64));
+                    counter += 1;
+                    heap.push(OpenNode { f, counter, id: nb, x: nx, y: ny });
+                }
+            }
+        }
+        None
+    }
+}
+
+/// Entity scan of tier_sim.FastVision.update (no reveals): builds the same
+/// signature (sources' (id, x, y, vision), invisible / agitated foes), compares
+/// it with the previous one of the team and, if changed, returns the sources and
+/// the foes that stand inside a source's vision circle and are not invisible
+/// (the bush rule stays in Python). None = signature unchanged.
+#[pyclass(module = "pokemoba_native")]
+struct VisionScan {
+    prev: HashMap<i64, Vec<(u8, i64, i64, i64, i64)>>,
+}
+
+fn attr_truthy(e: &Bound<'_, PyAny>, name: &Bound<'_, pyo3::types::PyString>) -> bool {
+    match e.getattr(name) {
+        Ok(v) => v.is_truthy().unwrap_or(false),
+        Err(_) => false,
+    }
+}
+
+#[pymethods]
+impl VisionScan {
+    #[new]
+    fn new() -> Self {
+        VisionScan { prev: HashMap::new() }
+    }
+
+    fn reset(&mut self, team: i64) {
+        self.prev.remove(&team);
+    }
+
+    fn scan<'py>(&mut self, entities: &Bound<'py, PyAny>, team: &Bound<'py, PyAny>,
+                 unit_cls: &Bound<'py, PyAny>, struct_cls: &Bound<'py, PyAny>)
+                 -> PyResult<Option<(Vec<Bound<'py, PyAny>>, Vec<Bound<'py, PyAny>>)>> {
+        let py = entities.py();
+        let team_i: i64 = team.extract()?;
+        let (k_team, k_alive, k_vision, k_id) =
+            (intern!(py, "team"), intern!(py, "alive"), intern!(py, "vision"), intern!(py, "id"));
+        let (k_inv, k_agi) = (intern!(py, "invisible"), intern!(py, "agitated"));
+        let mut sig: Vec<(u8, i64, i64, i64, i64)> = Vec::new();
+        let mut sources = Vec::new();
+        let mut keys: Vec<(i64, i64, i64)> = Vec::new();
+        let mut foes = Vec::new();
+        let mut foe_xy: Vec<(i64, i64)> = Vec::new();
+        for e in entities.try_iter()? {
+            let e = e?;
+            let t = e.getattr(k_team).ok();
+            let own = match &t {
+                None => true,
+                Some(t) => t.eq(team)?,
+            };
+            if own {
+                if t.is_some() && attr_truthy(&e, k_alive)
+                    && (e.is_instance(unit_cls)? || e.is_instance(struct_cls)?) {
+                    let v: f64 = match e.getattr(k_vision) {
+                        Ok(v) => v.extract()?,
+                        Err(_) => 0.0,
+                    };
+                    if v > 0.0 {
+                        let id: i64 = e.getattr(k_id)?.extract()?;
+                        let (x, y) = pos_of(&e)?;
+                        let key = (x.trunc() as i64, y.trunc() as i64, v.trunc() as i64);
+                        sig.push((0, id, key.0, key.1, key.2));
+                        keys.push(key);
+                        sources.push(e);
+                    }
+                }
+                continue;
+            }
+            if attr_truthy(&e, k_inv) {
+                let id: i64 = e.getattr(k_id)?.extract()?;
+                sig.push((1, id, 0, 0, 0));
+            }
+            if attr_truthy(&e, k_agi) {
+                let id: i64 = e.getattr(k_id)?.extract()?;
+                let (x, y) = pos_of(&e)?;
+                sig.push((2, id, x.trunc() as i64, y.trunc() as i64, 0));
+            }
+            if e.is_instance(unit_cls)? && attr_truthy(&e, k_alive) {
+                let (x, y) = pos_of(&e)?;
+                foe_xy.push((x.trunc() as i64, y.trunc() as i64));
+                foes.push(e);
+            }
+        }
+        sig.sort_unstable();
+        sig.dedup();
+        if self.prev.get(&team_i) == Some(&sig) {
+            return Ok(None);
+        }
+        self.prev.insert(team_i, sig);
+        let mut seen = Vec::new();
+        if !keys.is_empty() {
+            for (u, &(ux, uy)) in foes.into_iter().zip(foe_xy.iter()) {
+                let inside = keys.iter().any(|&(kx, ky, kv)| {
+                    (ux - kx) * (ux - kx) + (uy - ky) * (uy - ky) <= kv * kv
+                });
+                if inside && !attr_truthy(&u, k_inv) {
+                    seen.push(u);
+                }
+            }
+        }
+        Ok(Some((sources, seen)))
+    }
+}
+
 #[pymodule]
 fn pokemoba_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_hypot, m)?)?;
     m.add_class::<GridView>()?;
+    m.add_class::<SpatialHash>()?;
+    m.add_class::<WalkGrid>()?;
+    m.add_class::<VisionScan>()?;
+    m.add_function(wrap_pyfunction!(obstacle_hits, m)?)?;
     Ok(())
 }

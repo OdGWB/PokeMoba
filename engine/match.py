@@ -258,6 +258,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         if self.winner is not None:
             return
         self.time += dt
+        self._tick = tick
         self._surrender_tick()
         if self.winner is not None:
             return
@@ -359,10 +360,22 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         return base
 
     # --- IA ------------------------------------------------------------------
+    # Modalita' allenamento (tools/tier_sim.py): l'IA dei minion decide ogni N tick
+    # (a turno per id), tra una decisione e l'altra prosegue l'ultima. 1 = ogni tick.
+    minion_ai_stride = 1
+
     def _update_ai(self, dt: float) -> None:
-        for m in self.world.minions():
-            if m.alive:
-                self._ai_minion(m, dt)
+        k = self.minion_ai_stride
+        if k > 1:
+            t = self._tick
+            mdt = dt * k
+            for m in self.world.minions():
+                if m.alive and (m.id + t) % k == 0:
+                    self._ai_minion(m, mdt)
+        else:
+            for m in self.world.minions():
+                if m.alive:
+                    self._ai_minion(m, dt)
         for p in self.world.pokemons():
             if not p.alive:
                 continue
@@ -620,7 +633,11 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
             self._chase(p, t, dt)
 
     def _bp(self, u) -> BotParams:
-        """Parametri dell'IA per la squadra di `u` (neutrali: i default)."""
+        """Parametri dell'IA di `u`: i suoi se ne ha (taratura per ruolo), altrimenti
+        quelli della squadra (neutrali: i default)."""
+        bp = getattr(u, "bot_params", None)
+        if bp is not None:
+            return bp
         t = getattr(u, "team", -1)
         return self.bot_params[t] if t in (0, 1) else DEFAULT_BOT_PARAMS
 

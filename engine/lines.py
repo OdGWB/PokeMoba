@@ -65,9 +65,16 @@ HOOK_KINDS = ("init", "update", "precheck", "cast", "bot_cast", "speed_mult")
 NET_KINDS = ("lists", "shared", "moving", "unit_flags", "me")
 
 
+_HOOK_CACHE: dict = {}
+
+
 def hook_names(kind: str) -> tuple:
-    """Nomi dei metodi agganciati a `kind`, nell'ordine del registro."""
-    return tuple(m.LINE[kind] for m in LINE_MIXINS if m.LINE.get(kind))
+    """Nomi dei metodi agganciati a `kind`, nell'ordine del registro (in cache:
+    LINE_MIXINS e i loro LINE non cambiano a partita in corso)."""
+    r = _HOOK_CACHE.get(kind)
+    if r is None:
+        r = _HOOK_CACHE[kind] = tuple(m.LINE[kind] for m in LINE_MIXINS if m.LINE.get(kind))
+    return r
 
 
 def bot_cast_table() -> tuple:

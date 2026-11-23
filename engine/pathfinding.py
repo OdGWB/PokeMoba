@@ -37,6 +37,9 @@ def find_path(grid: Grid, start: tuple[int, int], goal: tuple[int, int],
     # Nodi = indici in una lista piatta di calpestabilita' con un bordo non
     # calpestabile (niente controlli dei confini); stesso ordine dei vicini, stessi
     # costi e stesso spareggio di prima, quindi lo stesso percorso, ~3x piu' veloce.
+    nw = grid.native_walk(block_bush)
+    if nw is not None:                       # stesso A*, in Rust (pokemoba_native)
+        return nw.find_path(sx, sy, gx, gy) or []
     walk, stride = grid.walk_flags(block_bush)
     steps = [(dx, dy, cost, dy * stride + dx) for dx, dy, cost in _NEIGHBORS]
     sq2m2 = _SQRT2 - 2.0
