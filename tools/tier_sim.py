@@ -174,10 +174,22 @@ def branch_plan(rng, name, is_jungler, is_support):
     return None
 
 
-OPTS = {"open_nexus": False, "max_time": MAX_TIME, "plan": False}   # impostato nei processi dal Pool (initializer)
+OPTS = {"open_nexus": False, "max_time": MAX_TIME, "plan": False, "utility": None}   # impostato nei processi dal Pool (initializer)
 
 
-def _init_worker(open_nexus, max_time, plan=False):
+def _utility_teams(mode, seed):
+    """Squadre con l'IA a punteggio. alt: una sola squadra, che cambia col seme (A/B equo)."""
+    if mode == "both":
+        return (0, 1)
+    if mode in ("0", "1"):
+        return (int(mode),)
+    if mode == "alt":
+        return (seed % 2,)
+    return ()
+
+
+def _init_worker(open_nexus, max_time, plan=False, utility=None):
+    OPTS["utility"] = utility
     OPTS["open_nexus"] = open_nexus
     OPTS["max_time"] = max_time
     OPTS["plan"] = plan
@@ -198,12 +210,14 @@ def play(job):
     if OPTS["plan"]:
         # IA a piani (engine/bot_plan.py): shopping, assedio, aiuto alle torri, roam del
         # support; gank del jungler piu largo (nemici fino al 90% di vita, ogni 40 s).
-        import engine.match as _em
-        import engine.smite as _es
         match.bot_plan = True
-        match.bot_gank_hp = 0.9
-        _em.GANK_COOLDOWN = 40.0
-        _es.GANK_MIN_TIME = 210.0
+        for bp in match.bot_params:
+            bp.gank_hp = 0.9
+            bp.gank_cooldown = 40.0
+            bp.gank_min_time = 210.0
+    u_teams = _utility_teams(OPTS["utility"], seed)
+    for t_ in u_teams:
+        match.bot_params[t_].utility = True     # IA a punteggio (engine/bot_utility.py)
     if OPTS["open_nexus"]:
         # La regola "nexus scoperto con una lane senza torri" ora e' nel motore
         # (Match._alive_towers); qui si registra solo quando si apre, per le statistiche.
@@ -473,7 +487,11 @@ def play(job):
         s.pop("streak", None)
         for k_, v_ in getattr(match, "bot_stat", {}).get(p.id, {}).items():
             s["bp_" + k_] = round(v_, 1)
-    return {"seed": seed, "winner": winner, "timeout": timeout, "open_nexus": OPTS["open_nexus"], "plan": OPTS["plan"],
+        tr_ = getattr(match, "bot_trace", {}).get(p.id)
+        if tr_:
+            s["u_time"] = {k_: round(v_, 1) for k_, v_ in tr_["time"].items() if v_ > 0}
+            s["u_switches"] = tr_["switches"]
+    return {"seed": seed, "winner": winner, "timeout": timeout, "open_nexus": OPTS["open_nexus"], "plan": OPTS["plan"], "utility_teams": list(u_teams),
             "end": {"towers": [{ln: sum(1 for x in world.structures() if x.team == t and x.alive
                                         and x.kind == "tower" and x.lane == ln) for ln in LANES}
                                for t in (0, 1)],
@@ -530,6 +548,8 @@ def main():
                     help="il nexus e' attaccabile appena una lane non ha piu torri")
     ap.add_argument("--plan", action="store_true",
                     help="IA a piani: shopping, assedio, aiuto alle torri, roam del support, gank piu largo")
+    ap.add_argument("--utility", default=None, choices=["both", "0", "1", "alt"],
+                    help="IA a punteggio: per entrambe, solo la squadra 0/1, o alt = a turno per seme (A/B)")
     ap.add_argument("--max-minutes", type=float, default=MAX_TIME / 60.0,
                     help="minuti di gioco massimi per partita")
     ap.add_argument("--status", default=str(ROOT / "tools" / "tier_status.json"))
@@ -573,7 +593,7 @@ def main():
         return time.time() + est <= deadline
 
     with Pool(a.workers, initializer=_init_worker,
-              initargs=(a.open_nexus, a.max_minutes * 60.0, a.plan)) as pool, out.open("a", encoding="utf-8") as f:
+              initargs=(a.open_nexus, a.max_minutes * 60.0, a.plan, a.utility)) as pool, out.open("a", encoding="utf-8") as f:
         results = []
         last_beat = 0.0
         while True:

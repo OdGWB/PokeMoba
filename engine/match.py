@@ -31,9 +31,11 @@ from .mienshao import PROJ_SHAPES
 from .venomoth import MOTH_PASSIVES
 from .item_effects import ItemEffectsMixin, cdr_to_haste
 from .bot_plan import BotPlanMixin
+from .bot_utility import BotUtilityMixin
 from .surrender import SurrenderMixin
 from .lines import LINE_MIXINS, bot_cast_table, hook_names
-from .smite import (GANK_COOLDOWN, GANK_DURATION, SmiteMixin, smite_damage)
+from .bot_params import DEFAULT_BOT_PARAMS, BotParams
+from .smite import SmiteMixin, smite_damage
 from .basic_attack import (ACQUIRE_EXTRA, AMOVE_DROP_EXTRA, AMOVE_EXTRA, AS_CAP,
                            IDLE_CHASE_LEASH, BasicAttackMixin)
 from .spiritomb import PASSIVE_ID as SPIRITOMB_PASSIVE
@@ -60,8 +62,6 @@ MINION_STATS = {
                    speed=2.9, radius=0.34, gold=50, xp=95),
 }
 
-BOT_AGGRO = 6.5
-BOT_RETREAT_HP = 0.28       # sotto questa frazione di hp il bot si ritira
 _WAYPOINT_REACHED = 0.6
 _TOWER_AGGRO_WINDOW = 4.0   # s: finestra in cui una torre può colpire un Pokémon
 _MINION_LEASH = 5.5         # tile: distanza max dalla lane prima di tornare indietro
@@ -184,7 +184,7 @@ CAST_ANIMS = {"projectile": "Shoot", "bubble": "Shoot",
             "incingrab": "Swing"}
 
 class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPlanMixin,
-            SurrenderMixin):
+            BotUtilityMixin, SurrenderMixin):
     def __init__(self, world, map_data):
         self.world = world
         self.map = map_data
@@ -198,6 +198,8 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         self._spawn_queue: list[tuple[float, int, str]] = []  # (due, team, lane)
         self._combat_hash = SpatialHash(cell_size=3.0)
         self._ai: dict[int, dict] = {}  # stato IA per unità (indice waypoint, cooldown A*)
+        # Parametri dell'IA dei bot, uno per squadra (engine/bot_params.py).
+        self.bot_params: list[BotParams] = [BotParams(), BotParams()]
         self._move_resume: dict[int, tuple] = {}  # ultimo ricalcolo di un ordine di movimento (dest, pos)
         data_dir = Path(__file__).resolve().parent.parent / "data"
         self.types = TypeChart.load(data_dir / "types.json")
@@ -379,6 +381,9 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                 continue              # Presa a Ventosa: attacca solo l'afferrato
             if p.is_bot and self._flor_bot_seek(p, dt):
                 continue              # Giardino: un bot ferito raccoglie un fiore vicino
+            if p.is_bot and self._bp(p).utility:
+                self._bot_utility_step(p, dt)
+                continue              # IA a punteggio (engine/bot_utility.py; opzionale)
             if p.is_bot and self.bot_plan and self._bot_plan_step(p, dt):
                 continue              # IA a piani (shopping, assedio, torri, roam; opzionale)
             if p.is_bot and p.is_jungler:
@@ -614,21 +619,27 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         else:
             self._chase(p, t, dt)
 
+    def _bp(self, u) -> BotParams:
+        """Parametri dell'IA per la squadra di `u` (neutrali: i default)."""
+        t = getattr(u, "team", -1)
+        return self.bot_params[t] if t in (0, 1) else DEFAULT_BOT_PARAMS
+
     def _ai_bot(self, p: Pokemon, dt: float) -> None:
         if self._immobile(p):
             p.stop()
             return
-        # Ritirata se la vita è bassa.
-        if p.hp < p.max_hp * BOT_RETREAT_HP:
+        bp = self._bp(p)
+        # Ritirata se la vita è bassa (con l'IA a punteggio la decide bot_utility).
+        if not bp.utility and p.hp < p.max_hp * bp.retreat_hp:
             p.target_id = None
             self._move_towards(p, p.spawn_pos, dt, use_astar=True)
             return
         target = self._valid_target(p)
         if target is None:
-            target = self._acquire_target(p, BOT_AGGRO)
+            target = self._acquire_target(p, bp.aggro)
         # Non fare dive su una struttura nemica senza minion alleati a proteggerti.
         if (isinstance(target, Structure)
-                and not self._has_allied_minion_near(p, target.pos, 4.5)):
+                and not self._has_allied_minion_near(p, target.pos, bp.struct_minion_r)):
             target = None
         # Prudenza: niente inseguimenti sotto torre senza buone possibilita' di kill
         # e niente allontanamenti dalla lane (engine/smite.py).
@@ -661,20 +672,22 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         return False
 
     def _unsafe_dive(self, p, point) -> bool:
+        bp = self._bp(p)
         for e in self.world.structures():
             if e.kind != "tower" or not e.alive or e.team == p.team:
                 continue
-            if point.dist(e.pos) <= e.attack_range + 0.8 and \
-                    not self._has_allied_minion_near(p, e.pos, 4.5):
+            if point.dist(e.pos) <= e.attack_range + bp.tower_margin and \
+                    not self._has_allied_minion_near(p, e.pos, bp.struct_minion_r):
                 return True
         return False
 
     def _threatened_structure(self, p):
+        bp = self._bp(p)
         best, bestd = None, 1e9
         for e in self.world.structures():
             if e.team != p.team or not e.alive:
                 continue
-            enemies = [x for x in self._combat_hash.query_radius(e.pos.x, e.pos.y, 6.0)
+            enemies = [x for x in self._combat_hash.query_radius(e.pos.x, e.pos.y, bp.defend_enemy_r)
                        if x.team != p.team and getattr(x, "alive", False)
                        and isinstance(x, (Pokemon, Minion))]
             if not enemies:
@@ -684,7 +697,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                 bestd, best = d, e
         # Difende solo se la struttura è abbastanza vicina (altrimenti continua
         # a spingere: difendere sempre porterebbe allo stallo).
-        return best if best is not None and bestd < 20.0 else None
+        return best if best is not None and bestd < bp.defend_max_dist else None
 
     def _follow_bot_lane_safe(self, p: Pokemon, dt: float) -> None:
         st = self._ai.setdefault(p.id, {})
@@ -692,16 +705,17 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         if len(pts) < 2:
             self._move_towards(p, p.spawn_pos, dt)
             return
+        bp = self._bp(p)
         idx = min(st.get("lane_idx", 1), len(pts) - 1)
         wp = pts[idx]
-        if p.pos.dist(wp) <= 1.2 and idx < len(pts) - 1:
+        if p.pos.dist(wp) <= bp.lane_wp_reach and idx < len(pts) - 1:
             idx += 1
             wp = pts[idx]
         st["lane_idx"] = idx
         # Se avanzare porterebbe dentro la gittata di una torre nemica non
         # protetta da minion alleati, aspetta (equilibrio di lane).
         step = (wp - p.pos)
-        ahead = p.pos + (step.normalized() * min(2.5, step.length())) if step.length() > 1e-6 else p.pos
+        ahead = p.pos + (step.normalized() * min(bp.dive_lookahead, step.length())) if step.length() > 1e-6 else p.pos
         if self._unsafe_dive(p, ahead) or self._unsafe_dive(p, p.pos):
             p.stop()
             return
@@ -719,7 +733,11 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                 and not self.vision.is_enemy_visible(u.team, t.id)):
             return None
         # Mantieni il bersaglio solo entro un guinzaglio ragionevole.
-        leash = (u.aggro if isinstance(u, Minion) else BOT_AGGRO) * 1.8
+        if isinstance(u, Minion):
+            leash = u.aggro * 1.8
+        else:
+            bp = self._bp(u)
+            leash = bp.aggro * bp.leash_mult
         if u.pos.dist(t.pos) > leash:
             return None
         return t
@@ -757,12 +775,9 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
             return
         if isinstance(u, Minion):
             u.chasing = True
-        bb = getattr(u, "bush_blocks", False)   # minion: aggira i cespugli
-        if self.world.grid.line_of_sight(u.pos.x, u.pos.y,
-                                          target.pos.x, target.pos.y, bb):
-            self._set_step(u, target.pos, dt)
-        else:
-            self._move_towards(u, target.pos, dt, use_astar=True)
+        # Linea di vista libera -> passo diretto, altrimenti A*: lo decide gia'
+        # _move_towards (prima la stessa linea di vista si calcolava due volte).
+        self._move_towards(u, target.pos, dt, use_astar=True)
         self._face(u, target)
 
     def _follow_lane(self, m: Minion) -> None:
@@ -4158,7 +4173,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         for slot in ("R", "Q", "W", "E"):
             ms = p.moveset.get(slot)
             if ms and ms.ready and ms.chosen and ms.chosen.power_at(ms.rank) > 0:
-                reach = max(2.5, ms.chosen.range)
+                reach = max(self._bp(p).cast_min_reach, ms.chosen.range)
                 if p.pos.dist(target.pos) <= reach:
                     p.pending_cast = (slot, target.pos.x, target.pos.y)
                     return
@@ -4182,7 +4197,8 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         if self._immobile(p):
             p.stop()
             return
-        if p.hp < p.max_hp * BOT_RETREAT_HP:
+        bp = self._bp(p)
+        if not bp.utility and p.hp < p.max_hp * bp.retreat_hp:
             p.target_id = None
             self._ai.setdefault(p.id, {})["gank_id"] = None
             self._move_towards(p, p.spawn_pos, dt, use_astar=True)
@@ -4196,7 +4212,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                     or not self.vision.is_enemy_visible(p.team, t.id)
                     or (self._under_enemy_tower(p, t.pos) and not self._good_kill_chance(p, t))):
                 st["gank_id"] = None
-                st["gank_cd"] = self.time + GANK_COOLDOWN
+                st["gank_cd"] = self.time + bp.gank_cooldown
             else:
                 p.target_id = t.id
                 self._bot_try_cast(p, t)
@@ -4207,7 +4223,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                 return
         # Minaccia: un CAMPIONE nemico vicino (i minion non si inseguono in giungla),
         # ma non sotto una torre senza buone possibilita'.
-        enemy = self._bot_filter_target(p, self._acquire_enemy_champ(p, BOT_AGGRO))
+        enemy = self._bot_filter_target(p, self._acquire_enemy_champ(p, bp.aggro))
         if enemy is not None:
             p.target_id = enemy.id
             self._bot_try_cast(p, enemy)
@@ -4220,7 +4236,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         g = self._jungler_gank_target(p, st)
         if g is not None:
             st["gank_id"] = g.id
-            st["gank_until"] = self.time + GANK_DURATION
+            st["gank_until"] = self.time + bp.gank_duration
             self._move_towards(p, g.pos, dt, use_astar=True)
             return
         # Farming: campo neutrale (o leggendario, se abbastanza forte) più vicino.
