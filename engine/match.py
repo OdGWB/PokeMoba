@@ -20,7 +20,7 @@ from pathlib import Path
 import config
 from . import evolution, skills
 from .entities import Core, Minion, Pillar, Pokemon, Structure, Unit, Wild
-from .grid import TILE_BUSH, TILE_PILLAR, TILE_RIVER
+from .grid import TILE_BUSH, TILE_PILLAR, TILE_RIVER, _native
 from .moves import Move
 from .items import ITEM_SLOTS, ItemCatalog
 from .jungle import JungleSystem
@@ -200,6 +200,12 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         self._spawn_queue: list[tuple[float, int, str]] = []  # (due, team, lane)
         self._combat_hash = SpatialHash(cell_size=3.0)
         self._ai: dict[int, dict] = {}  # stato IA per unità (indice waypoint, cooldown A*)
+        # IA dei minion in Rust (stessa logica di _ai_minion), se c'e' l'estensione.
+        self._minion_ai = None
+        if _native is not None and hasattr(_native, "MinionAI"):
+            self._minion_ai = _native.MinionAI(
+                Pokemon, Minion, Structure, Vec2, _WAYPOINT_REACHED, _MINION_LEASH,
+                _MINION_AGGRO_WINDOW, _MINION_RETALIATE, config.TICK_DT)
         # Parametri dell'IA dei bot, uno per squadra (engine/bot_params.py).
         self.bot_params: list[BotParams] = [BotParams(), BotParams()]
         self._move_resume: dict[int, tuple] = {}  # ultimo ricalcolo di un ordine di movimento (dest, pos)
@@ -368,7 +374,12 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
 
     def _update_ai(self, dt: float) -> None:
         k = self.minion_ai_stride
-        if k > 1:
+        nv = self.world.grid.native_view() if self._minion_ai is not None else None
+        if nv is not None and isinstance(self._combat_hash, _native.SpatialHash):
+            self._minion_ai.run(self.world.minions(), self._ai, self.world.entities,
+                                self._astar_move, self._combat_hash, nv,
+                                self.time, dt, k, self._tick if k > 1 else 0)
+        elif k > 1:
             t = self._tick
             mdt = dt * k
             for m in self.world.minions():
@@ -838,6 +849,11 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                                                            dest.x, dest.y, bb):
             u.set_path([dest])
             return
+        self._astar_move(u, dest, dt, bb)
+
+    def _astar_move(self, u, dest: Vec2, dt: float, bb) -> None:
+        """Ramo A* di _move_towards (linea di vista chiusa); usato anche
+        dall'IA dei minion in Rust."""
         st = self._ai.setdefault(u.id, {})
         st["astar_cd"] = st.get("astar_cd", 0.0) - dt
         if st["astar_cd"] <= 0.0:

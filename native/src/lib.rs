@@ -7,7 +7,7 @@
 
 use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::PyList;
+use pyo3::types::{PyDict, PyList};
 use std::collections::{HashMap, HashSet};
 
 const TILE_BUSH: u8 = 4;
@@ -957,6 +957,292 @@ impl VisionScan {
     }
 }
 
+// ---------------------------------------------------------------------------
+// IA dei minion (engine/match.py: _ai_minion, _valid_minion_target,
+// _acquire_minion_target, _within_attack, _chase, _follow_lane, _move_towards).
+// Stesse letture, stesse scritture, stesso ordine; il ramo A* di _move_towards
+// resta in Python (passato come `astar_move`).
+
+fn xy_of(v: &Bound<'_, PyAny>) -> PyResult<(f64, f64)> {
+    let py = v.py();
+    Ok((v.getattr(intern!(py, "x"))?.extract()?, v.getattr(intern!(py, "y"))?.extract()?))
+}
+
+fn attr_f64_or(e: &Bound<'_, PyAny>, name: &Bound<'_, pyo3::types::PyString>, d: f64) -> PyResult<f64> {
+    match e.getattr(name) {
+        Ok(v) => v.extract(),
+        Err(_) => Ok(d),
+    }
+}
+
+#[pyclass(module = "pokemoba_native")]
+struct MinionAI {
+    poke_cls: Py<PyAny>,
+    minion_cls: Py<PyAny>,
+    struct_cls: Py<PyAny>,
+    vec2: Py<PyAny>,
+    waypoint: f64,
+    leash: f64,
+    aggro_window: f64,
+    retaliate: f64,
+    tick_dt: f64,
+}
+
+struct MinionCtx<'a, 'py> {
+    ai: &'a Bound<'py, PyDict>,
+    entities: &'a Bound<'py, PyDict>,
+    astar_move: &'a Bound<'py, PyAny>,
+    hash: &'a SpatialHash,
+    gv: &'a GridView,
+    time: f64,
+}
+
+impl MinionAI {
+    fn move_towards(&self, c: &MinionCtx, u: &Bound<'_, PyAny>, dest: &Bound<'_, PyAny>,
+                    dt: f64) -> PyResult<()> {
+        let py = u.py();
+        let bb = attr_truthy(u, intern!(py, "bush_blocks"));
+        let (ux, uy) = pos_of(u)?;
+        let (dx, dy) = xy_of(dest)?;
+        if c.gv.los(ux, uy, dx, dy, bb) {
+            u.setattr(intern!(py, "path"), PyList::new(py, [dest])?)?;
+            u.setattr(intern!(py, "moving"), true)?;
+            return Ok(());
+        }
+        c.astar_move.call1((u, dest, dt, bb))?;
+        Ok(())
+    }
+
+    fn face(&self, c: &MinionCtx, u: &Bound<'_, PyAny>, tx: f64, ty: f64) -> PyResult<()> {
+        let (ux, uy) = pos_of(u)?;
+        u.setattr(intern!(u.py(), "facing"), c.gv.direction_index(tx - ux, ty - uy))
+    }
+
+    fn follow_lane(&self, c: &MinionCtx, m: &Bound<'_, PyAny>) -> PyResult<()> {
+        let py = m.py();
+        let lp = m.getattr(intern!(py, "lane_points"))?;
+        let n = lp.len()? as i64;
+        if n == 0 {
+            m.setattr(intern!(py, "path"), PyList::empty(py))?;
+            m.setattr(intern!(py, "moving"), false)?;
+            return Ok(());
+        }
+        let k_idx = intern!(py, "lane_idx");
+        let mut idx: i64 = m.getattr(k_idx)?.extract()?;
+        if idx >= n {
+            idx = n - 1;
+            m.setattr(k_idx, idx)?;
+        }
+        let mut wp = lp.get_item(idx)?;
+        let (mx, my) = pos_of(m)?;
+        let (wx, wy) = xy_of(&wp)?;
+        if hypot(mx - wx, my - wy) <= self.waypoint && idx < n - 1 {
+            idx += 1;
+            m.setattr(k_idx, idx)?;
+            wp = lp.get_item(idx)?;
+        }
+        self.move_towards(c, m, &wp, self.tick_dt)?;
+        let (wx, wy) = xy_of(&wp)?;
+        self.face(c, m, wx, wy)
+    }
+
+    fn acquire<'py>(&self, c: &MinionCtx<'_, 'py>, m: &Bound<'py, PyAny>, team: i64)
+                    -> PyResult<Option<Bound<'py, PyAny>>> {
+        let py = m.py();
+        let (k_team, k_alive, k_rad) = (intern!(py, "team"), intern!(py, "alive"), intern!(py, "radius"));
+        let aggro: f64 = m.getattr(intern!(py, "aggro"))?.extract()?;
+        let (mx, my) = pos_of(m)?;
+        let inv = 1.0 / c.hash.cell_size;
+        let cx0 = ((mx - aggro) * inv).floor() as i64;
+        let cy0 = ((my - aggro) * inv).floor() as i64;
+        let cx1 = ((mx + aggro) * inv).floor() as i64;
+        let cy1 = ((my + aggro) * inv).floor() as i64;
+        let mut cands: Vec<(Bound<'py, PyAny>, f64)> = Vec::new();
+        for cy in cy0..=cy1 {
+            for cx in cx0..=cx1 {
+                if let Some(b) = c.hash.cells.get(&(cx, cy)) {
+                    for e in b {
+                        let e = e.bind(py);
+                        if e.is(m) {
+                            continue;
+                        }
+                        let et: i64 = e.getattr(k_team)?.extract()?;
+                        if et == team || !attr_truthy(e, k_alive) {
+                            continue;
+                        }
+                        let (ex, ey) = pos_of(e)?;
+                        let d = hypot(mx - ex, my - ey);
+                        if d <= aggro + attr_f64_or(e, k_rad, 0.0)? {
+                            cands.push((e.clone(), d));
+                        }
+                    }
+                }
+            }
+        }
+        if cands.is_empty() {
+            return Ok(None);
+        }
+        let nearest = |pick: &dyn Fn(&Bound<'py, PyAny>) -> PyResult<bool>|
+                       -> PyResult<Option<Bound<'py, PyAny>>> {
+            let mut best: Option<(&Bound<'py, PyAny>, f64)> = None;
+            for (e, d) in cands.iter() {
+                if pick(e)? && best.map_or(true, |(_, bd)| *d < bd) {
+                    best = Some((e, *d));
+                }
+            }
+            Ok(best.map(|(e, _)| e.clone()))
+        };
+        let poke = self.poke_cls.bind(py);
+        let k_agg = intern!(py, "_minion_aggro_at");
+        let time = c.time;
+        let win = self.aggro_window;
+        if let Some(e) = nearest(&|e| Ok(e.is_instance(poke)?
+                                     && time - attr_f64_or(e, k_agg, -1e9)? <= win))? {
+            return Ok(Some(e));
+        }
+        let la = m.getattr(intern!(py, "last_attacker_id"))?;
+        if !la.is_none() {
+            let ld: f64 = m.getattr(intern!(py, "last_damaged_at"))?.extract()?;
+            if time - ld <= self.retaliate {
+                if let Some(a) = c.entities.get_item(&la)? {
+                    if cands.iter().any(|(e, _)| e.is(&a)) {
+                        return Ok(Some(a));
+                    }
+                }
+            }
+        }
+        for cls in [self.minion_cls.bind(py), poke] {
+            if let Some(e) = nearest(&|e| e.is_instance(cls))? {
+                return Ok(Some(e));
+            }
+        }
+        let st = self.struct_cls.bind(py);
+        nearest(&|e| e.is_instance(st))
+    }
+
+    fn ai_minion(&self, c: &MinionCtx, m: &Bound<'_, PyAny>, dt: f64) -> PyResult<()> {
+        let py = m.py();
+        let (k_tid, k_chasing, k_leash) =
+            (intern!(py, "target_id"), intern!(py, "chasing"), intern!(py, "leash"));
+        let id = m.getattr(intern!(py, "id"))?;
+        let state = match c.ai.get_item(&id)? {
+            Some(s) => s.cast_into::<PyDict>()?,
+            None => {
+                let s = PyDict::new(py);
+                c.ai.set_item(&id, &s)?;
+                s
+            }
+        };
+        let team: i64 = m.getattr(intern!(py, "team"))?.extract()?;
+        let (mx, my) = pos_of(m)?;
+        let aggro: f64 = m.getattr(intern!(py, "aggro"))?.extract()?;
+        let origin_xy = |state: &Bound<'_, PyDict>| -> PyResult<(f64, f64)> {
+            match state.get_item(k_leash)? {
+                Some(v) => xy_of(&v),
+                None => Ok((mx, my)),
+            }
+        };
+        // _valid_minion_target
+        let mut target = None;
+        let tid = m.getattr(k_tid)?;
+        if !tid.is_none() {
+            if let Some(t) = c.entities.get_item(&tid)? {
+                if attr_truthy(&t, intern!(py, "alive")) {
+                    let tt: i64 = t.getattr(intern!(py, "team"))?.extract()?;
+                    if tt != team {
+                        let (tx, ty) = pos_of(&t)?;
+                        let (ox, oy) = origin_xy(&state)?;
+                        if !(hypot(mx - tx, my - ty) > aggro * 1.6
+                             || hypot(mx - ox, my - oy) > self.leash) {
+                            target = Some(t);
+                        }
+                    }
+                }
+            }
+        }
+        if target.is_none() {
+            target = self.acquire(c, m, team)?;
+            match &target {
+                Some(t) => {
+                    m.setattr(k_tid, t.getattr(intern!(py, "id"))?)?;
+                    state.set_item(k_leash, self.vec2.bind(py).call1((mx, my))?)?;
+                }
+                None => {
+                    m.setattr(k_tid, py.None())?;
+                    if state.contains(k_leash)? {
+                        state.del_item(k_leash)?;
+                    }
+                }
+            }
+        }
+        if let Some(t) = target {
+            let (tx, ty) = pos_of(&t)?;
+            let reach = attr_f64_or(m, intern!(py, "attack_range"), 0.0)?
+                + attr_f64_or(&t, intern!(py, "radius"), 0.0)?;
+            if hypot(mx - tx, my - ty) <= reach {
+                m.setattr(intern!(py, "path"), PyList::empty(py))?;
+                m.setattr(intern!(py, "moving"), false)?;
+                self.face(c, m, tx, ty)?;
+                m.setattr(k_chasing, false)?;
+            } else {
+                let (ox, oy) = origin_xy(&state)?;
+                if hypot(mx - ox, my - oy) <= self.leash {
+                    m.setattr(k_chasing, true)?;
+                    let tpos = t.getattr(intern!(py, "pos"))?;
+                    self.move_towards(c, m, &tpos, dt)?;
+                    self.face(c, m, tx, ty)?;
+                } else {
+                    m.setattr(k_tid, py.None())?;
+                    if state.contains(k_leash)? {
+                        state.del_item(k_leash)?;
+                    }
+                    m.setattr(k_chasing, false)?;
+                    self.follow_lane(c, m)?;
+                }
+            }
+            return Ok(());
+        }
+        m.setattr(k_chasing, false)?;
+        self.follow_lane(c, m)
+    }
+}
+
+#[pymethods]
+impl MinionAI {
+    #[new]
+    #[allow(clippy::too_many_arguments)]
+    fn new(poke_cls: Py<PyAny>, minion_cls: Py<PyAny>, struct_cls: Py<PyAny>, vec2: Py<PyAny>,
+           waypoint: f64, leash: f64, aggro_window: f64, retaliate: f64, tick_dt: f64) -> Self {
+        MinionAI { poke_cls, minion_cls, struct_cls, vec2, waypoint, leash, aggro_window,
+                   retaliate, tick_dt }
+    }
+
+    /// Match._update_ai, parte dei minion (stride compreso).
+    #[allow(clippy::too_many_arguments)]
+    fn run(&self, minions: &Bound<'_, PyAny>, ai: &Bound<'_, PyDict>, entities: &Bound<'_, PyDict>,
+           astar_move: &Bound<'_, PyAny>, hash: PyRef<'_, SpatialHash>, gv: PyRef<'_, GridView>,
+           time: f64, dt: f64, stride: i64, tick: i64) -> PyResult<()> {
+        let py = ai.py();
+        let c = MinionCtx { ai, entities, astar_move, hash: &hash, gv: &gv, time };
+        let (k_alive, k_id) = (intern!(py, "alive"), intern!(py, "id"));
+        let mdt = if stride > 1 { dt * stride as f64 } else { dt };
+        for m in minions.try_iter()? {
+            let m = m?;
+            if !m.getattr(k_alive)?.is_truthy()? {
+                continue;
+            }
+            if stride > 1 {
+                let id: i64 = m.getattr(k_id)?.extract()?;
+                if (id + tick).rem_euclid(stride) != 0 {
+                    continue;
+                }
+            }
+            self.ai_minion(&c, &m, mdt)?;
+        }
+        Ok(())
+    }
+}
+
 #[pymodule]
 fn pokemoba_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_hypot, m)?)?;
@@ -964,6 +1250,7 @@ fn pokemoba_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<SpatialHash>()?;
     m.add_class::<WalkGrid>()?;
     m.add_class::<VisionScan>()?;
+    m.add_class::<MinionAI>()?;
     m.add_function(wrap_pyfunction!(obstacle_hits, m)?)?;
     Ok(())
 }
