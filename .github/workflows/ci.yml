@@ -1,0 +1,45 @@
+# CI: i test su ogni Pull Request verso main (e su ogni push su main), PRIMA del merge.
+# Non crea exe ne' Release: quella e' release.yml, che parte solo con una voce nuova in
+# data/news.json o a mano.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Un nuovo push sulla stessa PR annulla il giro di test vecchio.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      SDL_VIDEODRIVER: dummy
+      SDL_AUDIODRIVER: dummy
+      PYTHONUTF8: "1"
+      POKEMOBA_NO_UPDATE: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Dipendenze
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-build.txt
+
+      - name: Test
+        run: python -m pytest -q

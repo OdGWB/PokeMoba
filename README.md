@@ -86,6 +86,17 @@ Altri strumenti:
   Inno Setup 6). Le Release su GitHub pubblicano l'installer da sole; il gioco
   installato si aggiorna poi da solo come prima.
 
+## GitHub Actions
+
+- **CI** (`.github/workflows/ci.yml`): i test (`pytest`) su ogni Pull Request verso
+  `main` e su ogni push su `main`. Non crea exe né Release.
+- **Release** (`.github/workflows/release.yml`): NON parte a ogni merge. Parte solo
+  quando su `main` arriva una voce nuova in cima a `data/news.json`
+  (`python -m game.news 3.0.N "Titolo" "punto"...`) con una versione non ancora
+  pubblicata, oppure a mano da Actions → Release → Run workflow. Versione, tag
+  (`v<build>`) e note della Release vengono da quella voce
+  (`tools/release_info.py`).
+
 ## Comandi in partita
 
 | Comando | Azione |
