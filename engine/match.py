@@ -33,7 +33,7 @@ from .item_effects import ItemEffectsMixin, cdr_to_haste
 from .bot_plan import BotPlanMixin
 from .bot_utility import BotUtilityMixin
 from .surrender import SurrenderMixin
-from .lines import LINE_MIXINS, bot_cast_table, hook_names
+from .lines import LINE_MIXINS, bot_cast_names, hook_names
 from .bot_params import DEFAULT_BOT_PARAMS, BotParams
 from .smite import SmiteMixin, smite_damage
 from .basic_attack import (ACQUIRE_EXTRA, AMOVE_DROP_EXTRA, AMOVE_EXTRA, AS_CAP,
@@ -4234,8 +4234,8 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
     def _bot_try_cast(self, p, target) -> None:
         if p.pending_cast is not None or p.silence_until > self.time:
             return
-        for passives, name in bot_cast_table():   # IA delle linee (engine/lines.py)
-            if p.passive_id in passives and getattr(self, name)(p, target):
+        for name in bot_cast_names(p.passive_id):   # IA delle linee (engine/lines.py)
+            if getattr(self, name)(p, target):
                 return
         for slot in ("R", "Q", "W", "E"):
             ms = p.moveset.get(slot)
