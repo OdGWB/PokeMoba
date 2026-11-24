@@ -20,7 +20,7 @@ from pathlib import Path
 import config
 from . import evolution, skills
 from .entities import Core, Minion, Pillar, Pokemon, Structure, Unit, Wild
-from .grid import TILE_BUSH, TILE_PILLAR, TILE_RIVER
+from .grid import TILE_BUSH, TILE_PILLAR, TILE_RIVER, _native
 from .moves import Move
 from .items import ITEM_SLOTS, ItemCatalog
 from .jungle import JungleSystem
@@ -33,7 +33,7 @@ from .item_effects import ItemEffectsMixin, cdr_to_haste
 from .bot_plan import BotPlanMixin
 from .bot_utility import BotUtilityMixin
 from .surrender import SurrenderMixin
-from .lines import LINE_MIXINS, bot_cast_table, hook_names
+from .lines import LINE_MIXINS, bot_cast_names, hook_names
 from .bot_params import DEFAULT_BOT_PARAMS, BotParams
 from .smite import SmiteMixin, smite_damage
 from .basic_attack import (ACQUIRE_EXTRA, AMOVE_DROP_EXTRA, AMOVE_EXTRA, AS_CAP,
@@ -64,6 +64,8 @@ MINION_STATS = {
 
 _WAYPOINT_REACHED = 0.6
 _TOWER_AGGRO_WINDOW = 4.0   # s: finestra in cui una torre può colpire un Pokémon
+_UNIT_OR_STRUCT = (Unit, Structure)          # chiave della cache di World._of_type
+_CLEANUP_TYPES = (Minion, Wild, Structure)   # tipi tolti dal mondo alla morte
 _MINION_LEASH = 5.5         # tile: distanza max dalla lane prima di tornare indietro
 _MINION_AGGRO_WINDOW = 4.0  # s: i minion focalizzano il campione che attacca un alleato
 _MINION_RETALIATE = 2.5     # s: finestra per ritorsione contro chi li ha colpiti
@@ -198,6 +200,16 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         self._spawn_queue: list[tuple[float, int, str]] = []  # (due, team, lane)
         self._combat_hash = SpatialHash(cell_size=3.0)
         self._ai: dict[int, dict] = {}  # stato IA per unità (indice waypoint, cooldown A*)
+        # IA dei minion in Rust (stessa logica di _ai_minion), se c'e' l'estensione.
+        self._minion_ai = None
+        if _native is not None and hasattr(_native, "MinionAI"):
+            self._minion_ai = _native.MinionAI(
+                Pokemon, Minion, Structure, Vec2, _WAYPOINT_REACHED, _MINION_LEASH,
+                _MINION_AGGRO_WINDOW, _MINION_RETALIATE, config.TICK_DT)
+        # Aiutanti dell'IA dei bot in Rust (stesse scansioni), solo con l'hash nativo.
+        self._bot_nat = None
+        if _native is not None and hasattr(_native, "BotHelpers")                 and isinstance(self._combat_hash, _native.SpatialHash):
+            self._bot_nat = _native.BotHelpers(Pokemon, Minion)
         # Parametri dell'IA dei bot, uno per squadra (engine/bot_params.py).
         self.bot_params: list[BotParams] = [BotParams(), BotParams()]
         self._move_resume: dict[int, tuple] = {}  # ultimo ricalcolo di un ordine di movimento (dest, pos)
@@ -258,6 +270,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         if self.winner is not None:
             return
         self.time += dt
+        self._tick = tick
         self._surrender_tick()
         if self.winner is not None:
             return
@@ -359,10 +372,27 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         return base
 
     # --- IA ------------------------------------------------------------------
+    # Modalita' allenamento (tools/tier_sim.py): l'IA dei minion decide ogni N tick
+    # (a turno per id), tra una decisione e l'altra prosegue l'ultima. 1 = ogni tick.
+    minion_ai_stride = 1
+
     def _update_ai(self, dt: float) -> None:
-        for m in self.world.minions():
-            if m.alive:
-                self._ai_minion(m, dt)
+        k = self.minion_ai_stride
+        nv = self.world.grid.native_view() if self._minion_ai is not None else None
+        if nv is not None and isinstance(self._combat_hash, _native.SpatialHash):
+            self._minion_ai.run(self.world.minions(), self._ai, self.world.entities,
+                                self._astar_move, self._combat_hash, nv,
+                                self.time, dt, k, self._tick if k > 1 else 0)
+        elif k > 1:
+            t = self._tick
+            mdt = dt * k
+            for m in self.world.minions():
+                if m.alive and (m.id + t) % k == 0:
+                    self._ai_minion(m, mdt)
+        else:
+            for m in self.world.minions():
+                if m.alive:
+                    self._ai_minion(m, dt)
         for p in self.world.pokemons():
             if not p.alive:
                 continue
@@ -620,7 +650,11 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
             self._chase(p, t, dt)
 
     def _bp(self, u) -> BotParams:
-        """Parametri dell'IA per la squadra di `u` (neutrali: i default)."""
+        """Parametri dell'IA di `u`: i suoi se ne ha (taratura per ruolo), altrimenti
+        quelli della squadra (neutrali: i default)."""
+        bp = getattr(u, "bot_params", None)
+        if bp is not None:
+            return bp
         t = getattr(u, "team", -1)
         return self.bot_params[t] if t in (0, 1) else DEFAULT_BOT_PARAMS
 
@@ -666,6 +700,8 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         self._follow_bot_lane_safe(p, dt)
 
     def _has_allied_minion_near(self, p, pos, r: float) -> bool:
+        if self._bot_nat is not None:
+            return self._bot_nat.minion_near(self._combat_hash, p.team, pos.x, pos.y, r)
         for e in self._combat_hash.query_radius(pos.x, pos.y, r):
             if isinstance(e, Minion) and e.team == p.team and e.alive and pos.dist(e.pos) <= r:
                 return True
@@ -673,6 +709,9 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
 
     def _unsafe_dive(self, p, point) -> bool:
         bp = self._bp(p)
+        if self._bot_nat is not None:
+            return self._bot_nat.unsafe_dive(self.world.structures(), self._combat_hash, p.team,
+                                             point.x, point.y, bp.tower_margin, bp.struct_minion_r)
         for e in self.world.structures():
             if e.kind != "tower" or not e.alive or e.team == p.team:
                 continue
@@ -683,6 +722,9 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
 
     def _threatened_structure(self, p):
         bp = self._bp(p)
+        if self._bot_nat is not None:
+            return self._bot_nat.threatened(self.world.structures(), self._combat_hash, p.team,
+                                            p.pos.x, p.pos.y, bp.defend_enemy_r, bp.defend_max_dist)
         best, bestd = None, 1e9
         for e in self.world.structures():
             if e.team != p.team or not e.alive:
@@ -699,8 +741,43 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         # a spingere: difendere sempre porterebbe allo stallo).
         return best if best is not None and bestd < bp.defend_max_dist else None
 
+    def _lane_cached(self, lane_name: str, team: int):
+        """(waypoint, coordinate piatte) di oriented_lane, in cache: Vec2 e' frozen
+        e la mappa delle lane non cambia in partita."""
+        c = self.__dict__.setdefault("_lane_cache", {})
+        key = (lane_name, team)
+        r = c.get(key)
+        if r is None:
+            pts = self.oriented_lane(lane_name, team)
+            r = (pts, tuple(v for q in pts for v in (q.x, q.y)))
+            c[key] = r
+        return r
+
     def _follow_bot_lane_safe(self, p: Pokemon, dt: float) -> None:
         st = self._ai.setdefault(p.id, {})
+        nat = self._bot_nat
+        if nat is not None:
+            pts, flat = self._lane_cached(p.assigned_lane, p.team)
+            if len(pts) < 2:
+                self._move_towards(p, p.spawn_pos, dt)
+                return
+            bp = self._bp(p)
+            grid = self.world.grid
+            idx, code = nat.lane_safe(self.world.structures(), self._combat_hash,
+                                      grid.native_view(), p.team, p.pos.x, p.pos.y, flat,
+                                      st.get("lane_idx", 1), bp.lane_wp_reach,
+                                      bp.dive_lookahead, bp.tower_margin, bp.struct_minion_r,
+                                      getattr(p, "bush_blocks", False))
+            st["lane_idx"] = idx
+            if code == 0:
+                p.stop()
+            elif code == 1:
+                p.set_path([pts[idx]])
+            elif code == 2:
+                self._astar_move(p, pts[idx], dt, getattr(p, "bush_blocks", False))
+            else:
+                self._set_step(p, pts[idx], dt)
+            return
         pts = self.oriented_lane(p.assigned_lane, p.team)
         if len(pts) < 2:
             self._move_towards(p, p.spawn_pos, dt)
@@ -761,10 +838,24 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         return best
 
     def _within_attack(self, u, target) -> bool:
+        up = u.pos
+        tp = target.pos
+        d = math.hypot(up.x - tp.x, up.y - tp.y)
         if isinstance(u, Pokemon):
-            return u.pos.dist(target.pos) <= self._aa_reach(u, target)   # bordo a bordo
+            # = d <= self._aa_reach(u, target) (bordo a bordo), con _auto_reach,
+            # _fx_items e _claw_reach inline: stesse operazioni, stesso ordine.
+            now = self.time
+            r = u.attack_range
+            if "zoom_lens" in (() if getattr(u, "itemlock_until", -1.0) > now
+                               else getattr(u, "items", ())):
+                r *= 1.15
+            if u.passive_id == "distacco" and self._is_hidden(u):
+                r += config.DISTACCO_RANGE_BONUS
+            if u.shadowclaw_until > now:
+                r = r * u.shadowclaw_mult
+            return d <= r + getattr(u, "radius", 0.0) + getattr(target, "radius", 0.0)
         reach = getattr(u, "attack_range", 0.0) + getattr(target, "radius", 0.0)
-        return u.pos.dist(target.pos) <= reach
+        return d <= reach
 
     def _chase(self, u, target, dt: float) -> None:
         if isinstance(u, Pokemon) and u.aa_active and u.aa_target_id == target.id:
@@ -819,6 +910,11 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                                                            dest.x, dest.y, bb):
             u.set_path([dest])
             return
+        self._astar_move(u, dest, dt, bb)
+
+    def _astar_move(self, u, dest: Vec2, dt: float, bb) -> None:
+        """Ramo A* di _move_towards (linea di vista chiusa); usato anche
+        dall'IA dei minion in Rust."""
         st = self._ai.setdefault(u.id, {})
         st["astar_cd"] = st.get("astar_cd", 0.0) - dt
         if st["astar_cd"] <= 0.0:
@@ -838,8 +934,10 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
 
     # --- combattimento -------------------------------------------------------
     def _update_combat(self, dt: float) -> None:
-        for c in self.world.combatants():
-            if c.attack_timer > 0.0:
+        # Stesso effetto di "for c in world.combatants()" senza rifare la lista:
+        # Unit e Structure hanno sempre `alive` (Combatant).
+        for c in self.world._of_type(_UNIT_OR_STRUCT):
+            if c.attack_timer > 0.0 and c.alive:
                 c.attack_timer = max(0.0, c.attack_timer - dt)
         self._update_aa_projectiles(dt)   # attacchi base a distanza in volo
 
@@ -868,26 +966,43 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
     def _tower_fire(self, tower: Structure) -> None:
         enemy_minions = []
         enemy_pokes = []
-        for e in self._combat_hash.query_radius(tower.pos.x, tower.pos.y, tower.attack_range):
-            if e.team == tower.team or not getattr(e, "alive", False):
+        tp = tower.pos
+        tx, ty, team, rng = tp.x, tp.y, tower.team, tower.attack_range
+        now = self.time
+        for e in self._combat_hash.query_radius(tx, ty, rng):
+            if e.team == team or not getattr(e, "alive", False):
                 continue
-            if tower.pos.dist(e.pos) > tower.attack_range + getattr(e, "radius", 0.0):
+            if tp.dist(e.pos) > rng + getattr(e, "radius", 0.0):
                 continue
             if isinstance(e, Minion):
                 enemy_minions.append(e)
-            elif isinstance(e, Pokemon) and e.untargetable_until <= self.time:
+            elif isinstance(e, Pokemon) and e.untargetable_until <= now:
                 enemy_pokes.append(e)
-        cands ={e.id: e for e in enemy_minions}
-        cands.update((p.id, p) for p in enemy_pokes)
+        forced = getattr(tower, "_forced_id", None)
+        if not enemy_minions and not enemy_pokes:
+            # Caso comune: nessuno a tiro.
+            if forced is not None:
+                tower._forced_id = None
+            tower.target_id = None
+            return
+
+        def cand(i):
+            # Come un dict {id: e} di minion poi Pokemon (gli id sono unici).
+            for e in enemy_minions:
+                if e.id == i:
+                    return e
+            for e in enemy_pokes:
+                if e.id == i:
+                    return e
+            return None
         target = None
         # Richiesta d'aiuto: chi ha colpito un Pokémon alleato sotto la torre.
-        forced = getattr(tower, "_forced_id", None)
         if forced is not None:
-            target = cands.get(forced)
+            target = cand(forced)
             tower._forced_id = None
         # Il bersaglio resta lo stesso finché è vivo e a tiro (stile LoL).
         if target is None and tower.target_id is not None:
-            target = cands.get(tower.target_id)
+            target = cand(tower.target_id)
         if target is not None:
             pass
         elif enemy_minions:
@@ -1262,13 +1377,14 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                                        f"Torre {victim.lane} squadra {victim.team} distrutta!"))
 
     def _cleanup_dead(self) -> None:
-        for e in list(self.world.entities.values()):
-            if isinstance(e, Minion) and not e.alive:
+        # Solo i tipi che si tolgono (lista in cache, stesso ordine di
+        # world.entities); di solito non e' morto nessuno e non si fa altro.
+        dead = [e for e in self.world._of_type(_CLEANUP_TYPES) if not e.alive]
+        for e in dead:
+            if isinstance(e, Minion):
                 self.world.remove(e.id)
                 self._ai.pop(e.id, None)
-            elif isinstance(e, Wild) and not e.alive:
-                self.world.remove(e.id)
-            elif isinstance(e, Structure) and not isinstance(e, Core) and not e.alive:
+            elif not isinstance(e, Core):
                 self.world.remove(e.id)
 
     # --- passiva Muta / forma Shedinja (linea Nincada) -----------------------
@@ -4025,102 +4141,124 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         self._move_towards(p, p.pos + away.normalized() * 3.0, dt, use_astar=False)
 
     def _update_status(self, dt: float) -> None:
+        now = self.time
+        world_get = self.world.get
+        terrain = self.jungle.terrain_speed_mult
+        corvi_vision = self._corvi_vision
+        # Metodi dei moltiplicatori di velocita' legati una volta per tick (stesso
+        # ordine di hook_names; x * 1.0 == x, quindi saltare i 1.0 non cambia nulla).
+        speed_hooks = [getattr(self, name) for name in hook_names("speed_mult")]
         for p in self.world.pokemons():
             # Le ricariche (cooldown e cariche) scorrono anche da morti: al respawn
             # le mosse sono avanti/pronte come in un MOBA, non congelate.
             for ms in p.moveset.values():
-                if ms.cooldown_remaining > 0.0:
-                    ms.cooldown_remaining = max(0.0, ms.cooldown_remaining - dt)
+                cd = ms.cooldown_remaining
+                if cd > 0.0:
+                    ms.cooldown_remaining = max(0.0, cd - dt)
                 mv = ms.chosen
-                if mv is not None and mv.charges > 0:
-                    if ms.charges_cur < 0:
-                        ms.charges_cur = float(mv.charges)
-                    elif ms.charges_cur < mv.charges and mv.charge_time > 0.0:
-                        ms.charges_cur = min(float(mv.charges),
-                                             ms.charges_cur + dt / mv.charge_time)
+                if mv is not None:
+                    # = mv.charges / mv.charge_time (proprieta' sul dict d), letti
+                    # dal dict e solo se servono: quasi nessuna mossa ha cariche.
+                    nch = mv.d.get("charges", 0)
+                    if nch and int(nch) > 0:
+                        nch = int(nch)
+                        cur = ms.charges_cur
+                        if cur < 0:
+                            ms.charges_cur = float(nch)
+                        elif cur < nch:
+                            ct = float(mv.d.get("charge_time", 0.0))
+                            if ct > 0.0:
+                                ms.charges_cur = min(float(nch), cur + dt / ct)
             if not p.alive:
                 continue
-            if self.time > p.slow_until:
+            if now > p.slow_until:
                 p.slow_mult = 1.0
-            if self.time > p.speed_until:
+            if now > p.speed_until:
                 p.speed_mult = 1.0
-            if self.time > p.atk_until:
+            if now > p.atk_until:
                 p.atk_mult = 1.0
-            if self.time > p.shield_until:
+            if now > p.shield_until:
                 p.shield = 0.0
-            p.def_debuff_active = p.def_debuff_until > self.time
-            p.spdef_debuff_active = p.spdef_debuff_until > self.time
-            p.atk_debuff_active = p.atk_debuff_until > self.time
-            p.def_buff_active = p.def_buff_until > self.time
-            p.memento_weak = p.memento_weak_until > self.time   # Memento: Att./Att.Sp. dimezzati
+            p.def_debuff_active = p.def_debuff_until > now
+            p.spdef_debuff_active = p.spdef_debuff_until > now
+            p.atk_debuff_active = p.atk_debuff_until > now
+            p.def_buff_active = p.def_buff_until > now
+            p.memento_weak = p.memento_weak_until > now   # Memento: Att./Att.Sp. dimezzati
             # Memento / Notte Fonda: invisibile ai nemici
-            p.invisible = p.memento_until > self.time or p.nightfall_until > self.time
-            if self.time > p.spite_until:
+            p.invisible = p.memento_until > now or p.nightfall_until > now
+            if now > p.spite_until:
                 p.spite_mult = 1.0
             # Sonno ritardato (Ipnosi): scatta dopo il ritardo.
-            if p.sleep_arm_at >= 0.0 and self.time >= p.sleep_arm_at:
+            arm = p.sleep_arm_at
+            if arm >= 0.0 and now >= arm:
                 if not self._cc_immune(p):
-                    p.sleep_until = self.time + p.sleep_arm_dur
+                    p.sleep_until = now + p.sleep_arm_dur
                 p.sleep_arm_at = -1.0
             # Veleno: danno nel tempo (attribuito alla sorgente, per le uccisioni).
-            if p.poison_until > self.time and p.poison_dps > 0.0:
-                src = self.world.get(p.poison_src) if p.poison_src is not None else None
+            if p.poison_until > now and p.poison_dps > 0.0:
+                src = world_get(p.poison_src) if p.poison_src is not None else None
                 if src is not None and src.alive:
                     self._dmg_label = "Veleno"
                     self._deal_damage(src, p, p.poison_dps * dt)
                     self._dmg_label = None
             # Scottatura (Fiammacoda): danno nel tempo + Attacco ridotto (vedi
             # eff_attack, via burn_active).
-            p.burn_active = p.burn_until > self.time
-            if p.burn_active and p.burn_dps > 0.0:
-                src = self.world.get(p.burn_src) if p.burn_src is not None else None
+            burn = p.burn_active = p.burn_until > now
+            if burn and p.burn_dps > 0.0:
+                src = world_get(p.burn_src) if p.burn_src is not None else None
                 if src is not None and src.alive:
                     self._dmg_label = "Scottatura"
                     self._deal_damage(src, p, p.burn_dps * dt, dmg_type="Fire")
                     self._dmg_label = None
-            elif not p.burn_active:
+            elif not burn:
                 p.burn_dps = 0.0
+            passive = p.passive_id
             # Passiva Inversione: senza colpi per 10s le cariche calano di 2 ogni 0.75s.
-            if p.passive_id == "inversione":
-                if p.inversion_stacks > 0 and self.time - p.inversion_last_gain >= 10.0:
-                    if self.time >= p.inversion_decay_next:
+            if passive == "inversione":
+                if p.inversion_stacks > 0 and now - p.inversion_last_gain >= 10.0:
+                    if now >= p.inversion_decay_next:
                         p.inversion_stacks = max(0, p.inversion_stacks - 2)
-                        p.inversion_decay_next = self.time + 0.75
+                        p.inversion_decay_next = now + 0.75
                 else:
-                    p.inversion_decay_next = self.time + 0.75   # finestra ferma finché combatte
+                    p.inversion_decay_next = now + 0.75   # finestra ferma finché combatte
             # Lanciato in aria: lo sprite sale e ricade a parabola (cosmetico).
-            if p.airborne_until > self.time:
-                span = max(1e-6, p.airborne_until - p.airborne_start)
-                t = (self.time - p.airborne_start) / span
+            air_until = p.airborne_until
+            if air_until > now:
+                span = max(1e-6, air_until - p.airborne_start)
+                t = (now - p.airborne_start) / span
                 p.air_z = p.airborne_peak * 4.0 * t * (1.0 - t)
             elif p.airborne_start >= 0.0:
                 p.airborne_start = -1.0
                 p.air_z = 0.0
-            immobile = self._immobile(p)
-            rooted = p.root_until > self.time   # paralisi: fermo ma può agire
-            p.cc_active = (p.slow_until > self.time or immobile or rooted
-                           or p.confuse_until > self.time or p.charm_until > self.time
-                           or p.taunt_until > self.time)
-            p.speed = (p.move_speed_base * p.slow_mult * p.speed_mult
-                       * self.jungle.terrain_speed_mult(p))
-            if p.passive_id == "nuotovelox" and self._in_rain(p):
-                p.speed *= NUOTOVELOX_SPEED   # +20% in acqua/pioggia
-            for name in hook_names("speed_mult"):   # Distortozona, Scia Ghiacciata...
-                p.speed *= getattr(self, name)(p)
+            # = self._immobile(p): stun/congelamento, sonno o lanciato in aria.
+            immobile = (p.stun_until > now or p.sleep_until > now
+                        or p.frozen_until > now or air_until > now)
+            rooted = p.root_until > now   # paralisi: fermo ma può agire
+            cc = (p.slow_until > now or immobile or rooted
+                  or p.confuse_until > now or p.charm_until > now
+                  or p.taunt_until > now)
+            speed = p.move_speed_base * p.slow_mult * p.speed_mult * terrain(p)
+            if passive == "nuotovelox" and self._in_rain(p):
+                speed *= NUOTOVELOX_SPEED   # +20% in acqua/pioggia
+            for h in speed_hooks:   # Distortozona, Scia Ghiacciata...
+                m = h(p)
+                if m != 1.0:
+                    speed *= m
             # Nitrocarica: cariche di velocità cumulabili (scadono insieme).
-            if p.fc_until > self.time and p.fc_stacks > 0:
-                p.speed *= 1.0 + p.fc_per * p.fc_stacks
+            if p.fc_until > now and p.fc_stacks > 0:
+                speed *= 1.0 + p.fc_per * p.fc_stacks
             elif p.fc_stacks != 0:
                 p.fc_stacks = 0
             # Muro di Fumo: raggio visivo ridotto a 3 tile finché si resta nel fumo.
             if not p.is_decoy:
-                p.vision = 3.0 if p.smoke_until > self.time else 9.0
-                p.vision = self._corvi_vision(p, p.vision)   # Sguardofermo: +30%
-            if p.fear_until > self.time:
-                p.speed *= 0.5   # spavento: fuga rallentata del 50%
-                p.cc_active = True
+                p.vision = corvi_vision(p, 3.0 if p.smoke_until > now else 9.0)   # Sguardofermo: +30%
+            if p.fear_until > now:
+                speed *= 0.5   # spavento: fuga rallentata del 50%
+                cc = True
             if immobile or rooted:
-                p.speed = 0.0   # immobilizzato (stun/sonno) o paralizzato (rooted)
+                speed = 0.0   # immobilizzato (stun/sonno) o paralizzato (rooted)
+            p.cc_active = cc
+            p.speed = speed
 
     # --- evoluzioni / scelte / punti (bot) -----------------------------------
     def _update_evolution(self, dt: float) -> None:
@@ -4131,7 +4269,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                 self._recompute_stats(p, heal_delta=True)
                 self.announcements.append((self.time, f"{p.name} si è evoluto!"))
             # Offerta della scelta scaglionata: Q@5, W@6, E@7, R@8.
-            for slot, lvl in SLOT_UPGRADE_LEVEL.items():
+            for slot, lvl in (SLOT_UPGRADE_LEVEL.items() if p.level >= 5 else ()):
                 if p.level >= lvl and slot not in p.offered_slots:
                     ms = p.moveset.get(slot)
                     ready = ms and ms.upgrades and (
@@ -4141,17 +4279,20 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                         p.pending_choices.append(slot)
             # Slot con un'unica opzione (ultimate fissa delle forme di Eevee):
             # nessuna scelta da fare, si applica subito (anche lontano dalla base).
-            for slot in list(p.pending_choices):
-                ms = p.moveset.get(slot)
-                if ms and len(ms.upgrades) == 1:
-                    evolution.apply_choice(p, slot, 0)
+            if p.pending_choices:
+                for slot in list(p.pending_choices):
+                    ms = p.moveset.get(slot)
+                    if ms and len(ms.upgrades) == 1:
+                        evolution.apply_choice(p, slot, 0)
             if p.is_bot:
-                if not p.bot_standin:   # il sostituto lascia le scelte al giocatore
+                # il sostituto lascia le scelte al giocatore
+                if not p.bot_standin and p.pending_choices:
                     for slot in list(p.pending_choices):
                         ms = p.moveset.get(slot)
                         if ms and ms.upgrades:
                             evolution.apply_choice(p, slot, random.randrange(len(ms.upgrades)))
-                self._bot_spend_points(p)
+                if p.level > p.skill_points_spent:   # = skills.available_points(p) > 0
+                    self._bot_spend_points(p)
 
     def _bot_spend_points(self, p) -> None:
         for _ in range(16):
@@ -4167,8 +4308,8 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
     def _bot_try_cast(self, p, target) -> None:
         if p.pending_cast is not None or p.silence_until > self.time:
             return
-        for passives, name in bot_cast_table():   # IA delle linee (engine/lines.py)
-            if p.passive_id in passives and getattr(self, name)(p, target):
+        for name in bot_cast_names(p.passive_id):   # IA delle linee (engine/lines.py)
+            if getattr(self, name)(p, target):
                 return
         for slot in ("R", "Q", "W", "E"):
             ms = p.moveset.get(slot)

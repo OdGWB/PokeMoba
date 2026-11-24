@@ -49,39 +49,62 @@ class BotPlanMixin:
 
     # --- 1. shopping ---------------------------------------------------------
     def _bot_next_buy(self, p):
-        """Lo stesso criterio di _bot_buy, ma senza comprare: id del prossimo acquisto."""
-        cat = self.item_catalog
+        """Lo stesso criterio di _bot_buy, ma senza comprare: id del prossimo acquisto.
 
-        def can_buy(iid):
+        L'ordine di visita dell'albero e i controlli che non dipendono dall'oro
+        dipendono solo da oggetti posseduti, consigliati e Condividi Esp. della
+        squadra: in cache la lista dei candidati (id, prezzo) nell'ordine di
+        visita; il risultato e' il primo che l'oro attuale si puo' permettere."""
+        cat = self.item_catalog
+        rec = p.rec_items or cat.recommended_for(p.role)
+        exp = tuple(sorted(i for q in self.world.pokemons() if q.team == p.team
+                           for i in q.items if (cat.get(i) is not None
+                                                and cat.get(i).group == "exp_share")))
+        key = (tuple(p.items), tuple(rec), exp)
+        cache = self.__dict__.setdefault("_next_buy_cache", {})
+        cands = cache.get(key)
+        if cands is None:
+            if len(cache) > 4096:
+                cache.clear()
+            cands = cache[key] = self._next_buy_candidates(p, rec)
+        gold = p.gold
+        for iid, price in cands:
+            if gold >= price:
+                return iid
+        return None
+
+    def _next_buy_candidates(self, p, rec) -> tuple:
+        cat = self.item_catalog
+        out = []
+
+        def static_ok(iid):
             it = cat.get(iid)
             if it is None or not cat.group_ok(iid, p.items):
                 return False
             if it.group == "exp_share" and self._team_has_item(p.team, iid):
                 return False
             slots_after = len(p.items) - len(cat.components_in(iid, p.items)) + 1
-            return p.gold >= cat.effective_price(iid, p.items) and slots_after <= ITEM_SLOTS
+            return slots_after <= ITEM_SLOTS
 
-        def pick(iid, need=1):
+        def visit(iid, need=1):
             if p.items.count(iid) >= need:
-                return None
-            if can_buy(iid):
-                return iid
+                return
+            if static_ok(iid):
+                out.append((iid, cat.effective_price(iid, p.items)))
             comps = cat.get(iid).build_from
             for comp in dict.fromkeys(comps):
-                got = pick(comp, comps.count(comp))
-                if got is not None:
-                    return got
-            return None
+                visit(comp, comps.count(comp))
 
-        for target in (p.rec_items or cat.recommended_for(p.role)):
+        for target in rec:
             it = cat.get(target)
             if it is None or target in p.items:
                 continue
             if not cat.group_ok(target, p.items) or (
                     it.group == "exp_share" and self._team_has_item(p.team, target)):
                 continue
-            return pick(target)
-        return None
+            visit(target)
+            break
+        return tuple(out)
 
     def _plan_shop(self, p, st, dt) -> bool:
         home = p.spawn_pos

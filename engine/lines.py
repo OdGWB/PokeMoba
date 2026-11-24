@@ -65,15 +65,38 @@ HOOK_KINDS = ("init", "update", "precheck", "cast", "bot_cast", "speed_mult")
 NET_KINDS = ("lists", "shared", "moving", "unit_flags", "me")
 
 
+_HOOK_CACHE: dict = {}
+
+
 def hook_names(kind: str) -> tuple:
-    """Nomi dei metodi agganciati a `kind`, nell'ordine del registro."""
-    return tuple(m.LINE[kind] for m in LINE_MIXINS if m.LINE.get(kind))
+    """Nomi dei metodi agganciati a `kind`, nell'ordine del registro (in cache:
+    LINE_MIXINS e i loro LINE non cambiano a partita in corso)."""
+    r = _HOOK_CACHE.get(kind)
+    if r is None:
+        r = _HOOK_CACHE[kind] = tuple(m.LINE[kind] for m in LINE_MIXINS if m.LINE.get(kind))
+    return r
 
 
 def bot_cast_table() -> tuple:
-    """((passive della linea, nome del metodo), ...) per l'IA dei bot."""
-    return tuple((m.LINE["passives"], m.LINE["bot_cast"])
-                 for m in LINE_MIXINS if m.LINE.get("bot_cast"))
+    """((passive della linea, nome del metodo), ...) per l'IA dei bot (in cache)."""
+    r = _HOOK_CACHE.get("_bot_cast_table")
+    if r is None:
+        r = _HOOK_CACHE["_bot_cast_table"] = tuple(
+            (m.LINE["passives"], m.LINE["bot_cast"])
+            for m in LINE_MIXINS if m.LINE.get("bot_cast"))
+    return r
+
+
+_BOT_CAST_BY_PASSIVE: dict = {}
+
+
+def bot_cast_names(passive_id) -> tuple:
+    """Metodi di bot_cast_table() la cui linea ha `passive_id`, nello stesso ordine."""
+    r = _BOT_CAST_BY_PASSIVE.get(passive_id)
+    if r is None:
+        r = _BOT_CAST_BY_PASSIVE[passive_id] = tuple(
+            name for passives, name in bot_cast_table() if passive_id in passives)
+    return r
 
 
 def net_table(kind: str):
