@@ -838,10 +838,24 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         return best
 
     def _within_attack(self, u, target) -> bool:
+        up = u.pos
+        tp = target.pos
+        d = math.hypot(up.x - tp.x, up.y - tp.y)
         if isinstance(u, Pokemon):
-            return u.pos.dist(target.pos) <= self._aa_reach(u, target)   # bordo a bordo
+            # = d <= self._aa_reach(u, target) (bordo a bordo), con _auto_reach,
+            # _fx_items e _claw_reach inline: stesse operazioni, stesso ordine.
+            now = self.time
+            r = u.attack_range
+            if "zoom_lens" in (() if getattr(u, "itemlock_until", -1.0) > now
+                               else getattr(u, "items", ())):
+                r *= 1.15
+            if u.passive_id == "distacco" and self._is_hidden(u):
+                r += config.DISTACCO_RANGE_BONUS
+            if u.shadowclaw_until > now:
+                r = r * u.shadowclaw_mult
+            return d <= r + getattr(u, "radius", 0.0) + getattr(target, "radius", 0.0)
         reach = getattr(u, "attack_range", 0.0) + getattr(target, "radius", 0.0)
-        return u.pos.dist(target.pos) <= reach
+        return d <= reach
 
     def _chase(self, u, target, dt: float) -> None:
         if isinstance(u, Pokemon) and u.aa_active and u.aa_target_id == target.id:
