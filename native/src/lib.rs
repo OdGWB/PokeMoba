@@ -1348,6 +1348,29 @@ struct BotHelpers {
 }
 
 impl BotHelpers {
+    #[allow(clippy::too_many_arguments)]
+    fn unsafe_dive_impl(&self, structures: &Bound<'_, PyList>, hash: &SpatialHash, team: i64,
+                        x: f64, y: f64, margin: f64, smr: f64) -> PyResult<bool> {
+        let py = structures.py();
+        let (k_kind, k_alive, k_team, k_range) =
+            (intern!(py, "kind"), intern!(py, "alive"), intern!(py, "team"), intern!(py, "attack_range"));
+        for e in structures.iter() {
+            if e.getattr(k_kind)?.extract::<&str>()? != "tower" || !e.getattr(k_alive)?.is_truthy()? {
+                continue;
+            }
+            let et: i64 = e.getattr(k_team)?.extract()?;
+            if et == team {
+                continue;
+            }
+            let (ex, ey) = pos_of(&e)?;
+            let ar: f64 = e.getattr(k_range)?.extract()?;
+            if hypot(x - ex, y - ey) <= ar + margin && !self.minion_near_impl(py, hash, team, ex, ey, smr)? {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
     fn minion_near_impl(&self, py: Python<'_>, hash: &SpatialHash, team: i64, x: f64, y: f64,
                         r: f64) -> PyResult<bool> {
         let (k_team, k_alive) = (intern!(py, "team"), intern!(py, "alive"));
@@ -1398,24 +1421,43 @@ impl BotHelpers {
     #[allow(clippy::too_many_arguments)]
     fn unsafe_dive(&self, structures: &Bound<'_, PyList>, hash: PyRef<'_, SpatialHash>, team: i64,
                    x: f64, y: f64, margin: f64, smr: f64) -> PyResult<bool> {
-        let py = structures.py();
-        let (k_kind, k_alive, k_team, k_range) =
-            (intern!(py, "kind"), intern!(py, "alive"), intern!(py, "team"), intern!(py, "attack_range"));
-        for e in structures.iter() {
-            if e.getattr(k_kind)?.extract::<&str>()? != "tower" || !e.getattr(k_alive)?.is_truthy()? {
-                continue;
-            }
-            let et: i64 = e.getattr(k_team)?.extract()?;
-            if et == team {
-                continue;
-            }
-            let (ex, ey) = pos_of(&e)?;
-            let ar: f64 = e.getattr(k_range)?.extract()?;
-            if hypot(x - ex, y - ey) <= ar + margin && !self.minion_near_impl(py, &hash, team, ex, ey, smr)? {
-                return Ok(true);
-            }
+        self.unsafe_dive_impl(structures, &hash, team, x, y, margin, smr)
+    }
+
+    /// Match._follow_bot_lane_safe senza le scritture: avanza l'indice della lane
+    /// e decide la mossa. Ritorna (idx, code): 0 = fermati (dive non sicuro),
+    /// 1 = passo diretto verso pts[idx] (linea di vista libera), 2 = A* verso
+    /// pts[idx], 3 = linea di vista da chiedere a Python (gv assente).
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (structures, hash, gv, team, px, py_, pts, idx, reach, look, margin, smr, bb))]
+    fn lane_safe(&self, structures: &Bound<'_, PyList>, hash: PyRef<'_, SpatialHash>,
+                 gv: Option<PyRef<'_, GridView>>, team: i64, px: f64, py_: f64, pts: Vec<f64>,
+                 idx: i64, reach: f64, look: f64, margin: f64, smr: f64, bb: bool)
+                 -> PyResult<(i64, i64)> {
+        let n = (pts.len() / 2) as i64;
+        let mut idx = idx.min(n - 1);
+        let (mut wx, mut wy) = (pts[2 * idx as usize], pts[2 * idx as usize + 1]);
+        if hypot(px - wx, py_ - wy) <= reach && idx < n - 1 {
+            idx += 1;
+            wx = pts[2 * idx as usize];
+            wy = pts[2 * idx as usize + 1];
         }
-        Ok(false)
+        let (sx, sy) = (wx - px, wy - py_);
+        let sl = hypot(sx, sy);
+        let (ax, ay) = if sl > 1e-6 {
+            let m = if look < sl { look } else { sl };
+            (px + (sx / sl) * m, py_ + (sy / sl) * m)
+        } else {
+            (px, py_)
+        };
+        if self.unsafe_dive_impl(structures, &hash, team, ax, ay, margin, smr)?
+            || self.unsafe_dive_impl(structures, &hash, team, px, py_, margin, smr)? {
+            return Ok((idx, 0));
+        }
+        Ok(match gv {
+            Some(g) => (idx, if g.los(px, py_, wx, wy, bb) { 1 } else { 2 }),
+            None => (idx, 3),
+        })
     }
 
     /// _under_enemy_tower(p, pos).

@@ -741,8 +741,43 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         # a spingere: difendere sempre porterebbe allo stallo).
         return best if best is not None and bestd < bp.defend_max_dist else None
 
+    def _lane_cached(self, lane_name: str, team: int):
+        """(waypoint, coordinate piatte) di oriented_lane, in cache: Vec2 e' frozen
+        e la mappa delle lane non cambia in partita."""
+        c = self.__dict__.setdefault("_lane_cache", {})
+        key = (lane_name, team)
+        r = c.get(key)
+        if r is None:
+            pts = self.oriented_lane(lane_name, team)
+            r = (pts, tuple(v for q in pts for v in (q.x, q.y)))
+            c[key] = r
+        return r
+
     def _follow_bot_lane_safe(self, p: Pokemon, dt: float) -> None:
         st = self._ai.setdefault(p.id, {})
+        nat = self._bot_nat
+        if nat is not None:
+            pts, flat = self._lane_cached(p.assigned_lane, p.team)
+            if len(pts) < 2:
+                self._move_towards(p, p.spawn_pos, dt)
+                return
+            bp = self._bp(p)
+            grid = self.world.grid
+            idx, code = nat.lane_safe(self.world.structures(), self._combat_hash,
+                                      grid.native_view(), p.team, p.pos.x, p.pos.y, flat,
+                                      st.get("lane_idx", 1), bp.lane_wp_reach,
+                                      bp.dive_lookahead, bp.tower_margin, bp.struct_minion_r,
+                                      getattr(p, "bush_blocks", False))
+            st["lane_idx"] = idx
+            if code == 0:
+                p.stop()
+            elif code == 1:
+                p.set_path([pts[idx]])
+            elif code == 2:
+                self._astar_move(p, pts[idx], dt, getattr(p, "bush_blocks", False))
+            else:
+                self._set_step(p, pts[idx], dt)
+            return
         pts = self.oriented_lane(p.assigned_lane, p.team)
         if len(pts) < 2:
             self._move_towards(p, p.spawn_pos, dt)
@@ -4108,13 +4143,18 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                     ms.cooldown_remaining = max(0.0, cd - dt)
                 mv = ms.chosen
                 if mv is not None:
-                    nch = mv.charges
-                    if nch > 0:
+                    # = mv.charges / mv.charge_time (proprieta' sul dict d), letti
+                    # dal dict e solo se servono: quasi nessuna mossa ha cariche.
+                    nch = mv.d.get("charges", 0)
+                    if nch and int(nch) > 0:
+                        nch = int(nch)
                         cur = ms.charges_cur
                         if cur < 0:
                             ms.charges_cur = float(nch)
-                        elif cur < nch and mv.charge_time > 0.0:
-                            ms.charges_cur = min(float(nch), cur + dt / mv.charge_time)
+                        elif cur < nch:
+                            ct = float(mv.d.get("charge_time", 0.0))
+                            if ct > 0.0:
+                                ms.charges_cur = min(float(nch), cur + dt / ct)
             if not p.alive:
                 continue
             if now > p.slow_until:
@@ -4215,7 +4255,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                 self._recompute_stats(p, heal_delta=True)
                 self.announcements.append((self.time, f"{p.name} si è evoluto!"))
             # Offerta della scelta scaglionata: Q@5, W@6, E@7, R@8.
-            for slot, lvl in SLOT_UPGRADE_LEVEL.items():
+            for slot, lvl in (SLOT_UPGRADE_LEVEL.items() if p.level >= 5 else ()):
                 if p.level >= lvl and slot not in p.offered_slots:
                     ms = p.moveset.get(slot)
                     ready = ms and ms.upgrades and (
@@ -4225,17 +4265,20 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                         p.pending_choices.append(slot)
             # Slot con un'unica opzione (ultimate fissa delle forme di Eevee):
             # nessuna scelta da fare, si applica subito (anche lontano dalla base).
-            for slot in list(p.pending_choices):
-                ms = p.moveset.get(slot)
-                if ms and len(ms.upgrades) == 1:
-                    evolution.apply_choice(p, slot, 0)
+            if p.pending_choices:
+                for slot in list(p.pending_choices):
+                    ms = p.moveset.get(slot)
+                    if ms and len(ms.upgrades) == 1:
+                        evolution.apply_choice(p, slot, 0)
             if p.is_bot:
-                if not p.bot_standin:   # il sostituto lascia le scelte al giocatore
+                # il sostituto lascia le scelte al giocatore
+                if not p.bot_standin and p.pending_choices:
                     for slot in list(p.pending_choices):
                         ms = p.moveset.get(slot)
                         if ms and ms.upgrades:
                             evolution.apply_choice(p, slot, random.randrange(len(ms.upgrades)))
-                self._bot_spend_points(p)
+                if p.level > p.skill_points_spent:   # = skills.available_points(p) > 0
+                    self._bot_spend_points(p)
 
     def _bot_spend_points(self, p) -> None:
         for _ in range(16):

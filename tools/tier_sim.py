@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import operator
 import os
 import random
 import sys
@@ -52,6 +53,7 @@ EEVEE_CHOICES = {"jolteon": {"Q": 0, "W": 0, "E": 0}, "flareon": {"Q": 0, "W": 0
 CC_FIELDS = (("stun_until", 1.0), ("root_until", 1.0), ("sleep_until", 1.0), ("fear_until", 1.0),
              ("charm_until", 1.0), ("airborne_until", 1.0), ("taunt_until", 0.7),
              ("confuse_until", 0.6), ("silence_until", 0.5), ("slow_until", 0.4))
+_cc_get = operator.attrgetter(*(f for f, _ in CC_FIELDS))
 FORCED = {}     # id Pokemon -> {slot: indice}: scelte forzate per i rami (vedi _force_choice)
 
 _orig_apply_choice = evolution.apply_choice
@@ -428,6 +430,7 @@ def play(job):
         return None
 
     seen = {}                       # (id, campo) -> ultima scadenza vista
+    last_raw = {}                   # id -> scadenze lette all'ultima scansione
 
     def scan_cc(hint=None):
         """Conta i secondi di CC appena inflitti: confronta le scadenze degli stati di
@@ -435,6 +438,16 @@ def play(job):
         lanciando) se e' un nemico, altrimenti a chi ha colpito per ultimo."""
         now = match.time
         for v in units:
+            # Uscita rapida: scadenze identiche all'ultima scansione -> nessun
+            # campo supera il massimo gia' visto (seen tiene il massimo).
+            try:
+                raw = _cc_get(v)
+            except AttributeError:
+                raw = None
+            if raw is not None:
+                if last_raw.get(v.id) == raw:
+                    continue
+                last_raw[v.id] = raw
             for f, w in CC_FIELDS:
                 cur = getattr(v, f, -1.0)
                 key = (v.id, f)

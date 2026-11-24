@@ -160,7 +160,7 @@ class World:
 
     def combatants(self) -> list:
         """Tutto ciò che ha hp ed è vivo (unità + strutture)."""
-        return [e for e in self._of_type((Unit, Structure)) if getattr(e, "alive", True)]
+        return [e for e in self._of_type((Unit, Structure)) if e.alive]
 
     # --- avanzamento ---------------------------------------------------------
     def tick(self, dt: float) -> None:
