@@ -4092,102 +4092,119 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         self._move_towards(p, p.pos + away.normalized() * 3.0, dt, use_astar=False)
 
     def _update_status(self, dt: float) -> None:
+        now = self.time
+        world_get = self.world.get
+        terrain = self.jungle.terrain_speed_mult
+        corvi_vision = self._corvi_vision
+        # Metodi dei moltiplicatori di velocita' legati una volta per tick (stesso
+        # ordine di hook_names; x * 1.0 == x, quindi saltare i 1.0 non cambia nulla).
+        speed_hooks = [getattr(self, name) for name in hook_names("speed_mult")]
         for p in self.world.pokemons():
             # Le ricariche (cooldown e cariche) scorrono anche da morti: al respawn
             # le mosse sono avanti/pronte come in un MOBA, non congelate.
             for ms in p.moveset.values():
-                if ms.cooldown_remaining > 0.0:
-                    ms.cooldown_remaining = max(0.0, ms.cooldown_remaining - dt)
+                cd = ms.cooldown_remaining
+                if cd > 0.0:
+                    ms.cooldown_remaining = max(0.0, cd - dt)
                 mv = ms.chosen
-                if mv is not None and mv.charges > 0:
-                    if ms.charges_cur < 0:
-                        ms.charges_cur = float(mv.charges)
-                    elif ms.charges_cur < mv.charges and mv.charge_time > 0.0:
-                        ms.charges_cur = min(float(mv.charges),
-                                             ms.charges_cur + dt / mv.charge_time)
+                if mv is not None:
+                    nch = mv.charges
+                    if nch > 0:
+                        cur = ms.charges_cur
+                        if cur < 0:
+                            ms.charges_cur = float(nch)
+                        elif cur < nch and mv.charge_time > 0.0:
+                            ms.charges_cur = min(float(nch), cur + dt / mv.charge_time)
             if not p.alive:
                 continue
-            if self.time > p.slow_until:
+            if now > p.slow_until:
                 p.slow_mult = 1.0
-            if self.time > p.speed_until:
+            if now > p.speed_until:
                 p.speed_mult = 1.0
-            if self.time > p.atk_until:
+            if now > p.atk_until:
                 p.atk_mult = 1.0
-            if self.time > p.shield_until:
+            if now > p.shield_until:
                 p.shield = 0.0
-            p.def_debuff_active = p.def_debuff_until > self.time
-            p.spdef_debuff_active = p.spdef_debuff_until > self.time
-            p.atk_debuff_active = p.atk_debuff_until > self.time
-            p.def_buff_active = p.def_buff_until > self.time
-            p.memento_weak = p.memento_weak_until > self.time   # Memento: Att./Att.Sp. dimezzati
+            p.def_debuff_active = p.def_debuff_until > now
+            p.spdef_debuff_active = p.spdef_debuff_until > now
+            p.atk_debuff_active = p.atk_debuff_until > now
+            p.def_buff_active = p.def_buff_until > now
+            p.memento_weak = p.memento_weak_until > now   # Memento: Att./Att.Sp. dimezzati
             # Memento / Notte Fonda: invisibile ai nemici
-            p.invisible = p.memento_until > self.time or p.nightfall_until > self.time
-            if self.time > p.spite_until:
+            p.invisible = p.memento_until > now or p.nightfall_until > now
+            if now > p.spite_until:
                 p.spite_mult = 1.0
             # Sonno ritardato (Ipnosi): scatta dopo il ritardo.
-            if p.sleep_arm_at >= 0.0 and self.time >= p.sleep_arm_at:
+            arm = p.sleep_arm_at
+            if arm >= 0.0 and now >= arm:
                 if not self._cc_immune(p):
-                    p.sleep_until = self.time + p.sleep_arm_dur
+                    p.sleep_until = now + p.sleep_arm_dur
                 p.sleep_arm_at = -1.0
             # Veleno: danno nel tempo (attribuito alla sorgente, per le uccisioni).
-            if p.poison_until > self.time and p.poison_dps > 0.0:
-                src = self.world.get(p.poison_src) if p.poison_src is not None else None
+            if p.poison_until > now and p.poison_dps > 0.0:
+                src = world_get(p.poison_src) if p.poison_src is not None else None
                 if src is not None and src.alive:
                     self._dmg_label = "Veleno"
                     self._deal_damage(src, p, p.poison_dps * dt)
                     self._dmg_label = None
             # Scottatura (Fiammacoda): danno nel tempo + Attacco ridotto (vedi
             # eff_attack, via burn_active).
-            p.burn_active = p.burn_until > self.time
-            if p.burn_active and p.burn_dps > 0.0:
-                src = self.world.get(p.burn_src) if p.burn_src is not None else None
+            burn = p.burn_active = p.burn_until > now
+            if burn and p.burn_dps > 0.0:
+                src = world_get(p.burn_src) if p.burn_src is not None else None
                 if src is not None and src.alive:
                     self._dmg_label = "Scottatura"
                     self._deal_damage(src, p, p.burn_dps * dt, dmg_type="Fire")
                     self._dmg_label = None
-            elif not p.burn_active:
+            elif not burn:
                 p.burn_dps = 0.0
+            passive = p.passive_id
             # Passiva Inversione: senza colpi per 10s le cariche calano di 2 ogni 0.75s.
-            if p.passive_id == "inversione":
-                if p.inversion_stacks > 0 and self.time - p.inversion_last_gain >= 10.0:
-                    if self.time >= p.inversion_decay_next:
+            if passive == "inversione":
+                if p.inversion_stacks > 0 and now - p.inversion_last_gain >= 10.0:
+                    if now >= p.inversion_decay_next:
                         p.inversion_stacks = max(0, p.inversion_stacks - 2)
-                        p.inversion_decay_next = self.time + 0.75
+                        p.inversion_decay_next = now + 0.75
                 else:
-                    p.inversion_decay_next = self.time + 0.75   # finestra ferma finché combatte
+                    p.inversion_decay_next = now + 0.75   # finestra ferma finché combatte
             # Lanciato in aria: lo sprite sale e ricade a parabola (cosmetico).
-            if p.airborne_until > self.time:
-                span = max(1e-6, p.airborne_until - p.airborne_start)
-                t = (self.time - p.airborne_start) / span
+            air_until = p.airborne_until
+            if air_until > now:
+                span = max(1e-6, air_until - p.airborne_start)
+                t = (now - p.airborne_start) / span
                 p.air_z = p.airborne_peak * 4.0 * t * (1.0 - t)
             elif p.airborne_start >= 0.0:
                 p.airborne_start = -1.0
                 p.air_z = 0.0
-            immobile = self._immobile(p)
-            rooted = p.root_until > self.time   # paralisi: fermo ma può agire
-            p.cc_active = (p.slow_until > self.time or immobile or rooted
-                           or p.confuse_until > self.time or p.charm_until > self.time
-                           or p.taunt_until > self.time)
-            p.speed = (p.move_speed_base * p.slow_mult * p.speed_mult
-                       * self.jungle.terrain_speed_mult(p))
-            if p.passive_id == "nuotovelox" and self._in_rain(p):
-                p.speed *= NUOTOVELOX_SPEED   # +20% in acqua/pioggia
-            for name in hook_names("speed_mult"):   # Distortozona, Scia Ghiacciata...
-                p.speed *= getattr(self, name)(p)
+            # = self._immobile(p): stun/congelamento, sonno o lanciato in aria.
+            immobile = (p.stun_until > now or p.sleep_until > now
+                        or p.frozen_until > now or air_until > now)
+            rooted = p.root_until > now   # paralisi: fermo ma può agire
+            cc = (p.slow_until > now or immobile or rooted
+                  or p.confuse_until > now or p.charm_until > now
+                  or p.taunt_until > now)
+            speed = p.move_speed_base * p.slow_mult * p.speed_mult * terrain(p)
+            if passive == "nuotovelox" and self._in_rain(p):
+                speed *= NUOTOVELOX_SPEED   # +20% in acqua/pioggia
+            for h in speed_hooks:   # Distortozona, Scia Ghiacciata...
+                m = h(p)
+                if m != 1.0:
+                    speed *= m
             # Nitrocarica: cariche di velocità cumulabili (scadono insieme).
-            if p.fc_until > self.time and p.fc_stacks > 0:
-                p.speed *= 1.0 + p.fc_per * p.fc_stacks
+            if p.fc_until > now and p.fc_stacks > 0:
+                speed *= 1.0 + p.fc_per * p.fc_stacks
             elif p.fc_stacks != 0:
                 p.fc_stacks = 0
             # Muro di Fumo: raggio visivo ridotto a 3 tile finché si resta nel fumo.
             if not p.is_decoy:
-                p.vision = 3.0 if p.smoke_until > self.time else 9.0
-                p.vision = self._corvi_vision(p, p.vision)   # Sguardofermo: +30%
-            if p.fear_until > self.time:
-                p.speed *= 0.5   # spavento: fuga rallentata del 50%
-                p.cc_active = True
+                p.vision = corvi_vision(p, 3.0 if p.smoke_until > now else 9.0)   # Sguardofermo: +30%
+            if p.fear_until > now:
+                speed *= 0.5   # spavento: fuga rallentata del 50%
+                cc = True
             if immobile or rooted:
-                p.speed = 0.0   # immobilizzato (stun/sonno) o paralizzato (rooted)
+                speed = 0.0   # immobilizzato (stun/sonno) o paralizzato (rooted)
+            p.cc_active = cc
+            p.speed = speed
 
     # --- evoluzioni / scelte / punti (bot) -----------------------------------
     def _update_evolution(self, dt: float) -> None:
