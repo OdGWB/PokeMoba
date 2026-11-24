@@ -331,7 +331,8 @@ def resolve_collisions(units: list[Unit], grid: Grid, iterations: int = 2,
 _OBSTACLE_HITS = getattr(_native, "obstacle_hits", None)
 
 
-def resolve_obstacles(units: list[Unit], obstacles: list, grid: Grid) -> None:
+def resolve_obstacles(units: list[Unit], obstacles: list, grid: Grid,
+                      hits: list | None = None) -> None:
     """Spinge fuori le unità dai cerchi statici (x, y, raggio), es. le torri.
 
     La spinta è radiale, quindi chi cammina contro l'ostacolo scivola lungo il
@@ -340,7 +341,12 @@ def resolve_obstacles(units: list[Unit], obstacles: list, grid: Grid) -> None:
     del waypoint, così non resta incastrato. Un waypoint DENTRO l'ostacolo si
     considera raggiunto appena lo si tocca.
     """
-    if _OBSTACLE_HITS is not None and obstacles and type(units) is list:
+    if hits is not None:
+        # Indici gia' trovati dal chiamante (World.tick, insieme alle collisioni).
+        if not hits:
+            return
+        units = [units[i] for i in hits]
+    elif _OBSTACLE_HITS is not None and obstacles and type(units) is list:
         # Rust trova le sole unita' che toccano un ostacolo (stessi calcoli): le
         # altre non verrebbero toccate dal ciclo qui sotto.
         hits = _OBSTACLE_HITS(units, obstacles)

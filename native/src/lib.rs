@@ -9,6 +9,33 @@ use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use std::collections::{HashMap, HashSet};
+use std::hash::{BuildHasherDefault, Hasher};
+
+/// FxHash (rustc's): fast hasher for integer keys. Used only in maps where
+/// nothing depends on the iteration order (lookups and membership).
+#[derive(Default)]
+struct Fx(u64);
+impl Hasher for Fx {
+    #[inline]
+    fn write(&mut self, bytes: &[u8]) {
+        for &b in bytes {
+            self.write_u64(b as u64);
+        }
+    }
+    #[inline]
+    fn write_u64(&mut self, i: u64) {
+        self.0 = (self.0.rotate_left(5) ^ i).wrapping_mul(0x517cc1b727220a95);
+    }
+    #[inline]
+    fn write_i64(&mut self, i: i64) {
+        self.write_u64(i as u64);
+    }
+    #[inline]
+    fn finish(&self) -> u64 {
+        self.0
+    }
+}
+type FxBuild = BuildHasherDefault<Fx>;
 
 const TILE_BUSH: u8 = 4;
 const TILE_PILLAR: u8 = 7;
@@ -546,6 +573,72 @@ impl GridView {
         Ok(true)
     }
 
+    /// World.tick's loop `for u in movers: advance_unit(u, dt, grid)` in one
+    /// call: step_unit on each unit, in order. Returns the indices it could not
+    /// handle (centre inside a wall on the ground): Python runs those itself.
+    fn step_units(&self, units: &Bound<'_, PyList>, dt: f64, vec2: &Bound<'_, PyAny>) -> PyResult<Vec<usize>> {
+        let mut bad = Vec::new();
+        for (i, u) in units.iter().enumerate() {
+            if !self.step_unit(&u, dt, vec2)? {
+                bad.push(i);
+            }
+        }
+        Ok(bad)
+    }
+
+    /// movement.resolve_collisions on the unit objects: skips the airborne
+    /// (air_z > 0), reads pos/radius/id/bush_blocks, writes back only the
+    /// positions that changed (new Vec2), like the Python wrapper.
+    /// Also returns, like obstacle_hits on the positions after the collisions,
+    /// the indices (in `units`) of the ground units touching an obstacle.
+    fn collide_units(&self, units: &Bound<'_, PyList>, vec2: &Bound<'_, PyAny>, iterations: usize,
+                     obstacles: Vec<(f64, f64, f64)>) -> PyResult<Vec<usize>> {
+        let py = units.py();
+        let mut objs = Vec::with_capacity(units.len());
+        let mut idx: Vec<usize> = Vec::with_capacity(units.len());
+        let (mut xs, mut ys, mut rs, mut ids, mut bbs) = (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
+        for (i, u) in units.iter().enumerate() {
+            let air_z: f64 = match u.getattr(intern!(py, "air_z")) {
+                Ok(v) => v.extract()?,
+                Err(_) => 0.0,
+            };
+            if air_z > 0.0 {
+                continue;
+            }
+            idx.push(i);
+            let (x, y) = pos_of(&u)?;
+            xs.push(x);
+            ys.push(y);
+            rs.push(u.getattr(intern!(py, "radius"))?.extract::<f64>()?);
+            ids.push(u.getattr(intern!(py, "id"))?.extract::<i64>()?);
+            bbs.push(attr_truthy(&u, intern!(py, "bush_blocks")));
+            objs.push(u);
+        }
+        let (x0, y0) = (xs.clone(), ys.clone());
+        let rads = rs.clone();
+        let (nx, ny) = self.resolve_collisions(xs, ys, rs, ids, bbs, iterations);
+        let kpos = intern!(py, "pos");
+        for (k, u) in objs.iter().enumerate() {
+            if nx[k] != x0[k] || ny[k] != y0[k] {
+                u.setattr(kpos, vec2.call1((nx[k], ny[k]))?)?;
+            }
+        }
+        let mut hits = Vec::new();
+        for k in 0..objs.len() {
+            for &(ox, oy, r) in &obstacles {
+                let dx = nx[k] - ox;
+                let dy = ny[k] - oy;
+                let min_d = r + rads[k];
+                let d2 = dx * dx + dy * dy;
+                if d2 < min_d * min_d {
+                    hits.push(idx[k]);
+                    break;
+                }
+            }
+        }
+        Ok(hits)
+    }
+
     #[pyo3(signature = (px, py, bb=false))]
     fn is_walkable_point(&self, px: f64, py: f64, bb: bool) -> bool {
         self.walkable_point(px, py, bb)
@@ -575,9 +668,9 @@ impl GridView {
                           -> (Vec<f64>, Vec<f64>) {
         let n = xs.len();
         let kr: Vec<f64> = rs.iter().map(|&r| if WALL_R_MAX < r { WALL_R_MAX } else { r }).collect();
-        let mut cells: HashMap<(i64, i64), Vec<usize>> = HashMap::new();
+        let mut cells: HashMap<(i64, i64), Vec<usize>, FxBuild> = HashMap::default();
         let mut nb: Vec<usize> = Vec::with_capacity(64);
-        let mut seen: HashSet<(i64, i64)> = HashSet::new();
+        let mut seen: HashSet<(i64, i64), FxBuild> = HashSet::default();
         for _ in 0..iterations {
             for v in cells.values_mut() {
                 v.clear();

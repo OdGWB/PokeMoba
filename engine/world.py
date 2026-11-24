@@ -166,13 +166,25 @@ class World:
     def tick(self, dt: float) -> None:
         """Avanza il movimento di dt secondi. Muove solo le unità vive."""
         movers = self.alive_units()
-        for u in movers:
-            movement.advance_unit(u, dt, self.grid)
-        movement.resolve_collisions(movers, self.grid, spatial=self.spatial)
+        grid = self.grid
         # Le torri vive sono ostacoli fisici: chi ci finisce dentro (passo,
         # spinta, scatto) viene spinto fuori lungo il bordo.
         towers = [(s.pos.x, s.pos.y, config.TOWER_BLOCK_RADIUS)
                   for s in self._of_type(Structure)
                   if s.kind == "tower" and s.alive]
+        nv = grid.native_view() if movement._STEP_NATIVE and grid._shape_on else None
+        if nv is not None and hasattr(nv, "collide_units"):
+            # Stesso ciclo in Rust (advance_unit di ogni unita' in ordine, poi le
+            # collisioni); chi ha il centro dentro un muro torna al Python. Le
+            # collisioni restituiscono anche chi tocca una torre.
+            for i in nv.step_units(movers, dt, Vec2):
+                movement.advance_unit(movers[i], dt, grid)
+            hits = nv.collide_units(movers, Vec2, 2, towers)
+            if towers and hits:
+                movement.resolve_obstacles(movers, towers, grid, hits)
+            return
+        for u in movers:
+            movement.advance_unit(u, dt, grid)
+        movement.resolve_collisions(movers, grid, spatial=self.spatial)
         if towers:
-            movement.resolve_obstacles(movers, towers, self.grid)
+            movement.resolve_obstacles(movers, towers, grid)
