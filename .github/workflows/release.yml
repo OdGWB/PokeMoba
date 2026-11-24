@@ -1,12 +1,18 @@
-# Ogni push sul ramo main: test, exe Windows con PyInstaller, installer (Inno Setup) e nuova
-# GitHub Release "v<numero build>" (nome "PokéMoba 3.0.N", vedi game/version.py) con
-# PokeMoba-Setup.exe (da scaricare) e PokeMoba.exe allegati. Gli exe gia' installati vedono
-# la Release all'avvio (game/updater.py) e si aggiornano da soli scaricando PokeMoba.exe.
+# GitHub Release "v<build>" (nome "PokéMoba 3.0.N") con PokeMoba-Setup.exe (da scaricare)
+# e PokeMoba.exe allegati. Gli exe gia' installati vedono la Release all'avvio
+# (game/updater.py) e si aggiornano da soli scaricando PokeMoba.exe.
+#
+# NON parte a ogni merge: solo quando su main arriva una modifica a data/news.json con
+# in cima una versione NON ancora pubblicata (o a mano, da Actions -> Release -> Run
+# workflow). La versione 3.0.N della voce decide build e tag (tools/release_info.py).
+# Correggere il testo di una voce gia' pubblicata non rifa' la Release.
+# I test delle PR sono in ci.yml.
 name: Release
 
 on:
   push:
     branches: [main]
+    paths: [data/news.json]
   workflow_dispatch:
 
 permissions:
@@ -17,13 +23,43 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.info.outputs.version }}
+      build: ${{ steps.info.outputs.build }}
+      tag: ${{ steps.info.outputs.tag }}
+      new: ${{ steps.tag.outputs.new }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Versione dalle novita'
+        id: info
+        run: python tools/release_info.py --github
+
+      - name: Gia' pubblicata?
+        id: tag
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/${{ steps.info.outputs.tag }}" > /dev/null; then
+            echo "Il tag ${{ steps.info.outputs.tag }} esiste gia': nessuna Release."
+            echo "new=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "new=true" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: check
+    if: needs.check.outputs.new == 'true'
     runs-on: windows-latest
     env:
       SDL_VIDEODRIVER: dummy
       SDL_AUDIODRIVER: dummy
       PYTHONUTF8: "1"
-      BUILD: ${{ github.run_number }}
+      BUILD: ${{ needs.check.outputs.build }}
     steps:
       - uses: actions/checkout@v4
 
@@ -39,6 +75,9 @@ jobs:
 
       - name: Test
         run: python -m pytest -q -x
+
+      - name: Note della Release
+        run: python tools/release_info.py --notes
 
       - name: Numero di versione
         shell: python
@@ -85,16 +124,10 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.run_number }}
+          tag_name: ${{ needs.check.outputs.tag }}
           name: PokéMoba ${{ env.VERSION_NAME }}
           target_commitish: ${{ github.sha }}
-          body: |
-            ${{ github.event.head_commit.message }}
-
-            **Download:** scarica ed esegui **PokeMoba-Setup.exe**. Chi ha già il gioco
-            riceve l'aggiornamento da solo all'avvio.
-
-            <sub>PokeMoba.exe è il file usato dall'aggiornamento automatico.</sub>
+          body_path: notes.md
           files: |
             dist/PokeMoba-Setup.exe
             dist/PokeMoba.exe
