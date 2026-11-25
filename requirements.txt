@@ -2,7 +2,7 @@
 # non arriva a chi installa finche' non si aggiorna qui, apposta e dopo averlo provato)
 
 # Rendering, input, finestra.
-pygame-ce==2.5.7
+pygame==2.6.1
 
 # Rendering della mappa, visione, pathfinding (array).
 numpy==2.3.4

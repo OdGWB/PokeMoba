@@ -50,7 +50,7 @@ gioco. Gli avatar si riscaricano con `python tools/fetch_avatars.py`.
 ## Requisiti e installazione
 
 - Python 3.11+ (sviluppato su 3.13)
-- [pygame-ce](https://pyga.me/), [aiortc](https://github.com/aiortc/aiortc) (online)
+- [pygame](https://www.pygame.org/), [aiortc](https://github.com/aiortc/aiortc) (online)
 
 ```bash
 python -m venv .venv
