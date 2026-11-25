@@ -1,5 +1,17 @@
 [
   {
+    "version": "3.2.0",
+    "date": "2026-11-25",
+    "title": "Aggiornamenti firmati e online più sicuro",
+    "items": [
+      "Aggiornamenti firmati: da questa versione il gioco installa un aggiornamento solo se è firmato digitalmente da noi. Controlla anche che il file scaricato sia identico a quello pubblicato e rifiuta le versioni vecchie spacciate per nuove.",
+      "Online più sicuro: un host modificato non può più farti caricare mappe o Pokémon che non esistono nel gioco. Prima poteva far aprire al tuo PC file fuori dalla cartella del gioco, anche su un altro computer.",
+      "Nebbia di guerra più rigorosa: gli effetti delle mosse nemiche (coni, colpi, scie) e i pilastri di roccia avversari non vengono più inviati a chi non li vede, così un client modificato non può spiare attraverso la nebbia.",
+      "Partite online più stabili: un errore imprevisto o un messaggio malformato non chiude più la partita per tutti, e ci sono limiti anti-spam nella lobby e nel draft.",
+      "LAN: il gioco ignora i pacchetti che non arrivano dal server della partita."
+    ]
+  },
+  {
     "version": "3.1.0",
     "date": "2026-11-25",
     "title": "Natale Frost Punk",

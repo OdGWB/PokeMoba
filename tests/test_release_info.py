@@ -20,19 +20,21 @@ def test_versione_fuori_serie(bad):
         R.build_of(bad)
 
 
-def test_serie_31_parte_da_zero():
-    # 3.1.0 = build 7: piu' alta dell'ultima della serie 3.0 (3.0.2 = build 6).
-    assert version.SERIES == "3.1"
-    assert version.name_of(7) == "3.1.0"
+def test_serie_32_parte_da_zero():
+    # 3.2.0 = build 10: piu' alta dell'ultima della serie 3.1 (3.1.0 ricostruita = 9),
+    # cosi' gli exe installati la vedono come aggiornamento.
+    assert version.SERIES == "3.2"
+    assert version.name_of(10) == "3.2.0"
+    assert R.build_of("3.2.0") == 10 and R.build_of("3.2.1") == 11
 
 
-def test_ricostruzione_tiene_il_nome():
-    # build 8 e 9 = 3.1.0 ricostruita: l'updater le vede (9 > 8 > 7) ma il nome non
-    # cambia, e la patch dopo diventa la build 10.
-    assert version.REBUILDS == (8, 9)
-    assert version.name_of(8) == version.name_of(9) == "3.1.0"
-    assert R.build_of("3.1.0") == 9
-    assert R.build_of("3.1.1") == 10 and version.name_of(10) == "3.1.1"
+def test_ricostruzione_tiene_il_nome(monkeypatch):
+    # Una build ricostruita (es. 11 = 3.2.0 ricostruita): l'updater la vede
+    # (11 > 10) ma il nome non cambia, e la patch dopo slitta di uno.
+    monkeypatch.setattr(version, "REBUILDS", (11,))
+    assert version.name_of(10) == version.name_of(11) == "3.2.0"
+    assert R.build_of("3.2.0") == 11
+    assert R.build_of("3.2.1") == 12 and version.name_of(12) == "3.2.1"
 
 
 def test_info_dalla_voce_in_cima(tmp_path):
