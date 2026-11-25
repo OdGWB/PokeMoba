@@ -26,6 +26,11 @@ except ImportError:
 # Direzioni di movement._shape_push (stessa espressione: stessi float).
 _SHAPE_DIRS = tuple((math.cos(i * math.pi / 8), math.sin(i * math.pi / 8))
                     for i in range(16))
+# cos/sin degli angoli di movement._STEER_ANGLES (stessa espressione).
+_STEER_CS = tuple((math.cos(math.radians(d)), math.sin(math.radians(d)))
+                  for d in (35, -35, 70, -70, 100, -100))
+# Estensione con GridView.advance e SpatialHash (build recente).
+_NATIVE_ADV = _native is not None and hasattr(_native, "SpatialHash")
 
 # Tipi di tile
 TILE_FLOOR = 0        # erba / giungla
@@ -216,8 +221,12 @@ class Grid:
         if self._shape_ver != self._ver:
             self._shape_sync()
         tiles = np.array(self.tiles, dtype=np.uint8).tobytes()
-        v = _native.GridView(self.width, self.height, tiles, self._shape_b,
-                             self._shape_any_b, _SHAPE_DIRS)
+        if _NATIVE_ADV:
+            v = _native.GridView(self.width, self.height, tiles, self._shape_b,
+                                 self._shape_any_b, _SHAPE_DIRS, _STEER_CS)
+        else:
+            v = _native.GridView(self.width, self.height, tiles, self._shape_b,
+                                 self._shape_any_b, _SHAPE_DIRS)
         object.__setattr__(self, "_nv", (self._ver, v))
         return v
 
@@ -260,6 +269,22 @@ class Grid:
             pad[1:-1, 1:-1] = ~blk
             cache = self._walk_cache = (key, pad.ravel().tolist(), self.width + 2)
         return cache[1], cache[2]
+
+    def native_walk(self, block_bush: bool = False):
+        """pokemoba_native.WalkGrid di walk_flags (None senza estensione). In
+        cache per versione della griglia."""
+        if _native is None or not hasattr(_native, "WalkGrid"):
+            return None
+        key = (self._ver, block_bush)
+        cache = getattr(self, "_nwalk_cache", None)
+        if cache is None:
+            cache = {}
+            object.__setattr__(self, "_nwalk_cache", cache)
+        v = cache.get(block_bush)
+        if v is None or v[0] != key:
+            walk, stride = self.walk_flags(block_bush)
+            v = cache[block_bush] = (key, _native.WalkGrid(bytes(walk), stride))
+        return v[1]
 
     @classmethod
     def from_rows(cls, rows: list[list[int]]) -> "Grid":

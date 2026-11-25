@@ -8,6 +8,7 @@ import math
 
 from .entities import Unit
 from .grid import TILE_BUSH, TILE_PILLAR, Grid
+from .grid import _native
 from .spatial import SpatialHash
 from .vec import Vec2, direction_index
 
@@ -79,6 +80,12 @@ def advance_unit(unit: Unit, dt: float, grid: Grid | None = None) -> None:
     l'unità ha `bush_blocks` (minion) e il prossimo passo entrerebbe in un
     cespuglio, il movimento si ferma al bordo invece di attraversarlo.
     """
+    if _STEP_NATIVE and grid is not None and grid._shape_on:
+        nv = grid.native_view()
+        # Tutto advance_unit in Rust (stessi calcoli); False = centro dentro un
+        # muro a terra: anti-incastro e ciclo qui sotto, in Python.
+        if nv is not None and hasattr(nv, "step_unit") and nv.step_unit(unit, dt, Vec2):
+            return
     block_bush = grid is not None and getattr(unit, "bush_blocks", False)
     # Anti-incastro: chi si ritrova col centro dentro un muro (scatto, spinta,
     # cambio di meteo) viene riportato sul tile calpestabile piu' vicino.
@@ -96,6 +103,21 @@ def advance_unit(unit: Unit, dt: float, grid: Grid | None = None) -> None:
         return
 
     airborne = getattr(unit, "air_z", 0.0) > 0.0
+
+    if grid is not None and grid._shape_on:
+        nv = grid.native_view()
+        if nv is not None and hasattr(nv, "advance"):   # stesso ciclo, in Rust
+            x, y, n, f = nv.advance(unit.pos.x, unit.pos.y, unit.path, unit.speed * dt,
+                                    bool(block_bush), airborne,
+                                    min(getattr(unit, "radius", 0.35), _WALL_R_MAX))
+            if n:
+                del unit.path[:n]
+            if f >= 0:
+                unit.facing = f
+            if x != unit.pos.x or y != unit.pos.y:
+                unit.pos = Vec2(x, y)
+            unit.moving = bool(unit.path)
+            return
 
     def _blocked(p) -> bool:
         return (grid is not None and not airborne
@@ -164,6 +186,7 @@ def advance_unit(unit: Unit, dt: float, grid: Grid | None = None) -> None:
 # Raggio massimo con cui il corpo di un'unita' tiene le distanze dai muri: sotto
 # 0.5 per poter passare nei varchi larghi un tile.
 _WALL_R_MAX = 0.42
+_STEP_NATIVE = True   # advance_unit via GridView.step_unit (se c'e')
 
 
 # Direzioni e frazioni del raggio con cui si campiona la sagoma disegnata dei
@@ -305,7 +328,11 @@ def resolve_collisions(units: list[Unit], grid: Grid, iterations: int = 2,
                 _move_out(b, dir_ * overlap, grid)
 
 
-def resolve_obstacles(units: list[Unit], obstacles: list, grid: Grid) -> None:
+_OBSTACLE_HITS = getattr(_native, "obstacle_hits", None)
+
+
+def resolve_obstacles(units: list[Unit], obstacles: list, grid: Grid,
+                      hits: list | None = None) -> None:
     """Spinge fuori le unità dai cerchi statici (x, y, raggio), es. le torri.
 
     La spinta è radiale, quindi chi cammina contro l'ostacolo scivola lungo il
@@ -314,6 +341,18 @@ def resolve_obstacles(units: list[Unit], obstacles: list, grid: Grid) -> None:
     del waypoint, così non resta incastrato. Un waypoint DENTRO l'ostacolo si
     considera raggiunto appena lo si tocca.
     """
+    if hits is not None:
+        # Indici gia' trovati dal chiamante (World.tick, insieme alle collisioni).
+        if not hits:
+            return
+        units = [units[i] for i in hits]
+    elif _OBSTACLE_HITS is not None and obstacles and type(units) is list:
+        # Rust trova le sole unita' che toccano un ostacolo (stessi calcoli): le
+        # altre non verrebbero toccate dal ciclo qui sotto.
+        hits = _OBSTACLE_HITS(units, obstacles)
+        if not hits:
+            return
+        units = [units[i] for i in hits]
     for u in units:
         if getattr(u, "air_z", 0.0) > 0.0:
             continue                    # in volo passa sopra la torre; atterrando viene spinto fuori

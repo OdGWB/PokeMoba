@@ -10,7 +10,7 @@ import math
 from collections import defaultdict
 
 
-class SpatialHash:
+class PySpatialHash:
     def __init__(self, cell_size: float = 2.0):
         self.cell_size = cell_size
         self._cells: dict[tuple[int, int], list] = defaultdict(list)
@@ -52,3 +52,14 @@ class SpatialHash:
                 if bucket:
                     out.extend(bucket)
         return out
+
+
+# Estensione Rust (stesse celle, stesso ordine d'uscita), se c'e'.
+SpatialHash = PySpatialHash
+try:
+    import os as _os
+    if not _os.environ.get("POKEMOBA_NO_NATIVE"):
+        import pokemoba_native as _native
+        SpatialHash = getattr(_native, "SpatialHash", PySpatialHash)
+except ImportError:
+    pass

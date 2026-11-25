@@ -88,6 +88,10 @@ class SmiteMixin:
 
     # --- aiutanti per l'IA dei bot ------------------------------------------
     def _under_enemy_tower(self, p, pos) -> bool:
+        nat = getattr(self, "_bot_nat", None)
+        if nat is not None:
+            return nat.under_tower(self.world.structures(), p.team, pos.x, pos.y,
+                                   self._bp(p).tower_margin)
         for e in self.world.structures():
             if e.kind == "tower" and e.alive and e.team != p.team \
                     and pos.dist(e.pos) <= e.attack_range + self._bp(p).tower_margin:
@@ -95,6 +99,9 @@ class SmiteMixin:
         return False
 
     def _count_champs(self, pos, r: float, team: int, exclude=None) -> int:
+        nat = getattr(self, "_bot_nat", None)
+        if nat is not None:
+            return nat.count_champs(self.world.pokemons(), pos.x, pos.y, r, team, exclude)
         n = 0
         for e in self.world.pokemons():
             if e is exclude or not e.alive or e.team != team:

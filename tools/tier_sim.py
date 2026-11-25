@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import operator
 import os
 import random
 import sys
@@ -22,6 +23,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+import numpy as np  # noqa: E402
 import config  # noqa: E402
 from engine.content import load_map, load_pokemon_def  # noqa: E402
 from engine import evolution  # noqa: E402
@@ -34,6 +36,7 @@ from engine.world import World  # noqa: E402
 from engine.entities import Structure, Unit  # noqa: E402
 from engine.grid import TILE_BUSH  # noqa: E402
 from engine.vision import BUSH_REVEAL, VisionSystem  # noqa: E402
+from engine.grid import _native  # noqa: E402
 
 LANES = ["top", "mid", "bot"]
 MAP_5V5 = "data/maps/map_5v5.json"
@@ -50,6 +53,7 @@ EEVEE_CHOICES = {"jolteon": {"Q": 0, "W": 0, "E": 0}, "flareon": {"Q": 0, "W": 0
 CC_FIELDS = (("stun_until", 1.0), ("root_until", 1.0), ("sleep_until", 1.0), ("fear_until", 1.0),
              ("charm_until", 1.0), ("airborne_until", 1.0), ("taunt_until", 0.7),
              ("confuse_until", 0.6), ("silence_until", 0.5), ("slow_until", 0.4))
+_cc_get = operator.attrgetter(*(f for f, _ in CC_FIELDS))
 FORCED = {}     # id Pokemon -> {slot: indice}: scelte forzate per i rami (vedi _force_choice)
 
 _orig_apply_choice = evolution.apply_choice
@@ -72,40 +76,87 @@ class FastVision(VisionSystem):
     """Stessa visione dei nemici di VisionSystem, ma senza costruire gli insiemi di
     tile (nessuno li usa nel motore): ~3x piu' veloce, risultato identico."""
 
+    # Modalita' allenamento: visione ricalcolata ogni `stride` chiamate per squadra
+    # (approssimata, i nemici visti restano quelli dell'ultimo calcolo). 1 = esatta.
+    stride = 1
+
     def update(self, world, team):
-        sources = self._sources(world, team)
-        sig = frozenset((e.id, int(e.pos.x), int(e.pos.y), int(getattr(e, "vision", 0)))
-                        for e in sources)
-        sig |= frozenset(("inv", e.id) for e in world.entities.values()
-                         if getattr(e, "invisible", False) and getattr(e, "team", team) != team)
-        sig |= frozenset(("agi", u.id, int(u.pos.x), int(u.pos.y))
-                         for u in world.entities.values()
-                         if getattr(u, "agitated", False) and getattr(u, "team", team) != team)
+        if self.stride > 1:
+            calls = self.__dict__.setdefault("_calls", {})
+            n = calls[team] = calls.get(team, -1) + 1
+            if n % self.stride and team in self.visible_enemies:
+                return False
+        if not self.reveals.get(team) and _native is not None and hasattr(_native, "VisionScan"):
+            return self._update_native(world, team)
+        scan = self.__dict__.get("_nscan")
+        if scan is not None:
+            scan.reset(team)              # il prossimo giro in Rust ricalcola
+        sources, keys, extra, foes = [], [], [], []
+        for e in world.entities.values():
+            if getattr(e, "team", team) == team:
+                if (getattr(e, "team", None) == team and getattr(e, "alive", False)
+                        and isinstance(e, (Unit, Structure))):
+                    v = getattr(e, "vision", 0)
+                    if v > 0:
+                        sources.append(e)
+                        keys.append((e.id, int(e.pos.x), int(e.pos.y), int(v)))
+                continue
+            if getattr(e, "invisible", False):
+                extra.append(("inv", e.id))
+            if getattr(e, "agitated", False):
+                extra.append(("agi", e.id, int(e.pos.x), int(e.pos.y)))
+            if isinstance(e, Unit) and e.alive:
+                foes.append(e)
+        sig = set(keys)
+        sig.update(extra)
         reveals = self.reveals.get(team) or ()
         if reveals:
-            sig |= frozenset(("ping", round(x, 1), round(y, 1), r) for x, y, r in reveals)
-            sig |= frozenset(("pos", u.id, int(u.pos.x), int(u.pos.y))
-                             for u in world.entities.values()
-                             if isinstance(u, Unit) and u.team != team and u.alive)
+            sig.update(("ping", round(x, 1), round(y, 1), r) for x, y, r in reveals)
+            sig.update(("pos", u.id, int(u.pos.x), int(u.pos.y)) for u in foes)
         if sig == self._sig.get(team):
             return False
         self._sig[team] = sig
         self.version[team] = self.version.get(team, 0) + 1
-        circles = [(int(e.pos.x), int(e.pos.y), int(getattr(e, "vision", 0)) ** 2)
-                   for e in sources]
+        if foes and keys:
+            ux = np.fromiter((int(u.pos.x) for u in foes), np.int64, len(foes))
+            uy = np.fromiter((int(u.pos.y) for u in foes), np.int64, len(foes))
+            k = np.array([kk[1:] for kk in keys], dtype=np.int64)
+            inside = (((ux[:, None] - k[None, :, 0]) ** 2 + (uy[:, None] - k[None, :, 1]) ** 2)
+                      <= (k[None, :, 2] ** 2)).any(axis=1).tolist()
+        else:
+            inside = [False] * len(foes)
+        tile_at = self.grid.tile_at
         enemies = set()
-        for u in world.entities.values():
-            if not isinstance(u, Unit) or u.team == team or not u.alive:
-                continue
-            if any((u.pos.x - x) ** 2 + (u.pos.y - y) ** 2 <= r * r for x, y, r in reveals):
+        for u, seen in zip(foes, inside):
+            if reveals and any((u.pos.x - x) ** 2 + (u.pos.y - y) ** 2 <= r * r
+                               for x, y, r in reveals):
                 enemies.add(u.id)
                 continue
-            tx, ty = int(u.pos.x), int(u.pos.y)
-            if not any((tx - cx) ** 2 + (ty - cy) ** 2 <= r2 for cx, cy, r2 in circles):
+            if not seen or getattr(u, "invisible", False):
                 continue
-            if getattr(u, "invisible", False):
-                continue
-            if self.grid.tile_at(tx, ty) == TILE_BUSH and not getattr(u, "agitated", False):
+            if tile_at(int(u.pos.x), int(u.pos.y)) == TILE_BUSH and not getattr(u, "agitated", False):
+                if not any(e.pos.dist(u.pos) <= BUSH_REVEAL for e in sources):
+                    continue
+            enemies.add(u.id)
+        self.visible_enemies[team] = enemies
+        return True
+
+    def _update_native(self, world, team):
+        """Come update senza reveals: scansione e cerchi in Rust, regola dei
+        cespugli qui (stesso risultato)."""
+        scan = self.__dict__.get("_nscan")
+        if scan is None:
+            scan = self._nscan = _native.VisionScan()
+        r = scan.scan(world.entities.values(), team, Unit, Structure)
+        if r is None:
+            return False
+        self._sig[team] = None            # un eventuale giro in Python ricalcola
+        self.version[team] = self.version.get(team, 0) + 1
+        sources, seen = r
+        tile_at = self.grid.tile_at
+        enemies = set()
+        for u in seen:
+            if tile_at(int(u.pos.x), int(u.pos.y)) == TILE_BUSH and not getattr(u, "agitated", False):
                 if not any(e.pos.dist(u.pos) <= BUSH_REVEAL for e in sources):
                     continue
             enemies.add(u.id)
@@ -174,7 +225,19 @@ def branch_plan(rng, name, is_jungler, is_support):
     return None
 
 
-OPTS = {"open_nexus": False, "max_time": MAX_TIME, "plan": False, "utility": None}   # impostato nei processi dal Pool (initializer)
+OPTS = {"open_nexus": False, "max_time": MAX_TIME, "plan": False, "utility": None,
+        "params": None,   # impostato nei processi dal Pool (initializer)
+        "early_stop": None,      # dict di EARLY_STOP (anche parziale) per fermare le partite decise
+        "vision_stride": 1,      # modalita' allenamento: visione ogni N tick (1 = esatta)
+        "minion_stride": 1}      # modalita' allenamento: IA dei minion ogni N tick (1 = esatta)
+
+# Stop anticipato: dopo `min_time`, ogni `every` secondi si misura il vantaggio
+#   A = (patrimonio_0 - patrimonio_1) / gold_unit + (torri_0 - torri_1) / tower_unit
+#       (+ `nexus` se il nucleo dell'avversario e' scoperto, - se lo e' il proprio)
+# (patrimonio = oro in tasca + prezzo pieno degli oggetti). Se |A| >= `threshold` per
+# `hold` controlli di fila la partita si chiude e vince chi e' avanti.
+EARLY_STOP = {"min_time": 420.0, "every": 10.0, "threshold": 2.0, "hold": 2,
+              "gold_unit": 4000.0, "tower_unit": 3.0, "nexus": 1.0}
 
 
 def _utility_teams(mode, seed):
@@ -188,7 +251,20 @@ def _utility_teams(mode, seed):
     return ()
 
 
-def _init_worker(open_nexus, max_time, plan=False, utility=None):
+def param_group(role, is_jg, is_sup):
+    """Gruppo dei parametri tarati (tools/cma_tune.py): jungler, support o il ruolo base."""
+    if is_jg:
+        return "jungler"
+    if is_sup:
+        return "support"
+    return "mago" if role == "mago mobile" else role
+
+
+def _init_worker(open_nexus, max_time, plan=False, utility=None, early_stop=None,
+                 vision_stride=1, minion_stride=1):
+    OPTS["early_stop"] = early_stop
+    OPTS["vision_stride"] = vision_stride
+    OPTS["minion_stride"] = minion_stride
     OPTS["utility"] = utility
     OPTS["open_nexus"] = open_nexus
     OPTS["max_time"] = max_time
@@ -206,6 +282,8 @@ def play(job):
     world = World(map_data.grid)
     match = Match(world, map_data)
     match.vision = FastVision(world.grid)
+    match.vision.stride = max(1, int(OPTS.get("vision_stride") or 1))
+    match.minion_ai_stride = max(1, int(OPTS.get("minion_stride") or 1))
     core_ev = [{}, {}]              # per nucleo: esposto / primo colpo / ultimo colpo (secondi)
     if OPTS["plan"]:
         # IA a piani (engine/bot_plan.py): shopping, assedio, aiuto alle torri, roam del
@@ -255,6 +333,13 @@ def play(job):
                 plans[p.id] = plan
             p.is_jungler = is_jg
             p.bot_support = bool(is_sup)
+            # Parametri per gruppo: OPTS["params"] = {squadra: {gruppo | "*": {campo: valore}}}
+            tp = (OPTS.get("params") or {}).get(team)
+            if tp:
+                ov = dict(tp.get("*", {}))
+                ov.update(tp.get(param_group(defs[idx].role, is_jg, is_sup), {}))
+                if ov:
+                    p.bot_params = match.bot_params[team].copy(**ov)
             others_n = [n for n in names if n != name]
             stat[p.id] = {"name": name, "team": team, "idx": idx, "lane": lane,
                           "kills": 0, "deaths": 0, "dmg": 0.0, "taken": 0.0, "camps": 0,
@@ -345,6 +430,7 @@ def play(job):
         return None
 
     seen = {}                       # (id, campo) -> ultima scadenza vista
+    last_raw = {}                   # id -> scadenze lette all'ultima scansione
 
     def scan_cc(hint=None):
         """Conta i secondi di CC appena inflitti: confronta le scadenze degli stati di
@@ -352,6 +438,16 @@ def play(job):
         lanciando) se e' un nemico, altrimenti a chi ha colpito per ultimo."""
         now = match.time
         for v in units:
+            # Uscita rapida: scadenze identiche all'ultima scansione -> nessun
+            # campo supera il massimo gia' visto (seen tiene il massimo).
+            try:
+                raw = _cc_get(v)
+            except AttributeError:
+                raw = None
+            if raw is not None:
+                if last_raw.get(v.id) == raw:
+                    continue
+                last_raw[v.id] = raw
             for f, w in CC_FIELDS:
                 cur = getattr(v, f, -1.0)
                 key = (v.id, f)
@@ -436,12 +532,41 @@ def play(job):
     match._give_heal = heal
     match._give_shield = shield
 
+    es = OPTS.get("early_stop")
+    es = dict(EARLY_STOP, **es) if es is not None else None
+    early = None                    # (vincitore, istante, vantaggio) se fermata prima
+    es_next = es["min_time"] if es else float("inf")
+    es_run = [0, 0]                 # controlli di fila con la squadra 0 / 1 avanti
+
+    def networth(t):
+        cat = match.item_catalog.items
+        return sum(float(p.gold) + sum(cat[i].price for i in p.items if i in cat)
+                   for p in units if p.team == t)
+
+    def advantage():
+        tw = [sum(1 for x in world.structures() if x.team == t and x.alive and x.kind == "tower")
+              for t in (0, 1)]
+        a = (networth(0) - networth(1)) / es["gold_unit"] + (tw[0] - tw[1]) / es["tower_unit"]
+        for t, sign in ((1, 1.0), (0, -1.0)):
+            if match._alive_towers(t) == 0:
+                a += sign * es["nexus"]
+        return a
+
     dt = config.TICK_DT
     tick = 0
     while match.winner is None and match.time < max_time:
         match.update(dt, tick)
         tick += 1
         scan_cc()
+        if match.time >= es_next and match.winner is None:
+            es_next += es["every"]
+            a = advantage()
+            lead = 0 if a >= es["threshold"] else 1 if a <= -es["threshold"] else None
+            for t in (0, 1):
+                es_run[t] = es_run[t] + 1 if lead == t else 0
+            if lead is not None and es_run[lead] >= es["hold"]:
+                early = (lead, round(match.time, 1), round(a, 2))
+                break
         if tick % 30 == 0:
             for p in units:
                 if p.level >= 8 and stat[p.id]["t8"] is None:
@@ -459,8 +584,10 @@ def play(job):
                 if p.level >= 7 and p.id in plans and p.stage < 2:
                     prepare_branch(p, plans[p.id])
 
-    timeout = match.winner is None
-    if timeout:
+    timeout = match.winner is None and early is None
+    if early is not None:
+        winner = early[0]
+    elif timeout:
         towers = [sum(1 for s in world.structures() if s.team == t and s.alive and
                       s.__class__.__name__ == "Structure") for t in (0, 1)]
         if towers[0] != towers[1]:
@@ -491,7 +618,11 @@ def play(job):
         if tr_:
             s["u_time"] = {k_: round(v_, 1) for k_, v_ in tr_["time"].items() if v_ > 0}
             s["u_switches"] = tr_["switches"]
-    return {"seed": seed, "winner": winner, "timeout": timeout, "open_nexus": OPTS["open_nexus"], "plan": OPTS["plan"], "utility_teams": list(u_teams),
+    return {"seed": seed, "winner": winner, "timeout": timeout,
+            "early_stop": None if early is None else {"time": early[1], "adv": early[2]},
+            "networth": [round(networth(t)) for t in (0, 1)],
+            "train": {"vision_stride": match.vision.stride, "minion_stride": match.minion_ai_stride},
+            "open_nexus": OPTS["open_nexus"], "plan": OPTS["plan"], "utility_teams": list(u_teams),
             "end": {"towers": [{ln: sum(1 for x in world.structures() if x.team == t and x.alive
                                         and x.kind == "tower" and x.lane == ln) for ln in LANES}
                                for t in (0, 1)],
@@ -552,6 +683,12 @@ def main():
                     help="IA a punteggio: per entrambe, solo la squadra 0/1, o alt = a turno per seme (A/B)")
     ap.add_argument("--max-minutes", type=float, default=MAX_TIME / 60.0,
                     help="minuti di gioco massimi per partita")
+    ap.add_argument("--early-stop", type=float, default=0.0, metavar="SOGLIA",
+                    help="ferma le partite gia' decise (vantaggio >= SOGLIA, vedi EARLY_STOP; 0 = spento)")
+    ap.add_argument("--vision-stride", type=int, default=1,
+                    help="allenamento: visione ricalcolata ogni N tick (approssimata)")
+    ap.add_argument("--minion-stride", type=int, default=1,
+                    help="allenamento: IA dei minion ogni N tick (approssimata)")
     ap.add_argument("--status", default=str(ROOT / "tools" / "tier_status.json"))
     ap.add_argument("--out", default=str(ROOT / "tools" / "tier_matches_5v5.jsonl"))
     a = ap.parse_args()
@@ -593,7 +730,9 @@ def main():
         return time.time() + est <= deadline
 
     with Pool(a.workers, initializer=_init_worker,
-              initargs=(a.open_nexus, a.max_minutes * 60.0, a.plan, a.utility)) as pool, out.open("a", encoding="utf-8") as f:
+              initargs=(a.open_nexus, a.max_minutes * 60.0, a.plan, a.utility,
+                        {"threshold": a.early_stop} if a.early_stop else None,
+                        a.vision_stride, a.minion_stride)) as pool, out.open("a", encoding="utf-8") as f:
         results = []
         last_beat = 0.0
         while True:
