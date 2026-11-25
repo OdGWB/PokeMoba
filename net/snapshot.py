@@ -140,7 +140,29 @@ def fx_visible(match, team: int, ev: dict) -> bool:
         if e is None:
             return False
         return getattr(e, "team", team) == team or vis.is_enemy_visible(team, eid)
-    pts = [ev[k] for k in ("a", "b", "c") if isinstance(ev.get(k), (tuple, list))]
-    if not pts:
+    pts = [ev[k] for k in FX_POINT_KEYS if isinstance(ev.get(k), (tuple, list))]
+    pts += [p for p in ev.get("pts") or () if isinstance(p, (tuple, list))]
+    pts = [p for p in pts if len(p) >= 2 and all(isinstance(x, (int, float)) for x in p[:2])]
+    if pts:
+        return any(vis.is_tile_visible(team, int(p[0]), int(p[1])) for p in pts)
+    # Niente posizione: si manda solo se e' globale per scelta di design, oppure se
+    # riguarda un'unita' che la squadra vede. Prima passava TUTTO (coni con "o",
+    # colpi con "src"/"hit"): un client modificato li leggeva nella nebbia.
+    if ev.get("kind") in FX_GLOBAL_KINDS:
         return True
-    return any(vis.is_tile_visible(team, int(p[0]), int(p[1])) for p in pts if len(p) >= 2)
+    for k in FX_ID_KEYS:
+        oid = ev.get(k)
+        if isinstance(oid, int) and not isinstance(oid, bool):
+            e = world.get(oid)
+            if e is not None and (getattr(e, "team", team) == team
+                                  or vis.is_enemy_visible(team, oid)):
+                return True
+    return False
+
+
+# Chiavi degli eventi FX che portano un punto (x, y) della mappa.
+FX_POINT_KEYS = ("a", "b", "c", "o")
+# Chiavi con l'id di un'unita' coinvolta (oltre a "eid", gestito sopra).
+FX_ID_KEYS = ("eid2", "src", "hit", "tgt", "who")
+# Eventi senza posizione che vedono tutti (Elettroraggio: tremolio "per tutti").
+FX_GLOBAL_KINDS = frozenset({"shake"})

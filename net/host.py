@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import collections
 import json
+import logging
 import queue
 import threading
 import time
@@ -42,6 +43,8 @@ from .client import ClientSession
 from .draft import DONE_TIME, Draft
 from .signaling import ANSWER, OFFER, ManualSignaling, SignalingError, SignalMessage, new_session_id
 from .transport import CLOSED, CONNECTED, FAILED, LoopbackTransport
+
+log = logging.getLogger("pokemoba.host")
 
 ROOT = Path(__file__).resolve().parent.parent
 MAX_SLOTS = 10                 # 5v5
@@ -210,25 +213,46 @@ class HostSession:
         try:
             while self._running:
                 now = time.monotonic()
-                self._process_cmds(now)
-                if not self._running:
-                    break
-                self._poll_futures()
-                for s in self.slots:
-                    if s.transport is None:
-                        continue
-                    for ch, data in s.transport.recv():
-                        try:
-                            self._on_message(s, ch, data, now)
-                        except (P.ProtocolError, ValueError, KeyError, IndexError):
-                            self._strike(s)
-                self._check_links(now)
-                self._advance(now)
-                self._publish()
+                try:
+                    self._process_cmds(now)
+                    if not self._running:
+                        break
+                    self._poll_futures()
+                    for s in self.slots:
+                        if s.transport is None:
+                            continue
+                        for ch, data in s.transport.recv():
+                            try:
+                                self._on_message(s, ch, data, now)
+                            except (P.ProtocolError, ValueError, KeyError, IndexError):
+                                self._strike(s)
+                            except Exception:
+                                # Un pacchetto che fa saltare un bug del motore non deve
+                                # far cadere la partita di tutti: conta come violazione.
+                                self._log_error("messaggio dello slot %d" % s.index)
+                                self._strike(s)
+                    self._check_links(now)
+                    self._advance(now)
+                    self._publish()
+                except Exception:
+                    # Errore nella simulazione o nell'invio: si registra e si va avanti
+                    # (prima chiudeva il thread dell'host e tutti venivano disconnessi).
+                    self._log_error("ciclo dell'host")
+                    if self.phase == "match":
+                        self._next_tick = time.monotonic() + config.TICK_DT
                 wake = self._next_tick if self.phase == "match" else now + 0.01
                 time.sleep(min(0.01, max(0.001, wake - time.monotonic())))
         finally:
             self._close_all()
+
+    def _log_error(self, where):
+        """Traccia nel log, al massimo una volta al secondo per non riempire il disco
+        se lo stesso errore si ripete a ogni tick."""
+        now = time.monotonic()
+        self.errors_total = getattr(self, "errors_total", 0) + 1
+        if now - getattr(self, "_last_error_log", -10.0) >= 1.0:
+            self._last_error_log = now
+            log.exception("errore nell'host (%s), totale %d", where, self.errors_total)
 
     def _advance(self, now):
         if self.phase == "draft":
@@ -489,6 +513,12 @@ class HostSession:
             if s.joined:
                 self._on_input(s, data)
             return
+        if not s.guard.reliable.take():
+            self._strike(s)                      # flood sul canale reliable
+            return
+        is_lock = t == P.R_PICK and len(data) > 2 and data[2] & 1   # scelta definitiva
+        if t in (P.R_CHOICE, P.R_PICK) and not is_lock and not s.guard.lobby.take():
+            return                               # troppe scelte/anteprime: scartate
         if t == P.R_HELLO:
             self._on_hello(s, P.dec_hello(data))
         elif not s.joined:

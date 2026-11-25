@@ -10,12 +10,17 @@ import socket
 import time
 
 import config
+from net.validation import allowed_map
 from . import protocol as P
 from .snapshot import decode_snapshot
 
 
 class GameClient:
     def __init__(self, server_ip, port=config.DEFAULT_PORT):
+        try:     # IP numerico: e' quello che recvfrom restituisce come mittente
+            server_ip = socket.gethostbyname(server_ip)
+        except OSError:
+            pass
         self.server = (server_ip, port)
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.setblocking(False)
@@ -67,9 +72,11 @@ class GameClient:
             self._send(P.enc_ping())
         while True:
             try:
-                data, _addr = self.sock.recvfrom(8192)
+                data, addr = self.sock.recvfrom(8192)
             except (BlockingIOError, OSError):
                 break
+            if addr[:2] != self.server:
+                continue  # non dal server: UDP si falsifica facilmente, si scarta
             try:
                 self._handle(data, now)
             except Exception:
@@ -84,7 +91,10 @@ class GameClient:
             self.lobby = d["players"]
             self.lobby_map = d["map_index"]
         elif t == P.S_START:
-            self.start_info = P.dec_start(data)
+            info = P.dec_start(data)
+            if allowed_map(info["map"]) is None:
+                return    # mappa non tra quelle note (vedi net/validation.allowed_map)
+            self.start_info = info
             self.winner = None
         elif t == P.S_SNAPSHOT:
             snap = decode_snapshot(data)

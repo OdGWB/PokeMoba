@@ -43,6 +43,9 @@ COMMANDS = (20.0, 12.0)          # comandi NUOVI/s (click, mosse)
 ACTIONS = (10.0, 10.0)           # acquisti, gradi, scelte
 CHAT = (2.0, 5.0)
 TEAM = (3.0, 8.0)                # ping e chat rapida (oltre: scartati in silenzio)
+RELIABLE = (60.0, 60.0)          # TUTTI i messaggi del canale reliable (ping 1/s, il resto a click)
+LOBBY = (15.0, 15.0)             # scelte di lobby e anteprime del draft: ognuna fa un broadcast
+                                 # a tutti, quindi un flood si moltiplicherebbe per 9
 KICK_STRIKES = 200               # violazioni prima dell'espulsione
 
 
@@ -55,6 +58,8 @@ class ClientGuard:
         self.actions = TokenBucket(*ACTIONS)
         self.chat = TokenBucket(*CHAT)
         self.team = TokenBucket(*TEAM)
+        self.reliable = TokenBucket(*RELIABLE)
+        self.lobby = TokenBucket(*LOBBY)
         self.strikes = 0
         self.rejected = 0
 
@@ -88,6 +93,22 @@ def valid_avatar(dex) -> int:
     """Immagine profilo = numero di Pokédex; fuori intervallo diventa 0 (nessuna).
     Se il ritratto non c'è in assets/avatars il gioco mostra un riquadro vuoto."""
     return dex if isinstance(dex, int) and 0 <= dex <= 1025 else 0
+
+
+def allowed_map(path) -> str | None:
+    """Percorso della mappa mandato dall'host, solo se e' una delle mappe di
+    config.MAPS. Mai unire alla cartella del gioco un percorso arbitrario: su
+    Windows "//pc/condivisa/x.json" diventa un percorso UNC e il gioco si
+    collegherebbe a un server SMB altrui (furto dell'hash NTLM); anche "C:/..."
+    e "../" uscirebbero dalla cartella."""
+    import config
+    allowed = {p for _name, p in config.MAPS} | {config.DEFAULT_MAP}
+    return path if isinstance(path, str) and path in allowed else None
+
+
+def valid_roster_index(i) -> bool:
+    import config
+    return isinstance(i, int) and 0 <= i < len(config.ROSTER)
 
 
 def clean_text(text: str, limit: int = 120) -> str:

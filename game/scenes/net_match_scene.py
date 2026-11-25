@@ -18,6 +18,7 @@ from engine.items import ItemCatalog
 from engine.jungle import CODE_WEATHER, WEATHER_NAMES, apply_weather, ring_tiles
 from engine.vec import Vec2
 from engine.vision import VisionSystem
+from net.validation import allowed_map, valid_roster_index
 
 from .. import hud, mag_fx, scy_fx
 from ..camera import Camera
@@ -54,10 +55,16 @@ class NetMatchScene:
             if p["client_id"] == client.client_id:
                 self.team = p["team"]
                 self.pokemon_index = p["pokemon"]
+        if not valid_roster_index(self.pokemon_index):
+            raise ValueError(f"Pokémon non ammesso: {self.pokemon_index!r}")
         self.pdef = load_pokemon_def(str(ROOT / config.ROSTER[self.pokemon_index]))
         self.disp_moveset = moves_mod.build_moveset(self.pdef.moves)
 
-        self.map_data = load_map(str(ROOT / start_info.get("map", config.DEFAULT_MAP)))
+        # Il percorso arriva dalla rete (host online o server LAN): solo mappe note.
+        map_path = allowed_map(start_info.get("map", config.DEFAULT_MAP))
+        if map_path is None:
+            raise ValueError(f"mappa non ammessa: {start_info.get('map')!r}")
+        self.map_data = load_map(str(ROOT / map_path))
         self.world = NetWorld(self.map_data.grid)
         self.vision = VisionSystem(self.map_data.grid)
         self.minimap = Minimap(self.map_data.grid, self.map_data)

@@ -16,10 +16,21 @@ quel limite: il tag si legge dall'indirizzo finale del redirect. Esito ed errori
 finiscono in %APPDATA%/PokeMoba/updater.log.
 
 POKEMOBA_NO_UPDATE=1 disattiva tutto; POKEMOBA_UPDATE_URL sostituisce l'indirizzo
-dell'API (solo per provare l'aggiornamento con un server locale).
+dell'API (solo per provare l'aggiornamento con un server locale: vale SOLO se punta
+a localhost/127.0.0.1, altrimenti chiunque possa impostare una variabile d'ambiente
+farebbe installare un exe qualunque).
+
+SICUREZZA DEL FILE SCARICATO (l'exe nuovo viene eseguito: e' il punto piu' delicato)
+- l'indirizzo di download deve essere una Release di version.REPO su github.com;
+- se GitHub pubblica l'impronta sha256 dell'allegato ("digest"), deve coincidere;
+- se version.UPDATE_PUBKEY e' impostata, l'allegato "PokeMoba.exe.sig" (firma
+  Ed25519 dello sha256 dell'exe, tools/release_sign.py) e' OBBLIGATORIO e deve
+  essere valido: chi ruba l'account GitHub o il token delle Release non ha la
+  chiave privata, quindi non puo' far installare un exe suo.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -37,6 +48,45 @@ API = "https://api.github.com/repos/{repo}/releases/latest"
 LATEST_PAGE = "https://github.com/{repo}/releases/latest"
 DOWNLOAD = "https://github.com/{repo}/releases/download/{tag}/{asset}"
 TIMEOUT = 15
+SIG_SUFFIX = ".sig"
+MAX_SIG = 1024
+_LOCAL_HOSTS = ("http://127.0.0.1", "http://localhost", "https://127.0.0.1",
+                "https://localhost")
+
+
+def _is_local(url: str) -> bool:
+    return isinstance(url, str) and any(
+        url == h or url.startswith(h + ":") or url.startswith(h + "/") for h in _LOCAL_HOSTS)
+
+
+def _local_override() -> str | None:
+    """POKEMOBA_UPDATE_URL, ma solo se punta a questo PC (prove dell'updater)."""
+    url = os.environ.get("POKEMOBA_UPDATE_URL")
+    if not url:
+        return None
+    if _is_local(url):
+        return url
+    _log(f"POKEMOBA_UPDATE_URL ignorata (non e' localhost): {url!r}")
+    return None
+
+
+def download_allowed(url: str, local: bool = False) -> bool:
+    """Solo allegati delle Release del repo ufficiale (o localhost in prova)."""
+    if not isinstance(url, str):
+        return False
+    if local and _is_local(url):
+        return True
+    return url.startswith(f"https://github.com/{version.REPO}/releases/download/")
+
+
+def verify_signature(digest: bytes, sig: bytes, pubkey_hex: str) -> bool:
+    """Firma Ed25519 dello sha256 dell'exe. False per qualunque problema."""
+    try:
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+        Ed25519PublicKey.from_public_bytes(bytes.fromhex(pubkey_hex)).verify(sig, digest)
+        return True
+    except Exception:
+        return False
 
 
 def tag_build(tag: str) -> int:
@@ -106,6 +156,7 @@ class Updater:
         self.notes = ""
         self._new_file: Path | None = None
         self._applied = False
+        self._local: str | None = None
 
     # ---------------------------------------------------------------- avvio
     def start(self) -> None:
@@ -134,7 +185,11 @@ class Updater:
                 self.state = "none"
                 _log("nessuna release trovata")
                 return
-            build, dl_url, total, notes = found
+            build, dl_url, total, notes, want_sha, sig_url = found
+            local = self._local is not None
+            if not download_allowed(dl_url, local) or (
+                    sig_url and not download_allowed(sig_url, local)):
+                raise OSError(f"indirizzo di download non ammesso: {dl_url!r}")
             if build <= version.BUILD:
                 self.state = "none"
                 _log(f"gia' aggiornato (ultima v{build})")
@@ -147,6 +202,7 @@ class Updater:
             dst = exe.with_name(exe.name + ".new")
             tmp = exe.with_name(exe.name + ".part")
             got = 0
+            h = hashlib.sha256()
             with self._get(dl_url, "application/octet-stream") as r, open(tmp, "wb") as f:
                 if not total:
                     total = int(r.headers.get("Content-Length") or 0)
@@ -155,11 +211,13 @@ class Updater:
                     if not chunk:
                         break
                     f.write(chunk)
+                    h.update(chunk)
                     got += len(chunk)
                     if total:
                         self.progress = min(1.0, got / total)
             if total and got != total:
                 raise OSError(f"download incompleto ({got}/{total} byte)")
+            self._check_file(h.digest(), want_sha, sig_url, tmp)
             os.replace(tmp, dst)
             self._new_file = dst
             self.progress = 1.0
@@ -170,19 +228,45 @@ class Updater:
             self.state = "error"
             _log("errore: " + traceback.format_exc().strip().replace("\n", " | "))
 
+    def _check_file(self, digest, want_sha, sig_url, tmp) -> None:
+        """Impronta e firma dell'exe scaricato; se qualcosa non torna lo cancella."""
+        try:
+            if want_sha and digest.hex() != want_sha.lower():
+                raise OSError("impronta sha256 diversa da quella pubblicata da GitHub")
+            key = getattr(version, "UPDATE_PUBKEY", "")
+            if key:
+                if not sig_url:
+                    raise OSError("Release senza firma (PokeMoba.exe.sig)")
+                with self._get(sig_url, "application/octet-stream") as r:
+                    sig = r.read(MAX_SIG + 1)
+                if len(sig) > MAX_SIG or not verify_signature(digest, sig, key):
+                    raise OSError("firma dell'aggiornamento NON valida: non lo installo")
+        except Exception:
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+            raise
+
     def _latest(self):
-        """(build, url dell'exe, dimensione o 0, note) dell'ultima Release, o None."""
-        override = os.environ.get("POKEMOBA_UPDATE_URL")
+        """(build, url dell'exe, dimensione o 0, note, sha256 o "", url della firma o "")
+        dell'ultima Release, o None."""
+        override = self._local = _local_override()
+        sig_name = version.ASSET + SIG_SUFFIX
         try:
             url = override or API.format(repo=version.REPO)
             with self._get(url, "application/vnd.github+json") as r:
                 data = json.loads(r.read().decode("utf-8"))
-            asset = next((a for a in data.get("assets", [])
-                          if a.get("name") == version.ASSET), None)
+            assets = {a.get("name"): a for a in data.get("assets", [])}
+            asset = assets.get(version.ASSET)
             if asset is None:
                 return None
+            dig = str(asset.get("digest") or "")
+            sig = assets.get(sig_name)
             return (tag_build(data.get("tag_name", "")), asset["browser_download_url"],
-                    int(asset.get("size") or 0), (data.get("body") or "").strip())
+                    int(asset.get("size") or 0), (data.get("body") or "").strip(),
+                    dig[7:] if dig.startswith("sha256:") else "",
+                    sig["browser_download_url"] if sig else "")
         except Exception as e:
             if override:
                 raise
@@ -194,7 +278,8 @@ class Updater:
         if "/tag/" not in final or not tag_build(tag):
             return None
         return (tag_build(tag), DOWNLOAD.format(repo=version.REPO, tag=tag,
-                                                 asset=version.ASSET), 0, "")
+                                                 asset=version.ASSET), 0, "", "",
+                DOWNLOAD.format(repo=version.REPO, tag=tag, asset=sig_name))
 
     # ---------------------------------------------------------------- applica
     def apply(self, relaunch: bool) -> bool:

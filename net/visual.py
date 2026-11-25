@@ -140,7 +140,11 @@ def capture_visual(match, team: int, player=None) -> dict:
         out["bear_leaps"] = leaps
     pillars = [{"pos": pl.pos, "tx": pl.tx, "ty": pl.ty, "team": pl.team, "born": pl.born,
                 "until": pl.until, "radius": pl.radius}
-               for pl in getattr(world, "pillars", ())]
+               for pl in getattr(world, "pillars", ())
+               # Nemici solo se il tile e' in vista: altrimenti un client modificato
+               # vedrebbe nella nebbia dove l'avversario ha appena lanciato la mossa.
+               # Al client servono solo per disegnarli (la collisione e' dell'host).
+               if seen(pl.pos, pl.team)]
     if pillars:
         out["pillars"] = pillars
     spirits = [{"pos": sp.pos, "owner_id": sp.owner_id, "team": sp.team, "born": sp.born,
