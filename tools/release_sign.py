@@ -2,8 +2,10 @@
 
     python tools/release_sign.py setup
         Il modo consigliato, una volta sola: crea la coppia di chiavi, manda la
-        PRIVATA direttamente nel secret UPDATE_SIGNING_KEY del repo (con il comando
-        gh, gia' collegato) senza mai stamparla ne' salvarla su disco, e scrive la
+        PRIVATA direttamente nel secret UPDATE_SIGNING_KEY dell'environment "release"
+        del repo (con il comando gh, gia' collegato; l'environment va creato prima e
+        limitato al branch main, cosi' solo i workflow di main leggono la chiave)
+        senza mai stamparla ne' salvarla su disco, e scrive la
         PUBBLICA in game/version.py -> UPDATE_PUBKEY. Nessuno deve custodire chiavi:
         da li' in poi firma release.yml. Se il secret andasse perso, gli exe
         installati non accetterebbero piu' aggiornamenti e andrebbero reinstallati a
@@ -38,6 +40,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+ENVIRONMENT = "release"      # environment di GitHub (solo main) con il secret della firma
 sys.path.insert(0, str(ROOT))
 
 
@@ -79,7 +82,8 @@ def setup(force: bool = False) -> None:
     pub = k.public_key().public_bytes(serialization.Encoding.Raw,
                                       serialization.PublicFormat.Raw).hex()
     # La privata passa a gh solo dallo stdin: mai sullo schermo, su disco o negli argomenti.
-    r = subprocess.run([gh, "secret", "set", "UPDATE_SIGNING_KEY"], input=priv,
+    r = subprocess.run([gh, "secret", "set", "UPDATE_SIGNING_KEY", "--env", ENVIRONMENT],
+                       input=priv,
                        text=True, cwd=ROOT, capture_output=True)
     del priv, k
     if r.returncode:
@@ -90,8 +94,8 @@ def setup(force: bool = False) -> None:
     if n != 1:
         sys.exit(f"UPDATE_PUBKEY non trovata in game/version.py; mettila a mano: {pub}")
     vfile.write_text(s, encoding="utf-8")
-    print("Secret UPDATE_SIGNING_KEY impostato su GitHub (la chiave privata non e' "
-          "stata mostrata ne' salvata).")
+    print(f"Secret UPDATE_SIGNING_KEY impostato nell'environment {ENVIRONMENT!r} "
+          "(la chiave privata non e' stata mostrata ne' salvata).")
     print(f"UPDATE_PUBKEY scritta in game/version.py: {pub}")
     print("Ora committa game/version.py: le Release successive saranno firmate.")
 

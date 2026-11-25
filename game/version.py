@@ -28,7 +28,7 @@ ASSET = "PokeMoba.exe"       # nome del file allegato a ogni Release
 #   python tools/release_sign.py keygen
 # (la privata va nel secret UPDATE_SIGNING_KEY del repo). ATTENZIONE: gli exe
 # pubblicati con la chiave impostata rifiutano le Release non firmate.
-UPDATE_PUBKEY = "de1c869daa53a7bbe2093631a714de8aa1609f61151f5c6af294a34eac6af95c"
+UPDATE_PUBKEY = "db61360c46f3c55824e68701c6680c293ebde6ae6473518a327e9f40c8844c92"
 SERIES = "3.1"
 SERIES_BASE = 7              # build 7 = 3.1.0 (serie 3.0: build 4 = 3.0.1, build 6 = 3.0.2)
 REBUILDS = (8, 9)            # build 8 e 9 = 3.1.0 ricostruita (sfondo del menu; filtro per ruolo)
