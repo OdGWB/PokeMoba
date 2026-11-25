@@ -22,6 +22,7 @@ import time
 import config
 
 from . import protocol as P
+from . import validation as V
 from .stats import ClockSync, LossMeter, Rate
 from .transport import CLOSED, CONNECTED, FAILED
 
@@ -151,6 +152,11 @@ class ClientSession:
                 self.phase = DRAFT
         elif t == P.R_START:
             info = P.dec_start(data)
+            if V.allowed_map(info["map"]) is None or not all(
+                    V.valid_roster_index(p["pokemon"]) for p in info["players"]):
+                self._lose("L'host ha mandato una partita non valida (mappa o Pokémon "
+                           "sconosciuti): versione diversa o host modificato.")
+                return
             for p in info["players"]:
                 p["client_id"] = p["slot"]
             self.start_info = info

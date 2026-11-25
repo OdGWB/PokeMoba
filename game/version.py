@@ -23,6 +23,12 @@ main (la Release parte anche per le modifiche a questo file).
 BUILD = 0
 REPO = "OWNER/REPO"          # "utente/nome-repo" su github.com
 ASSET = "PokeMoba.exe"       # nome del file allegato a ogni Release
+# Chiave PUBBLICA Ed25519 (64 cifre esadecimali) con cui l'updater verifica la firma
+# dell'exe nuovo (game/updater.py). Vuota = firma non richiesta. Si genera con
+#   python tools/release_sign.py keygen
+# (la privata va nel secret UPDATE_SIGNING_KEY del repo). ATTENZIONE: gli exe
+# pubblicati con la chiave impostata rifiutano le Release non firmate.
+UPDATE_PUBKEY = ""
 SERIES = "3.1"
 SERIES_BASE = 7              # build 7 = 3.1.0 (serie 3.0: build 4 = 3.0.1, build 6 = 3.0.2)
 REBUILDS = (8, 9)            # build 8 e 9 = 3.1.0 ricostruita (sfondo del menu; filtro per ruolo)

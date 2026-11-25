@@ -32,9 +32,9 @@ jobs:
       tag: ${{ steps.info.outputs.tag }}
       new: ${{ steps.tag.outputs.new }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.13"
 
@@ -62,9 +62,9 @@ jobs:
       PYTHONUTF8: "1"
       BUILD: ${{ needs.check.outputs.build }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.13"
           cache: pip
@@ -122,8 +122,31 @@ jobs:
           & $iscc "/DAppVersion=$env:VERSION_NAME" installer\PokeMoba.iss
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
 
+      # Firma Ed25519 dell'exe (tools/release_sign.py): gli exe con UPDATE_PUBKEY in
+      # game/version.py installano un aggiornamento SOLO se la firma e' valida. Se la
+      # chiave pubblica c'e' ma il secret manca, si ferma tutto: una Release non
+      # firmata verrebbe rifiutata da tutti gli exe installati.
+      - name: Firma dell'exe
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        shell: python
+        run: |
+          import os, subprocess, sys
+          sys.path.insert(0, ".")
+          from game import version
+          if os.environ.get("UPDATE_SIGNING_KEY"):
+              subprocess.run([sys.executable, "tools/release_sign.py", "sign",
+                              "dist/PokeMoba.exe"], check=True)
+              if version.UPDATE_PUBKEY:
+                  subprocess.run([sys.executable, "tools/release_sign.py", "verify",
+                                  "dist/PokeMoba.exe"], check=True)
+          elif version.UPDATE_PUBKEY:
+              sys.exit("UPDATE_PUBKEY impostata ma manca il secret UPDATE_SIGNING_KEY")
+          else:
+              print("Firma non configurata (UPDATE_PUBKEY vuota): Release non firmata.")
+
       - name: Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: ${{ needs.check.outputs.tag }}
           name: PokéMoba ${{ env.VERSION_NAME }}
@@ -132,4 +155,5 @@ jobs:
           files: |
             dist/PokeMoba-Setup.exe
             dist/PokeMoba.exe
+            dist/PokeMoba.exe.sig
           make_latest: true
