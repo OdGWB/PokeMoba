@@ -53,10 +53,7 @@ class BotPlanMixin:
         cat = self.item_catalog
 
         def can_buy(iid):
-            it = cat.get(iid)
-            if it is None or not cat.group_ok(iid, p.items):
-                return False
-            if it.group == "exp_share" and self._team_has_item(p.team, iid):
+            if cat.get(iid) is None or not self._item_buy_ok(p, iid):
                 return False
             slots_after = len(p.items) - len(cat.components_in(iid, p.items)) + 1
             return p.gold >= cat.effective_price(iid, p.items) and slots_after <= ITEM_SLOTS
@@ -77,8 +74,7 @@ class BotPlanMixin:
             it = cat.get(target)
             if it is None or target in p.items:
                 continue
-            if not cat.group_ok(target, p.items) or (
-                    it.group == "exp_share" and self._team_has_item(p.team, target)):
+            if not self._item_buy_ok(p, target):
                 continue
             return pick(target)
         return None

@@ -18,7 +18,7 @@ import config
 from engine.entities import Core, Pillar, Pokemon, Structure, Unit
 from engine.grid import (TILE_BUSH, TILE_FLOOR, TILE_JUNGLE_WALL, TILE_LANE,
                          TILE_PUDDLE, TILE_RIVER, TILE_WALL)
-from . import char_fx, spirit_fx
+from . import char_fx, deli_fx, spirit_fx
 from . import (arch_fx, recall_fx, eevee_fx, hatt_fx, mag_fx, mien_fx, noivern_fx,
                flor_fx, incin_fx, moth_fx, octi_fx, scy_fx, swine_fx,
                sneasel_fx, ursa_fx)
@@ -608,7 +608,7 @@ class Renderer:
 
     # --- percorso di debug ---------------------------------------------------
     def draw_aim(self, surface, camera, origin, mouse_tile, move, hold=0.0, rain=False,
-                 ammo="Water"):
+                 ammo="Water", queue=None):
         """Indicatore di mira mentre si tiene premuto il tasto mossa.
 
         Mostra la gittata e l'area reale di colpo (linea/cono/cerchio/scatto).
@@ -657,6 +657,8 @@ class Renderer:
             return   # linea Scyther
         if incin_fx.draw_aim(surface, S, ts, ox, oy, nx, ny, dist, move):
             return   # linea Litten
+        if deli_fx.draw_aim(surface, S, ts, ox, oy, nx, ny, dist, move, queue):
+            return   # linea Delibird (pacco pronto in punta alla corsia)
         if shape == "rockwave":   # Rocciotomba: corsia dell'onda + pilastro in fondo
             ex, ey = ox + nx * rng, oy + ny * rng
             pygame.draw.line(surface, col, S(ox, oy), S(ex, ey), max(2, int(move.radius * ts)))

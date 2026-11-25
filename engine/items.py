@@ -15,8 +15,10 @@ from pathlib import Path
 ITEM_SLOTS = 6   # tetto di oggetti per Pokémon
 
 # Gruppi a possesso limitato: al massimo un oggetto del gruppo per Pokémon
-# (exp_share: al massimo uno per SQUADRA, controllato dal Match).
-LIMITED_GROUPS = ("choice", "boots", "exp_share")
+# (starter = Baccarancia/Mielino/Condividi Esp.; il Condividi Esp. resta anche
+# uno per SQUADRA, controllato dal Match).
+LIMITED_GROUPS = ("choice", "boots", "starter", "everstone")
+TEAM_UNIQUE = ("exp_share",)   # al massimo uno per squadra
 
 
 @dataclass
@@ -34,6 +36,8 @@ class ItemDef:
     icon: str = ""
     active: bool = False
     evo: str = ""        # oggetto evolutivo: forma che dà a Scyther (Scizor/Kleavor)
+    max_count: int = 0   # copie massime dello stesso oggetto (0 = senza limite)
+    consumable: bool = False   # si consuma (Baccacedro, Baccaprugna, Etere)
 
 
 class ItemCatalog:
@@ -60,7 +64,9 @@ class ItemCatalog:
                                          category=d.get("category", key),
                                          group=d.get("group", ""), icon=d.get("icon", ""),
                                          active=bool(d.get("active", False)),
-                                         evo=d.get("evo", ""))
+                                         evo=d.get("evo", ""),
+                                         max_count=int(d.get("max_count", 0)),
+                                         consumable=bool(d.get("consumable", False)))
                 lists[key].append(d["id"])
         cats = [tuple(c) for c in data.get("categories", [])]
         return cls(items, lists["base"], lists["completed"],
@@ -117,6 +123,11 @@ class ItemCatalog:
         for c in self.components_in(item_id, owned_ids):
             left.remove(c)
         return not any(self.items[o].group == it.group for o in left if o in self.items)
+
+    def count_ok(self, item_id, owned_ids) -> bool:
+        """Copie massime dello stesso oggetto (consumabili: 2)."""
+        it = self.items.get(item_id)
+        return it is None or it.max_count <= 0 or list(owned_ids).count(item_id) < it.max_count
 
     def total_bonus(self, owned_ids, skip=()) -> dict:
         """Somma dei bonus statistici degli oggetti posseduti (tranne `skip`)."""

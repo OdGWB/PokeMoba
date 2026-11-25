@@ -13,13 +13,19 @@ Hook chiamati dal Match:
   _item_aa_windup / _item_aa_mult / _item_dodge / _item_after_aa   attacchi base
   _item_on_damaged       ogni danno inflitto (Focalnastro, Cartelrossa, Pulsantefuga)
   _update_items          ogni tick, dopo _update_status (rigen, Bicicletta, Palla Fumo)
-  use_item               oggetti attivabili (Mentalerba, Palla Fumo)
+  use_item               oggetti attivabili (Mentalerba, Palla Fumo, Bici Cross,
+                         Scudo Rovinato, Etere)
+  _item_buy_ok           regole d'acquisto (gruppi, copie, Pietrastante)
+  _item_dmg_mult         ogni danno (Mielino, Occhialineri, Elettropalla)
+  _item_on_takedown      uccisioni e assist (Occhialineri, Monetamuleto)
+  _item_on_ult           lancio dell'ultimate (Rocciaumida, Rocciacalda)
+  _item_on_wild_kill     neutrale sconfitto (Mielino)
 """
 from __future__ import annotations
 
 import random
 
-from .entities import Pokemon, Structure, Wild
+from .entities import Minion, Pokemon, Structure, Wild
 from .moves import Move
 from .vec import Vec2
 
@@ -99,9 +105,61 @@ FLUTE_SPEED = 1.2          # ...+20% velocità per 2s e via sonno/confusione/par
 FLUTE_DUR = 2.0
 FLUTE_CD = 90.0
 
+# --- aggiornamento 3.1 (nuovi oggetti) ---
+EVIOLITE_MULT = 1.25       # Evolcondensa: +25% Difesa e Dif. Sp. finche' non e' completamente evoluto
+EVERSTONE_XP = 1.5         # Pietrastante: +50% esperienza...
+EVERSTONE_XP_LEVEL = 15    # ...fino al livello 15
+ORAN_REGEN = 0.003         # Baccarancia: 0,3% HP max/s
+HONEY_WILD = 1.30          # Mielino: +30% danno ai neutrali...
+HONEY_HEAL = 0.06          # ...ogni neutrale sconfitto cura il 6% HP max...
+HONEY_UNTIL = 15 * 60.0    # ...fino al minuto 15 (poi solo +100 HP)
+ACRO_SLOW = 0.7            # Bici Cross: rallentamenti subiti -30%...
+ACRO_JUMP = 3.0            # ...salto di 3 tile (attivabile)
+ACRO_CD = 40.0
+SITRUS_FRAC = 0.30         # Baccacedro: sotto il 30% HP...
+SITRUS_HEAL = 0.20         # ...cura il 20% HP max
+ETHER_CUT = 4.0            # Etere: -4 s alle ricariche (non l'ultimate)
+GLASSES_LOW = 0.40         # Occhialineri: +20% sui Pokemon sotto il 40% HP...
+GLASSES_MULT = 1.20
+GLASSES_SPEED = 1.15       # ...+15% velocita' per 3 s dopo uccisione/assist
+GLASSES_DUR = 3.0
+PLATE_FRAC = 0.06          # Lastraferro: 6% degli HP attuali (fisico)...
+PLATE_WILD_MAX = 60.0      # ...massimo 60 sui neutrali
+SILVER_BASE = 20.0         # Polvere Argento: 20 + 15% Att. Sp. (speciale)
+SILVER_SPA = 0.15
+LIGHTBALL_TAKEN = 1.10     # Elettropalla: +10% danno subito
+SAND_SINGLE = 0.8          # Sabbia Soffice: -20% su bersaglio singolo...
+SAND_AREA = 0.9            # ...-10% con le mosse ad area...
+SAND_DUR = 1.5             # ...per 1,5 s
+SNOWBALL_TEN = 0.75        # Pallaneve: controlli subiti -25%...
+SNOWBALL_ATK = 1.25        # ...e alla fine di un controllo +25% Attacco...
+SNOWBALL_DUR = 4.0         # ...per 4 s...
+SNOWBALL_CD = 10.0         # ...(ricarica 10 s)
+RSHIELD_RADIUS = 6.0       # Scudo Rovinato (attivabile): alleati entro 6 tile...
+RSHIELD_BASE = 80.0        # ...scudo di 80 + 8% HP max del possessore...
+RSHIELD_HP = 0.08
+RSHIELD_DUR = 3.0          # ...per 3 s
+RSHIELD_CD = 90.0
+AMULET_GOLD_S = 1.0        # Monetamuleto: +1 oro/s...
+AMULET_ASSIST = 30.0       # ...+30 oro per assist
+PRISM_OUT = 1.10           # Squama Bella: cure e scudi dati +10%...
+PRISM_AS = 0.20            # ...l'alleato ottiene +20% vel. d'attacco...
+PRISM_AA = 15.0            # ...e +15 danno sugli attacchi base...
+PRISM_DUR = 4.0            # ...per 4 s
+WEATHER_ROCK_RADIUS = 4.0  # Rocciaumida / Rocciacalda: area di 4 tile...
+WEATHER_ROCK_DUR = 6.0     # ...per 6 s all'ultimate
+DAMP_RAIN_DUR = 1.5        # Rocciaumida: le aree di pioggia del possessore +50%
+SUN_FIRE = 1.30            # sole locale: mosse Fuoco +30%...
+SUN_WATER = 0.70           # ...mosse Acqua -30%
+HEAT_FIRE = 1.10           # Rocciacalda: mosse Fuoco del possessore +10%
+# Forme di mossa che colpiscono un solo bersaglio (Sabbia Soffice: -20%; le altre -10%).
+SINGLE_TARGET_SHAPES = {"projectile", "dash", "blink", "chain", "curse", "dashback",
+                        "deligift", "bolt", "leap", "throwback"}
+
 ITEM_COOLDOWNS = {"weakness_policy": WP_CD, "red_card": REDCARD_CD, "focus_sash": SASH_CD,
                   "mental_herb": MENTAL_CD, "smoke_ball": SMOKE_CD, "eject_button": EJECT_CD,
-                  "focus_band": BAND_CD, "poke_flute": FLUTE_CD}
+                  "focus_band": BAND_CD, "poke_flute": FLUTE_CD, "acro_bike": ACRO_CD,
+                  "rusted_shield": RSHIELD_CD, "snowball": SNOWBALL_CD}
 
 
 def cdr_to_haste(cdr: float) -> float:
@@ -136,14 +194,127 @@ class ItemEffectsMixin:
         return m * self._healcut_mult(p)   # cure ridotte (Sporcolancio)
 
     def _heal_out_mult(self, caster) -> float:
-        return SOOTHE_MULT if isinstance(caster, Pokemon) and "soothe_bell" in self._fx_items(caster) else 1.0
+        if not isinstance(caster, Pokemon) or not caster.items:
+            return 1.0
+        items = self._fx_items(caster)
+        m = SOOTHE_MULT if "soothe_bell" in items else 1.0
+        if "prism_scale" in items:
+            m *= PRISM_OUT   # Squama Bella: cure date +10%
+        return m
 
     def _give_shield(self, caster, target, amt, dur) -> None:
-        """Scudo dato da `caster` (Creta Luce: +15% e +50% di durata)."""
-        if isinstance(caster, Pokemon) and "light_clay" in self._fx_items(caster):
-            amt *= LIGHTCLAY_AMT
-            dur *= LIGHTCLAY_DUR
+        """Scudo dato da `caster` (Creta Luce: +15% e +50% di durata; Squama
+        Bella: +10% e l'alleato si carica)."""
+        if isinstance(caster, Pokemon) and caster.items:
+            items = self._fx_items(caster)
+            if "light_clay" in items:
+                amt *= LIGHTCLAY_AMT
+                dur *= LIGHTCLAY_DUR
+            if "prism_scale" in items:
+                amt *= PRISM_OUT
         self._apply_shield(target, amt, dur)
+        self._item_on_support(caster, target)
+
+    def _item_on_support(self, caster, target) -> None:
+        """Squama Bella: l'alleato curato o protetto ottiene +20% vel. d'attacco
+        e +15 danno sugli attacchi base per 4 s."""
+        if (isinstance(caster, Pokemon) and isinstance(target, Pokemon) and caster.items
+                and "prism_scale" in self._fx_items(caster) and target.team == caster.team):
+            target.prism_until = self.time + PRISM_DUR
+
+    def _item_as_bonus(self, u) -> float:
+        return PRISM_AS if getattr(u, "prism_until", -1.0) > self.time else 0.0
+
+    # --- regole d'acquisto ---------------------------------------------------------
+    def _item_buy_ok(self, p, iid) -> bool:
+        """Gruppi a possesso limitato, copie massime (consumabili), Condividi Esp.
+        uno per squadra, Pietrastante solo a chi non e' completamente evoluto."""
+        cat = self.item_catalog
+        it = cat.get(iid)
+        if it is None:
+            return False
+        if not cat.group_ok(iid, p.items) or not cat.count_ok(iid, p.items):
+            return False
+        if iid == "exp_share" and self._team_has_item(p.team, iid):
+            return False
+        if iid == "everstone" and not self._can_evolve_more(p):
+            return False
+        return True
+
+    def _can_evolve_more(self, p) -> bool:
+        """Vero se la linea ha ancora un'evoluzione (Scyther compreso finche' non
+        evolve). Senza evoluzioni (Spiritomb, Delibird) o alla forma finale: falso."""
+        return not self._is_final_form(p)
+
+    # --- danno ---------------------------------------------------------------------------
+    def _item_dmg_mult(self, attacker, target) -> float:
+        """Ogni danno: Mielino (+30% ai neutrali fino al minuto 15),
+        Occhialineri (+20% sui Pokemon sotto il 40%), Elettropalla (+10% subito)."""
+        m = 1.0
+        if isinstance(attacker, Pokemon) and attacker.items:
+            items = self._fx_items(attacker)
+            if "honey" in items and isinstance(target, Wild) and self.time < HONEY_UNTIL:
+                m *= HONEY_WILD
+            if ("black_glasses" in items and isinstance(target, Pokemon)
+                    and target.team != attacker.team and target.max_hp > 0
+                    and target.hp < GLASSES_LOW * target.max_hp):
+                m *= GLASSES_MULT
+        if isinstance(target, Pokemon) and target.items and "light_ball" in self._fx_items(target):
+            m *= LIGHTBALL_TAKEN
+        return m
+
+    def _item_on_takedown(self, killer, assisters) -> None:
+        """Uccisione o assist su un Pokemon: Occhialineri (+15% velocita' 3 s),
+        Monetamuleto (+30 oro per assist)."""
+        for p, assist in ([(killer, False)] if isinstance(killer, Pokemon) else []) + \
+                [(a, True) for a in assisters]:
+            if not p.items:
+                continue
+            items = self._fx_items(p)
+            if "black_glasses" in items:
+                self._apply_speed(p, GLASSES_SPEED, GLASSES_DUR)
+            if assist and "amulet_coin" in items:
+                p.gold += AMULET_ASSIST
+
+    def _item_on_wild_kill(self, killer) -> None:
+        """Mielino: ogni neutrale sconfitto cura il 6% degli HP max (fino al minuto 15)."""
+        if (isinstance(killer, Pokemon) and killer.alive and "honey" in self._fx_items(killer)
+                and self.time < HONEY_UNTIL):
+            killer.hp = min(killer.max_hp, killer.hp + killer.max_hp * HONEY_HEAL
+                            * self._heal_in_mult(killer))
+
+    def _item_on_ult(self, p) -> None:
+        """Lancio dell'ultimate: area di pioggia (Rocciaumida) o di sole
+        (Rocciacalda) di 4 tile attorno al possessore per 6 s."""
+        if not p.items:
+            return
+        items = self._fx_items(p)
+        c = Vec2(p.pos.x, p.pos.y)
+        if "damp_rock" in items:
+            dur = WEATHER_ROCK_DUR
+            self.rain_zones.append({"center": c, "radius": WEATHER_ROCK_RADIUS,
+                                    "end": self.time + dur, "team": p.team})
+            self.fx_events.append({"kind": "zone", "c": (c.x, c.y), "radius": WEATHER_ROCK_RADIUS,
+                                   "mtype": "Water", "fx": "polirain", "dur": dur})
+        if "heat_rock" in items:
+            self.sun_zones.append({"c": c, "radius": WEATHER_ROCK_RADIUS, "team": p.team,
+                                   "start": self.time, "end": self.time + WEATHER_ROCK_DUR})
+
+    def _rain_dur_mult(self, p) -> float:
+        """Rocciaumida: le aree di pioggia create dal possessore durano +50%."""
+        return DAMP_RAIN_DUR if isinstance(p, Pokemon) and "damp_rock" in self._fx_items(p) else 1.0
+
+    def _sun_mult(self, caster, mv) -> float:
+        """Sole locale (Rocciacalda): chi lancia dentro un'area di sole fa +30% con
+        le mosse Fuoco e -30% con quelle Acqua (il +10% di Rocciacalda e' in _item_move_mult)."""
+        m = 1.0
+        if mv.type not in ("Fire", "Water") or not self.sun_zones:
+            return m
+        for z in self.sun_zones:
+            if z["c"].dist(caster.pos) <= z["radius"]:
+                m *= SUN_FIRE if mv.type == "Fire" else SUN_WATER
+                break
+        return m
 
     def _item_aa_cd_mult(self, u) -> float:
         """Gelomai: chi è stato rallentato attacca più piano (cooldown × 1/0.8)."""
@@ -209,6 +380,8 @@ class ItemEffectsMixin:
             m *= LIFEORB_MULT
         if "expert_belt" in items and eff > 1.0:
             m *= EXPERT_MULT
+        if mv.type == "Fire" and "heat_rock" in items:
+            m *= HEAT_FIRE   # Rocciacalda
         if "metronome" in items:
             prev = caster.metro.get(target.id)
             n = 0
@@ -223,6 +396,9 @@ class ItemEffectsMixin:
 
     def _item_after_move_hit(self, caster, mv, target, eff) -> None:
         self._item_hit_debuffs(caster, target, True)   # Carbonella, Spettrotarga, Velenpuntale
+        if self._item_hits_foe(caster, target) and caster.items and "soft_sand" in self._fx_items(caster):
+            single = mv.shape in SINGLE_TARGET_SHAPES or mv.d.get("target") == "unit"
+            self._apply_slow(target, SAND_SINGLE if single else SAND_AREA, SAND_DUR)
         # Assorbisfera: una sola volta per lancio, anche se colpisce piu' bersagli.
         if (isinstance(caster, Pokemon) and "life_orb" in self._fx_items(caster) and caster.alive
                 and caster.orb_paid_seq != caster.cast_seq):
@@ -270,8 +446,10 @@ class ItemEffectsMixin:
         return False
 
     def _item_after_aa(self, attacker, target) -> None:
-        """Dopo un attacco base a segno: veleno di Fangopece, Bitorzolelmo."""
+        """Dopo un attacco base a segno: veleno di Fangopece, Bitorzolelmo,
+        danni extra di Lastraferro / Polvere Argento / Squama Bella, Sabbia Soffice."""
         self._item_hit_debuffs(attacker, target, False)   # Velenpuntale
+        self._item_aa_extra(attacker, target)
         if self._item_hits_foe(attacker, target) and attacker.items:
             if "rusted_sword" in self._fx_items(attacker):   # Spada Arrugginita
                 attacker.rust_stacks = (min(RUST_MAX, attacker.rust_stacks + 1)
@@ -293,6 +471,29 @@ class ItemEffectsMixin:
                 and attacker.team != target.team and attacker.attack_range <= MELEE_REACH):
             self._deal_damage(target, attacker, HELMET_BASE + HELMET_DEF * target.eff_defense())
 
+    def _item_aa_extra(self, attacker, target) -> None:
+        if not isinstance(attacker, Pokemon) or not attacker.alive or not getattr(target, "alive", False):
+            return
+        if target.team == attacker.team or isinstance(target, Structure):
+            return
+        items = self._fx_items(attacker) if attacker.items else ()
+        if "iron_plate" in items:   # Lastraferro: 6% degli HP attuali, fisico
+            extra = PLATE_FRAC * target.hp
+            if isinstance(target, Wild):
+                extra = min(extra, PLATE_WILD_MAX)
+            if extra > 0:
+                self._deal_damage(attacker, target,
+                                  self._basic_damage(attacker, target, power=extra, magic=False))
+        if "silver_powder" in items and target.alive:   # Polvere Argento: speciale
+            power = SILVER_BASE + SILVER_SPA * attacker.eff_sp_attack()
+            self._deal_damage(attacker, target,
+                              self._basic_damage(attacker, target, power=power, magic=True))
+        if attacker.prism_until > self.time and target.alive:   # Squama Bella (alleato)
+            self._deal_damage(attacker, target, PRISM_AA)
+        if ("soft_sand" in items and isinstance(target, Pokemon) and target.alive
+                and not target.is_decoy):
+            self._apply_slow(target, SAND_SINGLE, SAND_DUR)
+
     # --- danno subito ------------------------------------------------------------
     def _item_on_damaged(self, attacker, target, amount) -> None:
         """Dopo che `target` ha perso `amount` HP (prima del controllo di morte)."""
@@ -308,6 +509,12 @@ class ItemEffectsMixin:
                 self._item_fx(target, "focus_sash", "Fighting", 1.0)
             else:
                 return
+        if ("sitrus_berry" in items and 0.0 < target.hp < SITRUS_FRAC * target.max_hp
+                and target.alive):   # Baccacedro: si consuma da sola
+            self._consume_item(target, "sitrus_berry")
+            target.hp = min(target.max_hp, target.hp + target.max_hp * SITRUS_HEAL
+                            * self._heal_in_mult(target))
+            self._item_fx(target, "sitrus_berry", "Grass", 1.0)
         if ("focus_band" in items and 0.0 < target.hp < BAND_FRAC * target.max_hp
                 and self._item_ready(target, "focus_band")):
             self._item_cooldown(target, "focus_band")
@@ -375,6 +582,36 @@ class ItemEffectsMixin:
                 if not (q.speed_until > now and q.speed_mult >= FLUTE_SPEED):
                     self._apply_speed(q, FLUTE_SPEED, FLUTE_DUR)
                 self._item_fx(q, "poke_flute", "Normal", 1.0)
+        elif iid == "acro_bike":   # Bici Cross: salto di 3 tile dove si guarda
+            if p.dashlock_until > self.time or self._immobile(p):
+                return False
+            if p.path:
+                dirv = p.path[0] - p.pos
+            else:
+                from .vec import DIR_VECTORS
+                dirv = DIR_VECTORS[p.facing % 8]
+            if dirv.length() < 1e-6:
+                return False
+            origin = Vec2(p.pos.x, p.pos.y)
+            dest = self._clamp_to_wall(origin, origin + dirv.normalized() * ACRO_JUMP)
+            p.pos = dest
+            p.stop()
+            self.fx_events.append({"kind": "dash", "a": (origin.x, origin.y),
+                                   "b": (dest.x, dest.y), "mtype": "Flying", "fx": "acrobike"})
+        elif iid == "rusted_shield":   # Scudo Rovinato: scudo a se' e agli alleati vicini
+            amt = RSHIELD_BASE + RSHIELD_HP * p.max_hp
+            for q in self.world.pokemons():
+                if (q.team == p.team and q.alive and not q.is_decoy
+                        and q.pos.dist(p.pos) <= RSHIELD_RADIUS):
+                    self._give_shield(p, q, amt, RSHIELD_DUR)
+                    self._item_fx(q, "rusted_shield", "Steel", 1.0)
+        elif iid == "ether":   # Etere (consumabile): -4 s alle ricariche tranne la R
+            for s_, ms in p.moveset.items():
+                if s_ != "R" and ms.cooldown_remaining > 0.0:
+                    ms.cooldown_remaining = max(0.0, ms.cooldown_remaining - ETHER_CUT)
+            self._consume_item(p, "ether")
+            self._item_fx(p, "ether", "Psychic", 1.0)
+            return True
         elif iid == "smoke_ball":
             c = Vec2(p.pos.x, p.pos.y)
             self.item_clouds.append({"center": c, "radius": SMOKE_RADIUS,
@@ -387,6 +624,18 @@ class ItemEffectsMixin:
         self._item_cooldown(p, iid)
         return True
 
+    def _consume_item(self, p, iid) -> None:
+        """Consumabile usato: toglie UNA copia e ricalcola le statistiche."""
+        if iid in p.items:
+            p.items.remove(iid)
+            self._apply_items(p)
+
+    def _hard_cc(self, p) -> bool:
+        t = self.time
+        return (p.stun_until > t or p.sleep_until > t or p.frozen_until > t
+                or p.root_until > t or p.charm_until > t or p.fear_until > t
+                or p.taunt_until > t or p.confuse_until > t or p.airborne_until > t)
+
     # --- tick --------------------------------------------------------------------------
     def _update_items(self, dt: float) -> None:
         """Dopo _update_status (che ricalcola p.speed e p.invisible): rigenerazioni,
@@ -395,6 +644,7 @@ class ItemEffectsMixin:
         aura_holders = []
         for p in self.world.pokemons():
             p.wp_active = p.wp_until > now
+            p.snow_atk_active = p.snow_atk_until > now
             p.smoke_hidden = False
             p.aura_spdef = 0.0
             if p.rust_n and p.rust_until <= now:
@@ -418,6 +668,22 @@ class ItemEffectsMixin:
                           else LEFTOVERS_REGEN)
             if "black_sludge" in items:
                 regen += SLUDGE_REGEN_POISON if "Poison" in p.types else SLUDGE_REGEN
+            if "oran_berry" in items:
+                regen += ORAN_REGEN   # Baccarancia
+            if "amulet_coin" in items:
+                p.gold += AMULET_GOLD_S * dt   # Monetamuleto: +1 oro/s
+            if "lum_berry" in items and self._has_status(p):   # Baccaprugna
+                self._cleanse(p)
+                self._consume_item(p, "lum_berry")
+                self._item_fx(p, "lum_berry", "Grass", 1.0)
+                items = self._fx_items(p)
+            if "snowball" in items:   # Pallaneve: fine di un controllo -> +25% Attacco
+                cc = self._hard_cc(p)
+                if (p.snow_cc and not cc and self._item_ready(p, "snowball")):
+                    p.snow_atk_until = now + SNOWBALL_DUR
+                    self._item_cooldown(p, "snowball")
+                    self._item_fx(p, "snowball", "Ice", 1.0)
+                p.snow_cc = cc
             if regen > 0.0 and p.hp < p.max_hp:
                 p.hp = min(p.max_hp, p.hp + p.max_hp * regen * dt * self._heal_in_mult(p))
             if ("bicycle" in items and now - p.last_damaged_at >= BIKE_IDLE
@@ -427,6 +693,8 @@ class ItemEffectsMixin:
             for q in self.world.pokemons():
                 if q is not h and q.alive and q.team == h.team and q.pos.dist(h.pos) <= AURA_RADIUS:
                     q.aura_spdef = AURA_SPDEF
+        if self.sun_zones:
+            self.sun_zones = [z for z in self.sun_zones if now < z["end"]]
         if self.item_clouds:
             keep = []
             for c in self.item_clouds:

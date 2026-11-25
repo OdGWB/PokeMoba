@@ -4,7 +4,7 @@
   "name": "Charcadet",
   "types": ["Fire"],
   "role": "combattente",
-  "recommended_items": ["black_sludge", "focus_band", "rusted_sword", "leftovers"],
+  "recommended_items": ["oran_berry", "black_sludge", "soft_sand", "focus_band", "rusted_sword", "leftovers"],
   "color": [214, 96, 60],
   "radius": 0.36,
   "base_speed": 3.5,

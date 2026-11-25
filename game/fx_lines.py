@@ -13,14 +13,14 @@ passiva (game/hud_passives.py).
 """
 from __future__ import annotations
 
-from . import (arch_fx, char_fx, charcadet_fx, corvi_fx, eevee_fx, flor_fx, gastly_fx, hatt_fx, incin_fx, mag_fx,
+from . import (arch_fx, char_fx, charcadet_fx, corvi_fx, deli_fx, eevee_fx, flor_fx, gastly_fx, hatt_fx, incin_fx, mag_fx,
                mien_fx, moth_fx, nincada_fx, noivern_fx, octi_fx, poli_fx, roggen_fx, rowlet_fx, scy_fx, sneasel_fx, snivy_fx, swine_fx, totodile_fx, ursa_fx)
 
 # L'ORDINE conta: a parità di forma vince il primo modulo, a parità di stile l'ultimo.
 FX_LINES: tuple = (
     roggen_fx, eevee_fx, corvi_fx, charcadet_fx, noivern_fx, ursa_fx, sneasel_fx, mien_fx, arch_fx,
     hatt_fx, mag_fx, swine_fx, moth_fx, octi_fx, flor_fx, scy_fx, incin_fx, char_fx,
-    gastly_fx, rowlet_fx, snivy_fx, totodile_fx, nincada_fx, poli_fx,
+    gastly_fx, rowlet_fx, snivy_fx, totodile_fx, nincada_fx, poli_fx, deli_fx,
 )
 
 

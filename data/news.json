@@ -1,5 +1,19 @@
 [
   {
+    "version": "3.1.0",
+    "date": "2026-11-25",
+    "title": "Natale Frost Punk",
+    "items": [
+      "Nuovo Pokémon: Delibird, tiratore Ghiaccio/Volante a danno speciale senza evoluzione. Con la Q lancia pacchi a sorpresa: Piccolo, Medio (danno doppio), Grande (danno triplo con schizzo) o Regalo (cura). Accanto alla Q vedi i prossimi due pacchi.",
+      "Delibird può piantare punte di ghiaccio, lanciare un raggio che fa danno doppio ai tipi Acqua e lasciare un pacco-bomba dove spicca il volo.",
+      "Ultimate di Delibird: Consegna Speciale (un pacco gigante col paracadute che congela i nemici e cura gli alleati) oppure Paradosso Futuro, che per 8 secondi lo trasforma in Ferrosacco, velocissimo e con getti d'acqua. Dentro un Campo Elettrico Ferrosacco attiva Propulsione Quark e resta in campo più a lungo.",
+      "20 nuovi oggetti: Baccarancia e Mielino (iniziali), Bici Corsa e Bici Cross, Baccacedro, Baccaprugna ed Etere (consumabili, massimo 2), Pietrastante, Occhialineri, Lastraferro, Polvere Argento, Elettropalla, Sabbia Soffice, Pallaneve, Scudo Rovinato, Monetamuleto, Squama Bella, Rocciaumida e Rocciacalda.",
+      "Pietrastante: blocca l'evoluzione e l'ultimate ma dà il 50% di esperienza in più fino al livello 15; quando la vendi ti evolvi subito. L'Evolcondensa ora costa 650 e dà +25% di Difesa e Difesa Speciale finché non sei completamente evoluto.",
+      "Negozio con le nuove schede Iniziali e Consumabili. Limiti: un solo oggetto iniziale (Baccarancia, Mielino o Condividi Esp.), un paio di scarpe, una Pietrastante. Oggetti consigliati aggiornati per tutti i Pokémon.",
+      "Corretto: la partita offline si chiudeva all'avvio."
+    ]
+  },
+  {
     "version": "3.0.2",
     "date": "2026-11-19",
     "title": "Enciclopedia più completa e stati spiegati",

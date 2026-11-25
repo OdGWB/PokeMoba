@@ -95,6 +95,8 @@ class BasicAttackMixin:
     def _eff_attack_speed(self, u) -> float:
         base = u.as_base if u.as_base > 0.0 else u.attack_speed
         bonus = u.as_bonus + self._moth_as_bonus(u)   # Eledanza: +30%
+        bonus += self._deli_as_bonus(u)                # Ferrosacco: +25%
+        bonus += self._item_as_bonus(u)                # Squama Bella ricevuta: +20%
         bonus += self._octi_as_bonus(u)                # Presa a Ventosa: +50%
         bonus += self._scy_as_bonus(u)                 # Chele d'Acciaio: +25%
         if u.rampage_until > self.time:

@@ -38,6 +38,7 @@ from __future__ import annotations
 from .archaludon import ArchaludonMixin
 from .charcadet import CharcadetMixin
 from .corviknight import CorviknightMixin
+from .delibird import DelibirdMixin
 from .eevee import EeveeMixin
 from .florges import FlorgesMixin
 from .hatterene import HattereneMixin
@@ -58,7 +59,7 @@ LINE_MIXINS: tuple = (
     SpiritombMixin, EeveeMixin, CorviknightMixin, CharcadetMixin, NoivernMixin,
     UrsaringMixin, SneaselMixin, MienshaoMixin, ArchaludonMixin, HattereneMixin,
     MagnezoneMixin, MamoswineMixin, VenomothMixin, OctilleryMixin, FlorgesMixin,
-    ScizorMixin, IncineroarMixin,
+    ScizorMixin, IncineroarMixin, DelibirdMixin,
 )
 
 HOOK_KINDS = ("init", "update", "precheck", "cast", "bot_cast", "speed_mult")

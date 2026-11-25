@@ -16,7 +16,7 @@ import pygame
 
 from engine.eevee import eevee_candidates, eevee_forms
 
-from . import (arch_fx, eevee_fx, flor_fx, hatt_fx, incin_fx, mag_fx, mien_fx, moth_fx, octi_fx, scy_fx, sneasel_fx,
+from . import (arch_fx, deli_fx, eevee_fx, flor_fx, hatt_fx, incin_fx, mag_fx, mien_fx, moth_fx, octi_fx, scy_fx, sneasel_fx,
                swine_fx, ursa_fx)
 
 
@@ -164,6 +164,9 @@ def draw_passive(surface, font, p, bx, y0, bh, ctx) -> None:
     # Linea Venonat: Scaglie Velenose (+ Lentifume' da Venomoth).
     if p.passive_id in ("scaglievelenose", "lentifume"):
         _draw_moth(surface, font, p, bx, y0, bh, ctx)
+    # Linea Delibird: pacco pronto + i 2 successivi; Ferrosacco: tempo e Quark.
+    if p.passive_id in ("paccoinarrivo", "propulsionequark"):
+        deli_fx.draw_hud(surface, font, p, bx, y0, bh, ctx.now)
     # Linea Remoraid: Prendimira (mirino + ricarica) e munizioni disponibili.
     if p.passive_id in ("cecchino", "ventose"):
         _draw_octi(surface, font, p, bx, y0, bh, ctx)

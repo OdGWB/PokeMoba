@@ -4,7 +4,7 @@
   "name": "Flabébé",
   "types": ["Fairy"],
   "role": "supporto",
-  "recommended_items": ["soothe_bell", "light_clay", "king_rock", "poke_flute", "mental_herb"],
+  "recommended_items": ["soothe_bell", "prism_scale", "light_clay", "king_rock", "poke_flute", "mental_herb"],
   "color": [236, 120, 140],
   "radius": 0.32,
   "base_speed": 3.4,

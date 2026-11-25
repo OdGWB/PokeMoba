@@ -33,7 +33,7 @@ SLOTS = ["Q", "W", "E", "R"]
 # Liste del Match: nome -> (chiave della posizione, chiave della squadra).
 LISTS = {
     "projectiles": ("pos", "team"), "avalanches": ("pos", "team"),
-    "item_clouds": ("center", "team"),
+    "item_clouds": ("center", "team"), "sun_zones": ("c", "team"),
     **{name: (pk, "team") for name, pk in net_table("lists").items()},
 }
 # Liste che vedono entrambe le squadre (aree d'effetto da evitare, ostacoli...).

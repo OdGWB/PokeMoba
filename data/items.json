@@ -1,7 +1,7 @@
 {
-  "_comment": "Catalogo oggetti a 3 livelli (vitamine -> intermedi -> completi). 'build_from' = componenti che si fondono nell'oggetto (il prezzo e' il TOTALE: nel negozio si paga la differenza coi componenti posseduti, anche annidati). 'stats' si sommano tra oggetti uguali; gli effetti unici (engine/item_effects.py, per id) no. Chiavi di 'stats': hp/attack/defense/sp_attack/sp_defense piatte; attack_speed, move_speed_pct, crit, lifesteal, omnivamp, cdr (riduzione ricariche), heal_power in FRAZIONE (0.12 = 12%). 'group': choice/boots/exp_share = al massimo uno per Pokemon (exp_share: uno per squadra). 'category' = scheda del negozio. 'icon' = file in assets/items/ (tools/fetch_items.py, PokeAPI/sprites); se manca, segnaposto con l'iniziale.",
+  "_comment": "Catalogo oggetti a 3 livelli (vitamine -> intermedi -> completi). 'build_from' = componenti che si fondono nell'oggetto (il prezzo e' il TOTALE: nel negozio si paga la differenza coi componenti posseduti, anche annidati). 'stats' si sommano tra oggetti uguali; gli effetti unici (engine/item_effects.py, per id) no. Chiavi di 'stats': hp/attack/defense/sp_attack/sp_defense piatte; attack_speed, move_speed_pct, crit, lifesteal, omnivamp, cdr (riduzione ricariche), heal_power in FRAZIONE (0.12 = 12%). 'group': choice/boots/starter/everstone = al massimo uno del gruppo per Pokemon (starter = Baccarancia, Mielino, Condividi Esp.; il Condividi Esp. resta anche uno per squadra). 'max_count' = copie massime dello stesso oggetto (consumabili: 2). 'consumable' = si consuma all'uso o da solo (Baccacedro, Baccaprugna, Etere). 'active' = attivabile coi tasti 1-6. 'category' = scheda del negozio. 'icon' = file in assets/items/ (tools/fetch_items.py, PokeAPI/sprites); se manca, segnaposto con l'iniziale.",
 
-  "categories": [["vitamins", "Vitamine"], ["intermediate", "Intermedi"], ["physical", "Fisici"], ["special", "Speciali"], ["hybrid", "Ibridi"], ["fighter", "Combattenti"], ["tank", "Tank"], ["support", "Supporto"], ["utility", "Utilità"]],
+  "categories": [["vitamins", "Vitamine"], ["starter", "Iniziali"], ["consumable", "Consumabili"], ["intermediate", "Intermedi"], ["physical", "Fisici"], ["special", "Speciali"], ["hybrid", "Ibridi"], ["fighter", "Combattenti"], ["tank", "Tank"], ["support", "Supporto"], ["utility", "Utilità"]],
 
   "base": [
     {"id": "hp_up", "name": "PS-su", "icon": "hp-up", "category": "vitamins", "price": 400, "stats": {"hp": 150}},
@@ -10,7 +10,14 @@
     {"id": "calcium", "name": "Calcio", "icon": "calcium", "category": "vitamins", "price": 400, "stats": {"sp_attack": 20}},
     {"id": "zinc", "name": "Zinco", "icon": "zinc", "category": "vitamins", "price": 400, "stats": {"sp_defense": 20}},
     {"id": "carbos", "name": "Carburante", "icon": "carbos", "category": "vitamins", "price": 300, "stats": {"attack_speed": 0.12}},
-    {"id": "running_shoes", "name": "Scarpe da Corsa", "icon": "running-shoes", "category": "vitamins", "price": 300, "stats": {"move_speed_pct": 0.1}, "group": "boots", "note": "Scarpe: al massimo un paio per Pokemon."}
+    {"id": "running_shoes", "name": "Scarpe da Corsa", "icon": "running-shoes", "category": "vitamins", "price": 300, "stats": {"move_speed_pct": 0.1}, "group": "boots", "note": "Scarpe: al massimo un paio per Pokemon."},
+    {"id": "eviolite", "name": "Evolcondensa", "icon": "eviolite", "category": "utility", "price": 650, "stats": {}, "note": "Finche' il possessore non e' completamente evoluto: +25% Difesa e +25% Dif. Sp. sul valore totale. Altrimenti non da' nulla."},
+    {"id": "everstone", "name": "Pietrastante", "icon": "everstone", "category": "utility", "price": 450, "stats": {}, "group": "everstone", "note": "Solo per Pokemon non completamente evoluti. Finche' la tiene non si evolve, guadagna il 50% di esperienza in piu' (fino al liv.15) e l'ultimate non si sblocca. Vendendola si evolve subito fino allo stadio del suo livello e, dal liv.8, sblocca l'ultimate."},
+    {"id": "oran_berry", "name": "Baccarancia", "icon": "oran-berry", "category": "starter", "price": 400, "stats": {"hp": 100}, "group": "starter", "note": "Rigenera lo 0,3% degli HP max al secondo. Per chi va in lane. Oggetto iniziale: al massimo uno tra Baccarancia, Mielino e Condividi Esp."},
+    {"id": "honey", "name": "Mielino", "icon": "honey", "category": "starter", "price": 400, "stats": {"hp": 100}, "group": "starter", "note": "+30% danno ai Pokemon neutrali; ogni neutrale sconfitto cura il 6% degli HP max. Dopo il minuto 15 vale solo i +100 HP. Per i jungler. Oggetto iniziale: al massimo uno."},
+    {"id": "sitrus_berry", "name": "Baccacedro", "icon": "sitrus-berry", "category": "consumable", "price": 150, "stats": {}, "max_count": 2, "consumable": true, "note": "Massimo 2. Sotto il 30% degli HP si consuma da sola e cura il 20% degli HP max."},
+    {"id": "lum_berry", "name": "Baccaprugna", "icon": "lum-berry", "category": "consumable", "price": 150, "stats": {}, "max_count": 2, "consumable": true, "note": "Massimo 2. Si consuma da sola al primo stato alterato subito e lo rimuove."},
+    {"id": "ether", "name": "Etere", "icon": "ether", "category": "consumable", "price": 200, "stats": {}, "max_count": 2, "consumable": true, "active": true, "note": "Massimo 2. Attivabile (si consuma): riduce subito di 4 secondi le ricariche in corso di tutte le mosse tranne l'ultimate."}
   ],
 
   "intermediate": [
@@ -26,9 +33,10 @@
     {"id": "miracle_seed", "name": "Miracolseme", "icon": "miracle-seed", "category": "intermediate", "price": 1000, "build_from": ["calcium", "hp_up"], "stats": {"sp_attack": 25, "hp": 150}, "note": "Rigenera lo 0,3% degli HP max al secondo."},
     {"id": "thick_club", "name": "Ossospesso", "icon": "thick-club", "category": "intermediate", "price": 950, "build_from": ["hp_up", "hp_up"], "stats": {"hp": 350}},
     {"id": "bicycle", "name": "Bicicletta", "icon": "bicycle", "category": "intermediate", "price": 1000, "build_from": ["running_shoes"], "stats": {"move_speed_pct": 0.18}, "group": "boots", "note": "+12% velocita' extra se non infligge ne' subisce danni da 5 secondi. Scarpe: al massimo un paio."},
-    {"id": "eviolite", "name": "Evolcondensa", "icon": "eviolite", "category": "intermediate", "price": 1200, "build_from": ["iron", "zinc"], "stats": {"defense": 45, "sp_defense": 45}, "note": "Funziona solo se il Pokemon NON e' alla forma finale: dopo l'evoluzione finale non da' nulla."},
     {"id": "metal_coat", "name": "Metalcoperta", "icon": "metal-coat", "category": "intermediate", "price": 1000, "build_from": ["iron", "carbos"], "stats": {"attack": 10, "defense": 20, "attack_speed": 0.10}, "evo": "Scizor", "note": "Oggetto evolutivo: Scyther dal liv.8 si evolve in Scizor."},
-    {"id": "black_augurite", "name": "Augite Nera", "icon": "black-augurite", "category": "intermediate", "price": 1000, "build_from": ["protein", "hp_up"], "stats": {"attack": 15, "hp": 150}, "evo": "Kleavor", "note": "+20% danno alle torri. Oggetto evolutivo: Scyther dal liv.8 si evolve in Kleavor."}
+    {"id": "black_augurite", "name": "Augite Nera", "icon": "black-augurite", "category": "intermediate", "price": 1000, "build_from": ["protein", "hp_up"], "stats": {"attack": 15, "hp": 150}, "evo": "Kleavor", "note": "+20% danno alle torri. Oggetto evolutivo: Scyther dal liv.8 si evolve in Kleavor."},
+    {"id": "mach_bike", "name": "Bici Corsa", "icon": "mach-bike", "category": "intermediate", "price": 1000, "build_from": ["running_shoes", "carbos"], "stats": {"move_speed_pct": 0.15, "attack_speed": 0.15}, "group": "boots", "note": "Per i tiratori. Scarpe: al massimo un paio."},
+    {"id": "acro_bike", "name": "Bici Cross", "icon": "acro-bike", "category": "intermediate", "price": 1000, "build_from": ["running_shoes"], "stats": {"move_speed_pct": 0.15}, "group": "boots", "active": true, "note": "I rallentamenti subiti durano il 30% in meno. Attivabile: salto di 3 tile nella direzione in cui si guarda, senza attraversare i muri (ricarica 40s). Scarpe: al massimo un paio."}
   ],
 
   "completed": [
@@ -62,12 +70,23 @@
     {"id": "king_rock", "name": "Roccia di Re", "icon": "kings-rock", "category": "support", "price": 1500, "build_from": ["thick_club", "zinc"], "stats": {"hp": 300, "sp_defense": 20, "heal_power": 0.15}, "note": "Cure e scudi dati +15%; curando un alleato gli da' anche uno scudo (30% della cura, 3s). Se Poliwhirl ce l'ha al liv.8 evolve in POLITOAD (invece che Poliwrath)."},
     {"id": "light_clay", "name": "Creta Luce", "icon": "light-clay", "category": "support", "price": 2600, "build_from": ["silk_scarf", "twisted_spoon", "hp_up"], "stats": {"hp": 150, "sp_attack": 25, "sp_defense": 45, "cdr": 0.1}, "note": "Gli scudi dati dal possessore sono piu' forti del 15% e durano il 50% in piu'."},
     {"id": "soothe_bell", "name": "Calmanella", "icon": "soothe-bell", "category": "support", "price": 2500, "build_from": ["twisted_spoon", "miracle_seed", "hp_up"], "stats": {"hp": 300, "sp_attack": 50, "cdr": 0.15}, "note": "Le cure date dal possessore sono piu' forti del 15%."},
-    {"id": "exp_share", "name": "Condividi Esp.", "icon": "exp-share", "category": "support", "price": 1000, "build_from": ["hp_up"], "stats": {"hp": 150, "move_speed_pct": 0.05}, "group": "exp_share", "note": "Quando un alleato entro 8 tile da' l'ultimo colpo a un minion, ricevi 10 oro e il 30% dell'esperienza (senza togliere nulla all'alleato). Massimo uno per squadra."},
+    {"id": "exp_share", "name": "Condividi Esp.", "icon": "exp-share", "category": "support", "price": 1000, "build_from": ["hp_up"], "stats": {"hp": 150, "move_speed_pct": 0.05}, "group": "starter", "note": "Quando un alleato entro 8 tile da' l'ultimo colpo a un minion, ricevi 10 oro e il 30% dell'esperienza (senza togliere nulla all'alleato). Massimo uno per squadra."},
     {"id": "poke_flute", "name": "Pokéflauto", "icon": "poke-flute", "category": "support", "price": 2600, "build_from": ["silk_scarf", "twisted_spoon", "calcium"], "stats": {"sp_attack": 45, "sp_defense": 45, "cdr": 0.15}, "active": true, "note": "ATTIVABILE (tasto dello slot, 1-6): gli alleati entro 6 tile (te incluso) si liberano da sonno, confusione e paralisi e hanno +20% velocita' per 2s (ricarica 90s)."},
     {"id": "focus_sash", "name": "Focalnastro", "icon": "focus-sash", "category": "utility", "price": 2600, "build_from": ["thick_club", "hard_stone", "hp_up"], "stats": {"hp": 500, "defense": 25}, "note": "Quando subisce un colpo letale sopravvive con 1 HP (ricarica 90s)."},
     {"id": "mental_herb", "name": "Mentalerba", "icon": "mental-herb", "category": "utility", "price": 2700, "build_from": ["silk_scarf", "twisted_spoon", "zinc"], "stats": {"sp_attack": 25, "sp_defense": 65, "cdr": 0.1}, "active": true, "note": "ATTIVABILE (tasto dello slot, 1-6): rimuove tutti gli stati alterati e i controlli (ricarica 90s)."},
     {"id": "smoke_ball", "name": "Palla Fumo", "icon": "smoke-ball", "category": "utility", "price": 2500, "build_from": ["sharp_beak", "thick_club", "carbos"], "stats": {"hp": 350, "attack_speed": 0.4, "move_speed_pct": 0.05}, "active": true, "note": "ATTIVABILE (tasto dello slot, 1-6): nube di fumo di 3 tile per 3s; dentro sei invisibile e hai +30% velocita' (ricarica 75s)."},
-    {"id": "eject_button", "name": "Pulsantefuga", "icon": "eject-button", "category": "utility", "price": 2700, "build_from": ["thick_club", "silk_scarf", "iron"], "stats": {"hp": 350, "defense": 15, "sp_defense": 45}, "note": "Quando gli HP scendono sotto il 30% scatta di 4 tile lontano dal nemico piu' vicino (ricarica 60s)."}
+    {"id": "eject_button", "name": "Pulsantefuga", "icon": "eject-button", "category": "utility", "price": 2700, "build_from": ["thick_club", "silk_scarf", "iron"], "stats": {"hp": 350, "defense": 15, "sp_defense": 45}, "note": "Quando gli HP scendono sotto il 30% scatta di 4 tile lontano dal nemico piu' vicino (ricarica 60s)."},
+    {"id": "black_glasses", "name": "Occhialineri", "icon": "black-glasses", "category": "physical", "price": 2900, "build_from": ["muscle_band", "black_belt", "iron"], "stats": {"attack": 50, "defense": 15, "cdr": 0.1}, "note": "+20% danno ai Pokemon nemici sotto il 40% degli HP. Dopo un'uccisione o un assist: +15% velocita' per 3s. Per gli assassini."},
+    {"id": "iron_plate", "name": "Lastraferro", "icon": "iron-plate", "category": "physical", "price": 2900, "build_from": ["scope_lens", "black_belt", "carbos"], "stats": {"attack": 35, "attack_speed": 0.3, "defense": 15}, "note": "Gli attacchi base fanno danno fisico extra pari al 6% degli HP attuali del bersaglio (max 60 sui neutrali). Per i tiratori contro i tank."},
+    {"id": "silver_powder", "name": "Polvere Argento", "icon": "silver-powder", "category": "special", "price": 2900, "build_from": ["wise_glasses", "sharp_beak", "calcium"], "stats": {"sp_attack": 50, "attack_speed": 0.3}, "note": "Gli attacchi base fanno danno speciale extra pari a 20 + 15% dell'Att. Sp. Per i tiratori speciali (Noivern, Venomoth, Delibird)."},
+    {"id": "light_ball", "name": "Elettropalla", "icon": "light-ball", "category": "special", "price": 3200, "build_from": ["wise_glasses", "wise_glasses", "calcium"], "stats": {"sp_attack": 120}, "note": "Il possessore subisce +10% di danno da tutte le fonti. Tanto danno, piu' fragilita'."},
+    {"id": "soft_sand", "name": "Sabbia Soffice", "icon": "soft-sand", "category": "fighter", "price": 2700, "build_from": ["black_belt", "thick_club", "iron"], "stats": {"attack": 30, "hp": 350, "defense": 40}, "note": "Attacchi base e mosse su un solo bersaglio rallentano del 20% per 1,5s; le mosse ad area del 10%."},
+    {"id": "snowball", "name": "Pallaneve", "icon": "snowball", "category": "fighter", "price": 2800, "build_from": ["black_belt", "hard_stone", "protein"], "stats": {"attack": 35, "hp": 250, "defense": 35}, "note": "I controlli subiti durano il 25% in meno. Quando finisce un controllo subito: +25% Attacco per 4s (ricarica 10s)."},
+    {"id": "rusted_shield", "name": "Scudo Rovinato", "icon": "rusted-shield", "category": "tank", "price": 2900, "build_from": ["hard_stone", "silk_scarf", "zinc"], "stats": {"hp": 300, "defense": 50, "sp_defense": 50}, "active": true, "note": "Attivabile: a se' e agli alleati entro 6 tile uno scudo di 80 + 8% degli HP max del possessore per 3s (ricarica 90s)."},
+    {"id": "amulet_coin", "name": "Monetamuleto", "icon": "amulet-coin", "category": "support", "price": 2000, "build_from": ["thick_club", "twisted_spoon"], "stats": {"hp": 350, "sp_attack": 25, "cdr": 0.1}, "note": "+1 oro al secondo in piu' e +30 oro per ogni assist."},
+    {"id": "prism_scale", "name": "Squama Bella", "icon": "prism-scale", "category": "support", "price": 2500, "build_from": ["twisted_spoon", "miracle_seed", "calcium"], "stats": {"sp_attack": 55, "hp": 150, "cdr": 0.1}, "note": "Cure e scudi dati +10%. L'alleato curato o protetto ottiene per 4s +20% velocita' d'attacco e +15 danno sugli attacchi base."},
+    {"id": "damp_rock", "name": "Rocciaumida", "icon": "damp-rock", "category": "utility", "price": 2700, "build_from": ["silk_scarf", "miracle_seed", "zinc"], "stats": {"sp_attack": 40, "hp": 150, "sp_defense": 65}, "note": "Usando l'ultimate crea per 6s un'area di pioggia di 4 tile attorno a se' (pioggia locale). Le aree di pioggia del possessore durano il 50% in piu'."},
+    {"id": "heat_rock", "name": "Rocciacalda", "icon": "heat-rock", "category": "utility", "price": 2700, "build_from": ["black_belt", "miracle_seed", "protein"], "stats": {"attack": 25, "sp_attack": 25, "hp": 150, "defense": 25}, "note": "Usando l'ultimate crea per 6s un'area di sole di 4 tile attorno a se' (dentro: mosse Fuoco +30%, mosse Acqua -30%). Le mosse Fuoco del possessore fanno +10%."}
   ],
 
   "recommended": {
@@ -81,25 +100,29 @@
       "weakness_policy",
       "black_sludge",
       "focus_band",
-      "rusted_sword"
+      "rusted_sword",
+      "soft_sand"
     ],
     "assassino": [
       "dragon_fang",
       "quick_claw",
       "zoom_lens",
-      "poison_barb"
+      "poison_barb",
+      "black_glasses"
     ],
     "tiratore": [
       "zoom_lens",
       "quick_claw",
       "dragon_fang",
-      "poison_barb"
+      "poison_barb",
+      "iron_plate"
     ],
     "mago": [
       "choice_specs",
       "magnet",
       "charcoal",
-      "spell_tag"
+      "spell_tag",
+      "light_ball"
     ],
     "mago mobile": [
       "choice_specs",
@@ -111,13 +134,15 @@
       "assault_vest",
       "rocky_helmet",
       "never_melt_ice",
-      "mystic_water"
+      "mystic_water",
+      "rusted_shield"
     ],
     "supporto": [
       "king_rock",
       "soothe_bell",
       "poke_flute",
-      "exp_share"
+      "exp_share",
+      "prism_scale"
     ]
   }
 }

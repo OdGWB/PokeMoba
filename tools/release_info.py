@@ -1,7 +1,7 @@
 """Dati della prossima Release, ricavati dalla voce piu' recente di data/news.json.
 
 Usato da .github/workflows/release.yml: la Release si fa SOLO quando in cima alle
-novita' c'e' una versione che non e' ancora stata pubblicata. La versione "3.0.N"
+novita' c'e' una versione che non e' ancora stata pubblicata. La versione "SERIE.N"
 decide il numero della build (BUILD = SERIES_BASE + N, vedi game/version.py) e
 quindi il tag "v<BUILD>" che l'updater confronta.
 
@@ -23,10 +23,11 @@ from game import version  # noqa: E402
 
 
 def build_of(ver: str) -> int:
-    """'3.0.3' -> 7 con SERIES "3.0" e SERIES_BASE 4. Errore se la serie non e' quella
+    """'3.1.2' -> 9 con SERIES "3.1" e SERIES_BASE 7 (la patch parte da 0: 3.1.0 = 7).
+    Errore se la serie non e' quella
     di game/version.py (per una serie nuova si cambiano SERIES e SERIES_BASE)."""
     series, _, patch = ver.rpartition(".")
-    if series != version.SERIES or not patch.isdigit() or int(patch) < 1:
+    if series != version.SERIES or not patch.isdigit():
         raise ValueError(f"versione {ver!r} fuori dalla serie {version.SERIES}.N "
                          "(aggiorna SERIES/SERIES_BASE in game/version.py)")
     build = version.SERIES_BASE + int(patch)

@@ -4,7 +4,7 @@
   "name": "Gastly",
   "types": ["Ghost", "Poison"],
   "role": "mago",
-  "recommended_items": ["choice_specs", "charcoal", "magnet", "spell_tag"],
+  "recommended_items": ["oran_berry", "choice_specs", "light_ball", "charcoal", "magnet", "spell_tag"],
   "color": [150, 100, 205],
   "radius": 0.42,
   "base_speed": 3.8,

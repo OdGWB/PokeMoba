@@ -4,7 +4,7 @@
   "name": "Totodile",
   "types": ["Water"],
   "role": "combattente",
-  "recommended_items": ["choice_band", "black_sludge", "rusted_sword", "quick_claw"],
+  "recommended_items": ["honey", "choice_band", "snowball", "black_sludge", "rusted_sword", "quick_claw"],
   "color": [90, 150, 210],
   "radius": 0.44,
   "base_speed": 3.6,

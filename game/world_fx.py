@@ -19,7 +19,7 @@ import pygame
 
 import config
 
-from . import (arch_fx, char_fx, charcadet_fx, corvi_fx, eevee_fx, gastly_fx, hatt_fx, mag_fx, mien_fx, noivern_fx,
+from . import (arch_fx, char_fx, charcadet_fx, corvi_fx, deli_fx, eevee_fx, gastly_fx, hatt_fx, mag_fx, mien_fx, noivern_fx,
                flor_fx, moth_fx, octi_fx, poli_fx, scy_fx, sneasel_fx, spirit_fx, swine_fx, totodile_fx, ursa_fx)
 from .fx import type_color
 from .roggen_fx import draw_avalanche, draw_sandstorm
@@ -192,6 +192,19 @@ def draw_world_effects(surface, camera, world, m, team, vision, now, player_id,
         scy_fx.draw_field(surface, camera, fl, now)
     for ch in getattr(m, "scy_chops", ()):
         scy_fx.draw_chop(surface, camera, ch, now)
+    # Linea Delibird: Punte, pacchi in volo, Pacco a Sorpresa, Consegna Speciale.
+    for sp in getattr(m, "deli_spikes", ()):
+        if seen(sp["c"], sp["team"]):
+            deli_fx.draw_spike(surface, camera, sp, now)
+    for b in getattr(m, "deli_bombs", ()):
+        if seen(b["c"], b["team"]):
+            deli_fx.draw_bomb(surface, camera, b, now)
+    for g in getattr(m, "deli_gifts", ()):
+        if seen(g["pos"], g["team"]):
+            deli_fx.draw_gift(surface, camera, g, now)
+    for d in getattr(m, "deli_drops", ()):
+        if seen(d["c"], d["team"]):
+            deli_fx.draw_drop(surface, camera, d, now)
     # Linea Remoraid: proiettili di Pistolacqua / Raffica / Colpo Perforante.
     for o in getattr(m, "octi_shots", ()):
         if seen(o["pos"], o["team"]):

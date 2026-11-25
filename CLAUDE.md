@@ -1667,6 +1667,47 @@ Passaggi completati:
   (pulsante verde in alto a destra della griglia o F1): schede con barra e nome nel
   colore della categoria e spiegazione. Screenshot: step_82_griglia, _mossa/_mossa2,
   _stati/_stati2/_stati3.
+- DELIBIRD (con la forma FERROSACCO) e NUOVI OGGETTI 3.1 (step_83). (1) Logica in
+  engine/delibird.py (DelibirdMixin in engine/lines.py; dati in data/pokemon/delibird.json,
+  blocco "ferro" letto da delibird.ferro_data perche' il caricatore scarta le chiavi
+  ignote). Nessuna evoluzione: potenziamenti Q5/W6/E7, R al liv.8. Coda dei pacchi
+  p.deli_queue (3: pronto + 2 nell'HUD), probabilita' dalla Q scelta (effects.odds); il
+  pacco (deli_gifts, "moving" online) si ferma sulla prima unita' alleata o nemica, mai
+  chi lancia; sui nemici danno x1/x2/x3 (+schizzo 50% del Grande), il Regalo cura
+  l'alleato o, su un nemico, Delibird; un pacco di danno su un alleato si apre senza
+  effetto. Punte (deli_spikes, max 6), Liofilizzazione (bonus_vs_types), Pacco a
+  Sorpresa (deli_bombs), Consegna Speciale (deli_drops: congela con gli effetti della
+  mossa, cura gli alleati). Paradosso Futuro: _deli_to_ferro salva la forma e gli slot
+  Q/E, mette statistiche/tipi/mosse di Ferrosacco (preserve_ratio), +25% vel. d'attacco
+  (_deli_as_bonus); al termine _deli_from_ferro rimette tutto (coda dei pacchi intatta).
+  Propulsione Quark: mag_fields o mossa Elettro subita -> forma 12 s, statistica base piu'
+  alta x1,3 (Pokemon.quark_*). (2) Grafica game/deli_fx.py (registrato in FX_LINES):
+  PACCHI pixel art a mano (bitmap 9-15 px per Piccolo/Medio/Grande/Regalo, NEAREST, in
+  cache) in volo con l'ombra, che si aprono (coperchio che salta + coriandoli); palla di
+  neve e getto d'acqua a ricerca (AA_TRAVEL); punte di ghiaccio 9x9 x2; bomba con miccia
+  e area che si riempie; Consegna = pacco GIGANTE col paracadute a spicchi che scende
+  sull'area tratteggiata; scintille gialle di Quark sulle unita'; Liofilizzazione e
+  Idropompa riusano mothbeam (Venonat) ricolorato. HUD della passiva = pacco pronto nel
+  riquadro + i 2 successivi in colonna verso la Q; Ferrosacco = secondi della forma e
+  cornice gialla con Quark. Mirino col pacco pronto in punta (Renderer.draw_aim queue=).
+  Prima versione: pacchi a scala x2/x3 nel mondo (coprivano 2 tile) -> x1; ali rosse su
+  Volo Postale coprivano lo sprite -> piume. (3) CORRETTO un crash della partita
+  offline (da step_78): MatchScene._setup_moba usava self.renderer prima di crearlo;
+  set_terrain ora dopo la creazione del Renderer. (4) Oggetti (data/items.json,
+  engine/item_effects.py, test in tests/test_items_31.py): schede Iniziali e Consumabili;
+  gruppi starter (Baccarancia/Mielino/Condividi Esp., che resta anche uno per squadra) e
+  everstone; max_count (consumabili 2) in ItemCatalog.count_ok; regole in
+  Match._item_buy_ok (anche per i bot). Evolcondensa ora oggetto base, +25% Dif./Dif. Sp.
+  (Pokemon.evio_mult) se non completamente evoluto; Pietrastante blocca evoluzione e R
+  (evolution.check_evolution/apply_choice, offerta della R saltata), +50% XP fino al
+  liv.15, vendendola si evolve al tick dopo. Nuovi agganci: _item_dmg_mult (in
+  _deal_damage), _item_on_takedown (_award_kill), _item_on_ult (_cast slot R), sole
+  locale sun_zones (_sun_mult in _hit_core, lista "sun_zones" online), _item_on_support
+  (Squama Bella), _item_aa_extra, consumabili tolti con _consume_item. Icone da
+  tools/fetch_items.py (19 nuove; Scudo Rovinato 64x64 rimpicciolita NEAREST nel
+  negozio). Screenshot: step_83_* (attacco, regalino_volo/_apre, regalo, ventogelato,
+  punte/_colpo, liofilizzazione, pacco_sorpresa/_boom, consegna/_arrivo, ferrosacco,
+  ferro_attacco, idropompa, quark, ritorno, hud_zoom, negozio_*).
 Scelte tecniche importanti:
 - canopy NON e' piu del tutto vuoto: porta l'OVERHANG delle chiome dei muri sul
   bordo sud (sopra le unita, vedi passo rilievi pseudo-3D). lighting_overlay

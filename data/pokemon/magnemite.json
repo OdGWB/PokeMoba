@@ -4,7 +4,7 @@
   "name": "Magnemite",
   "types": ["Electric", "Steel"],
   "role": "mago",
-  "recommended_items": ["choice_specs", "magnet", "light_clay", "wide_lens"],
+  "recommended_items": ["oran_berry", "choice_specs", "light_ball", "magnet", "light_clay", "wide_lens"],
   "color": [170, 180, 196],
   "radius": 0.32,
   "base_speed": 3.3,

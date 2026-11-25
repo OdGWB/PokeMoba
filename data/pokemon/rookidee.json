@@ -4,7 +4,7 @@
   "name": "Rookidee",
   "types": ["Flying"],
   "role": "tank",
-  "recommended_items": ["rocky_helmet", "king_rock", "mystic_water", "leftovers"],
+  "recommended_items": ["rocky_helmet", "rusted_shield", "king_rock", "mystic_water", "leftovers"],
   "color": [70, 96, 170],
   "radius": 0.34,
   "base_speed": 3.6,

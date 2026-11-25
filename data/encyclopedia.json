@@ -198,6 +198,14 @@
         "prepotenza": {"name": "Prepotenza", "text": "Dopo 5 s senza fare ne' subire danni, il primo danno a un Pokemon nemico da' -20% di Attacco ai Pokemon nemici entro 4 tile per 4 s."},
         "cattivodelring": {"name": "Cattivo del Ring (Incineroar)", "text": "+5% di danno per ogni Pokemon nemico entro 5 tile, fino a +15%. Prepotenza resta."}
       }
+    },
+    "delibird": {
+      "summary": "Tiratore Ghiaccio/Volante a danno speciale, senza evoluzione: lancia pacchi a sorpresa che possono fare danno doppio o triplo oppure curare. Con la R può diventare per 8 secondi Ferrosacco, un tiratore Acqua/Ghiaccio velocissimo.",
+      "tips": ["Guarda i pacchi accanto alla Q: se il prossimo è un Regalo, tiralo su un alleato ferito.", "Un pacco di danno si ferma sul primo che incontra: un alleato davanti lo spreca.", "Ferrosacco dentro un Campo Elettrico (o colpito da una mossa Elettro) resta in campo 12 secondi e diventa ancora più veloce."],
+      "passives": {
+        "paccoinarrivo": {"name": "Pacco in Arrivo", "text": "Gli attacchi base sono palle di neve a distanza con danno speciale; l'Attacco degli oggetti diventa Att. Sp. La Q lancia il prossimo pacco di una coda: Piccolo (danno x1, 40%), Medio (x2, 30%), Grande (x3 e schizzo del 50% entro 2 tile, 10%) o Regalo (cura, 20%). Accanto alla Q si vedono i 2 pacchi successivi."},
+        "propulsionequark": {"name": "Propulsione Quark (Ferrosacco)", "text": "Dentro un Campo Elettrico o dopo aver subito una mossa Elettro, la forma Ferrosacco dura 12 secondi da quel momento e la statistica più alta (la Velocità) sale del 30%. Una volta per forma."}
+      }
     }
   },
   "moves": {
@@ -494,5 +502,17 @@
     "venonat:venomoth_silverwind": "Vento argenteo in linea; se colpisce un Pokémon nemico, tutte le statistiche di Venomoth aumentano del 10% per 2,5 secondi.",
     "venonat:venomoth_sleeppowder": "Come Velenpolvere; chi resta dentro più di 1 secondo si addormenta per 1,5 secondi (un colpo lo sveglia).",
     "venonat:venomoth_stunspore": "Come Velenpolvere, e all'apparire della nube i nemici dentro restano paralizzati per 1 secondo."
+,
+    "delibird:deli_present": "Lancia in linea il pacco pronto: si ferma sulla prima unità che incontra, alleata o nemica. Sui nemici Piccolo, Medio e Grande fanno danno x1, x2 e x3 (il Grande schizza il 50% entro 2 tile); il Regalo cura l'alleato colpito, o Delibird se prende un nemico. Un pacco di danno su un alleato si apre senza effetto.",
+    "delibird:deli_present_packing": "Come Regalino, ma i pacchi pesano di più: Piccolo 30%, Medio 30%, Grande 20%, Regalo 20%.",
+    "delibird:deli_present_express": "Come Regalino, con 2 cariche: due pacchi uno dopo l'altro (ogni carica torna in 8 secondi).",
+    "delibird:deli_icywind": "Vento gelido nel cono davanti a Delibird: danno e rallentamento del 30% per 2 secondi.",
+    "delibird:deli_spikes": "Pianta 3 punte di ghiaccio a terra che restano 30 secondi (al massimo 6). Il primo nemico che ne tocca una subisce danno ed è rallentato del 40% per 2 secondi.",
+    "delibird:deli_freezedry": "Raggio di ghiaccio che attraversa tutti i nemici sulla linea; fa danno doppio ai Pokémon di tipo Acqua.",
+    "delibird:deli_fly": "Scatto in volo di 5 tile che colpisce i nemici sul percorso.",
+    "delibird:deli_fly_double": "Come Volo Postale, con 2 cariche (ogni carica torna in 12 secondi).",
+    "delibird:deli_fly_bomb": "Come Volo Postale, ma lascia un pacco-bomba nel punto di partenza: dopo 1 secondo esplode e colpisce i nemici entro 2 tile.",
+    "delibird:deli_paradox": "Per 8 secondi Delibird diventa Ferrosacco (Acqua/Ghiaccio): stessa percentuale di vita, statistiche molto più alte, +25% di velocità d'attacco e getti d'acqua come attacco base. La Q diventa Idropompa (raggio di 10 tile), la E Inversione (scatto su un nemico e ritorno di 4 tile), la W resta quella scelta. Alla fine torna Delibird con la coda dei pacchi intatta.",
+    "delibird:deli_delivery": "Consegna un pacco gigante fino a 15 tile: dopo 1 secondo cade in un'area di 4 tile, fa molto danno ai nemici e li congela per 1 secondo, e cura gli alleati dentro."
   }
 }

@@ -3,7 +3,7 @@
 BUILD a zero vuol dire "copia di sviluppo" (python run_client.py o exe fatto in
 casa con crea_exe.bat): niente controllo degli aggiornamenti. La GitHub Action
 (.github/workflows/release.yml) parte quando in cima a data/news.json c'e' una
-versione 3.0.N non ancora pubblicata: riscrive BUILD = SERIES_BASE + N
+versione SERIE.N non ancora pubblicata: riscrive BUILD = SERIES_BASE + N
 (tools/release_info.py) prima di creare l'exe, e pubblica la Release col tag
 "v<BUILD>" (numerico: l'updater confronta quello) e il nome "PokéMoba <name()>".
 
@@ -16,18 +16,18 @@ della serie precedente.
 BUILD = 0
 REPO = "OWNER/REPO"          # "utente/nome-repo" su github.com
 ASSET = "PokeMoba.exe"       # nome del file allegato a ogni Release
-SERIES = "3.0"
-SERIES_BASE = 4              # build 4 = 3.0.1 (max 1), build 6 = 3.0.2: la run 5 e' fallita
+SERIES = "3.1"
+SERIES_BASE = 7              # build 7 = 3.1.0 (serie 3.0: build 4 = 3.0.1, build 6 = 3.0.2)
 
 
 def name() -> str:
-    """Versione leggibile, es. "3.0.1" ("3.0 dev" per le copie di sviluppo)."""
+    """Versione leggibile, es. "3.1.0" ("3.1 dev" per le copie di sviluppo)."""
     return name_of(BUILD)
 
 
 def name_of(build: int) -> str:
     """Nome leggibile di una build qualunque (es. quella appena scaricata)."""
-    return f"{SERIES}.{max(1, build - SERIES_BASE)}" if build else f"{SERIES} dev"
+    return f"{SERIES}.{max(0, build - SERIES_BASE)}" if build else f"{SERIES} dev"
 
 
 def label() -> str:

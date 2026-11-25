@@ -480,6 +480,19 @@ class Pokemon(Unit):
     incin_lariat_next: float = -1.0
     incin_ring_n: int = 0              # Cattivo del Ring: nemici entro 5 tile (max 3)
     incin_atk_mult: float = 1.0        # ricalcolato a ogni tick
+    # Linea Delibird (engine/delibird.py): coda dei pacchi della Q e forma Ferrosacco.
+    deli_queue: list = field(default_factory=list)   # prossimi pacchi: "s"/"m"/"l"/"g"
+    ferro_until: float = -1.0          # Paradosso Futuro: fine della forma Ferrosacco
+    quark_until: float = -1.0          # Propulsione Quark attiva fino a
+    quark_stat: str = ""               # statistica potenziata (attack/defense/...)
+    quark_active: bool = False
+    deli_saved: object = None          # forma Delibird salvata durante Ferrosacco
+    # Oggetti dell'aggiornamento 3.1 (engine/item_effects.py).
+    evio_mult: float = 1.0             # Evolcondensa: x1,25 Dif./Dif. Sp. se non completamente evoluto
+    prism_until: float = -1.0          # Squama Bella ricevuta: +vel. d'attacco e +danno agli attacchi base
+    snow_atk_until: float = -1.0       # Pallaneve: +25% Attacco dopo un controllo
+    snow_cc: bool = False              # Pallaneve: era sotto controllo al tick prima
+    snow_atk_active: bool = False      # ricalcolato a ogni tick (_update_items)
 
     def _bonus(self, stat: str) -> float:
         return (self.passive_bonus.get(stat, 0.0) + self.item_bonus.get(stat, 0.0)
@@ -510,6 +523,10 @@ class Pokemon(Unit):
             atk *= self.ancient_mult    # Forzantica (Mamoswine): tutte le statistiche
         if self.silver_active:
             atk *= self.silver_mult     # Ventargenteo (Venomoth): tutte le statistiche
+        if self.quark_active and self.quark_stat == "attack":
+            atk *= 1.3   # Propulsione Quark (Ferrosacco)
+        if self.snow_atk_active:
+            atk *= 1.25  # Pallaneve: dopo un controllo subito
         return atk * self.scy_atk_mult * self.incin_atk_mult   # Troppoforte; Prepotenza/Bullo
 
     def eff_sp_attack(self) -> float:
@@ -533,6 +550,8 @@ class Pokemon(Unit):
             ap *= self.silver_mult     # Ventargenteo
         if self.quiver_active:
             ap *= self.quiver_spa      # Eledanza: +30% Att. Sp.
+        if self.quark_active and self.quark_stat == "sp_attack":
+            ap *= 1.3                  # Propulsione Quark (Ferrosacco)
         return ap
 
     def snatch_mult(self) -> float:
@@ -553,6 +572,9 @@ class Pokemon(Unit):
             d *= self.ancient_mult      # Forzantica
         if self.silver_active:
             d *= self.silver_mult       # Ventargenteo
+        if self.quark_active and self.quark_stat == "defense":
+            d *= 1.3                    # Propulsione Quark (Ferrosacco)
+        d *= self.evio_mult             # Evolcondensa
         return max(0.0, d * self.scy_def_mult)   # Troppoforte, Spaccaroccia, campo di schegge
 
     def eff_sp_defense(self) -> float:
@@ -570,6 +592,9 @@ class Pokemon(Unit):
             d *= self.silver_mult       # Ventargenteo
         if self.quiver_active:
             d *= self.quiver_spd        # Eledanza: +30% Dif. Sp.
+        if self.quark_active and self.quark_stat == "sp_defense":
+            d *= 1.3                    # Propulsione Quark (Ferrosacco)
+        d *= self.evio_mult             # Evolcondensa
         return max(0.0, d * self.scy_spdef_mult)   # campo di schegge (Kleavor)
     # Ordine corrente impartito dal giocatore (o dal controllo): guida l'IA.
     #   "idle" | "move" | "attack" | "attackmove" | "stop" (stop = tieni la posizione)

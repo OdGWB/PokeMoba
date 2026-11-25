@@ -71,6 +71,8 @@ def check_evolution(p) -> bool:
     """
     if not p.evolutions:
         return False
+    if "everstone" in getattr(p, "items", ()):
+        return False   # Pietrastante: evoluzione rimandata finche' non la vende
     target = p.stage
     for st in p.evolutions:
         if p.level >= st.get("level", 1) and st.get("stage", 0) > target:
@@ -166,6 +168,8 @@ def apply_choice(p, slot: str, index: int) -> bool:
         return False
     if slot not in p.pending_choices:
         return False
+    if slot == "R" and "everstone" in getattr(p, "items", ()):
+        return False   # Pietrastante: l'ultimate resta bloccata
     index = max(0, min(index, len(ms.upgrades) - 1))
     ms.chosen = ms.upgrades[index]
     if slot == "R":

@@ -4,7 +4,7 @@
   "name": "Sneasel",
   "types": ["Dark", "Ice"],
   "role": "assassino",
-  "recommended_items": ["dragon_fang", "quick_claw", "poison_barb", "life_orb"],
+  "recommended_items": ["honey", "dragon_fang", "black_glasses", "quick_claw", "poison_barb", "life_orb"],
   "color": [52, 58, 96],
   "radius": 0.36,
   "base_speed": 3.7,

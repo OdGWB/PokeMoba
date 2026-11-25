@@ -4,7 +4,7 @@
   "name": "Duraludon",
   "types": ["Steel", "Dragon"],
   "role": "supporto",
-  "recommended_items": ["light_clay", "soothe_bell", "poke_flute", "wide_lens"],
+  "recommended_items": ["light_clay", "damp_rock", "soothe_bell", "poke_flute", "wide_lens"],
   "color": [176, 184, 196],
   "radius": 0.44,
   "base_speed": 3.4,

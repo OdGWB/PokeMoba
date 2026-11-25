@@ -229,6 +229,7 @@ class JungleSystem:
             # Oro al last-hit SOLO per i campi: +2% per livello medio dei
             # giocatori, raddoppiato dalla taglia di recupero se la squadra è
             # indietro. I leggendari danno oro di squadra (sotto).
+            self.m._item_on_wild_kill(killer)   # Mielino: cura il 6% degli HP max
             if victim.kind == "camp":
                 killer.stat_cs += 1
                 gold = victim.reward_gold

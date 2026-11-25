@@ -21,9 +21,11 @@ class TestItems(unittest.TestCase):
         self.assertEqual(ITEM_SLOTS, 6)
 
     def test_catalog_shape(self):
-        self.assertEqual(len(self.cat.base_ids), 7)
-        self.assertEqual(len(self.cat.intermediate_ids), 15)   # + Metalcoperta, Augite Nera
-        self.assertEqual(len(self.cat.completed_ids), 36)
+        # 3.1: + Evolcondensa (ora oggetto base), Pietrastante, Baccarancia, Mielino e
+        # 3 consumabili; intermedi + Bici Corsa/Cross; completi + 11.
+        self.assertEqual(len(self.cat.base_ids), 14)
+        self.assertEqual(len(self.cat.intermediate_ids), 16)   # + Metalcoperta, Augite Nera
+        self.assertEqual(len(self.cat.completed_ids), 47)
         for it in self.cat.items.values():
             self.assertTrue(it.icon, it.id)
             for c in it.build_from:
@@ -52,7 +54,7 @@ class TestItems(unittest.TestCase):
     def test_recipes_two_intermediates_plus_vitamin(self):
         # Regola: completo = 2 intermedi + 1 vitamina (eccezioni: Roccia di Re, Condividi Esp.).
         for iid in self.cat.completed_ids:
-            if iid in ("king_rock", "exp_share"):
+            if iid in ("king_rock", "exp_share", "amulet_coin"):
                 continue
             kinds = [self.cat.items[c].tier for c in self.cat.items[iid].build_from]
             self.assertEqual(sorted(kinds), [1, 2, 2], iid)
@@ -124,7 +126,7 @@ class TestItemEffects(unittest.TestCase):
         self.match._recompute_stats(self.a)
         base_def = self.a.eff_defense()
         self.give(self.a, "eviolite")
-        self.assertAlmostEqual(self.a.eff_defense(), base_def + 45, places=5)
+        self.assertAlmostEqual(self.a.eff_defense(), base_def * 1.25, places=5)
         self.a.stage = self.match._n_stages(self.a) - 1   # forma finale
         self.match._recompute_stats(self.a)
         self.assertAlmostEqual(self.a.eff_defense(),

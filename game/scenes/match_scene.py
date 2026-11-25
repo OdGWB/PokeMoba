@@ -119,6 +119,11 @@ class MatchScene:
         if self.match is not None:   # fiori della linea Flabébé (a terra, visibili a tutti)
             self.renderer.flower_source = lambda: self.match.flowers
         self.renderer.map.set_camps(map_data.camps)   # sentieri di terra verso le lane
+        # Mappa disegnata che segue il meteo (pozze, cespugli secchi, varchi, tana).
+        # Va DOPO la creazione del renderer (prima la partita offline andava in crash).
+        jg = getattr(self.match, "jungle", None) if self.match is not None else None
+        if jg is not None and getattr(jg, "base_tiles", None):
+            self.renderer.map.set_terrain(jg.base_tiles, jg._seal_tiles, self.map_data)
         self.fx = FXSystem()
         self._sfx = sfx.Watcher()
         # Ping sulla mappa e chat rapida (offline: i messaggi restano qui).
@@ -152,6 +157,11 @@ class MatchScene:
         for e in pdef.evolutions:
             if e.get("dex") is not None and e.get("sprite_dir"):
                 self._dex_sprite.setdefault(int(e["dex"]), e["sprite_dir"])
+        if pdef.passive == "paccoinarrivo":   # Delibird: forma Ferrosacco della R
+            from engine.delibird import ferro_data
+            fd = ferro_data()
+            self._dex_sprite.setdefault(int(fd.get("dex", 991)),
+                                        fd.get("sprite_dir", "assets/pokemon/0991"))
 
     def _bot_defs(self, n):
         """Definizioni dei `n` bot: quelle passate (bot_paths) oppure Pokémon CASUALI
@@ -195,10 +205,6 @@ class MatchScene:
 
     def _setup_moba(self):
         self.match = Match(self.world, self.map_data)
-        # Mappa disegnata che segue il meteo (pozze, cespugli secchi, varchi, tana).
-        jg = getattr(self.match, "jungle", None)
-        if jg is not None and getattr(jg, "base_tiles", None):
-            self.renderer.map.set_terrain(jg.base_tiles, jg._seal_tiles, self.map_data)
         # team_size Pokémon per squadra (3v3 o 5v5), lane a rotazione. Il giocatore
         # prende il primo slot in mid; il resto della squadra 0 e tutta la 1 sono bot.
         self.player = None
@@ -564,7 +570,8 @@ class MatchScene:
                                        (wx / config.TILE_SIZE, wy / config.TILE_SIZE),
                                        ms.chosen, hold=hold,
                                        rain=getattr(self.player, "arch_rain", False),
-                                       ammo=getattr(self.player, "ammo", "Water"))
+                                       ammo=getattr(self.player, "ammo", "Water"),
+                                       queue=getattr(self.player, "deli_queue", None))
         # Particelle degli effetti.
         self.fx.draw(surface, self.camera)
         arch_fx.draw_shake(surface, self.fx)   # Elettroraggio: lo schermo trema

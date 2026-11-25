@@ -372,7 +372,8 @@ class NetMatchScene:
                 self.renderer.draw_aim(surface, self.camera, me.pos,
                                        (wx / config.TILE_SIZE, wy / config.TILE_SIZE), mv,
                                        hold=hold, rain=getattr(me, "arch_rain", False),
-                                       ammo=getattr(me, "ammo", "Water"))
+                                       ammo=getattr(me, "ammo", "Water"),
+                                       queue=getattr(me, "deli_queue", None))
 
     def _draw_world_extras(self, surface):
         """Effetti che durano, sopra mappa e unità (la scena online li ha)."""
@@ -407,6 +408,8 @@ class NetMatchScene:
         for e in self.pdef.evolutions or ():
             if e.get("dex") is not None and int(e["dex"]) == dex:
                 return e.get("name") or self.pdef.name, e.get("sprite_dir") or self.pdef.sprite_dir
+        if dex == 991:   # Delibird nella forma Ferrosacco (Paradosso Futuro)
+            return "Ferrosacco", "assets/pokemon/0991"
         return self.pdef.name, self.pdef.sprite_dir
 
     def _player_view(self, h, me) -> hud.PlayerView:

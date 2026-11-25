@@ -100,8 +100,13 @@ class ShopUI:
                 bb = img.get_bounding_rect()
                 if bb.w and bb.h:
                     img = img.subsurface(bb).copy()
-                k = max(1, size // max(bb.w, bb.h, 1))
-                img = pygame.transform.scale(img, (bb.w * k, bb.h * k))
+                big = max(bb.w, bb.h, 1)
+                if big > size:   # icona piu' grande della casella (Scudo Rovinato 64x64)
+                    img = pygame.transform.scale(img, (max(1, bb.w * size // big),
+                                                       max(1, bb.h * size // big)))
+                else:
+                    k = max(1, size // big)
+                    img = pygame.transform.scale(img, (bb.w * k, bb.h * k))
                 surf = pygame.Surface((size, size), pygame.SRCALPHA)
                 surf.blit(img, ((size - img.get_width()) // 2, (size - img.get_height()) // 2))
             except (pygame.error, ValueError):
@@ -246,7 +251,7 @@ class ShopUI:
             price = catalog.effective_price(iid, owned)
             slots_after = len(owned) - len(catalog.components_in(iid, owned)) + 1
             afford = (near_base and gold >= price and slots_after <= ITEM_SLOTS
-                      and catalog.group_ok(iid, owned))
+                      and catalog.group_ok(iid, owned) and catalog.count_ok(iid, owned))
             pygame.draw.rect(surface, (34, 38, 48) if afford else (26, 26, 32), r)
             pygame.draw.rect(surface, (100, 150, 100) if afford else (80, 80, 90), r, 1)
             surface.blit(self._icon(catalog, iid, 44, font), (r.x + 4, r.y + 4))

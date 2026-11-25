@@ -57,6 +57,14 @@ ICONS = {
     "mystic_water": "mystic-water", "poke_flute": "poke-flute",
     # oggetti evolutivi della linea Scyther (black-augurite ridotta a 30x30 a mano)
     "metal_coat": "metal-coat", "black_augurite": "black-augurite",
+    # aggiornamento 3.1: evolutivi, iniziali, scarpe, consumabili e 11 completi
+    "everstone": "everstone", "oran_berry": "oran-berry", "honey": "honey",
+    "mach_bike": "mach-bike", "acro_bike": "acro-bike", "sitrus_berry": "sitrus-berry",
+    "lum_berry": "lum-berry", "ether": "ether", "black_glasses": "black-glasses",
+    "iron_plate": "iron-plate", "silver_powder": "silver-powder", "light_ball": "light-ball",
+    "soft_sand": "soft-sand", "snowball": "snowball", "rusted_shield": "rusted-shield",
+    "amulet_coin": "amulet-coin", "prism_scale": "prism-scale", "damp_rock": "damp-rock",
+    "heat_rock": "heat-rock",
     # consumabili / visione (non ancora in items.json)
     "potion": "potion", "full_heal": "full-heal", "escape_rope": "escape-rope",
     "poke_ball": "poke-ball", "silph_scope": "silph-scope",

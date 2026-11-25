@@ -14,10 +14,17 @@ def test_build_dalla_versione():
     assert version.name_of(R.build_of(ver)) == ver
 
 
-@pytest.mark.parametrize("bad", ["9.9.1", f"{version.SERIES}.0", f"{version.SERIES}.x", "3"])
+@pytest.mark.parametrize("bad", ["9.9.1", f"{version.SERIES}.x", f"{version.SERIES}.-1", "3"])
 def test_versione_fuori_serie(bad):
     with pytest.raises(ValueError):
         R.build_of(bad)
+
+
+def test_serie_31_parte_da_zero():
+    # 3.1.0 = build 7: piu' alta dell'ultima della serie 3.0 (3.0.2 = build 6).
+    assert version.SERIES == "3.1"
+    assert R.build_of("3.1.0") == 7
+    assert version.name_of(7) == "3.1.0"
 
 
 def test_info_dalla_voce_in_cima(tmp_path):

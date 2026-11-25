@@ -67,6 +67,7 @@ CHUNSOFT = sprite originali di Pokémon Mystery Dungeon (Spike Chunsoft).
 | 221 | Piloswine | CHUNSOFT |
 | 223 | Remoraid | CHUNSOFT |
 | 224 | Octillery | CHUNSOFT |
+| 225 | Delibird | CHUNSOFT, G〜, FlowerSnek |
 | 290 | Nincada | CHUNSOFT |
 | 291 | Ninjask | CHUNSOFT |
 | 292 | Shedinja | CHUNSOFT |
@@ -118,6 +119,7 @@ CHUNSOFT = sprite originali di Pokémon Mystery Dungeon (Spike Chunsoft).
 | 935 | Charcadet | Emmuffin |
 | 936 | Armarouge | Soulja |
 | 937 | Ceruledge | baronessfaron |
+| 991 | Iron_Bundle | JFain |
 | 1018 | Archaludon | Soulja |
 
 <!-- SPRITE-CREDITS:END -->

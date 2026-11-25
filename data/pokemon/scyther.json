@@ -4,7 +4,7 @@
   "name": "Scyther",
   "types": ["Bug", "Flying"],
   "role": "combattente",
-  "recommended_items": ["metal_coat", "black_augurite", "rusted_sword", "focus_band", "weakness_policy", "dragon_fang", "black_sludge"],
+  "recommended_items": ["metal_coat", "black_augurite", "rusted_sword", "soft_sand", "focus_band", "weakness_policy", "dragon_fang", "black_sludge"],
   "color": [96, 168, 72],
   "radius": 0.42,
   "base_speed": 3.7,

@@ -4,7 +4,7 @@
   "name": "Litten",
   "types": ["Fire"],
   "role": "combattente",
-  "recommended_items": ["rusted_sword", "focus_band", "weakness_policy", "rocky_helmet", "never_melt_ice"],
+  "recommended_items": ["oran_berry", "rusted_sword", "heat_rock", "focus_band", "weakness_policy", "rocky_helmet", "never_melt_ice"],
   "color": [200, 70, 50],
   "radius": 0.36,
   "base_speed": 3.6,

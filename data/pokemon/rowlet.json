@@ -4,7 +4,7 @@
   "name": "Rowlet",
   "types": ["Grass", "Flying"],
   "role": "tiratore",
-  "recommended_items": ["zoom_lens", "quick_claw", "dragon_fang", "poison_barb"],
+  "recommended_items": ["oran_berry", "mach_bike", "iron_plate", "zoom_lens", "quick_claw", "dragon_fang", "poison_barb"],
   "color": [150, 110, 80],
   "radius": 0.40,
   "base_speed": 3.5,

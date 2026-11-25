@@ -4,7 +4,7 @@
   "name": "Venonat",
   "types": ["Bug", "Poison"],
   "role": "tiratore",
-  "recommended_items": ["poison_barb", "quick_claw", "zoom_lens", "charcoal", "spell_tag"],
+  "recommended_items": ["oran_berry", "mach_bike", "silver_powder", "poison_barb", "quick_claw", "zoom_lens", "charcoal"],
   "color": [128, 84, 170],
   "radius": 0.4,
   "base_speed": 3.5,

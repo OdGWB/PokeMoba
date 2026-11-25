@@ -4,7 +4,7 @@
   "name": "Remoraid",
   "types": ["Water"],
   "role": "tiratore",
-  "recommended_items": ["choice_band", "zoom_lens", "quick_claw", "dragon_fang", "poison_barb"],
+  "recommended_items": ["oran_berry", "mach_bike", "iron_plate", "choice_band", "zoom_lens", "quick_claw", "dragon_fang"],
   "color": [120, 168, 200],
   "radius": 0.4,
   "base_speed": 3.5,

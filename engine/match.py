@@ -29,7 +29,9 @@ from .spatial import SpatialHash
 from .noivern import ECHO_ID
 from .mienshao import PROJ_SHAPES
 from .venomoth import MOTH_PASSIVES
-from .item_effects import ItemEffectsMixin, cdr_to_haste
+from .delibird import DELI_PASSIVES
+from .item_effects import (ACRO_SLOW, EVERSTONE_XP, EVERSTONE_XP_LEVEL, EVIOLITE_MULT,
+                           SNOWBALL_TEN, ItemEffectsMixin, cdr_to_haste)
 from .bot_plan import BotPlanMixin
 from .bot_utility import BotUtilityMixin
 from .surrender import SurrenderMixin
@@ -177,6 +179,8 @@ CAST_ANIMS = {"projectile": "Shoot", "bubble": "Shoot",
             "florseed": "Rotate", "florheal": "Charge", "florstorm": "Rotate",
             "florgarden": "Charge", "florsolar": "Charge",
             "scyfury": "Attack", "scyfocus": "Charge", "scywing": "Attack",
+            "deligift": "Shoot", "delispikes": "Shoot", "delibeam": "Shoot",
+            "delidash": "Charge", "deliparadox": "Charge", "delidelivery": "Shoot",
             "scybullet": "Attack", "scysuperpower": "Attack", "scyclaws": "Charge",
             "kleaaxe": "Attack", "kleachop": "Charge", "kleasmash": "Charge",
             "incinkick": "Double", "incinfang": "Attack", "incincross": "Swing",
@@ -218,6 +222,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         self.avalanches: list[dict] = []
         self.smackdown_zones: list[dict] = []
         self.item_clouds: list[dict] = []   # nubi della Palla Fumo (oggetto attivabile)
+        self.sun_zones: list[dict] = []     # aree di sole locale (Rocciacalda)
         for name in hook_names("init"):   # linee con logica propria (engine/lines.py)
             getattr(self, name)()
         self._init_basic_attack()   # attacco base: proiettili a ricerca
@@ -964,6 +969,9 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         if attacker.passive_id in MOTH_PASSIVES:
             # Scaglie Velenose (Venonat/Venomoth): scaglie a distanza, danno speciale.
             return self._moth_aa_power(attacker), True
+        if attacker.passive_id in DELI_PASSIVES:
+            # Pacco in Arrivo / Propulsione Quark: palle di neve e getti, danno speciale.
+            return self._deli_aa_power(attacker), True
         power = attacker.eff_attack()
         if attacker.rampage_until > self.time:
             power *= 1.4   # Oltraggio: attacchi base più forti
@@ -1076,6 +1084,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         if isinstance(target, Pokemon) and target.untargetable_until > self.time:
             return
         amount *= self._honey_wild_mult(attacker, target)   # Miele: +30% ai neutrali
+        amount *= self._item_dmg_mult(attacker, target)   # Mielino, Occhialineri, Elettropalla
         amount *= self._sneasel_wild_mult(attacker, target)   # Scalaroccia: +30% ai neutrali
         amount *= self._swine_wild_mult(attacker, target)   # Fiuto: +30% ai neutrali
         amount *= self._swine_type_mult(target, dmg_type)   # Grassospesso: -50% Fuoco/Ghiaccio
@@ -1456,6 +1465,8 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         # strutture: niente esperienza (per ora)
 
     def _gain_xp(self, p: Pokemon, amount: float) -> None:
+        if "everstone" in p.items and p.level < EVERSTONE_XP_LEVEL:
+            amount *= EVERSTONE_XP   # Pietrastante: +50% esperienza fino al liv.15
         p.xp += amount
         new_level = level_from_xp(p.xp)
         while p.level < new_level:
@@ -1483,6 +1494,9 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
             p.item_bonus[k] = p.item_bonus.get(k, 0.0) + v
         self._echo_convert(p)   # Ecolocalizzazione: Attacco degli oggetti -> Att. Sp.
         self._moth_convert(p)   # Scaglie Velenose: idem
+        self._deli_convert(p)   # Pacco in Arrivo (Delibird): idem
+        p.evio_mult = (EVIOLITE_MULT if "eviolite" in p.items and not self._is_final_form(p)
+                       else 1.0)   # Evolcondensa
         self._octi_convert(p)   # linea Remoraid: Att. Sp. degli oggetti -> Attacco
         d = derive(p.base_stats, p.level, ranged=p.ranged)
         # M (moltiplicatore d'evoluzione, punto 8) si applica a HP, AD, armatura,
@@ -1716,6 +1730,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
             killer.stat_kills += 1
         for a in assisters:
             a.stat_assists += 1
+        self._item_on_takedown(killer if killer_is_champ else None, assisters)   # Occhialineri, Monetamuleto
 
         fb_assist = config.FIRST_BLOOD_ASSIST if first_blood else 0
         if killer_is_champ:
@@ -1773,10 +1788,9 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         price = self.item_catalog.effective_price(item_id, unit.items)
         if unit.gold < price:
             return False
-        # Al massimo un oggetto Scelta e un paio di scarpe; un Condividi Esp. per squadra.
-        if not self.item_catalog.group_ok(item_id, unit.items):
-            return False
-        if it.group == "exp_share" and self._team_has_item(unit.team, item_id):
+        # Al massimo un oggetto Scelta, un paio di scarpe, un oggetto iniziale e
+        # una Pietrastante; un Condividi Esp. per squadra; consumabili al massimo 2.
+        if not self._item_buy_ok(unit, item_id):
             return False
         consumed = self.item_catalog.components_in(item_id, unit.items)
         if len(unit.items) - len(consumed) + 1 > ITEM_SLOTS:
@@ -1822,10 +1836,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         cat = self.item_catalog
 
         def can_buy(iid):
-            it = cat.get(iid)
-            if it is None or not cat.group_ok(iid, p.items):
-                return False
-            if it.group == "exp_share" and self._team_has_item(p.team, iid):
+            if cat.get(iid) is None or not self._item_buy_ok(p, iid):
                 return False
             slots_after = len(p.items) - len(cat.components_in(iid, p.items)) + 1
             return p.gold >= cat.effective_price(iid, p.items) and slots_after <= ITEM_SLOTS
@@ -1846,8 +1857,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
             it = cat.get(target)
             if it is None or target in p.items:
                 continue
-            if not cat.group_ok(target, p.items) or (
-                    it.group == "exp_share" and self._team_has_item(p.team, target)):
+            if not self._item_buy_ok(p, target):
                 continue   # regola "al massimo uno": passa al consigliato dopo
             got = pick(target)
             if got is not None:
@@ -1917,6 +1927,8 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         mv = self._item_on_cast(p, mv, slot)   # Scelta, Assorbisfera, Grandelente (+portata)
         self._hatt_on_cast(p)   # Quiete (Hatenna): lanciare vicino alla linea agita
         mv = self._mag_on_cast(p, mv)   # Campo Elettrico: +50% portata (linea Magnemite)
+        if slot == "R":
+            self._item_on_ult(p)   # Rocciaumida / Rocciacalda: pioggia o sole attorno a se'
         origin = Vec2(p.pos.x, p.pos.y)
         tgt = Vec2(tx, ty)
         to = tgt - origin
@@ -2321,7 +2333,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         """Pioggiadanza: zona di pioggia a tempo centrata su di sé. Dentro, le
         mosse Acqua degli alleati sono potenziate e conta come pioggia per
         Nuotovelox (gestito in _hit / _in_rain via self.rain_zones)."""
-        dur = float(mv.effects.get("duration", 3.0))
+        dur = float(mv.effects.get("duration", 3.0)) * self._rain_dur_mult(p)   # Rocciaumida
         rad = mv.radius if mv.radius > 0 else 3.0
         self.rain_zones.append({"center": Vec2(origin.x, origin.y), "radius": rad,
                                 "end": self.time + dur, "team": p.team})
@@ -2493,6 +2505,8 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         before = target.hp
         target.hp = min(target.max_hp, target.hp + amount)
         healed = target.hp - before
+        if healed > 0.0 and target is not caster:
+            self._item_on_support(caster, target)   # Squama Bella
         if (healed > 0.0 and isinstance(caster, Pokemon) and target is not caster
                 and "king_rock" in self._fx_items(caster)):
             self._give_shield(caster, target, healed * KINGROCK_SHIELD_FRAC, KINGROCK_SHIELD_DUR)
@@ -3646,6 +3660,8 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
             raw *= self._hatt_dmg_mult(caster, target, mv)   # Quiete / Strega della Foresta
             raw *= self._swine_dmg_mult(caster, target, mv)   # Valanga: x2 su chi l'ha colpito
             raw *= self._scy_move_mult(caster, mv, rank)   # Tecnico (Scizor): +40%
+            raw *= self._deli_move_mult(caster, target, mv)   # pacchi di Delibird, Liofilizzazione
+            raw *= self._sun_mult(caster, mv)   # sole locale (Rocciacalda): Fuoco +30%, Acqua -30%
             raw *= self._item_move_mult(caster, mv, target, eff)   # Scelta, Metronomo, ...
             crit_bonus = HIGH_CRIT_CHANCE if mv.d.get("high_crit") else 0.0
             crit_bonus += float(mv.d.get("crit_bonus", 0.0))   # Lacerazione: +20%
@@ -3692,6 +3708,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
             self._add_inversion(caster)
         self._sneasel_on_hit(caster, target)   # Arraffalesto, colpo d'agguato di Notte Fonda
         self._swine_on_hit(caster, target, mv)   # Gelo (accumuli), Frana (stordimento)
+        self._deli_on_hit(caster, target, mv)    # Propulsione Quark: mossa Elettro subita
 
     def _apply_hit_effects(self, caster, target, fx) -> None:
         """Controlli e debuff di una mossa sul Pokémon colpito."""
@@ -3847,12 +3864,17 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
     def _tenacity_dur(self, p, dur):
         """Tenacia: accorcia la durata dei CC (durata × (1 − tenacia))."""
         ten = getattr(p, "tenacity", 0.0) if isinstance(p, Pokemon) else 0.0
-        return dur * (1.0 - ten) * self._eevee_cc_mult(p)   # Forza Interiore / Fogliamanto
+        dur = dur * (1.0 - ten) * self._eevee_cc_mult(p)   # Forza Interiore / Fogliamanto
+        if isinstance(p, Pokemon) and p.items and "snowball" in self._fx_items(p):
+            dur *= SNOWBALL_TEN   # Pallaneve: controlli -25%
+        return dur
 
     def _apply_slow(self, p, mult, dur):
         if self._cc_immune(p) or self._ursa_slow_immune(p):   # Luna Piena
             return
         dur = self._tenacity_dur(p, dur)
+        if isinstance(p, Pokemon) and p.items and "acro_bike" in self._fx_items(p):
+            dur *= ACRO_SLOW   # Bici Cross: rallentamenti -30%
         p.slow_mult = min(p.slow_mult, mult) if self.time <= p.slow_until else mult
         p.slow_until = max(p.slow_until, self.time + dur)
 
@@ -4131,7 +4153,16 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                 self._recompute_stats(p, heal_delta=True)
                 self.announcements.append((self.time, f"{p.name} si è evoluto!"))
             # Offerta della scelta scaglionata: Q@5, W@6, E@7, R@8.
+            # Pietrastante: finche' la tiene l'ultimate non si sblocca (si offre
+            # appena la vende); una R gia' in attesa torna nascosta.
+            stone = "everstone" in p.items
+            rms = p.moveset.get("R")
+            if stone and "R" in p.pending_choices and rms is not None and rms.chosen is None:
+                p.pending_choices.remove("R")
+                p.offered_slots.discard("R")
             for slot, lvl in SLOT_UPGRADE_LEVEL.items():
+                if stone and slot == "R":
+                    continue
                 if p.level >= lvl and slot not in p.offered_slots:
                     ms = p.moveset.get(slot)
                     ready = ms and ms.upgrades and (

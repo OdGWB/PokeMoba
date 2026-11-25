@@ -4,7 +4,7 @@
   "name": "Mienfoo",
   "types": ["Fighting"],
   "role": "assassino",
-  "recommended_items": ["dragon_fang", "quick_claw", "focus_sash", "poison_barb"],
+  "recommended_items": ["oran_berry", "dragon_fang", "black_glasses", "quick_claw", "focus_sash", "poison_barb"],
   "color": [214, 176, 72],
   "radius": 0.38,
   "base_speed": 3.7,
