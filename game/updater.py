@@ -24,7 +24,7 @@ SICUREZZA DEL FILE SCARICATO (l'exe nuovo viene eseguito: e' il punto piu' delic
 - l'indirizzo di download deve essere una Release di version.REPO su github.com;
 - se GitHub pubblica l'impronta sha256 dell'allegato ("digest"), deve coincidere;
 - se version.UPDATE_PUBKEY e' impostata, l'allegato "PokeMoba.exe.sig" (firma
-  Ed25519 dello sha256 dell'exe, tools/release_sign.py) e' OBBLIGATORIO e deve
+  Ed25519 di sha256 dell'exe + numero di build, tools/release_sign.py) e' OBBLIGATORIO e deve
   essere valido: chi ruba l'account GitHub o il token delle Release non ha la
   chiave privata, quindi non puo' far installare un exe suo.
 """
@@ -79,11 +79,25 @@ def download_allowed(url: str, local: bool = False) -> bool:
     return url.startswith(f"https://github.com/{version.REPO}/releases/download/")
 
 
-def verify_signature(digest: bytes, sig: bytes, pubkey_hex: str) -> bool:
-    """Firma Ed25519 dello sha256 dell'exe. False per qualunque problema."""
+SIG_DOMAIN = b"PokeMoba-update-v1\x00"
+
+
+def signed_message(digest: bytes, build: int) -> bytes:
+    """Cio' che si firma: prefisso + numero di build (4 byte) + sha256 dell'exe.
+    Il build dentro la firma impedisce il downgrade: chi controlla le Release non
+    puo' ripubblicare un vecchio exe firmato (magari con un bug noto) sotto un tag
+    piu' alto, perche' la firma vale solo per il build con cui e' stato pubblicato."""
+    if not isinstance(build, int) or not 0 < build < 2 ** 32:
+        raise ValueError(f"build non valido: {build!r}")
+    return SIG_DOMAIN + build.to_bytes(4, "big") + digest
+
+
+def verify_signature(digest: bytes, build: int, sig: bytes, pubkey_hex: str) -> bool:
+    """Firma Ed25519 di signed_message(digest, build). False per qualunque problema."""
     try:
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-        Ed25519PublicKey.from_public_bytes(bytes.fromhex(pubkey_hex)).verify(sig, digest)
+        Ed25519PublicKey.from_public_bytes(bytes.fromhex(pubkey_hex)).verify(
+            sig, signed_message(digest, build))
         return True
     except Exception:
         return False
@@ -217,7 +231,7 @@ class Updater:
                         self.progress = min(1.0, got / total)
             if total and got != total:
                 raise OSError(f"download incompleto ({got}/{total} byte)")
-            self._check_file(h.digest(), want_sha, sig_url, tmp)
+            self._check_file(h.digest(), build, want_sha, sig_url, tmp)
             os.replace(tmp, dst)
             self._new_file = dst
             self.progress = 1.0
@@ -228,7 +242,7 @@ class Updater:
             self.state = "error"
             _log("errore: " + traceback.format_exc().strip().replace("\n", " | "))
 
-    def _check_file(self, digest, want_sha, sig_url, tmp) -> None:
+    def _check_file(self, digest, build, want_sha, sig_url, tmp) -> None:
         """Impronta e firma dell'exe scaricato; se qualcosa non torna lo cancella."""
         try:
             if want_sha and digest.hex() != want_sha.lower():
@@ -239,7 +253,7 @@ class Updater:
                     raise OSError("Release senza firma (PokeMoba.exe.sig)")
                 with self._get(sig_url, "application/octet-stream") as r:
                     sig = r.read(MAX_SIG + 1)
-                if len(sig) > MAX_SIG or not verify_signature(digest, sig, key):
+                if len(sig) > MAX_SIG or not verify_signature(digest, build, sig, key):
                     raise OSError("firma dell'aggiornamento NON valida: non lo installo")
         except Exception:
             try:

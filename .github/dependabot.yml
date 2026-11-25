@@ -1,0 +1,25 @@
+# Dependabot: PR settimanali per aggiornare le dipendenze fissate a versione esatta
+# (requirements*.txt) e le action fissate allo SHA del commit (.github/workflows).
+# Ogni PR passa dalla CI prima del merge: niente si aggiorna da solo.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      python-minor:
+        update-types: [minor, patch]
+    labels: [dipendenze]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ["*"]
+    labels: [dipendenze]

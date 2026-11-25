@@ -56,6 +56,10 @@ jobs:
     needs: check
     if: needs.check.outputs.new == 'true'
     runs-on: windows-latest
+    # Il secret UPDATE_SIGNING_KEY sta nell'environment "release", che GitHub
+    # concede solo ai workflow del branch main: un workflow su un altro branch non
+    # puo' leggere la chiave della firma.
+    environment: release
     env:
       SDL_VIDEODRIVER: dummy
       SDL_AUDIODRIVER: dummy

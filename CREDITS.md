@@ -245,4 +245,4 @@ colorato con l'iniziale dell'oggetto.
 
 ## Software
 
-- [pygame-ce](https://pyga.me/) — licenza LGPL.
+- [pygame](https://www.pygame.org/) (comunità di pygame) — licenza LGPL.
