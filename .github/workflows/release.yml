@@ -1,4 +1,4 @@
-# GitHub Release "v<build>" (nome "PokéMoba 3.0.N") con PokeMoba-Setup.exe (da scaricare)
+# GitHub Release "v<build>" (nome "PokéMoba 3.1.N", le ricostruzioni "3.1.N (build B)") con PokeMoba-Setup.exe (da scaricare)
 # e PokeMoba.exe allegati. Gli exe gia' installati vedono la Release all'avvio
 # (game/updater.py) e si aggiornano da soli scaricando PokeMoba.exe.
 #
@@ -94,6 +94,7 @@ jobs:
           exec(s, ns)
           with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as fh:
               print(f"VERSION_NAME={ns['name']()}", file=fh)
+              print(f"RELEASE_NAME={ns['release_name_of'](ns['BUILD'])}", file=fh)
 
       - name: Exe
         run: >
@@ -126,7 +127,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.check.outputs.tag }}
-          name: PokéMoba ${{ env.VERSION_NAME }}
+          name: PokéMoba ${{ env.RELEASE_NAME }}
           target_commitish: ${{ github.sha }}
           body_path: notes.md
           files: |

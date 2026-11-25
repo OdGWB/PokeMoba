@@ -35,6 +35,13 @@ def test_ricostruzione_tiene_il_nome():
     assert R.build_of("3.1.1") == 10 and version.name_of(10) == "3.1.1"
 
 
+def test_nome_release_delle_ricostruzioni():
+    # Su GitHub le ricostruzioni dicono la build; la Release originale e le patch no.
+    assert version.release_name_of(7) == "3.1.0"
+    assert version.release_name_of(9) == "3.1.0 (build 9)"
+    assert version.release_name_of(10) == "3.1.1"
+
+
 def test_info_dalla_voce_in_cima(tmp_path):
     f = tmp_path / "news.json"
     f.write_text(json.dumps([
