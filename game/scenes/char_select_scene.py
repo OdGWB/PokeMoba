@@ -29,18 +29,56 @@ GOLD = UI.GOLD
 TEXT = UI.TEXT
 DIM = UI.DIM
 
-ROLES = ["combattente", "mago", "tiratore", "assassino", "tank", "supporto", "jungler"]
-# "jungler" non è un ruolo dei JSON: è un filtro in più, per nome della linea.
-JUNGLERS = {"Nincada", "Totodile", "Swinub", "Sneasel", "Teddiursa"}
+# Filtro per RUOLO = corsia (top, giungla, mid, bottom, support). La CATEGORIA
+# dei JSON ("combattente", "mago"...) resta scritta sulle carte di selezione.
+ROLES = ["top", "giungla", "mid", "bottom", "support"]
+ROLE_LABELS = {"top": "Top", "giungla": "Giungla", "mid": "Mid", "bottom": "Bottom",
+               "support": "Support"}
+# Corsie di ogni linea (per nome della forma base). Chi manca non passa nessun filtro.
+LANES = {
+    "Litten": ("top",),
+    "Scyther": ("top",),
+    "Mienfoo": ("top", "mid"),
+    "Roggenrola": ("top",),
+    "Snivy": ("top", "mid"),
+    "Charcadet": ("top", "mid", "bottom"),
+    "Rookidee": ("top", "support"),
+    "Totodile": ("top", "giungla"),
+    "Poliwag": ("top", "support"),
+    "Nincada": ("giungla",),
+    "Swinub": ("giungla",),
+    "Sneasel": ("giungla", "mid"),
+    "Teddiursa": ("giungla",),
+    "Charmander": ("mid",),
+    "Gastly": ("mid",),
+    "Hatenna": ("mid",),
+    "Magnemite": ("mid",),
+    "Eevee": ("mid", "bottom", "support"),
+    "Rowlet": ("bottom",),
+    "Noibat": ("bottom",),
+    "Venonat": ("bottom",),
+    "Remoraid": ("bottom",),
+    "Delibird": ("bottom",),
+    "Duraludon": ("support",),
+    "Flabébé": ("support",),
+    "Spiritomb": ("support",),
+}
+# Linee da jungler (le usa anche chi deve sapere solo questo).
+JUNGLERS = {n for n, ls in LANES.items() if "giungla" in ls}
+
+
+def lanes_of(d) -> tuple:
+    return LANES.get(d.name, ())
+
+
+def lanes_label(d) -> str:
+    """"Top · Mid" (o "-" se la linea non ha corsie)."""
+    return " · ".join(ROLE_LABELS[r] for r in lanes_of(d)) or "-"
 
 
 def role_matches(d, role) -> bool:
-    """Il Pokémon `d` passa il filtro `role` (None = tutti)?"""
-    if role is None:
-        return True
-    if role == "jungler":
-        return d.name in JUNGLERS
-    return role in (d.role or "").split()      # "mago mobile" passa anche "mago"
+    """Il Pokémon `d` passa il filtro `role` (corsia; None = tutti)?"""
+    return role is None or role in lanes_of(d)
 
 
 def draw_role_chips(surface, x, y, role, defs, k=1.0, max_w=None):
@@ -52,7 +90,7 @@ def draw_role_chips(surface, x, y, role, defs, k=1.0, max_w=None):
     nf = UI.font(max(9, S(10)))
     out = []
     for ro in [None] + ROLES:
-        label = "Tutti" if ro is None else ro
+        label = "Tutti" if ro is None else ROLE_LABELS[ro]
         cnt = sum(role_matches(d, ro) for d in defs)
         on = ro == role
         t = cf.render(label, True, GOLD if on else UI.SOFT)
@@ -432,7 +470,8 @@ class CharSelectScene:
         y += S(22) + S(10)
         rf = UI.font(max(11, S(13)))
         a = rf.render("Ruolo · ", True, UI.SOFT)
-        b = UI.font(max(11, S(13)), bold=True).render(d.role or "-", True, TEXT)
+        b = UI.font(max(11, S(13)), bold=True).render(
+            f"{lanes_label(d)}  ({d.role or '-'})", True, TEXT)
         rx = panel.centerx - (a.get_width() + b.get_width()) // 2
         surface.blit(a, (rx, y))
         surface.blit(b, (rx + a.get_width(), y))

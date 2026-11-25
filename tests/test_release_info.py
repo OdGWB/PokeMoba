@@ -27,12 +27,12 @@ def test_serie_31_parte_da_zero():
 
 
 def test_ricostruzione_tiene_il_nome():
-    # build 8 = 3.1.0 ricostruita: l'updater la vede (8 > 7) ma il nome non cambia,
-    # e la patch dopo diventa la build 9.
-    assert version.REBUILDS == (8,)
-    assert version.name_of(8) == "3.1.0"
-    assert R.build_of("3.1.0") == 8
-    assert R.build_of("3.1.1") == 9 and version.name_of(9) == "3.1.1"
+    # build 8 e 9 = 3.1.0 ricostruita: l'updater le vede (9 > 8 > 7) ma il nome non
+    # cambia, e la patch dopo diventa la build 10.
+    assert version.REBUILDS == (8, 9)
+    assert version.name_of(8) == version.name_of(9) == "3.1.0"
+    assert R.build_of("3.1.0") == 9
+    assert R.build_of("3.1.1") == 10 and version.name_of(10) == "3.1.1"
 
 
 def test_info_dalla_voce_in_cima(tmp_path):

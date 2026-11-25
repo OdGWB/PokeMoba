@@ -16,7 +16,7 @@ RICOSTRUZIONI (REBUILDS): build in piu' della STESSA versione (es. un asset
 dimenticato nella Release). L'updater confronta solo il numero di build, quindi
 gli exe installati le scaricano, ma il nome resta quello della versione
 precedente e le patch successive slittano di uno (build 8 = 3.1.0 ricostruita,
-build 9 = 3.1.1). Per farne una: aggiungere qui la build nuova e fare push su
+build 10 = 3.1.1). Per farne una: aggiungere qui la build nuova e fare push su
 main (la Release parte anche per le modifiche a questo file).
 """
 
@@ -25,7 +25,7 @@ REPO = "OWNER/REPO"          # "utente/nome-repo" su github.com
 ASSET = "PokeMoba.exe"       # nome del file allegato a ogni Release
 SERIES = "3.1"
 SERIES_BASE = 7              # build 7 = 3.1.0 (serie 3.0: build 4 = 3.0.1, build 6 = 3.0.2)
-REBUILDS = (8,)              # build 8 = 3.1.0 ricostruita (nuovo sfondo del menu)
+REBUILDS = (8, 9)            # build 8 e 9 = 3.1.0 ricostruita (sfondo del menu; filtro per ruolo)
 
 
 def name() -> str:

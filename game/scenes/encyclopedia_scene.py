@@ -2,7 +2,7 @@
 
 Due viste:
 - GRIGLIA delle linee (config.ROSTER): ritratto Idle NEAREST, nome, ruolo;
-  filtro per ruolo (Tab / Maiusc+Tab o clic) e ricerca scrivendo il nome.
+  filtro per ruolo/corsia (Tab / Maiusc+Tab o clic) e ricerca scrivendo il nome.
 - SCHEDA della linea: forme (livello, tipi, ruolo, requisito d'evoluzione),
   come si gioca e consigli, passive, poi le mosse per casella Q/W/E/R
   (iniziale, potenziamenti a scelta, mosse proprie di una forma).
@@ -32,7 +32,7 @@ class _StatusPage:
 
 
 STATUS_PAGE = _StatusPage()
-from .char_select_scene import (TYPE_COLORS, draw_role_chips, evo_line, load_idle, role_matches,
+from .char_select_scene import (TYPE_COLORS, draw_role_chips, evo_line, lanes_label, load_idle, role_matches,
                                 scale_nearest, ROLES, config_root)
 
 GOLD, TEXT, DIM = UI.GOLD, UI.TEXT, UI.DIM
@@ -568,7 +568,8 @@ class EncyclopediaScene:
         r = UI.title(cv, ln.name, hx, y, max(28, S(36)), shadow=max(2, S(3)))
         cv.blit(f_t.render(evo_line(ln), True, UI.SOFT), (hx, r.bottom + S(6)))
         yy = r.bottom + S(6) + lh + S(4)
-        cv.blit(f_s.render("Ruolo: " + raw.get("role", ""), True, DIM), (hx, yy))
+        cv.blit(f_s.render("Ruolo: " + lanes_label(ln) + "   ·   Categoria: " + raw.get("role", ""),
+                            True, DIM), (hx, yy))
         y += S(112)
 
         def section(title_txt, y):

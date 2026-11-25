@@ -9,7 +9,7 @@ I turni dei bot si saltano: quando tutti gli umani hanno scelto, i bot prendono
 insieme un Pokémon a caso fra i rimasti. Nessun Pokémon si ripete.
 
 Comandi: frecce / mouse per guardare, Tab (o clic sulle pillole) per filtrare
-per ruolo (anche "jungler"), INVIO o doppio clic per confermare (solo al tuo
+per ruolo (top, giungla, mid, bottom, support), INVIO o doppio clic per confermare (solo al tuo
 turno; prima di confermare gli altri vedono la tua anteprima), ESC per uscire
 (l'host chiude la partita per tutti).
 """
@@ -24,7 +24,7 @@ from net import client as C
 from .. import avatars as A
 from .. import flor_fx
 from .char_select_scene import (PANEL, PANEL_HI, ROLES, TYPE_COLORS, draw_role_chips,
-                                load_idle, role_matches, scale_nearest)
+                                lanes_label, load_idle, role_matches, scale_nearest)
 from .online_lobby_scene import BG, BORDER, DIM, GOLD, RED, TEXT, Buttons, font
 
 COLS = 5
@@ -350,7 +350,7 @@ class OnlineDraftScene:
             pygame.draw.rect(surface, TYPE_COLORS.get(t, (180, 180, 180)), pr, border_radius=8)
             surface.blit(p, (pr.x + 7, pr.y + 2))
             x = pr.right + 6
-        surface.blit(sm.render(f"Ruolo: {pd.role}", True, DIM), (x + 8, y + 3))
+        surface.blit(sm.render(f"Ruolo: {lanes_label(pd)}  ·  {pd.role}", True, DIM), (x + 8, y + 3))
         self._color_rects = []
         if pd.passive == "giardino":   # Flabébé: colore dei fiori (tasti 1-5)
             pw = 5 * 32 + 4 * 6
