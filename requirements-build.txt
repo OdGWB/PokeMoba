@@ -4,5 +4,6 @@
 pygame==2.6.1
 numpy==2.3.4
 aiortc==1.15.0
+cryptography==50.0.2
 pyinstaller==6.16.0
 pytest==9.2.0

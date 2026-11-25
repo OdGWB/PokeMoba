@@ -206,12 +206,18 @@ class TestUpdater(unittest.TestCase):
         k = Ed25519PrivateKey.generate()
         pub = k.public_key().public_bytes(serialization.Encoding.Raw,
                                           serialization.PublicFormat.Raw).hex()
+        from game.updater import signed_message
         d = hashlib.sha256(b"exe").digest()
-        sig = k.sign(d)
-        self.assertTrue(verify_signature(d, sig, pub))
-        self.assertFalse(verify_signature(hashlib.sha256(b"altro").digest(), sig, pub))
-        self.assertFalse(verify_signature(d, b"x" * 64, pub))
-        self.assertFalse(verify_signature(d, sig, "zz"))
+        sig = k.sign(signed_message(d, 12))
+        self.assertTrue(verify_signature(d, 12, sig, pub))
+        self.assertFalse(verify_signature(hashlib.sha256(b"altro").digest(), 12, sig, pub))
+        self.assertFalse(verify_signature(d, 12, b"x" * 64, pub))
+        self.assertFalse(verify_signature(d, 12, sig, "zz"))
+        # Downgrade: lo stesso exe firmato per il build 12 non vale come build 13.
+        self.assertFalse(verify_signature(d, 13, sig, pub))
+        # Una firma del solo sha256 (formato senza build) non e' accettata.
+        self.assertFalse(verify_signature(d, 12, k.sign(d), pub))
+        self.assertFalse(verify_signature(d, 0, sig, pub))
 
     def test_bad_file_is_deleted(self):
         import hashlib
@@ -222,16 +228,16 @@ class TestUpdater(unittest.TestCase):
             tmp.write_bytes(b"exe")
             d = hashlib.sha256(b"exe").digest()
             with self.assertRaises(OSError):
-                u._check_file(d, "00" * 32, "", tmp)          # impronta sbagliata
+                u._check_file(d, 12, "00" * 32, "", tmp)          # impronta sbagliata
             self.assertFalse(tmp.exists())
             tmp.write_bytes(b"exe")
             self.version.UPDATE_PUBKEY = "11" * 32
             with self.assertRaises(OSError):
-                u._check_file(d, d.hex(), "", tmp)            # firma richiesta e assente
+                u._check_file(d, 12, d.hex(), "", tmp)        # firma richiesta e assente
             self.assertFalse(tmp.exists())
             tmp.write_bytes(b"exe")
             self.version.UPDATE_PUBKEY = ""
-            u._check_file(d, d.hex(), "", tmp)                # impronta giusta, niente firma
+            u._check_file(d, 12, d.hex(), "", tmp)            # impronta giusta, niente firma
             self.assertTrue(tmp.exists())
 
 
