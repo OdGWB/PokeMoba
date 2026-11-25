@@ -23,16 +23,20 @@ from game import version  # noqa: E402
 
 
 def build_of(ver: str) -> int:
-    """'3.1.2' -> 9 con SERIES "3.1" e SERIES_BASE 7 (la patch parte da 0: 3.1.0 = 7).
+    """'3.1.2' -> 10 con SERIES "3.1", SERIES_BASE 7 e REBUILDS (8,)
+    (la patch parte da 0: 3.1.0 = 7, ricostruita come 8).
     Errore se la serie non e' quella
     di game/version.py (per una serie nuova si cambiano SERIES e SERIES_BASE)."""
     series, _, patch = ver.rpartition(".")
     if series != version.SERIES or not patch.isdigit():
         raise ValueError(f"versione {ver!r} fuori dalla serie {version.SERIES}.N "
                          "(aggiorna SERIES/SERIES_BASE in game/version.py)")
-    build = version.SERIES_BASE + int(patch)
-    assert version.name_of(build) == ver
-    return build
+    # L'ultima build con quel nome: con le ricostruzioni (version.REBUILDS) la
+    # stessa versione puo' avere piu' build, e si pubblica la piu' recente.
+    base = version.SERIES_BASE + int(patch)
+    builds = [b for b in range(base, base + len(version.REBUILDS) + 1)
+              if version.name_of(b) == ver]
+    return max(builds)
 
 
 def notes(entry: dict) -> str:

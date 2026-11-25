@@ -5,14 +5,15 @@
 # NON parte a ogni merge: solo quando su main arriva una modifica a data/news.json con
 # in cima una versione NON ancora pubblicata (o a mano, da Actions -> Release -> Run
 # workflow). La versione 3.0.N della voce decide build e tag (tools/release_info.py).
-# Correggere il testo di una voce gia' pubblicata non rifa' la Release.
+# Correggere il testo di una voce gia' pubblicata non rifa' la Release. Per ripubblicare
+# la stessa versione (asset dimenticato) si aggiunge una build a REBUILDS in game/version.py.
 # I test delle PR sono in ci.yml.
 name: Release
 
 on:
   push:
     branches: [main]
-    paths: [data/news.json]
+    paths: [data/news.json, game/version.py]
   workflow_dispatch:
 
 permissions:
