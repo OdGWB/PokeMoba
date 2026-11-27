@@ -2,7 +2,7 @@
 
 Righe: schermo intero, volumi (generale, musica, combattimento, interfaccia,
 avvisi: barre da trascinare), limite FPS, velocità della camera,
-lancio rapido (smart cast) e la pagina dei tasti. Frecce su/giù per scegliere,
+lancio rapido (smart cast), gittata dell'attacco base e la pagina dei tasti. Frecce su/giù per scegliere,
 sinistra/destra (o clic sulle frecce) per cambiare il valore, Invio/clic per
 attivare. Tutto si salva subito in %APPDATA%/PokeMoba/options.json.
 """
@@ -106,7 +106,11 @@ def _slider_row(surface, r, on, label, vol, t, small):
 
 class OptionsScene:
     ROWS = ("fullscreen", "master", "music", "combat", "ui", "alert", "fps", "camera",
-            "smart", "keys", "back")
+            "smart", "aa_range", "keys", "back")
+    # Testi e sfondo che la versione in partita (game/ingame_menu.py) cambia.
+    BACK_LABEL = "Indietro"
+    ESC_HINT = "ESC: menu"
+    leave_note = ""
 
     def __init__(self, app):
         self.app = app
@@ -162,6 +166,8 @@ class OptionsScene:
             return f"x{keybinds.camera_speed:.2f}".rstrip("0").rstrip(".")
         if key == "smart":
             return "SÌ" if keybinds.smart_cast else "NO"
+        if key == "aa_range":
+            return "SÌ" if keybinds.show_aa_range else "NO"
         return None
 
     def _change(self, key, delta):
@@ -188,6 +194,9 @@ class OptionsScene:
             _save_options(keybinds.to_options())
         elif key == "smart":
             keybinds.smart_cast = not keybinds.smart_cast
+            _save_options(keybinds.to_options())
+        elif key == "aa_range":
+            keybinds.show_aa_range = not keybinds.show_aa_range
             _save_options(keybinds.to_options())
         elif key == "keys":
             self.next_scene = KeybindScene(self.app)
@@ -259,9 +268,12 @@ class OptionsScene:
     def hud_lines(self):
         return []
 
+    def _backdrop(self, surface):
+        surface.fill(BG)
+
     def draw_fullres(self, surface, f):
         W, H = surface.get_size()
-        surface.fill(BG)
+        self._backdrop(surface)
         big = font(max(26, H // 22), True)
         t = font(max(15, H // 46), True)
         small = font(max(13, H // 54))
@@ -270,28 +282,39 @@ class OptionsScene:
         surface.blit(title, (W // 2 - title.get_width() // 2, ty))
         labels = {"fullscreen": "Schermo intero",
                   "fps": "Limite FPS", "camera": "Velocità camera (bordi)",
-                  "smart": "Lancio rapido (smart cast)", "keys": "Tasti...",
-                  "back": "Indietro"}
+                  "smart": "Lancio rapido (smart cast)",
+                  "aa_range": "Mostra gittata attacco base", "keys": "Tasti...",
+                  "back": self.BACK_LABEL, "leave": "Esci dalla partita"}
         gap = 6
         sec = small.get_height() + 6                 # spazio per l'intestazione "AUDIO"/"GIOCO"
         y0 = ty + title.get_height() + 12
-        n = len(self.ROWS)
+        n = len(self.ROWS) - ("leave" in self.ROWS)   # "leave" sta accanto a "back"
         foot = small.get_height() * 2 + 34
-        bh = max(28, min(H // 15, (H - y0 - foot - 2 * sec) // n - gap))
+        bh = (H - y0 - foot - 2 * sec) // n - gap
+        compact = bh < 28        # finestra bassa: senza intestazioni e note, tutto dentro
+        if compact:
+            gap, sec, foot = 3, 0, 6
+            bh = (H - y0 - foot) // n - gap
+        bh = max(20, min(H // 15 if not compact else 28, bh))
         bw = min(int(W * 0.7), max(720, int(H * 0.85)))
         x0 = W // 2 - bw // 2
         self._rects = []
         self._bars = {}
         y = y0
         for i, key in enumerate(self.ROWS):
-            if key in ("master", "fps"):                 # intestazione del gruppo
+            if sec and key in ("master", "fps"):         # intestazione del gruppo
                 h = small.render("AUDIO" if key == "master" else "GIOCO", True, DIM)
                 surface.blit(h, (x0 + 4, y + 2))
                 pygame.draw.line(surface, BORDER, (x0 + h.get_width() + 12, y + 2 + h.get_height() // 2),
                                  (x0 + bw, y + 2 + h.get_height() // 2))
                 y += sec
-            r = pygame.Rect(x0, y, bw, bh)
-            y += bh + gap
+            if key == "leave":       # metà destra della riga di "back"
+                half = (bw - gap) // 2
+                r = pygame.Rect(x0 + bw - half, y - bh - gap, half, bh)
+            else:
+                w = (bw - gap) // 2 if key == "back" and "leave" in self.ROWS else bw
+                r = pygame.Rect(x0, y, w, bh)
+                y += bh + gap
             on = i == self.sel or key == self._drag
             if key in VOLUMES:
                 self._bars[key] = _slider_row(surface, r, on, VOLUMES[key][0],
@@ -308,17 +331,21 @@ class OptionsScene:
                           "(Tiro Lungo e la R di Magnezone restano a mira).",
                  "fps": "Limite FPS: più basso = meno lavoro per la CPU (portatili).",
                  "camera": "Velocità dello scorrimento quando il mouse tocca il bordo.",
+                 "aa_range": "Linea attorno al tuo Pokémon: fin dove arriva l'attacco base.",
                  "master": "Volume generale: moltiplica musica ed effetti.",
                  "music": "Musica dei menu (in partita non suona).",
                  "combat": "Colpi, mosse, proiettili, torri e morti delle unità.",
                  "ui": "Clic e scorrimento dei menu, acquisti e vendite nel negozio.",
-                 "alert": "Ping, chat rapida, voto di resa, livelli, evoluzioni, uccisioni, oro."}
+                 "alert": "Ping, chat rapida, voto di resa, livelli, evoluzioni, uccisioni, oro.",
+                 "leave": self.leave_note}
+        if compact:
+            return
         note = notes.get(self.ROWS[self.sel])
         if note:
             nn = small.render(note, True, DIM)
             surface.blit(nn, (W // 2 - nn.get_width() // 2, y + 4))
         hint = small.render("frecce: scegli e cambia    trascina la barra o rotella: volume    "
-                            "Invio / clic destro: muto    ESC: menu", True, DIM)
+                            "Invio / clic destro: muto    " + self.ESC_HINT, True, DIM)
         surface.blit(hint, (W // 2 - hint.get_width() // 2, H - hint.get_height() - 12))
 
 
@@ -396,9 +423,12 @@ class KeybindScene:
     def hud_lines(self):
         return []
 
+    def _backdrop(self, surface):
+        surface.fill(BG)
+
     def draw_fullres(self, surface, f):
         W, H = surface.get_size()
-        surface.fill(BG)
+        self._backdrop(surface)
         big = font(max(26, H // 22), True)
         t = font(max(14, H // 46), True)
         small = font(max(13, H // 54))

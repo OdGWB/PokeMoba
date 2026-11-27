@@ -123,7 +123,7 @@ Altri strumenti:
 | Minimappa | Sinistro: sposta la camera. Destro: muovi lì |
 | `Tab` / rotella | Cambia polarità (Magnezone, mentre miri) |
 | `F11` / `F` | Schermo intero |
-| `Esc` | Esci |
+| `Esc` | Chiude il negozio; apre e chiude le opzioni (da lì si esce) |
 
 La finestra si può ridimensionare. L'area di gioco resta fissa e uguale per tutti,
 scalata con le bande nere, così nessuno vede più mappa degli altri.

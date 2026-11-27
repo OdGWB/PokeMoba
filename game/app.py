@@ -110,6 +110,7 @@ class App:
             self.scene = MatchScene(map_path, pokemon_path, start_level=start_level,
                                     start_items=start_items, start_armature=start_armature,
                                     flower_color=flower_color)
+            self.scene.options_app = self       # opzioni in partita (ESC) nel launcher
         else:
             from .avatars import load_profile
             self.profile = load_profile()       # nickname + immagine profilo salvati
@@ -260,6 +261,9 @@ class App:
         if fullres is not None:
             self.scene.fps = self.clock.get_fps()   # mostrato dall'HUD della partita
             fullres(self.window, self.font)
+        menu = getattr(self.scene, "match_menu", None)
+        if menu is not None:        # opzioni in partita: sopra tutta l'interfaccia
+            menu.draw(self.window, self.font)
         self._draw_update()
         pygame.display.flip()
 

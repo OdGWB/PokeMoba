@@ -95,7 +95,9 @@ In giocatore singolo non c'è draft: il Pokémon lo scegli prima della partita.
 - **Q W E R** (tieni premuto, poi rilascia): mosse. **Ctrl + Q/W/E/R**: alza il grado.
 - **P**: negozio (in base). **B**: torna in base. **Y**: blocca/sblocca la telecamera.
 - **F3**: mostra o nasconde le info di rete (ping, pacchetti persi...).
-- **ESC**: esci (se sei l'host, chiude la partita per tutti).
+- **ESC**: chiude il negozio; se non c'è nulla di aperto apre le opzioni (ESC di
+  nuovo le chiude). Per uscire: **Esci dalla partita** nelle opzioni (se sei
+  l'host, chiude la partita per tutti).
 
 ---
 

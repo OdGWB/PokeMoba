@@ -45,7 +45,7 @@ STEPS = [
     ("Tornare in base", "Premi B e resta fermo qualche secondo: torni in base, ti curi "
      "e puoi comprare. Muoverti o venire colpito interrompe il richiamo.", None),
     ("Tutorial completato!", "Ora conosci le basi. INVIO = Allenamento libero con "
-     "Charmander, ESC = torna al menu. Nell'Enciclopedia trovi tutte le mosse e le "
+     "Charmander. Per uscire: ESC, poi Esci dalla partita. Nell'Enciclopedia trovi tutte le mosse e le "
      "passive di ogni linea.", None),
 ]
 LAST = len(STEPS) - 1
@@ -125,6 +125,9 @@ class TutorialScene(TrainingScene):
     def handle_events(self, events) -> None:
         rest = []
         for ev in events:
+            if self.match_menu is not None:     # opzioni aperte: Invio e clic sono loro
+                rest.append(ev)
+                continue
             if ev.type == pygame.KEYDOWN and ev.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
                 if self.step == 0:
                     self._advance()
