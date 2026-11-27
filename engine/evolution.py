@@ -161,7 +161,8 @@ def apply_choice(p, slot: str, index: int) -> bool:
     """Applica la scelta del potenziamento (o ultimate) per uno slot.
 
     Il grado della mossa si conserva (cambia solo la variante). Per la R,
-    scegliere l'ultimate sblocca lo slot e le da' il 1° grado (gratis).
+    scegliere l'ultimate sblocca lo slot e le da' il 1° grado, pagato col
+    punto del liv.8 (tenuto da parte da skills.available_points).
     """
     ms = p.moveset.get(slot)
     if ms is None or not ms.upgrades:
@@ -174,10 +175,11 @@ def apply_choice(p, slot: str, index: int) -> bool:
     ms.chosen = ms.upgrades[index]
     if slot == "R":
         ms.unlocked = True
-        # Scelta l'ultimate, il 1° grado arriva da solo (senza spendere punti):
-        # non serve "attivarla" a mano dopo averla scelta.
+        # Scelta l'ultimate, il punto del liv.8 ci va da solo: non serve
+        # "attivarla" a mano dopo averla scelta, e non resta un punto in più.
         if ms.rank <= 0:
             ms.rank = 1
+            p.skill_points_spent += 1
     p.pending_choices.remove(slot)
     skills._apply_passive(p)
     return True

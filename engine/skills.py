@@ -16,12 +16,28 @@ R_RANK_LEVELS = [8, 11, 14]
 
 
 def available_points(p) -> int:
-    """Punti mossa non ancora spesi (1 per livello)."""
-    return max(0, p.level - p.skill_points_spent)
+    """Punti mossa che il giocatore può spendere (1 per livello).
+
+    Il punto del liv.8 è della ultimate: finché la R non ha il 1° grado resta
+    da parte, e lo spende evolution.apply_choice quando la sblocca."""
+    r = p.moveset.get("R")
+    reserved = 1 if p.level >= R_RANK_LEVELS[0] and (r is None or r.rank <= 0) else 0
+    return max(0, p.level - p.skill_points_spent - reserved)
 
 
 def _base_rank_cap(level: int) -> int:
     return math.ceil(level / 2)
+
+
+def rank_allowed(slot: str, rank: int, max_rank: int, level: int) -> bool:
+    """Il livello consente un grado in più? (Punti e sblocco si controllano a
+    parte: la usa anche l'HUD online, che ha solo i numeri dello snapshot.)"""
+    if rank >= max_rank:
+        return False
+    if slot == "R":
+        # Solo ai livelli 8/11/14 e nell'ordine.
+        return level >= R_RANK_LEVELS[rank]
+    return rank + 1 <= _base_rank_cap(level)
 
 
 def can_rank_up(p, slot: str) -> bool:
@@ -30,13 +46,7 @@ def can_rank_up(p, slot: str) -> bool:
         return False
     if not ms.unlocked:
         return False
-    if ms.rank >= ms.max_rank:
-        return False
-    new_rank = ms.rank + 1
-    if slot == "R":
-        # Solo ai livelli 8/11/14 e nell'ordine.
-        return p.level >= R_RANK_LEVELS[new_rank - 1]
-    return new_rank <= _base_rank_cap(p.level)
+    return rank_allowed(slot, ms.rank, ms.max_rank, p.level)
 
 
 def rank_up(p, slot: str) -> bool:

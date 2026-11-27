@@ -19,6 +19,7 @@ import time
 import pygame
 
 import config
+from engine.vec import Vec2
 from net import client as C
 from net.prediction import Predictor
 
@@ -209,7 +210,6 @@ class OnlineMatchScene(NetMatchScene):
         Pokémon morto; se lo stato visivo lo dà a terra (dead) parte la dissolvenza,
         altrimenti era solo uscito dalla visione."""
         from engine.entities import Pokemon
-        from engine.vec import Vec2
         now = time.monotonic()
         alive = {}
         for u in self.world.units():
@@ -235,6 +235,15 @@ class OnlineMatchScene(NetMatchScene):
             d["t"] += dt
             if eid in alive or d["t"] >= DEATH_FADE:
                 del self._dying[eid]
+
+    def _my_path(self, me):
+        """Percorso del PROPRIO Pokémon, come offline: quello predetto (subito
+        al clic) o, se si segue l'host, quello che manda l'host."""
+        if me is None or me.id in self.world.dead:
+            return None
+        pr = self.predictor
+        pts = self._me_vis().get("route", ()) if pr.follow else pr.path
+        return [me.pos] + [Vec2(x, y) for x, y in pts]
 
     def _draw_world_extras(self, surface):
         me = self.world.get(self.your_id)
