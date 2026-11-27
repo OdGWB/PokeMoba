@@ -9,6 +9,20 @@ if errorlevel 1 (
     python -m pip install pyinstaller || goto :errore
 )
 
+REM Il motore Rust (native/) fa parte del gioco: si ricompila a ogni exe.
+where cargo >nul 2>&1
+if errorlevel 1 (
+    echo Manca Rust: installalo da https://rustup.rs e rilancia.
+    goto :errore
+)
+python -m maturin --version >nul 2>&1
+if errorlevel 1 (
+    echo Installo maturin...
+    python -m pip install maturin==1.16.0 || goto :errore
+)
+echo Compilo il motore Rust...
+python tools\build_native.py || goto :errore
+
 echo Creo l'exe, ci vuole qualche minuto...
 python -m PyInstaller --noconfirm --clean --onefile --windowed ^
     --name PokeMoba ^
@@ -20,6 +34,12 @@ python -m PyInstaller --noconfirm --clean --onefile --windowed ^
     --collect-all aiortc ^
     --distpath dist --workpath build\pyinstaller --specpath build ^
     "%~dp0run_client.py" || goto :errore
+
+start /wait "" "%~dp0dist\PokeMoba.exe" --check-engine
+if errorlevel 1 (
+    echo L'exe non carica il motore Rust: non distribuirlo.
+    goto :errore
+)
 
 echo.
 echo FATTO: %~dp0dist\PokeMoba.exe

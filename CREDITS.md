@@ -246,3 +246,13 @@ colorato con l'iniziale dell'oggetto.
 ## Software
 
 - [pygame](https://www.pygame.org/) (comunità di pygame) — licenza LGPL.
+
+Compilati nel motore Rust del gioco (`native/`), tutti con doppia licenza
+**MIT** o **Apache-2.0**:
+
+- [PyO3](https://github.com/PyO3/pyo3) (`pyo3`, `pyo3-ffi`) — © PyO3 Project and
+  Contributors.
+- [libc](https://github.com/rust-lang/libc) — © The Rust Project Developers.
+- [once_cell](https://github.com/matklad/once_cell) — © Aleksey Kladov.
+- [Libreria standard di Rust](https://github.com/rust-lang/rust) — © The Rust
+  Project Developers.

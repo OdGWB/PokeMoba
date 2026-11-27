@@ -141,7 +141,10 @@ decide whether to continue.
 `engine/` had 77 commits in the last month. Every rule change must then be
 made twice. Policy proposed:
 
-* Python stays the source of truth; nothing in the game depends on Rust.
+* Python stays the source of truth for the rules. This policy is about the
+  training engine only: the live-game module (`native/`) is required by the
+  published exe (`engine/backend.py`), and a change to a function it ports must
+  be made in both (CI runs `rust_parity`, py vs native).
 * A rule change is "done" for training only when `rust_parity` passes; until
   then training falls back to Python automatically (section 4).
 * Bot logic (`bot_utility.py`, `bot_params.py`, owned by the CMA chat) changes
