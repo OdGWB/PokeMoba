@@ -24,3 +24,6 @@ screenshots/
 *.prof
 tools/tier_matches_5v5.jsonl
 reports/
+
+# Storico grafica locale (letto da CLAUDE.md)
+docs/STATO_GRAFICA.md

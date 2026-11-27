@@ -79,6 +79,7 @@ class BotParams:
     tower_w_dist: float = 0.5
     tower_w_frac: float = 30.0
     tower_w_minion: float = 10.0
+    tower_w_ally: float = 3.0       # peso di (alleati - nemici) attorno alla torre (prima fisso a 3.0)
     # roam del support
     roam_from: float = 180.0
     roam_time: float = 26.0

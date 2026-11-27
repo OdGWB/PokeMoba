@@ -49,6 +49,7 @@ class Simulation:
         if unit is None or not getattr(unit, "alive", True):
             return
         if isinstance(cmd, MoveCommand):
+            self._drop_lock(unit)
             self._set_order(unit, "move", point=Vec2(cmd.x, cmd.y))
             self._apply_move(unit, cmd.x, cmd.y)
         elif isinstance(cmd, AttackCommand):
@@ -102,6 +103,15 @@ class Simulation:
         elif isinstance(cmd, StopCommand):
             self._set_order(unit, "stop")
             unit.stop()
+
+    def _drop_lock(self, unit) -> None:
+        """Ordine di movimento: il bersaglio agganciato si molla davvero. Da fermo
+        non verra' reinseguito per un po' (solo attaccato se entra a portata)."""
+        if self.match is None or not hasattr(unit, "order"):
+            return
+        tid = unit.order_target_id if unit.order == "attack" else unit.target_id
+        if tid is not None:
+            self.match.skip_chase(unit, tid)
 
     @staticmethod
     def _set_order(unit, order: str, target_id=None, point=None) -> None:

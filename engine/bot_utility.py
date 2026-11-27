@@ -180,7 +180,7 @@ class BotUtilityMixin:
                            and self.vision.is_enemy_visible(p.team, e.id))
                 good = (bp.tower_w_frac * (1.0 - frac)
                         + (bp.tower_w_minion if minions else -bp.tower_w_minion)
-                        + 3.0 * (allies - foes) - d * bp.tower_w_dist)
+                        + bp.tower_w_ally * (allies - foes) - d * bp.tower_w_dist)
                 if bs is None or good > bs:
                     best, bs = tw, good
             if best is not None:
