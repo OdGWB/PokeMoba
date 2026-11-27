@@ -68,6 +68,13 @@ class KeybindsTest(unittest.TestCase):
         self.assertEqual(len(vals), len(set(vals)))
         self.assertLessEqual(keybinds.camera_speed, 3.0)
 
+    def test_show_aa_range_saved(self):
+        keybinds.load({})
+        self.assertTrue(keybinds.show_aa_range)              # predefinito: accesa
+        keybinds.load({"show_aa_range": False})
+        self.assertFalse(keybinds.show_aa_range)
+        self.assertFalse(keybinds.to_options()["show_aa_range"])
+
     def _press(self, effects):
         ic = InputController(1)
         world = _World(_Me(effects))
