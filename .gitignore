@@ -1,29 +1,63 @@
+# Build e pacchetti (crea_exe.bat, crea_installer.bat)
 build/
 dist/
-tools/tier_status.json
-tools/tier_run.*
-tools/tier_watch.log
-tools/tier_watch.out
-tools/tier_watch.err
-tools/tier_matches_5v5_b.jsonl
-tools/tier_matches_5v5_nexus.jsonl
-tools/tier_matches_5v5_plan.jsonl
-tools/tier_matches_5v5_plan_nexusbug.jsonl
+*.exe
+*.zip
+*.spec
 
 # Python
 __pycache__/
 *.py[cod]
 .venv/
+venv/
+*.egg-info/
+.eggs/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Segreti: chiavi di firma e variabili d'ambiente non vanno MAI nel repo
+*.pem
+*.key
+.env
+.env.*
+!.env.example
+
+# Uscite degli strumenti (tier, taratura bot, profili)
+tools/tier_status.json
+tools/tier_run.*
+tools/tier_matches_*.jsonl
 tools/cma_out/
-notes.md
-
-# Locale / output generati
-CLAUDE.md
-screenshots/
-*.prof
-tools/tier_matches_5v5.jsonl
 reports/
+*.prof
+*.log
+tools/*.err
+tools/*.out
 
-# Storico grafica locale (letto da CLAUDE.md)
+# File temporanei
+*.tmp
+*.bak
+*.orig
+*.rej
+*.swp
+*~
+
+# Editor e sistema operativo
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Locale: appunti, assistente, output generati
+CLAUDE.md
+.claude/
+notes.md
+# Storico grafica locale (letto da CLAUDE.md): le due grafie contano
+# dove il filesystem distingue le maiuscole
+docs/stato_grafica.md
 docs/STATO_GRAFICA.md
+screenshots/
