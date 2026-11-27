@@ -18,6 +18,8 @@ from engine.movement import advance_unit, resolve_collisions, resolve_obstacles
 from engine.pathfinding import plan_move
 from engine.vec import Vec2
 from engine.world import World
+from sim.commands import AttackMoveCommand
+from sim.simulation import Simulation
 
 from tests.test_match_rules import DT, spawn
 
@@ -63,6 +65,29 @@ class TestPlanMove(unittest.TestCase):
         self.assertTrue(g.is_walkable(int(ex), int(ey)))
         self.assertLess(ex, 3.0)          # resta dal lato dell'unita'
 
+    def test_click_on_wall_never_walks_around_for_little(self):
+        # Muro lungo con un solo varco in fondo: il clic nel muro, un po' piu'
+        # vicino all'altro lato, non deve far fare tutto il giro.
+        rows = [[0] * 12 for _ in range(30)]
+        for y in range(28):
+            for x in range(4, 8):
+                rows[y][x] = 1
+        g = Grid.from_rows(rows)
+        for ty in (4.5, 5.5, 6.5):     # clic ripetuti mentre ci si sposta
+            ex, ey = plan_move(g, (2.5, 3.5), (6.4, ty))[-1]
+            self.assertLess(ex, 4.0)
+            self.assertAlmostEqual(ey, ty, delta=1.0)
+
+    def test_click_on_thin_wall_can_use_the_other_side(self):
+        # Se il giro e' corto, vince ancora il lato vicino al punto cliccato.
+        rows = [[0] * 9 for _ in range(9)]
+        for y in range(1, 8):
+            for x in range(3, 6):
+                rows[y][x] = 1
+        g = Grid.from_rows(rows)       # varco in cima, accanto all'unita'
+        ex, ey = plan_move(g, (2.5, 0.5), (5.8, 4.5))[-1]
+        self.assertEqual((int(ex), int(ey)), (6, 4))
+
     def test_click_in_closed_pocket(self):
         rows = [[0] * 7 for _ in range(7)]
         for i in range(2, 5):
@@ -102,6 +127,42 @@ class TestResumeAfterCC(unittest.TestCase):
             if p.pos.dist(dest) < 0.3:
                 break
         self.assertLess(p.pos.dist(dest), 0.3)
+
+
+class TestAttackMoveOnWall(unittest.TestCase):
+    def setUp(self):
+        # Mappa 3v3 vera, ma con un muro di prova su griglia vuota: via diretta chiusa.
+        random.seed(1)
+        m = load_map(os.path.join(ROOT, "data", "maps", "map_3v3.json"))
+        rows = [[0] * m.grid.width for _ in range(m.grid.height)]
+        for y in range(42, 70):
+            rows[y][50] = 1
+        self.grid = Grid.from_rows(rows)
+        self.world = World(self.grid)
+        self.match = Match(self.world, m)
+        self.sim = Simulation(self.world, DT, self.match)
+        self.p = spawn(self.world, Vec2(46.5, 55.5), 0)
+
+    def order(self, x, y):
+        self.sim.queue_command(AttackMoveCommand(seq=1, entity_id=self.p.id, x=x, y=y))
+
+    def test_click_on_wall_replaces_previous_destination(self):
+        self.order(54.5, 55.5)          # oltre il muro
+        for _ in range(3):
+            self.sim.step()
+        self.order(50.5, 65.5)          # subito dopo, SUL muro
+        for _ in range(300):
+            self.sim.step()
+            self.assertLess(self.p.pos.x, 50.0)     # non va piu' dall'altra parte
+        self.assertLess(self.p.pos.dist(Vec2(49.5, 65.5)), 0.6)
+        self.assertEqual(self.p.order, "idle")      # arrivato: l'ordine finisce
+
+    def test_blocked_goal_never_follows_old_path(self):
+        u = self.p
+        self.match._move_towards(u, Vec2(54.5, 55.5), 1.0, use_astar=True)
+        self.match._move_towards(u, Vec2(50.5, 65.5), 1.0, use_astar=True)
+        self.assertLess(u.path[-1].x, 50.0)
+        self.assertGreater(u.path[-1].y, 63.0)
 
 
 class TestObstaclesAndAir(unittest.TestCase):
@@ -186,6 +247,45 @@ class TestWallShape(unittest.TestCase):
                                        u.pos.y + math.sin(a) * 0.35 * f):
                         worst = max(worst, 0.35 * (1 - f))
         self.assertLessEqual(worst, 0.35 * 0.5 + 1e-9)
+
+    def test_waypoints_next_to_drawn_walls_are_reached(self):
+        # Il centro di questi tile e' libero ma piu' vicino al muro del raggio del
+        # corpo: l'unita' restava incastrata li' per sempre.
+        g = map3().grid
+        for start, click in (((9.1, 29.3), (6.0, 37.1)), ((42.6, 27.9), (35.9, 32.4)),
+                             ((49.9, 96.8), (57.3, 95.2))):
+            u = unit(*start)
+            u.speed = 3.0
+            pts = plan_move(g, start, click)
+            u.set_path([Vec2(x, y) for x, y in pts])
+            for _ in range(600):
+                advance_unit(u, DT, g)
+            self.assertFalse(u.path, (start, click, u.pos))
+            self.assertLess(u.pos.dist(Vec2(*pts[-1])), 0.05)
+
+    def test_random_moves_almost_never_get_stuck(self):
+        g = map3().grid
+        rng = random.Random(7)
+        total = stuck = 0
+        while total < 300:
+            p = (rng.uniform(2, g.width - 2), rng.uniform(2, g.height - 2))
+            t = (p[0] + rng.uniform(-14, 14), p[1] + rng.uniform(-10, 10))
+            if not (0 < t[0] < g.width and 0 < t[1] < g.height) or not g.is_walkable_point(*p):
+                continue
+            u = unit(*p)
+            u.speed = 4.0
+            advance_unit(u, 0.0, g)             # parte gia' staccato dai muri
+            pts = plan_move(g, (u.pos.x, u.pos.y), t)
+            if not pts:
+                continue
+            total += 1
+            u.set_path([Vec2(x, y) for x, y in pts])
+            for _ in range(900):
+                advance_unit(u, DT, g)
+                if not u.path:
+                    break
+            stuck += bool(u.path)
+        self.assertLess(stuck / total, 0.02)   # prima della correzione: oltre il 15%
 
     def test_no_camp_or_structure_blocked(self):
         m = map3()

@@ -8,6 +8,7 @@ import heapq
 import math
 
 from .grid import Grid
+from .movement import standable_point
 
 # Vicini a 8 direzioni: (dx, dy, costo)
 _SQRT2 = math.sqrt(2.0)
@@ -15,6 +16,14 @@ _NEIGHBORS = [
     (1, 0, 1.0), (-1, 0, 1.0), (0, 1, 1.0), (0, -1, 1.0),
     (1, 1, _SQRT2), (1, -1, _SQRT2), (-1, 1, _SQRT2), (-1, -1, _SQRT2),
 ]
+# Rapporto massimo fra distanza octile e distanza in linea d'aria (a 22,5 gradi).
+_OCTILE_MAX = 1.083
+# Clic su un muro (approach_tile): quanto "costa" un tile di giro rispetto a un
+# tile di distanza dal clic. Deve restare sotto 1 / (1 + _OCTILE_MAX).
+DETOUR_WEIGHT = 0.4
+# Oltre questa distanza (clic sulla minimappa) vale il tile piu' vicino al clic:
+# il giro si vedra' comunque, e cercare su mezza mappa costerebbe un tick intero.
+APPROACH_RANGE = 24.0
 
 
 def find_path(grid: Grid, start: tuple[int, int], goal: tuple[int, int],
@@ -99,6 +108,8 @@ def smooth_path(grid: Grid, tile_path: list[tuple[int, int]],
     linea di vista libera, così il movimento risulta più diretto e naturale.
     `start`/`end` (opzionali) sostituiscono il centro del primo/ultimo tile col
     punto esatto (posizione dell'unità, punto cliccato).
+    I waypoint dopo il primo (la partenza) vengono staccati dai muri quanto basta
+    perche' il corpo possa raggiungerli (movement.standable_point).
     """
     if not tile_path:
         return []
@@ -108,7 +119,7 @@ def smooth_path(grid: Grid, tile_path: list[tuple[int, int]],
     if end is not None:
         pts[-1] = (float(end[0]), float(end[1]))
     if len(pts) <= 2:
-        return pts
+        return pts[:1] + [standable_point(grid, x, y, block_bush) for x, y in pts[1:]]
 
     result = [pts[0]]
     anchor = 0
@@ -124,7 +135,7 @@ def smooth_path(grid: Grid, tile_path: list[tuple[int, int]],
             anchor = i
             i += 1
     result.append(pts[-1])
-    return result
+    return result[:1] + [standable_point(grid, x, y, block_bush) for x, y in result[1:]]
 
 
 def _components(grid: Grid, block_bush: bool) -> list[int]:
@@ -194,14 +205,80 @@ def nearest_reachable_tile(grid: Grid, start: tuple[int, int],
     return best
 
 
+def approach_tile(grid: Grid, start: tuple[int, int], target: tuple[float, float],
+                  block_bush: bool = False) -> tuple[int, int] | None:
+    """Tile in cui fermarsi per un clic su un punto non raggiungibile (muro).
+
+    Non basta il piu' vicino al clic: quello puo' stare dall'ALTRO lato del muro,
+    con decine di tile di giro per arrivarci, e cliccando ripetutamente mentre si
+    cammina la scelta saltava da un lato all'altro (avanti e indietro sul posto).
+    Si minimizza quindi
+        distanza dal clic + DETOUR_WEIGHT * giro
+    dove il giro e' quanto il percorso vero supera quello in campo aperto (zero
+    senza ostacoli: li' vince il tile piu' vicino al clic, come sempre).
+    """
+    nearest = nearest_reachable_tile(grid, start, target, block_bush)
+    if (nearest is None or not grid.in_bounds(*start)
+            or math.dist((start[0] + 0.5, start[1] + 0.5), target) > APPROACH_RANGE):
+        return nearest
+    walk, stride = grid.walk_flags(block_bush)
+    steps = [(dx, dy, cost, dy * stride + dx) for dx, dy, cost in _NEIGHBORS]
+    tx, ty = target
+    sx, sy = start
+    w = DETOUR_WEIGHT
+    d_min = math.hypot(nearest[0] + 0.5 - tx, nearest[1] + 0.5 - ty)
+    # Esplorazione A* verso il clic; si ferma quando nessun tile ancora da vedere
+    # puo' battere il migliore. Limite inferiore del punteggio (f = costo +
+    # distanza dal clic, crescente): il percorso in campo aperto fino a un tile
+    # e' al massimo _OCTILE_MAX volte la sua distanza in linea d'aria.
+    base = _OCTILE_MAX * math.hypot(sx + 0.5 - tx, sy + 0.5 - ty)
+    floor = (1.0 - w - w * _OCTILE_MAX) * d_min
+
+    s_id = (sy + 1) * stride + sx + 1
+    open_heap = [(math.hypot(sx + 0.5 - tx, sy + 0.5 - ty), s_id, sx, sy)]
+    g_score = {s_id: 0.0}
+    closed: set = set()
+    best, best_score = None, math.inf
+    while open_heap:
+        f, cur, cx, cy = heapq.heappop(open_heap)
+        if floor + w * (f - base) >= best_score:
+            break
+        if cur in closed:
+            continue
+        closed.add(cur)
+        g_cur = g_score[cur]
+        if walk[cur]:
+            hx, hy = abs(cx - sx), abs(cy - sy)
+            open_cost = (hx + hy) + (_SQRT2 - 2.0) * min(hx, hy)
+            score = (math.hypot(cx + 0.5 - tx, cy + 0.5 - ty)
+                     + w * max(0.0, g_cur - open_cost))
+            if score < best_score:
+                best, best_score = (cx, cy), score
+        for dx, dy, cost, off in steps:
+            nb = cur + off
+            if not walk[nb] or nb in closed:
+                continue
+            if dx != 0 and dy != 0 and (not walk[cur + dx] or not walk[cur + dy * stride]):
+                continue
+            tentative = g_cur + cost
+            if tentative < g_score.get(nb, math.inf):
+                g_score[nb] = tentative
+                nx, ny = cx + dx, cy + dy
+                heapq.heappush(open_heap, (tentative + math.hypot(nx + 0.5 - tx, ny + 0.5 - ty),
+                                           nb, nx, ny))
+    return best if best is not None else nearest
+
+
 def plan_move(grid: Grid, pos: tuple[float, float], target: tuple[float, float],
               block_bush: bool = False) -> list[tuple[float, float]]:
     """Waypoint di un ordine di movimento verso il punto `target`.
 
     - Se il punto cliccato e' calpestabile e raggiungibile, l'ultimo waypoint e'
-      il punto ESATTO (non il centro del tile), anche dentro il tile dell'unita'.
-    - Altrimenti (muro, zona irraggiungibile) si va al centro del tile
-      raggiungibile piu' vicino al punto cliccato.
+      il punto ESATTO (non il centro del tile), anche dentro il tile dell'unita';
+      se e' troppo addossato a un muro per starci, il punto libero accanto.
+    - Altrimenti (muro, zona irraggiungibile) si va al centro di un tile
+      raggiungibile vicino al punto cliccato, senza fare il giro del muro per
+      guadagnare poco (vedi approach_tile).
     - Il percorso parte dalla posizione vera dell'unita'.
     Ritorna [] se non c'e' modo di muoversi. Usata dall'host (Simulation) e dalla
     predizione online (MovementModel.plan): deve restare l'unica implementazione.
@@ -223,12 +300,12 @@ def plan_move(grid: Grid, pos: tuple[float, float], target: tuple[float, float],
     gc = comp(goal)
     if (not gc or (sc and gc != sc)
             or not grid.is_walkable_point(tx, ty, block_bush)):
-        goal = nearest_reachable_tile(grid, start, (tx, ty), block_bush)
+        goal = approach_tile(grid, start, (tx, ty), block_bush)
         if goal is None:
             return []
         end = (goal[0] + 0.5, goal[1] + 0.5)
     if goal == start:
-        return [end]
+        return [standable_point(grid, end[0], end[1], block_bush)]
     tile_path = find_path(grid, start, goal, block_bush)
     if not tile_path:
         return []

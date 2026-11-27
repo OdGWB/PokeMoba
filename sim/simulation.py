@@ -60,6 +60,7 @@ class Simulation:
             if hasattr(unit, "champs_only"):
                 unit.champs_only = bool(getattr(cmd, "champs_only", False))
                 unit.target_id = None   # nuovo attacco-movimento: si sceglie da capo
+            self._aim_attackmove(unit, cmd.x, cmd.y)
         elif isinstance(cmd, CastMoveCommand):
             # Il lancio vero lo esegue il Match al prossimo tick (autoritativo).
             if hasattr(unit, "pending_cast"):
@@ -114,6 +115,17 @@ class Simulation:
             unit.champs_only = False
             if hasattr(unit, "move_dest"):
                 unit.move_dest = None   # lo imposta _apply_move per gli ordini di movimento
+
+    def _aim_attackmove(self, unit, tx: float, ty: float) -> None:
+        """Dove cammina un attacco-movimento: stessa destinazione di un movimento
+        (clic su un muro -> tile raggiungibile vicino), come nella predizione
+        online. order_point resta il punto cliccato, per scegliere il bersaglio."""
+        if self.match is not None:
+            self.match.forget_path(unit)    # il percorso era dell'ordine precedente
+        if hasattr(unit, "move_dest"):
+            pts = plan_move(self.world.grid, (unit.pos.x, unit.pos.y), (tx, ty))
+            if pts:
+                unit.move_dest = Vec2(*pts[-1])
 
     def _apply_move(self, unit, tx: float, ty: float) -> None:
         if not getattr(unit, "alive", True):

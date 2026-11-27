@@ -584,10 +584,13 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                 self._chase_or_hold(p, t, dt)
                 return
             p.target_id = None
-            if p.order_point is not None and p.pos.dist(p.order_point) > 0.5:
-                self._move_towards(p, p.order_point, dt, use_astar=True)
+            # move_dest: il punto raggiungibile verso il clic (vedi Simulation).
+            dest = p.move_dest if p.move_dest is not None else p.order_point
+            if dest is not None and p.pos.dist(dest) > 0.5:
+                self._move_towards(p, dest, dt, use_astar=True)
             else:
                 p.order = "idle"
+                p.move_dest = None
                 p.idle_anchor = None
                 p.stop()
             return
@@ -928,11 +931,24 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
             goal = (int(dest.x), int(dest.y))
             tile_path = find_path(self.world.grid, start, goal, bb)
             if tile_path:
-                pts = smooth_path(self.world.grid, tile_path, bb)
-                wps = [Vec2(px, py) for (px, py) in pts[1:]]
-                st["astar_path"] = wps
+                pts = smooth_path(self.world.grid, tile_path, bb)[1:]
+            else:
+                # Arrivo su un tile bloccato (bordo di un muro, cespuglio per i
+                # minion): ci si avvicina, senza tenere il percorso di un'altra
+                # destinazione.
+                pts = plan_move(self.world.grid, (u.pos.x, u.pos.y),
+                                (dest.x, dest.y), bb)
+            st["astar_path"] = [Vec2(px, py) for (px, py) in pts]
         wps = st.get("astar_path") or [dest]
         u.set_path(wps)
+
+    def forget_path(self, u) -> None:
+        """Nuovo ordine: il prossimo _astar_move ricalcola subito, invece di
+        seguire per un altro po' il percorso in cache."""
+        st = self._ai.get(u.id)
+        if st is not None:
+            st.pop("astar_path", None)
+            st.pop("astar_cd", None)
 
     def _face(self, u, target) -> None:
         u.facing = direction_index(target.pos.x - u.pos.x, target.pos.y - u.pos.y)
