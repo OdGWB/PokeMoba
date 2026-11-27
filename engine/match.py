@@ -220,7 +220,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         # Bersaglio che il giocatore ha mollato di proposito (ordine di movimento) o
         # che non si riesce a raggiungere: da fermo non lo si reinsegue per un po'.
         self._chase_skip: dict[int, tuple] = {}   # id Pokemon -> (id bersaglio, fino a)
-        self._chase_prog: dict[int, list] = {}    # id Pokemon -> [id bersaglio, miglior dist, da quando]
+        self._chase_prog: dict[int, list] = {}    # id Pokemon -> stato di _chase_stalled
         data_dir = Path(__file__).resolve().parent.parent / "data"
         self.types = TypeChart.load(data_dir / "types.json")
         self.item_catalog = ItemCatalog.load(data_dir / "items.json")
@@ -670,8 +670,8 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
 
     # --- bersagli mollati / irraggiungibili ----------------------------------------
     CHASE_SKIP_TIME = 6.0     # s: da fermo non si reinsegue chi si e' mollato
-    CHASE_STALL_TIME = 1.2    # s senza avvicinarsi: il bersaglio e' irraggiungibile
-    CHASE_STALL_GAIN = 0.25   # tile: avvicinamento minimo per dire "sto progredendo"
+    CHASE_STALL_TIME = 1.2    # s fermi sul posto: il bersaglio e' irraggiungibile
+    CHASE_STALL_MOVE = 0.5    # tile: spostamento che dimostra che ci si sta muovendo
 
     def skip_chase(self, p, target_id) -> None:
         """Il giocatore ha mollato `target_id` (o non si raggiunge): lo si attacca
@@ -689,17 +689,22 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         return e[0]
 
     def _chase_stalled(self, p, t) -> bool:
-        """True se da CHASE_STALL_TIME secondi `p` non si avvicina a `t` (bersaglio
-        dietro un muro o in un angolo): l'inseguimento non puo' riuscire."""
-        if self._within_attack(p, t):
+        """True se `p` insegue `t` ma da CHASE_STALL_TIME secondi resta sul posto
+        (muro, angolo, nessuna strada). Conta solo lo spostamento di `p`, non la
+        distanza da `t`: chi scappa si insegue ancora, e aggirare un muro allontana
+        in linea d'aria. Il tempo non scorre se `p` e' fermo per altri motivi."""
+        if (self._within_attack(p, t)
+                or p.speed <= 0.0                                   # paralisi, stordimento
+                or (p.aa_active and p.aa_target_id == t.id)):       # fermo a caricare il colpo
             self._chase_prog.pop(p.id, None)
             return False
-        d = p.pos.dist(t.pos)
-        e = self._chase_prog.get(p.id)
+        # Da rallentati si fa meno strada: la soglia scende con la velocita'.
+        need = min(self.CHASE_STALL_MOVE, 0.25 * p.speed * self.CHASE_STALL_TIME)
+        e = self._chase_prog.get(p.id)          # [id bersaglio, da dove, da quando, ultimo controllo]
         now = self.time
         if (e is None or e[0] != t.id or now - e[3] > 0.25     # inseguimento nuovo/interrotto
-                or d < e[1] - self.CHASE_STALL_GAIN):
-            self._chase_prog[p.id] = [t.id, d, now, now]
+                or p.pos.dist(e[1]) > need):
+            self._chase_prog[p.id] = [t.id, Vec2(p.pos.x, p.pos.y), now, now]
             return False
         e[3] = now
         return now - e[2] >= self.CHASE_STALL_TIME

@@ -54,6 +54,63 @@ class TestChaseLock(unittest.TestCase):
         self.run_ticks(60)
         self.assertAlmostEqual(self.p.pos.x, x, places=2)  # e non lo reinsegue
 
+    # --- inseguimenti legittimi: l'ordine di attacco NON va annullato --------------
+    def attack(self):
+        self.sim.queue_command(AttackCommand(seq=1, entity_id=self.p.id, target_id=self.t.id))
+
+    def flee(self, factor, sec):
+        """Il bersaglio scappa verso destra a `factor` volte la velocita' di chi insegue."""
+        self.t.pos = Vec2(31.5, 47.5)
+        self.attack()
+        x = self.t.pos.x
+        for _ in range(int(sec / DT)):
+            x += self.p.speed * factor * DT
+            self.t.pos = Vec2(x, 47.5)
+            self.sim.step()
+            self.vis()
+            self.assertEqual(self.p.order, "attack")
+        self.assertGreater(self.p.pos.x, 27.5 + 0.8 * self.p.speed * factor * sec)
+
+    def test_chase_target_fleeing_at_same_speed(self):
+        self.flee(1.0, 5.0)
+
+    def test_chase_slightly_slower_target(self):
+        self.flee(0.9, 7.0)
+
+    def test_chase_slower_target_between_hits(self):
+        self.flee(0.7, 7.0)
+
+    def test_chase_goes_around_a_wall(self):
+        self.t.pos = Vec2(33.5, 47.5)
+        for y in range(41, 54):
+            self.world.grid.tiles[y][30] = 1               # per passare si gira attorno
+        self.attack()
+        for _ in range(int(8.0 / DT)):
+            self.sim.step()
+            self.vis()
+            self.assertEqual(self.p.order, "attack")
+            if self.match._within_attack(self.p, self.t):
+                return
+        self.fail("non e' arrivato a portata")
+
+    def test_root_does_not_cancel_the_attack_order(self):
+        self.t.pos = Vec2(34.5, 47.5)
+        self.attack()
+        self.run_ticks(2)
+        self.match._apply_root(self.p, 2.5)                # paralisi piu' lunga dello stallo
+        self.run_ticks(int(2.4 / DT))
+        self.assertEqual(self.p.order, "attack")
+        self.run_ticks(int(2.0 / DT))
+        self.assertEqual(self.p.order, "attack")
+        self.assertTrue(self.match._within_attack(self.p, self.t))
+
+    def test_heavy_slow_does_not_cancel_the_attack_order(self):
+        self.t.pos = Vec2(40.5, 47.5)
+        self.attack()
+        self.p.slow_mult, self.p.slow_until = 0.1, 1e9
+        self.run_ticks(int(4.0 / DT))
+        self.assertEqual(self.p.order, "attack")
+
     def test_attackmove_away_ignores_enemy_behind(self):
         self.t.pos = Vec2(25.5, 47.5)                      # alle spalle, a portata
         self.sim.queue_command(AttackMoveCommand(seq=1, entity_id=self.p.id, x=45.5, y=47.5))
