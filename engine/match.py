@@ -1047,7 +1047,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         if not use_astar or self.world.grid.line_of_sight(u.pos.x, u.pos.y,
                                                            dest.x, dest.y, bb):
             u.set_path([dest])
-            if isinstance(u, Pokemon):
+            if isinstance(u, Pokemon) and not u.is_bot:   # solo il giocatore: i bot restano
                 self._ai.setdefault(u.id, {})["astar_cd"] = 0.0   # al prossimo ostacolo A* subito
             return
         self._astar_move(u, dest, dt, bb)
@@ -1073,7 +1073,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                                 (dest.x, dest.y), bb)
             st["astar_path"] = [Vec2(px, py) for (px, py) in pts]
         wps = st.get("astar_path") or [dest]
-        if isinstance(u, Pokemon) and not recomputed and u.path:
+        if isinstance(u, Pokemon) and not u.is_bot and not recomputed and u.path:
             return        # il percorso in corso si segue: rimetterlo intero riporterebbe
                           # indietro i waypoint gia' raggiunti (avanti-indietro)
         u.set_path(wps)
