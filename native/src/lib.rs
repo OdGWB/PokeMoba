@@ -552,7 +552,7 @@ impl GridView {
             if ground {
                 let (qx, qy) = self.keep_off(px, py0, keep_r, bb);
                 if qx != px || qy != py0 {
-                    unit.setattr(kpos, vec2.call1((qx, qy))?)?;
+                    unit.setattr(kpos, new_vec2(vec2, qx, qy)?)?;
                 }
             }
             return Ok(true);
@@ -567,7 +567,7 @@ impl GridView {
             unit.setattr(intern!(py, "facing"), f)?;
         }
         if x != px || y != py0 {
-            unit.setattr(kpos, vec2.call1((x, y))?)?;
+            unit.setattr(kpos, new_vec2(vec2, x, y)?)?;
         }
         unit.setattr(intern!(py, "moving"), path.len() > 0)?;
         Ok(true)
@@ -620,7 +620,7 @@ impl GridView {
         let kpos = intern!(py, "pos");
         for (k, u) in objs.iter().enumerate() {
             if nx[k] != x0[k] || ny[k] != y0[k] {
-                u.setattr(kpos, vec2.call1((nx[k], ny[k]))?)?;
+                u.setattr(kpos, new_vec2(vec2, nx[k], ny[k])?)?;
             }
         }
         let mut hits = Vec::new();
@@ -739,6 +739,58 @@ impl SpatialHash {
     fn key(&self, x: f64, y: f64) -> (i64, i64) {
         let inv = 1.0 / self.cell_size;
         ((x * inv).floor() as i64, (y * inv).floor() as i64)
+    }
+}
+
+/// The Vec2 class we may build directly (validated once, see new_vec2).
+static FAST_VEC2: pyo3::sync::PyOnceLock<Py<PyAny>> = pyo3::sync::PyOnceLock::new();
+
+/// True if `cls` is a dataclass whose fields are exactly (x, y) with no
+/// __post_init__: its generated __init__ then only does
+/// object.__setattr__(self, "x", x); object.__setattr__(self, "y", y).
+fn vec2_is_plain(cls: &Bound<'_, PyAny>) -> bool {
+    let py = cls.py();
+    if cls.cast::<pyo3::types::PyType>().is_err() || cls.hasattr(intern!(py, "__post_init__")).unwrap_or(true) {
+        return false;
+    }
+    let Ok(fields) = cls.getattr(intern!(py, "__dataclass_fields__")) else { return false };
+    let Ok(fields) = fields.cast::<PyDict>() else { return false };
+    let keys: Vec<String> = fields.keys().iter().filter_map(|k| k.extract::<String>().ok()).collect();
+    keys == ["x", "y"]
+}
+
+/// vec2(x, y), i.e. a new engine.vec.Vec2. Vec2 is a frozen dataclass, and its
+/// __init__ called from Python costs ~330 ns. For that class we do exactly what
+/// the generated __init__ does, from C: allocate the instance as object.__new__
+/// does, then set x and y (in that order) with the generic setattr, which is
+/// what object.__setattr__ calls. Same object, same __dict__. Any other
+/// callable is just called.
+fn new_vec2<'py>(vec2: &Bound<'py, PyAny>, x: f64, y: f64) -> PyResult<Bound<'py, PyAny>> {
+    let py = vec2.py();
+    let fast = match FAST_VEC2.get(py) {
+        Some(c) => c.bind(py).is(vec2),
+        None => {
+            if vec2_is_plain(vec2) {
+                let _ = FAST_VEC2.set(py, vec2.clone().unbind());
+                FAST_VEC2.get(py).map_or(false, |c| c.bind(py).is(vec2))
+            } else {
+                false
+            }
+        }
+    };
+    if !fast {
+        return vec2.call1((x, y));
+    }
+    unsafe {
+        let tp = vec2.as_ptr() as *mut pyo3::ffi::PyTypeObject;
+        let o = Bound::from_owned_ptr_or_err(py, pyo3::ffi::PyType_GenericAlloc(tp, 0))?;
+        for (k, v) in [(intern!(py, "x"), x), (intern!(py, "y"), y)] {
+            let fv = pyo3::types::PyFloat::new(py, v);
+            if pyo3::ffi::PyObject_GenericSetAttr(o.as_ptr(), k.as_ptr(), fv.as_ptr()) < 0 {
+                return Err(PyErr::fetch(py));
+            }
+        }
+        Ok(o)
     }
 }
 
@@ -1258,7 +1310,7 @@ impl MinionAI {
             match &target {
                 Some(t) => {
                     m.setattr(k_tid, t.getattr(intern!(py, "id"))?)?;
-                    state.set_item(k_leash, self.vec2.bind(py).call1((mx, my))?)?;
+                    state.set_item(k_leash, new_vec2(self.vec2.bind(py), mx, my)?)?;
                 }
                 None => {
                     m.setattr(k_tid, py.None())?;
