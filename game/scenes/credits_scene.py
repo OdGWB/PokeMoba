@@ -51,6 +51,11 @@ OUTRO = [
     ("h", "Software"),
     ("t", "pygame (LGPL) - https://www.pygame.org/"),
     ("t", "aiortc (BSD) - https://github.com/aiortc/aiortc  (multiplayer online WebRTC)"),
+    ("t", "Motore Rust, librerie con licenza MIT o Apache-2.0:"),
+    ("d", "PyO3 (c) PyO3 Project and Contributors - github.com/PyO3/pyo3"),
+    ("d", "libc (c) The Rust Project Developers - github.com/rust-lang/libc"),
+    ("d", "once_cell (c) Aleksey Kladov - github.com/matklad/once_cell"),
+    ("d", "Libreria standard di Rust (c) The Rust Project Developers"),
 ]
 
 

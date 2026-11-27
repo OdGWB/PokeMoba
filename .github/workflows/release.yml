@@ -65,6 +65,7 @@ jobs:
       SDL_AUDIODRIVER: dummy
       PYTHONUTF8: "1"
       BUILD: ${{ needs.check.outputs.build }}
+      RUST_VERSION: "1.100.0"   # la stessa in ci.yml
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -77,6 +78,18 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements-build.txt
+
+      # Il motore Rust (native/) fa parte del gioco pubblicato. Si installa PRIMA dei
+      # test, cosi' si prova quello che finisce nell'exe, e prima di PyInstaller, che
+      # lo include da solo.
+      - name: Motore Rust
+        shell: pwsh
+        run: |
+          rustup toolchain install $env:RUST_VERSION --profile minimal
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $env:RUSTUP_TOOLCHAIN = $env:RUST_VERSION
+          python tools/build_native.py
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
 
       - name: Test
         run: python -m pytest -q -x
@@ -111,6 +124,16 @@ jobs:
           --collect-all aiortc
           --distpath dist --workpath build/pyinstaller
           run_client.py
+
+      # Senza motore Rust l'exe non si pubblica. L'exe e' senza console: conta il
+      # codice d'uscita; il limite di tempo copre un'eventuale finestra d'errore.
+      - name: L'exe usa il motore Rust?
+        shell: pwsh
+        run: |
+          $p = Start-Process dist\PokeMoba.exe -ArgumentList "--check-engine" -PassThru
+          $null = $p.Handle   # senza, ExitCode resta vuoto
+          if (-not $p.WaitForExit(120000)) { $p.Kill(); throw "L'exe non risponde al controllo del motore." }
+          if ($p.ExitCode -ne 0) { throw "L'exe non carica il motore Rust (codice $($p.ExitCode))." }
 
       # Installer (Inno Setup 6) che mette PokeMoba.exe in %LOCALAPPDATA%\Programs\PokeMoba
       # con menu Start, icona sul desktop e disinstallazione. PokeMoba.exe resta allegato

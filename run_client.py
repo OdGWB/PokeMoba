@@ -13,7 +13,30 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 
 
+def check_engine() -> None:
+    """Nell'exe il motore Rust e' obbligatorio (engine/backend.py).
+    `--check-engine`: esce con 0 se c'e', 1 se no, senza aprire il gioco (lo usano
+    release.yml e crea_exe.bat sull'exe appena creato)."""
+    only_check = sys.argv[1:] == ["--check-engine"]
+    if not only_check and not getattr(sys, "frozen", False):
+        return
+    from engine.backend import native_problem
+    problem = native_problem()
+    if only_check:
+        if sys.stdout is not None:      # l'exe senza console non ha stdout
+            print(problem or "motore Rust attivo")
+        sys.exit(1 if problem else 0)
+    if problem:
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(
+            None, f"PokéMoba non può partire: {problem}.\n\n"
+                  "Reinstalla il gioco con l'ultimo PokeMoba-Setup.exe.",
+            "PokéMoba", 0x10)
+        sys.exit(1)
+
+
 def main() -> None:
+    check_engine()
     if len(sys.argv) >= 3 and sys.argv[1] == "--terrain-worker":
         # Processo delle varianti della mappa col meteo (game/terrain_variants.py).
         from game import terrain_variants
