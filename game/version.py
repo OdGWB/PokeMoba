@@ -48,5 +48,12 @@ def name_of(build: int) -> str:
     return f"{SERIES}.{max(0, patch)}"
 
 
+def release_name_of(build: int) -> str:
+    """Nome della GitHub Release: come name_of, ma le ricostruzioni dicono la build
+    (es. "3.1.0 (build 9)"), cosi' le Release con la stessa versione si distinguono."""
+    base = name_of(build)
+    return f"{base} (build {build})" if build in REBUILDS else base
+
+
 def label() -> str:
     return f"v{name()}" if BUILD else name()

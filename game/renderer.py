@@ -33,6 +33,8 @@ from .sprites.animator import SpriteAnimator
 # Palette greybox (sostituita dai tileset in futuro).
 COL_BG = (18, 20, 24)
 _TOWER_RANGE_DEFAULT = config.TOWER_RANGE   # tile: fallback gittata (es. in rete)
+AA_RING_LINE = (178, 222, 232, 150)         # gittata del proprio attacco base
+AA_RING_SHADOW = (6, 12, 14, 110)
 _FOG_UNSEEN = (6, 7, 12, 235)    # nebbia: tile mai visto (quasi nero)
 _FOG_SEEN = (8, 10, 16, 110)     # nebbia: tile esplorato ma non visibile ora
 TILE_COLORS = {
@@ -139,12 +141,13 @@ class Renderer:
         self._fog_key = None          # nebbia in cache (camera + versione della visione)
         self._fog_surf = None
         self._fog_pos = (0, 0)
+        self._aa_rings: dict = {}      # raggio in px -> anello della gittata dell'AA
         # Mappa statica in layer pre-renderizzati (costruiti al primo draw).
         self.map = MapRenderer(self, tile_size)
 
     def draw(self, surface, world, camera, animators, selected_path=None,
              selected_id=None, dens=None, respawning=None, vision=None, player_team=0,
-             now=1e9):
+             now=1e9, attack_range=None):
         surface.fill(COL_BG)
         camera.snap()   # offset intero del frame, condiviso da mappa e unita
         # Mappa statica: costruita una volta in layer, poi solo blit.
@@ -152,6 +155,8 @@ class Renderer:
         self.map.draw(surface, camera)            # ground, decor, ombre, muri base
         if dens:
             self._draw_dens(surface, camera, dens)
+        if attack_range is not None:      # (posizione, raggio): a terra, sotto le unità
+            self.draw_attack_range(surface, camera, *attack_range)
         if config.SHOW_PATH and selected_path:
             self._draw_path(surface, selected_path, camera)
         self._draw_entities(surface, camera, world, animators, selected_id,
@@ -605,6 +610,27 @@ class Renderer:
                                max(1, r - 3), 1)
         if overlay is not None:
             surface.blit(overlay, (0, 0))
+
+    # --- gittata dell'attacco base -------------------------------------------
+    def draw_attack_range(self, surface, camera, pos, radius):
+        """Linea sottile attorno al PROPRIO Pokémon: fin dove arriva l'attacco
+        base (stile LoL). `radius` in tile = portata + raggio del Pokémon: un
+        bersaglio è a tiro quando il suo corpo tocca la linea. L'anello si
+        disegna una volta per raggio, poi solo blit."""
+        ts = self.tile_size
+        r = int(radius * ts)
+        if r <= 0:
+            return
+        ring = self._aa_rings.get(r)
+        if ring is None:
+            side = 2 * r + 3
+            ring = pygame.Surface((side, side), pygame.SRCALPHA)
+            # ombra verso il basso a destra, poi la linea chiara
+            pygame.draw.circle(ring, AA_RING_SHADOW, (r + 2, r + 2), r, 1)
+            pygame.draw.circle(ring, AA_RING_LINE, (r + 1, r + 1), r, 1)
+            self._aa_rings[r] = ring
+        cx, cy = camera.world_to_screen(pos.x * ts, pos.y * ts)
+        surface.blit(ring, (cx - r - 1, cy - r - 1))
 
     # --- percorso di debug ---------------------------------------------------
     def draw_aim(self, surface, camera, origin, mouse_tile, move, hold=0.0, rain=False,

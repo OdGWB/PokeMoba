@@ -10,7 +10,7 @@ from pathlib import Path
 import pygame
 
 import config
-from engine import moves as moves_mod
+from engine import moves as moves_mod, skills
 from engine.content import load_map, load_pokemon_def
 from engine.entities import Pokemon, Structure, Unit
 from engine.grid import TILE_FLOOR, TILE_WALL
@@ -24,6 +24,7 @@ from .. import hud, mag_fx, scy_fx
 from ..camera import Camera
 from ..fx import type_color
 from .. import keybinds, match_ui, target_pick
+from ..ingame_menu import MatchMenuMixin
 from ..input_controller import champs_only_held, needs_aim
 from ..minimap import Minimap
 from ..networld import NetWorld
@@ -42,7 +43,7 @@ ITEM_KEYS = {k: i for i, k in enumerate((pygame.K_1, pygame.K_2, pygame.K_3,
 
 
 
-class NetMatchScene:
+class NetMatchScene(MatchMenuMixin):
     _comm_first = False      # OnlineMatchScene passa gli eventi a TeamComm prima di ESC
     def __init__(self, app, client, start_info):
         self.app = app
@@ -130,11 +131,13 @@ class NetMatchScene:
     # --- ciclo ---------------------------------------------------------------
     def handle_events(self, events):
         for ev in events:
+            if self.match_menu is not None:      # opzioni aperte: input solo a loro
+                self._menu_event(ev)
+                continue
             if not self._comm_first and self.comm.handle_event(ev, self.camera, self.minimap):
                 continue
             if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
-                self.client.close()
-                self.quit_app = True
+                self._escape()
             elif ev.type == pygame.KEYDOWN and ev.key == keybinds.key("shop"):
                 self.shop.toggle()
             elif (self.shop.open and ev.type == pygame.MOUSEBUTTONDOWN
@@ -193,6 +196,48 @@ class NetMatchScene:
                   and self.aiming_slot is not None
                   and mag_fx.has_polarity(self._aim_move(self.aiming_slot))):
                 mag_fx.toggle_polarity()   # Bombagnete / Campo Elettrico: + <-> -
+
+    # --- opzioni in partita (game/ingame_menu.py) ------------------------------
+    def _cancel_aim(self) -> None:
+        self.aiming_slot = None
+
+    def _leave_match(self) -> None:
+        """LAN: chiude la connessione (e il server, se ospitato qui), torna al menu."""
+        self.client.close()
+        if getattr(self.app, "server", None) is not None:
+            self.app.server.stop()
+            self.app.server = None
+        from .menu_scene import MenuScene
+        self.next_scene = MenuScene(self.app)
+
+    def _aim_ready(self, me):
+        """Mossa di cui si vede il mirino (tasto tenuto e mossa pronta), o None."""
+        if self.aiming_slot is None or me is None or not self.world.hud:
+            return None
+        name = ["Q", "W", "E", "R"][self.aiming_slot]
+        s = self.world.hud["slots"][name]
+        mv = self._variant_move(self.disp_moveset.get(name), s["variant"])
+        ready = mv is not None and s["rank"] > 0 and s["cd"] <= 0 and s["variant"] != -2
+        return mv if ready else None
+
+    def _attack_range_ring(self, me, aim):
+        """(posizione, raggio) della gittata del proprio attacco base; None se
+        spenta nelle opzioni, da morto, a partita finita o mentre si mira una
+        mossa. Il raggio vero (oggetti, passive, forma) lo manda l'host nello
+        stato visivo."""
+        if (not keybinds.show_aa_range or me is None or aim is not None
+                or self.world.winner is not None
+                or me.id in getattr(self.world, "dead", ())):
+            return None
+        reach = self._me_vis().get("aa_range")
+        if reach is None:      # LAN (niente stato visivo): portata base della forma
+            reach = self.pdef.attack_range
+            dex = getattr(me, "dex", None)
+            for e in self.pdef.evolutions or ():
+                if e.get("dex") is not None and int(e["dex"]) == dex:
+                    reach = e.get("attack_range", reach)
+            reach = float(reach) + me.radius
+        return me.pos, reach
 
     def _skillbar_click(self, pos) -> bool:
         """Clic sui popup delle evoluzioni (sceglie) o su una casella (alza il grado),
@@ -297,6 +342,8 @@ class NetMatchScene:
         import time
         self.client.poll()
         now = time.monotonic()
+        if self.world.winner is not None:
+            self.match_menu = None      # fine partita: resta la schermata finale
         self.comm.update(now)
         msgs = getattr(self.client, "team_msgs", None)
         while msgs:
@@ -312,10 +359,11 @@ class NetMatchScene:
         self._sync_terrain()
         me = self.world.get(self.your_id)
         if me is not None:
+            in_menu = self.match_menu is not None
             self.camera.update(dt, self.camera_locked, me.pos.x * config.TILE_SIZE,
                                me.pos.y * config.TILE_SIZE, pygame.mouse.get_pos(),
-                               pygame.key.get_pressed()[pygame.K_SPACE],
-                               edge_ok=not (self.minimap is not None
+                               pygame.key.get_pressed()[pygame.K_SPACE] and not in_menu,
+                               edge_ok=not in_menu and not (self.minimap is not None
                                             and self.minimap.blocks_edge_scroll(pygame.mouse.get_pos())))
         for u in self.world.units():
             from engine.entities import Pokemon
@@ -351,12 +399,15 @@ class NetMatchScene:
 
     def draw(self, surface):
         me = self.world.get(self.your_id)
+        aim = self._aim_ready(me)
         self.renderer.draw(surface, self.world, self.camera, self.animators,
+                           selected_path=self._my_path(me),
                            selected_id=me.id if me else None,
                            dens=self.map_data.dens or None,
                            respawning=getattr(self.world, "respawning", None) or None,
                            vision=self.vision, player_team=self.team,
-                           now=self.world.match_time)
+                           now=self.world.match_time,
+                           attack_range=self._attack_range_ring(me, aim))
         # Gittata delle torri nemiche: cerchio di pericolo quando ti avvicini.
         self.renderer.draw_tower_ranges(surface, self.camera, self.world, self.team,
                                         now=self.world.match_time,
@@ -367,20 +418,19 @@ class NetMatchScene:
         self.weather_fx.draw(surface, self.camera, self._applied_weather or "clear")
         self._draw_after_particles(surface)
         self.comm.draw_world(surface, self.camera)
-        if self.aiming_slot is not None and me is not None:
-            s = self.world.hud["slots"][["Q", "W", "E", "R"][self.aiming_slot]]
-            ms = self.disp_moveset.get(["Q", "W", "E", "R"][self.aiming_slot])
-            mv = self._variant_move(ms, s["variant"])
-            ready = mv is not None and s["rank"] > 0 and s["cd"] <= 0 and s["variant"] != -2
-            if mv is not None and ready:   # niente mirino se in cooldown o non pronta
-                mx, my = pygame.mouse.get_pos()
-                wx, wy = self.camera.screen_window_to_world(mx, my)
-                hold = (pygame.time.get_ticks() - self.aim_start) / 1000.0
-                self.renderer.draw_aim(surface, self.camera, me.pos,
-                                       (wx / config.TILE_SIZE, wy / config.TILE_SIZE), mv,
-                                       hold=hold, rain=getattr(me, "arch_rain", False),
-                                       ammo=getattr(me, "ammo", "Water"),
-                                       queue=getattr(me, "deli_queue", None))
+        if aim is not None:            # niente mirino se in cooldown o non pronta
+            mx, my = pygame.mouse.get_pos()
+            wx, wy = self.camera.screen_window_to_world(mx, my)
+            hold = (pygame.time.get_ticks() - self.aim_start) / 1000.0
+            self.renderer.draw_aim(surface, self.camera, me.pos,
+                                   (wx / config.TILE_SIZE, wy / config.TILE_SIZE), aim,
+                                   hold=hold, rain=getattr(me, "arch_rain", False),
+                                   ammo=getattr(me, "ammo", "Water"),
+                                   queue=getattr(me, "deli_queue", None))
+
+    def _my_path(self, me):
+        """Percorso di movimento del proprio Pokémon (la scena online lo ha)."""
+        return None
 
     def _draw_world_extras(self, surface):
         """Effetti che durano, sopra mappa e unità (la scena online li ha)."""
@@ -406,7 +456,7 @@ class NetMatchScene:
         # L'HUD vero e' in draw_fullres (game/hud.py); qui solo messaggi temporanei.
         return []
 
-    HELP = "ONLINE  Dx muovi  Sx attacca  Q/W/E/R mosse  clic o Ctrl+tasto grado  ESC esci"
+    HELP = "ONLINE  Dx muovi  Sx attacca  Q/W/E/R mosse  clic o Ctrl+tasto grado  ESC opzioni"
 
     # --- HUD a piena risoluzione (game/hud.py, uguale alla partita locale) -------------
     def _my_form(self, me):
@@ -461,7 +511,20 @@ class NetMatchScene:
         rows.append(("Oggetti", f"{len(h.get('items', []))}/6", ""))
         return rows
 
+    def _sync_moveset(self):
+        """Mosse della forma attuale (dal dex), come engine/evolution.py: senza,
+        le forme con mosse proprie (es. la R di Eevee o Charcadet) restano
+        "bloccate" nell'HUD online anche dopo lo sblocco."""
+        dex = getattr(self.world.get(self.your_id), "dex", None)
+        for e in self.pdef.evolutions or ():
+            if e.get("moves") and e.get("dex") is not None and int(e["dex"]) == dex:
+                if dex != getattr(self, "_moves_dex", None):
+                    self._moves_dex = dex
+                    self.disp_moveset.update(moves_mod.build_moveset(e["moves"]))
+                return
+
     def _slot_views(self, h) -> list:
+        self._sync_moveset()
         pend = {["Q", "W", "E", "R"][i] for i in self._pending()}
         charges = self._me_vis().get("charges", {})
         out = []
@@ -471,7 +534,8 @@ class NetMatchScene:
             mv = self._variant_move(ms, s["variant"])
             maxr = ms.max_rank if ms is not None else (3 if sl == "R" else 4)
             v = hud.SlotView(key=sl, rank=s["rank"], max_rank=maxr,
-                             can_rank=h["points"] > 0 and s["rank"] < maxr,
+                             can_rank=(h["points"] > 0 and skills.rank_allowed(
+                                 sl, s["rank"], maxr, h["level"])),
                              evolvable=sl in pend and ms is not None and bool(ms.upgrades))
             if mv is not None:
                 v.name, v.mtype = mv.name, mv.type
@@ -484,7 +548,8 @@ class NetMatchScene:
                     v.cd_frac = s["cd"] / max(0.1, mv.cooldown_at(s["rank"]))
             else:
                 v.can_rank = False
-                v.locked = "Liv. 8" if (s["variant"] == -2 or h["level"] < 8) else "Evolvi"
+                v.locked = ("Liv. 8" if h["level"] < 8
+                            else "Scegli" if s["variant"] == -2 else "Evolvi")
                 if ms is None:
                     v.max_rank = 0
             out.append(v)

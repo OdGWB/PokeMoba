@@ -1,3 +1,11 @@
+# Compilazione di cargo/maturin
 target/
+dist/
+*.whl
+
+# Librerie e simboli compilati
 *.pyd
 *.so
+*.dll
+*.dylib
+*.pdb

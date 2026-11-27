@@ -9,6 +9,7 @@ data/maps/map_training.json, con le regole di engine/training.TrainingMatch.
   - misuratore del danno ai manichini: totale, ultimo colpo, DPS sugli ultimi 5 s.
 
 Nessuna logica nuova nel motore oltre a TrainingMatch (sottoclasse di Match).
+ESC apre le opzioni (game/ingame_menu.py): da li' si esce.
 Il Tutorial (tutorial_scene.py) e' una sottoclasse di questa scena.
 """
 from __future__ import annotations
@@ -41,7 +42,7 @@ class TrainingScene(MatchScene):
     def __init__(self, pokemon_path, start_level=1, flower_color=None, back=None):
         self._pokemon_path = str(pokemon_path)
         self._flower_color = flower_color
-        self._back_factory = back          # callable(app) -> scena a cui tornare con ESC
+        self._back_factory = back          # callable(app) -> scena a cui tornare uscendo
         self._dummy_spots = json.loads(TRAINING_MAP.read_text(encoding="utf-8")).get(
             "dummies", [])
         self._dummies: list = []
@@ -114,6 +115,9 @@ class TrainingScene(MatchScene):
         nxt.panel_open = self.panel_open
         self.next_scene = nxt
 
+    def _leave_match(self) -> None:
+        self._leave()
+
     def _leave(self):
         app = getattr(self, "app", None)
         if app is None:
@@ -132,11 +136,8 @@ class TrainingScene(MatchScene):
     def handle_events(self, events) -> None:
         rest = []
         for ev in events:
-            if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
-                if self.shop.open:
-                    self.shop.toggle()
-                else:
-                    self._leave()
+            if self.match_menu is not None:     # opzioni aperte: le gestisce MatchScene
+                rest.append(ev)
                 continue
             if ev.type == pygame.KEYDOWN and ev.key == pygame.K_F4:
                 self.panel_open = not self.panel_open

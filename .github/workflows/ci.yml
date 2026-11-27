@@ -28,6 +28,7 @@ jobs:
       SDL_AUDIODRIVER: dummy
       PYTHONUTF8: "1"
       POKEMOBA_NO_UPDATE: "1"
+      RUST_VERSION: "1.100.0"   # la stessa in release.yml
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -41,5 +42,19 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-build.txt
 
+      - name: Motore Rust
+        shell: pwsh
+        run: |
+          rustup toolchain install $env:RUST_VERSION --profile minimal
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $env:RUSTUP_TOOLCHAIN = $env:RUST_VERSION
+          python tools/build_native.py
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
       - name: Test
         run: python -m pytest -q
+
+      # Il gioco pubblicato gira sul Rust: una regola cambiata solo in Python
+      # darebbe un gioco diverso. Stesse partite nei due motori, tick per tick.
+      - name: Parita' Python / Rust
+        run: python tools/rust_parity.py --jobs 2 --secs 30

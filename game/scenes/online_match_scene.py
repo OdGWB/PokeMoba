@@ -19,6 +19,7 @@ import time
 import pygame
 
 import config
+from engine.vec import Vec2
 from net import client as C
 from net.prediction import Predictor
 
@@ -77,14 +78,22 @@ class OnlineMatchScene(NetMatchScene):
         for ev in events:
             if self.slot_panel is not None and self.slot_panel.handle_event(ev):
                 continue
+            over = self.session.phase in (C.ENDED, C.LOST) or self.world.winner is not None
+            if over:
+                self.match_menu = None
+            elif self.match_menu is not None:    # opzioni aperte: input solo a loro
+                self._menu_event(ev)
+                continue
             if (self.world.winner is None and self.slot_panel is None
                     and self.comm.handle_event(ev, self.camera, self.minimap)):
                 continue
             if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
                 if self.slot_panel is not None:
                     self.slot_panel = None
-                else:
+                elif over:
                     self._leave()
+                else:
+                    rest.append(ev)      # negozio o opzioni (NetMatchScene)
                 continue
             if ev.type == pygame.KEYDOWN and ev.key == pygame.K_F3:
                 self.show_debug = not self.show_debug
@@ -97,7 +106,7 @@ class OnlineMatchScene(NetMatchScene):
                     and ev.type == pygame.KEYDOWN and ev.key == pygame.K_r):
                 self._rejoin()
                 continue
-            if self.session.phase in (C.ENDED, C.LOST) or self.world.winner is not None:
+            if over:
                 if ((ev.type == pygame.KEYDOWN and ev.key in (pygame.K_RETURN, pygame.K_KP_ENTER))
                         or (ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1
                             and self._end_btn is not None and self._end_btn.collidepoint(ev.pos))):
@@ -105,6 +114,13 @@ class OnlineMatchScene(NetMatchScene):
                 continue
             rest.append(ev)
         super().handle_events(rest)
+
+    def _leave_match(self) -> None:
+        self._leave()
+
+    def _leave_note(self) -> str:
+        return ("Sei l'host: uscendo la partita si chiude per tutti."
+                if self.host is not None else "")
 
     def _leave(self):
         """Torna al menu chiudendo tutto in modo pulito (host: avvisa gli amici)."""
@@ -178,6 +194,8 @@ class OnlineMatchScene(NetMatchScene):
         self._update_deaths(dt)
         self.fx.update(dt)
         self._sound_state()
+        if self.session.phase in (C.ENDED, C.LOST):
+            self.match_menu = None      # partita chiusa: resta l'avviso finale
         if self.slot_panel is not None:
             self.slot_panel.update()
         if self.host is not None and self.session.phase == C.MATCH:
@@ -209,7 +227,6 @@ class OnlineMatchScene(NetMatchScene):
         Pokémon morto; se lo stato visivo lo dà a terra (dead) parte la dissolvenza,
         altrimenti era solo uscito dalla visione."""
         from engine.entities import Pokemon
-        from engine.vec import Vec2
         now = time.monotonic()
         alive = {}
         for u in self.world.units():
@@ -235,6 +252,15 @@ class OnlineMatchScene(NetMatchScene):
             d["t"] += dt
             if eid in alive or d["t"] >= DEATH_FADE:
                 del self._dying[eid]
+
+    def _my_path(self, me):
+        """Percorso del PROPRIO Pokémon, come offline: quello predetto (subito
+        al clic) o, se si segue l'host, quello che manda l'host."""
+        if me is None or me.id in self.world.dead:
+            return None
+        pr = self.predictor
+        pts = self._me_vis().get("route", ()) if pr.follow else pr.path
+        return [me.pos] + [Vec2(x, y) for x, y in pts]
 
     def _draw_world_extras(self, surface):
         me = self.world.get(self.your_id)
@@ -308,7 +334,7 @@ class OnlineMatchScene(NetMatchScene):
     @property
     def HELP(self):
         return ("ONLINE  Dx muovi  Sx attacca  Q/W/E/R mosse  Ctrl+tasto grado  F3 rete"
-                + ("  F2 slot" if self.host else "") + "  ESC esci")
+                + ("  F2 slot" if self.host else "") + "  ESC opzioni")
 
     def _portrait(self, sprite_dir, side):
         """Ritratto di una forma (primo fotogramma Idle), come MatchScene._portrait."""

@@ -12,9 +12,10 @@ from dataclasses import dataclass
 
 import numpy as np
 
-# Estensione Rust facoltativa (native/, `maturin develop --release`): stessi
-# risultati bit per bit del codice Python, solo piu' veloce. Se manca (o con
-# POKEMOBA_NO_NATIVE=1) si usa il Python qui sotto.
+# Motore Rust (native/, `python tools/build_native.py`): stessi risultati bit per
+# bit del codice Python, solo piu' veloce. Obbligatorio nell'exe pubblicato
+# (engine/backend.py); dal sorgente, se manca (o con POKEMOBA_NO_NATIVE=1), si
+# usa il Python qui sotto.
 import os as _os
 try:
     if _os.environ.get("POKEMOBA_NO_NATIVE"):

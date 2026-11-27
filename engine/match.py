@@ -221,7 +221,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         # che non si riesce a raggiungere: da fermo non lo si reinsegue per un po'.
         self._chase_skip: dict[int, tuple] = {}   # id Pokemon -> (id bersaglio, fino a)
         self._lock_seen: dict[int, tuple] = {}    # id Pokemon -> (id bersaglio, ultima volta visto)
-        self._chase_prog: dict[int, list] = {}    # id Pokemon -> [id bersaglio, miglior dist, da quando]
+        self._chase_prog: dict[int, list] = {}    # id Pokemon -> stato di _chase_stalled
         data_dir = Path(__file__).resolve().parent.parent / "data"
         self.types = TypeChart.load(data_dir / "types.json")
         self.item_catalog = ItemCatalog.load(data_dir / "items.json")
@@ -359,7 +359,10 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         d = (pts[1] - base).normalized()
         perp = Vec2(-d.y, d.x)
         # Scostamento perpendicolare per non impilarli, pseudo-casuale ma deterministico.
-        jig = (hash((int(self.time * 10), team, lane, len(self.world.minions()))) % 7 - 3) * 0.25
+        # La corsia entra come INDICE: l'hash di una stringa cambia a ogni processo
+        # (PYTHONHASHSEED), quello di una tupla di interi no.
+        lane_i = list(self.map.lanes).index(lane)
+        jig = (hash((int(self.time * 10), team, lane_i, len(self.world.minions()))) % 7 - 3) * 0.25
         pos = base + d * 3.0 + perp * jig
         stats = dict(MINION_STATS[mtype])
         # I minion crescono col tempo (hp e danno) per rompere gli stalli.
@@ -621,10 +624,13 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
             am[1] = None
             st.pop("lock_id", None)
             p.target_id = None
-            if p.order_point is not None and p.pos.dist(p.order_point) > 0.5:
-                self._move_towards(p, p.order_point, dt, use_astar=True)
+            # move_dest: il punto raggiungibile verso il clic (vedi Simulation).
+            dest = p.move_dest if p.move_dest is not None else p.order_point
+            if dest is not None and p.pos.dist(dest) > 0.5:
+                self._move_towards(p, dest, dt, use_astar=True)
             else:
                 p.order = "idle"
+                p.move_dest = None
                 p.idle_anchor = None
                 p.stop()
             return
@@ -714,8 +720,8 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
 
     # --- bersagli mollati / irraggiungibili ----------------------------------------
     CHASE_SKIP_TIME = 6.0     # s: da fermo non si reinsegue chi si e' mollato
-    CHASE_STALL_TIME = 1.2    # s senza avvicinarsi: il bersaglio e' irraggiungibile
-    CHASE_STALL_GAIN = 0.25   # tile: avvicinamento minimo per dire "sto progredendo"
+    CHASE_STALL_TIME = 1.2    # s fermi sul posto: il bersaglio e' irraggiungibile
+    CHASE_STALL_MOVE = 0.5    # tile: spostamento che dimostra che ci si sta muovendo
 
     def skip_chase(self, p, target_id) -> None:
         """Il giocatore ha mollato `target_id` (o non si raggiunge): lo si attacca
@@ -733,17 +739,22 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         return e[0]
 
     def _chase_stalled(self, p, t) -> bool:
-        """True se da CHASE_STALL_TIME secondi `p` non si avvicina a `t` (bersaglio
-        dietro un muro o in un angolo): l'inseguimento non puo' riuscire."""
-        if self._within_attack(p, t):
+        """True se `p` insegue `t` ma da CHASE_STALL_TIME secondi resta sul posto
+        (muro, angolo, nessuna strada). Conta solo lo spostamento di `p`, non la
+        distanza da `t`: chi scappa si insegue ancora, e aggirare un muro allontana
+        in linea d'aria. Il tempo non scorre se `p` e' fermo per altri motivi."""
+        if (self._within_attack(p, t)
+                or p.speed <= 0.0                                   # paralisi, stordimento
+                or (p.aa_active and p.aa_target_id == t.id)):       # fermo a caricare il colpo
             self._chase_prog.pop(p.id, None)
             return False
-        d = p.pos.dist(t.pos)
-        e = self._chase_prog.get(p.id)
+        # Da rallentati si fa meno strada: la soglia scende con la velocita'.
+        need = min(self.CHASE_STALL_MOVE, 0.25 * p.speed * self.CHASE_STALL_TIME)
+        e = self._chase_prog.get(p.id)          # [id bersaglio, da dove, da quando, ultimo controllo]
         now = self.time
         if (e is None or e[0] != t.id or now - e[3] > 0.25     # inseguimento nuovo/interrotto
-                or d < e[1] - self.CHASE_STALL_GAIN):
-            self._chase_prog[p.id] = [t.id, d, now, now]
+                or p.pos.dist(e[1]) > need):
+            self._chase_prog[p.id] = [t.id, Vec2(p.pos.x, p.pos.y), now, now]
             return False
         e[3] = now
         return now - e[2] >= self.CHASE_STALL_TIME
@@ -1053,14 +1064,27 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
             goal = (int(dest.x), int(dest.y))
             tile_path = find_path(self.world.grid, start, goal, bb)
             if tile_path:
-                pts = smooth_path(self.world.grid, tile_path, bb)
-                wps = [Vec2(px, py) for (px, py) in pts[1:]]
-                st["astar_path"] = wps
+                pts = smooth_path(self.world.grid, tile_path, bb)[1:]
+            else:
+                # Arrivo su un tile bloccato (bordo di un muro, cespuglio per i
+                # minion): ci si avvicina, senza tenere il percorso di un'altra
+                # destinazione.
+                pts = plan_move(self.world.grid, (u.pos.x, u.pos.y),
+                                (dest.x, dest.y), bb)
+            st["astar_path"] = [Vec2(px, py) for (px, py) in pts]
         wps = st.get("astar_path") or [dest]
         if isinstance(u, Pokemon) and not recomputed and u.path:
             return        # il percorso in corso si segue: rimetterlo intero riporterebbe
                           # indietro i waypoint gia' raggiunti (avanti-indietro)
         u.set_path(wps)
+
+    def forget_path(self, u) -> None:
+        """Nuovo ordine: il prossimo _astar_move ricalcola subito, invece di
+        seguire per un altro po' il percorso in cache."""
+        st = self._ai.get(u.id)
+        if st is not None:
+            st.pop("astar_path", None)
+            st.pop("astar_cd", None)
 
     def _face(self, u, target) -> None:
         u.facing = direction_index(target.pos.x - u.pos.x, target.pos.y - u.pos.y)
@@ -1307,10 +1331,21 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
 
     def _alive_towers(self, team: int) -> int:
         """Torri vive della squadra; 0 se una lane e' rimasta senza torri (nucleo scoperto)."""
+        # Le torri di ogni squadra in cache per versione della lista delle strutture
+        # (World._of_type la rifa' a ogni add/remove; kind/team/lane non cambiano):
+        # a ogni chiamata resta solo il controllo di `alive`. Stesso conteggio.
+        structs = self.world._of_type(Structure)
+        c = self.__dict__.get("_alive_towers_c")
+        if c is None or c[0] is not structs:
+            per = {}
+            for e in structs:
+                if e.kind == "tower":
+                    per.setdefault(e.team, []).append(e)
+            c = self._alive_towers_c = (structs, per)
         n = 0
         left = {ln: 0 for ln in getattr(self, "_tower_lanes", {}).get(team, ())}
-        for e in self.world.structures():
-            if e.kind == "tower" and e.team == team and e.alive:
+        for e in c[1].get(team, ()):
+            if e.alive:
                 n += 1
                 if e.lane in left:
                     left[e.lane] += 1
@@ -4450,7 +4485,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                         ms = p.moveset.get(slot)
                         if ms and ms.upgrades:
                             evolution.apply_choice(p, slot, random.randrange(len(ms.upgrades)))
-                if p.level > p.skill_points_spent:   # = skills.available_points(p) > 0
+                if p.level > p.skill_points_spent:   # filtro rapido: forse ha punti
                     self._bot_spend_points(p)
 
     def _bot_spend_points(self, p) -> None:

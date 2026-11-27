@@ -6,4 +6,5 @@ numpy==2.5.5
 aiortc==1.16.0
 cryptography==50.0.2
 pyinstaller==6.22.3
+maturin==1.16.0
 pytest==9.2.0

@@ -191,6 +191,13 @@ def capture_score(match) -> list:
 def capture_me_visual(match, p) -> dict:
     me = {name: getattr(p, name) for name in ME_FIELDS if hasattr(p, name)}
     me["respawn_timer"] = round(max(0.0, p.respawn_timer))
+    # Gittata dell'attacco base (cerchio del proprio Pokémon): portata con
+    # oggetti e passive + raggio, come la disegna la partita offline.
+    me["aa_range"] = round(match._auto_reach(p) + p.radius, 2)
+    if p.alive and p.moving and p.path:
+        # Percorso da disegnare, solo al proprietario: serve quando il client non
+        # lo predice (inseguimento di un bersaglio, ripresa dopo una mossa).
+        me["route"] = tuple((round(v.x, 1), round(v.y, 1)) for v in p.path)
     if p.passive_id == "armature":   # Charcadet: barre di Armature (arrotondate)
         me["fausta"], me["infausta"] = round(p.fausta), round(p.infausta)
     if p.passive_id == "soleluna":   # Sneasel: oro dai minion e dai neutrali

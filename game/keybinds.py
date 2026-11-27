@@ -39,6 +39,7 @@ _keys = dict(DEFAULTS)
 _slot_of: dict = {}
 smart_cast = False        # lancio rapido: la mossa parte alla PRESSIONE del tasto
 camera_speed = 1.0        # moltiplicatore dello scorrimento ai bordi
+show_aa_range = True      # linea della gittata dell'attacco base attorno al proprio Pokémon
 
 
 def _rebuild():
@@ -48,7 +49,7 @@ def _rebuild():
 
 
 def load(options: dict | None) -> None:
-    global smart_cast, camera_speed
+    global smart_cast, camera_speed, show_aa_range
     _keys.clear()
     _keys.update(DEFAULTS)
     opts = options or {}
@@ -65,6 +66,7 @@ def load(options: dict | None) -> None:
             _keys.clear()
             _keys.update(DEFAULTS)
     smart_cast = bool(opts.get("smart_cast", False))
+    show_aa_range = bool(opts.get("show_aa_range", True))
     try:
         camera_speed = max(0.25, min(3.0, float(opts.get("camera_speed", 1.0))))
     except (TypeError, ValueError):
@@ -106,7 +108,8 @@ def reset() -> None:
 
 
 def to_options() -> dict:
-    return {"keys": dict(_keys), "smart_cast": smart_cast, "camera_speed": camera_speed}
+    return {"keys": dict(_keys), "smart_cast": smart_cast, "camera_speed": camera_speed,
+            "show_aa_range": show_aa_range}
 
 
 _rebuild()

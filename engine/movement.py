@@ -5,6 +5,7 @@ Funzioni pure che operano su Unit + Grid. Nessuno stato globale.
 from __future__ import annotations
 
 import math
+from types import SimpleNamespace
 
 from .entities import Unit
 from .grid import TILE_BUSH, TILE_PILLAR, Grid
@@ -194,6 +195,23 @@ _STEP_NATIVE = True   # advance_unit via GridView.step_unit (se c'e')
 _SHAPE_DIRS = tuple((math.cos(i * math.pi / 8), math.sin(i * math.pi / 8))
                     for i in range(16))
 _SHAPE_FRACS = (0.2, 0.4, 0.6, 0.8, 1.0)
+
+
+def standable_point(grid: Grid, x: float, y: float,
+                    block_bush: bool = False) -> tuple[float, float]:
+    """Punto vicino a (x, y) in cui il corpo di un'unita' ci sta davvero.
+
+    Un waypoint piu' vicino a un muro del raggio del corpo non si raggiunge mai:
+    la collisione ributta indietro l'unita' a ogni tick e questa resta incastrata.
+    Vale la stessa spinta di _keep_off_walls, ripetuta finche' il punto si assesta,
+    col raggio massimo (cosi' il punto va bene per ogni unita')."""
+    probe = SimpleNamespace(pos=Vec2(x, y), radius=_WALL_R_MAX)
+    for _ in range(8):
+        before = probe.pos
+        _keep_off_walls(probe, grid, block_bush)
+        if probe.pos.dist(before) < 1e-3:
+            break
+    return probe.pos.x, probe.pos.y
 
 
 def _keep_off_walls(unit: Unit, grid: Grid, block_bush: bool) -> None:

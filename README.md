@@ -81,7 +81,13 @@ Pokémon sono in [launchers/](launchers/), per esempio `launchers/gioca_weavile.
 Altri strumenti:
 
 - Test online su un solo PC: `python tools/net_local_test.py`.
-- Exe unico da mandare agli amici: `crea_exe.bat` (crea `dist\PokeMoba.exe`).
+- Motore Rust (`native/`): l'exe pubblicato lo usa sempre e senza non parte.
+  Dal sorgente si compila con `python tools/build_native.py` (serve
+  [Rust](https://rustup.rs) e `maturin`, vedi `requirements-build.txt`); se manca,
+  il gioco gira in Python puro. Chi cambia in Python una funzione che esiste
+  anche in Rust deve cambiarle entrambe: lo controlla `python tools/rust_parity.py`.
+- Exe unico da mandare agli amici: `crea_exe.bat` (compila il motore e crea
+  `dist\PokeMoba.exe`).
 - Installer: `crea_installer.bat` (crea `dist\PokeMoba-Setup.exe` dall'exe, serve
   Inno Setup 6). Le Release su GitHub pubblicano l'installer da sole; il gioco
   installato si aggiorna poi da solo come prima.
@@ -117,7 +123,7 @@ Altri strumenti:
 | Minimappa | Sinistro: sposta la camera. Destro: muovi lì |
 | `Tab` / rotella | Cambia polarità (Magnezone, mentre miri) |
 | `F11` / `F` | Schermo intero |
-| `Esc` | Esci |
+| `Esc` | Chiude il negozio; apre e chiude le opzioni (da lì si esce) |
 
 La finestra si può ridimensionare. L'area di gioco resta fissa e uguale per tutti,
 scalata con le bande nere, così nessuno vede più mappa degli altri.

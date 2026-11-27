@@ -28,6 +28,7 @@ from sim.simulation import Simulation
 
 from ..camera import Camera
 from ..fx import FXSystem
+from ..ingame_menu import MatchMenuMixin
 from ..input_controller import InputController
 from ..minimap import Minimap
 from .. import anim_tuning, arch_fx, eevee_fx, hatt_fx, mag_fx, moth_fx, scy_fx, spirit_fx, swine_fx
@@ -55,7 +56,7 @@ SLOT_OFFSET = {"top": Vec2(-1.2, 0.0), "mid": Vec2(0.0, 0.0), "bot": Vec2(0.0, 1
 DEATH_FADE = 1.5   # s: posa Hurt tenuta mentre l'unità si dissolve alla morte
 
 
-class MatchScene:
+class MatchScene(MatchMenuMixin):
     def __init__(self, map_path: str, pokemon_path: str, start_level: int = 1,
                  start_items=None, bot_paths=None, start_armature=None, flower_color=None):
         map_data = load_map(map_path)
@@ -310,10 +311,13 @@ class MatchScene:
                             and self._end_btn is not None and self._end_btn.collidepoint(ev.pos))):
                     self._back_to_menu()
                 continue
+            if self.match_menu is not None:      # opzioni aperte: input solo a loro
+                self._menu_event(ev)
+                continue
             if self.comm.handle_event(ev, self.camera, self.minimap):
                 continue   # ping (ruota) o chat rapida
             if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
-                self.quit_app = True
+                self._escape()
             elif ev.type == pygame.KEYDOWN and ev.key == keybinds.key("shop") and self.match is not None:
                 self.shop.toggle()
             elif (self.shop.open and ev.type == pygame.MOUSEBUTTONDOWN
@@ -363,6 +367,32 @@ class MatchScene:
                 passthrough.append(ev)
         for cmd in self.input.process(passthrough, self.camera, self.world):
             self.sim.queue_command(cmd)
+        if self.match_menu is not None:
+            self._cancel_aim()      # tasto mossa premuto nello stesso frame di ESC
+
+    # --- opzioni in partita (game/ingame_menu.py) ------------------------------
+    def _cancel_aim(self) -> None:
+        self.input.aiming_slot = None
+
+    def _leave_match(self) -> None:
+        self._back_to_menu()
+
+    def _aim_move(self):
+        """Mossa di cui si vede il mirino (tasto tenuto e mossa pronta), o None."""
+        if not self.input.aiming_slot or not self.player.alive:
+            return None
+        ms = self.player.moveset.get(self.input.aiming_slot)
+        return ms.chosen if ms and ms.chosen and ms.ready else None
+
+    def _attack_range_ring(self, aim):
+        """(posizione, raggio) della gittata dell'attacco base del giocatore;
+        None se spenta nelle opzioni, da morto, a partita finita o mentre si mira
+        una mossa."""
+        m, p = self.match, self.player
+        if (not keybinds.show_aa_range or m is None or m.winner is not None
+                or not p.alive or aim is not None):
+            return None
+        return p.pos, m._auto_reach(p) + p.radius
 
     def _skillbar_click(self, pos) -> bool:
         for r, sl, idx in self._choice_rects:         # scelta del potenziamento (in base)
@@ -410,6 +440,8 @@ class MatchScene:
                                                     entity_id=self.player.id, yes=yes))
 
     def update(self, dt: float) -> None:
+        if self.match is not None and self.match.winner is not None:
+            self.match_menu = None      # fine partita: resta la schermata finale
         self.comm.update(self.match.time if self.match is not None else 0.0)
         if self.match is not None and self.player is not None:
             self.comm.set_vote(self.match.surrender_state(self.player.team), self.match.time,
@@ -427,14 +459,15 @@ class MatchScene:
                 if aset is not None:
                     self.animators[p.id] = SpriteAnimator(aset)
 
+        in_menu = self.match_menu is not None
         keys = pygame.key.get_pressed()
-        space_held = keys[pygame.K_SPACE]
+        space_held = keys[pygame.K_SPACE] and not in_menu
         mouse_win = pygame.mouse.get_pos()
         tx = self.player.pos.x * config.TILE_SIZE
         ty = self.player.pos.y * config.TILE_SIZE
         over_map = self.minimap is not None and self.minimap.blocks_edge_scroll(mouse_win)
         self.camera.update(dt, self.camera_locked, tx, ty, mouse_win, space_held,
-                           edge_ok=not over_map)
+                           edge_ok=not over_map and not in_menu)
 
         alive_ids = {u.id for u in self.world.alive_units()}
         for u in self.world.alive_units():
@@ -528,11 +561,13 @@ class MatchScene:
             respawning = [(p.spawn_pos, p.team,
                            1.0 - max(0.0, p.respawn_timer) / max(0.1, p.respawn_max))
                           for p in self.world.pokemons() if not p.alive]
+        aim = self._aim_move()
         self.renderer.draw(surface, self.world, self.camera, self.animators,
                            selected_path=path_pts, selected_id=sel,
                            dens=self.map_data.dens or None, respawning=respawning,
                            vision=self.vision, player_team=self.player.team,
-                           now=self.match.time if self.match else 1e9)
+                           now=self.match.time if self.match else 1e9,
+                           attack_range=self._attack_range_ring(aim))
         # Gittata delle torri nemiche: cerchio di pericolo quando ti avvicini.
         if self.match is not None:
             self.renderer.draw_tower_ranges(surface, self.camera, self.world,
@@ -560,18 +595,16 @@ class MatchScene:
         if self.match is not None:
             draw_projectiles(surface, self.camera, self.match, self.match.time)
         # Indicatore di mira (solo se la mossa è pronta: niente mirino in cooldown).
-        if self.input.aiming_slot and self.player.alive:
-            ms = self.player.moveset.get(self.input.aiming_slot)
-            if ms and ms.chosen and ms.ready:
-                mx, my = pygame.mouse.get_pos()
-                wx, wy = self.camera.screen_window_to_world(mx, my)
-                hold = (pygame.time.get_ticks() - self.input.aim_start) / 1000.0
-                self.renderer.draw_aim(surface, self.camera, self.player.pos,
-                                       (wx / config.TILE_SIZE, wy / config.TILE_SIZE),
-                                       ms.chosen, hold=hold,
-                                       rain=getattr(self.player, "arch_rain", False),
-                                       ammo=getattr(self.player, "ammo", "Water"),
-                                       queue=getattr(self.player, "deli_queue", None))
+        if aim is not None:
+            mx, my = pygame.mouse.get_pos()
+            wx, wy = self.camera.screen_window_to_world(mx, my)
+            hold = (pygame.time.get_ticks() - self.input.aim_start) / 1000.0
+            self.renderer.draw_aim(surface, self.camera, self.player.pos,
+                                   (wx / config.TILE_SIZE, wy / config.TILE_SIZE),
+                                   aim, hold=hold,
+                                   rain=getattr(self.player, "arch_rain", False),
+                                   ammo=getattr(self.player, "ammo", "Water"),
+                                   queue=getattr(self.player, "deli_queue", None))
         # Particelle degli effetti.
         self.fx.draw(surface, self.camera)
         arch_fx.draw_shake(surface, self.fx)   # Elettroraggio: lo schermo trema
@@ -707,7 +740,7 @@ class MatchScene:
             right = self.minimap.rect.x
         hud.draw_top(surface, self._match_view(), getattr(self, "fps", None))
         hud.text(surface, "Dx muovi  Sx attacca  Q/W/E/R mosse  Ctrl+tasto grado  "
-                 "Y camera  ESC esci", (8, 6), 12, hud.DIM)
+                 "Y camera  ESC opzioni", (8, 6), 12, hud.DIM)
         icon = lambda iid, size: self.shop._icon(self.match.item_catalog, iid, size, font)
         lay = hud.draw_bar(surface, self._player_view(), self._slot_views(), type_color,
                            icon, right_limit=right)
