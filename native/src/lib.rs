@@ -387,6 +387,73 @@ impl GridView {
             ys[i] = py;
         }
     }
+
+    /// movement.advance_unit (grid present, shape on) except the `pos` write:
+    /// writes path/facing/moving like before and returns the new position, or
+    /// None when the unit stands inside a wall on the ground (or its path is not
+    /// a list): Python then runs its own path for it.
+    fn step_core(&self, unit: &Bound<'_, PyAny>, dt: f64, a: &UnitAttrs) -> PyResult<Option<(f64, f64)>> {
+        let py = unit.py();
+        let (bb, px, py0) = (a.bb, a.x, a.y);
+        let ground = a.air_z <= 0.0;
+        if ground && !self.walkable_point(px, py0, bb) {
+            return Ok(None);
+        }
+        let path_any = unit.getattr(intern!(py, "path"))?;
+        let path = match path_any.cast::<PyList>() {
+            Ok(l) => l.clone(),
+            Err(_) => return Ok(None),
+        };
+        let keep_r: f64 = match a.radius {
+            Some(r) => if r < WALL_R_MAX { r } else { WALL_R_MAX },
+            None => 0.35,
+        };
+        if path.len() == 0 {
+            unit.setattr(intern!(py, "moving"), false)?;
+            if ground {
+                return Ok(Some(self.keep_off(px, py0, keep_r, bb)));
+            }
+            return Ok(Some((px, py0)));
+        }
+        let airborne = a.air_z > 0.0;
+        let speed: f64 = unit.getattr(intern!(py, "speed"))?.extract()?;
+        let (x, y, n, f) = self.advance(px, py0, &path, speed * dt, bb, airborne, keep_r)?;
+        if n > 0 {
+            path.del_slice(0, n)?;
+        }
+        if f >= 0 {
+            unit.setattr(intern!(py, "facing"), f)?;
+        }
+        unit.setattr(intern!(py, "moving"), path.len() > 0)?;
+        Ok(Some((x, y)))
+    }
+}
+
+/// The unit attributes the movement step and the collisions both need, read
+/// once: bush_blocks, air_z (0 if missing), pos, radius (None if missing).
+struct UnitAttrs {
+    bb: bool,
+    air_z: f64,
+    x: f64,
+    y: f64,
+    radius: Option<f64>,
+}
+
+impl UnitAttrs {
+    fn read(u: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let py = u.py();
+        let bb = attr_truthy(u, intern!(py, "bush_blocks"));
+        let air_z: f64 = match u.getattr(intern!(py, "air_z")) {
+            Ok(v) => v.extract()?,
+            Err(_) => 0.0,
+        };
+        let (x, y) = pos_of(u)?;
+        let radius = match u.getattr(intern!(py, "radius")) {
+            Ok(v) => Some(v.extract::<f64>()?),
+            Err(_) => None,
+        };
+        Ok(UnitAttrs { bb, air_z, x, y, radius })
+    }
 }
 
 #[inline]
@@ -524,53 +591,96 @@ impl GridView {
     /// (anti-stuck search + loop).
     fn step_unit(&self, unit: &Bound<'_, PyAny>, dt: f64, vec2: &Bound<'_, PyAny>) -> PyResult<bool> {
         let py = unit.py();
-        let bb = attr_truthy(unit, intern!(py, "bush_blocks"));
-        let air_z: f64 = match unit.getattr(intern!(py, "air_z")) {
-            Ok(v) => v.extract()?,
-            Err(_) => 0.0,
-        };
-        let (px, py0) = pos_of(unit)?;
-        let ground = air_z <= 0.0;
-        if ground && !self.walkable_point(px, py0, bb) {
-            return Ok(false);
-        }
-        let path_any = unit.getattr(intern!(py, "path"))?;
-        let path = match path_any.cast::<PyList>() {
-            Ok(l) => l.clone(),
-            Err(_) => return Ok(false),
-        };
-        let keep_r: f64 = match unit.getattr(intern!(py, "radius")) {
-            Ok(v) => {
-                let r: f64 = v.extract()?;
-                if r < WALL_R_MAX { r } else { WALL_R_MAX }
+        let a = UnitAttrs::read(unit)?;
+        match self.step_core(unit, dt, &a)? {
+            None => Ok(false),
+            Some((x, y)) => {
+                if x != a.x || y != a.y {
+                    unit.setattr(intern!(py, "pos"), new_vec2(vec2, x, y)?)?;
+                }
+                Ok(true)
             }
-            Err(_) => 0.35,
-        };
+        }
+    }
+
+    /// World.tick's whole native movement in ONE call: step_units, then (when no
+    /// unit was left to Python) collide_units on the positions in memory, so each
+    /// unit's attributes are read once and its `pos` written at most once.
+    /// Same arithmetic, same order as the two calls. Returns (bad, hits):
+    /// - bad not empty: units Python must step itself (centre inside a wall). The
+    ///   stepped positions are written as step_units does, collisions NOT done:
+    ///   the caller runs advance_unit on those, then collide_units as before.
+    /// - bad empty: collisions done; hits as collide_units returns them.
+    fn step_collide_units(&self, units: &Bound<'_, PyList>, dt: f64, vec2: &Bound<'_, PyAny>,
+                          iterations: usize, obstacles: Vec<(f64, f64, f64)>)
+                          -> PyResult<(Vec<usize>, Vec<usize>)> {
+        let py = units.py();
         let kpos = intern!(py, "pos");
-        if path.len() == 0 {
-            unit.setattr(intern!(py, "moving"), false)?;
-            if ground {
-                let (qx, qy) = self.keep_off(px, py0, keep_r, bb);
-                if qx != px || qy != py0 {
-                    unit.setattr(kpos, new_vec2(vec2, qx, qy)?)?;
+        let n = units.len();
+        let mut objs = Vec::with_capacity(n);
+        let mut attrs: Vec<UnitAttrs> = Vec::with_capacity(n);
+        let mut stepped: Vec<(f64, f64)> = Vec::with_capacity(n);
+        let mut bad = Vec::new();
+        for (i, u) in units.iter().enumerate() {
+            let a = UnitAttrs::read(&u)?;
+            match self.step_core(&u, dt, &a)? {
+                Some(p) => stepped.push(p),
+                None => {
+                    bad.push(i);
+                    stepped.push((a.x, a.y));
                 }
             }
-            return Ok(true);
+            attrs.push(a);
+            objs.push(u);
         }
-        let airborne = air_z > 0.0;
-        let speed: f64 = unit.getattr(intern!(py, "speed"))?.extract()?;
-        let (x, y, n, f) = self.advance(px, py0, &path, speed * dt, bb, airborne, keep_r)?;
-        if n > 0 {
-            path.del_slice(0, n)?;
+        if !bad.is_empty() {
+            for (k, u) in objs.iter().enumerate() {
+                let (x, y) = stepped[k];
+                if x != attrs[k].x || y != attrs[k].y {
+                    u.setattr(kpos, new_vec2(vec2, x, y)?)?;
+                }
+            }
+            return Ok((bad, Vec::new()));
         }
-        if f >= 0 {
-            unit.setattr(intern!(py, "facing"), f)?;
+        // collide_units on the stepped positions (ground units only).
+        let mut idx: Vec<usize> = Vec::with_capacity(n);
+        let (mut xs, mut ys, mut rs, mut ids, mut bbs) = (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
+        for (k, a) in attrs.iter().enumerate() {
+            if a.air_z > 0.0 {
+                continue;
+            }
+            idx.push(k);
+            xs.push(stepped[k].0);
+            ys.push(stepped[k].1);
+            rs.push(a.radius.ok_or_else(|| pyo3::exceptions::PyAttributeError::new_err("radius"))?);
+            ids.push(objs[k].getattr(intern!(py, "id"))?.extract::<i64>()?);
+            bbs.push(a.bb);
         }
-        if x != px || y != py0 {
-            unit.setattr(kpos, new_vec2(vec2, x, y)?)?;
+        let rads = rs.clone();
+        let (nx, ny) = self.resolve_collisions(xs, ys, rs, ids, bbs, iterations);
+        let mut fin = stepped;
+        for (j, &k) in idx.iter().enumerate() {
+            fin[k] = (nx[j], ny[j]);
         }
-        unit.setattr(intern!(py, "moving"), path.len() > 0)?;
-        Ok(true)
+        for (k, u) in objs.iter().enumerate() {
+            let (x, y) = fin[k];
+            if x != attrs[k].x || y != attrs[k].y {
+                u.setattr(kpos, new_vec2(vec2, x, y)?)?;
+            }
+        }
+        let mut hits = Vec::new();
+        for j in 0..idx.len() {
+            for &(ox, oy, r) in &obstacles {
+                let dx = nx[j] - ox;
+                let dy = ny[j] - oy;
+                let min_d = r + rads[j];
+                if dx * dx + dy * dy < min_d * min_d {
+                    hits.push(idx[j]);
+                    break;
+                }
+            }
+        }
+        Ok((bad, hits))
     }
 
     /// World.tick's loop `for u in movers: advance_unit(u, dt, grid)` in one

@@ -1179,10 +1179,21 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
 
     def _alive_towers(self, team: int) -> int:
         """Torri vive della squadra; 0 se una lane e' rimasta senza torri (nucleo scoperto)."""
+        # Le torri di ogni squadra in cache per versione della lista delle strutture
+        # (World._of_type la rifa' a ogni add/remove; kind/team/lane non cambiano):
+        # a ogni chiamata resta solo il controllo di `alive`. Stesso conteggio.
+        structs = self.world._of_type(Structure)
+        c = self.__dict__.get("_alive_towers_c")
+        if c is None or c[0] is not structs:
+            per = {}
+            for e in structs:
+                if e.kind == "tower":
+                    per.setdefault(e.team, []).append(e)
+            c = self._alive_towers_c = (structs, per)
         n = 0
         left = {ln: 0 for ln in getattr(self, "_tower_lanes", {}).get(team, ())}
-        for e in self.world.structures():
-            if e.kind == "tower" and e.team == team and e.alive:
+        for e in c[1].get(team, ()):
+            if e.alive:
                 n += 1
                 if e.lane in left:
                     left[e.lane] += 1
