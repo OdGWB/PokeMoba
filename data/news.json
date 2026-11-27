@@ -1,5 +1,18 @@
 [
   {
+    "version": "3.2.1",
+    "date": "2026-11-27",
+    "title": "Motore più veloce e movimento migliorato",
+    "items": [
+      "Nuovo motore: le parti più pesanti (movimento, collisioni, visione e comportamento dei minion) ora girano in Rust. La partita chiede molto meno lavoro al processore, soprattutto a chi la ospita.",
+      "Clic sui muri: il Pokémon va in un punto vicino senza saltare da un lato all'altro del muro, resta meno spesso incastrato lungo le pareti e l'attacco-movimento si ferma quando arriva.",
+      "Bersagli: un ordine di movimento molla davvero il nemico agganciato, e da fermo il tuo Pokémon non torna a inseguirlo per alcuni secondi. Se resta bloccato mentre insegue, dopo poco rinuncia.",
+      "Attacco-movimento: ignora i nemici alle spalle e non li insegue troppo lontano dal punto in cui li ha agganciati.",
+      "Online: ora vedi il percorso del tuo Pokémon, come in partita contro i bot.",
+      "Livello 8: il punto abilità è riservato alla mossa R e si spende scegliendola, senza un punto in più. Online la cornice verde segue le stesse regole della partita locale e l'interfaccia mostra le mosse della forma evoluta."
+    ]
+  },
+  {
     "version": "3.2.0",
     "date": "2026-11-25",
     "title": "Aggiornamenti firmati e online più sicuro",
