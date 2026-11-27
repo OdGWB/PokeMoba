@@ -10,7 +10,7 @@ from pathlib import Path
 import pygame
 
 import config
-from engine import moves as moves_mod
+from engine import moves as moves_mod, skills
 from engine.content import load_map, load_pokemon_def
 from engine.entities import Pokemon, Structure, Unit
 from engine.grid import TILE_FLOOR, TILE_WALL
@@ -345,6 +345,7 @@ class NetMatchScene:
     def draw(self, surface):
         me = self.world.get(self.your_id)
         self.renderer.draw(surface, self.world, self.camera, self.animators,
+                           selected_path=self._my_path(me),
                            selected_id=me.id if me else None,
                            dens=self.map_data.dens or None,
                            respawning=getattr(self.world, "respawning", None) or None,
@@ -374,6 +375,10 @@ class NetMatchScene:
                                        hold=hold, rain=getattr(me, "arch_rain", False),
                                        ammo=getattr(me, "ammo", "Water"),
                                        queue=getattr(me, "deli_queue", None))
+
+    def _my_path(self, me):
+        """Percorso di movimento del proprio Pokémon (la scena online lo ha)."""
+        return None
 
     def _draw_world_extras(self, surface):
         """Effetti che durano, sopra mappa e unità (la scena online li ha)."""
@@ -454,7 +459,20 @@ class NetMatchScene:
         rows.append(("Oggetti", f"{len(h.get('items', []))}/6", ""))
         return rows
 
+    def _sync_moveset(self):
+        """Mosse della forma attuale (dal dex), come engine/evolution.py: senza,
+        le forme con mosse proprie (es. la R di Eevee o Charcadet) restano
+        "bloccate" nell'HUD online anche dopo lo sblocco."""
+        dex = getattr(self.world.get(self.your_id), "dex", None)
+        for e in self.pdef.evolutions or ():
+            if e.get("moves") and e.get("dex") is not None and int(e["dex"]) == dex:
+                if dex != getattr(self, "_moves_dex", None):
+                    self._moves_dex = dex
+                    self.disp_moveset.update(moves_mod.build_moveset(e["moves"]))
+                return
+
     def _slot_views(self, h) -> list:
+        self._sync_moveset()
         pend = {["Q", "W", "E", "R"][i] for i in self._pending()}
         charges = self._me_vis().get("charges", {})
         out = []
@@ -464,7 +482,8 @@ class NetMatchScene:
             mv = self._variant_move(ms, s["variant"])
             maxr = ms.max_rank if ms is not None else (3 if sl == "R" else 4)
             v = hud.SlotView(key=sl, rank=s["rank"], max_rank=maxr,
-                             can_rank=h["points"] > 0 and s["rank"] < maxr,
+                             can_rank=(h["points"] > 0 and skills.rank_allowed(
+                                 sl, s["rank"], maxr, h["level"])),
                              evolvable=sl in pend and ms is not None and bool(ms.upgrades))
             if mv is not None:
                 v.name, v.mtype = mv.name, mv.type
@@ -477,7 +496,8 @@ class NetMatchScene:
                     v.cd_frac = s["cd"] / max(0.1, mv.cooldown_at(s["rank"]))
             else:
                 v.can_rank = False
-                v.locked = "Liv. 8" if (s["variant"] == -2 or h["level"] < 8) else "Evolvi"
+                v.locked = ("Liv. 8" if h["level"] < 8
+                            else "Scegli" if s["variant"] == -2 else "Evolvi")
                 if ms is None:
                     v.max_rank = 0
             out.append(v)

@@ -4322,7 +4322,7 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
                         ms = p.moveset.get(slot)
                         if ms and ms.upgrades:
                             evolution.apply_choice(p, slot, random.randrange(len(ms.upgrades)))
-                if p.level > p.skill_points_spent:   # = skills.available_points(p) > 0
+                if p.level > p.skill_points_spent:   # filtro rapido: forse ha punti
                     self._bot_spend_points(p)
 
     def _bot_spend_points(self, p) -> None:
