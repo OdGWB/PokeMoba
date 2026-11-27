@@ -354,7 +354,10 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         d = (pts[1] - base).normalized()
         perp = Vec2(-d.y, d.x)
         # Scostamento perpendicolare per non impilarli, pseudo-casuale ma deterministico.
-        jig = (hash((int(self.time * 10), team, lane, len(self.world.minions()))) % 7 - 3) * 0.25
+        # La corsia entra come INDICE: l'hash di una stringa cambia a ogni processo
+        # (PYTHONHASHSEED), quello di una tupla di interi no.
+        lane_i = list(self.map.lanes).index(lane)
+        jig = (hash((int(self.time * 10), team, lane_i, len(self.world.minions()))) % 7 - 3) * 0.25
         pos = base + d * 3.0 + perp * jig
         stats = dict(MINION_STATS[mtype])
         # I minion crescono col tempo (hp e danno) per rompere gli stalli.

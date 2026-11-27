@@ -8,7 +8,7 @@
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::hash::{BuildHasherDefault, Hasher};
 
 /// FxHash (rustc's): fast hasher for integer keys. Used only in maps where
@@ -388,6 +388,101 @@ impl GridView {
         }
     }
 
+    /// The waypoint loop of movement.advance_unit (grid present, shape on) on n
+    /// waypoints read through `wp` (in order, only as far as the loop gets).
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn advance_with<F>(&self, px0: f64, py0: f64, n: usize, mut wp: F, budget0: f64,
+                                  bb: bool, airborne: bool, keep_r: f64) -> PyResult<(f64, f64, usize, i64)>
+    where
+        F: FnMut(usize) -> PyResult<(f64, f64)>,
+    {
+        let (mut px, mut py) = (px0, py0);
+        let mut budget = budget0;
+        let mut i = 0usize;
+        let mut facing = -1i64;
+        let blocked = |x: f64, y: f64| !airborne && !self.walkable_point(x, y, bb);
+        while budget > 1e-9 && i < n {
+            let (tx, ty) = wp(i)?;
+            let (tox, toy) = (tx - px, ty - py);
+            let d = hypot(tox, toy);
+            // Vec2.normalized
+            let (ux, uy) = if d < 1e-9 { (0.0, 0.0) } else { (tox / d, toy / d) };
+            if d > ARRIVE_EPS {
+                let m = if d < budget { d } else { budget };
+                let (sx, sy) = (ux * m, uy * m);
+                let (qx, qy) = (px + sx, py + sy);
+                let step_in = self.in_pillar(qx, qy);
+                if step_in || self.in_pillar(tx, ty) {
+                    let alt = if step_in { self.steer(px, py, sx, sy) } else { Some((qx, qy)) };
+                    if let Some((ax, ay)) = alt {
+                        if !blocked(ax, ay) {
+                            px = ax;
+                            py = ay;
+                        }
+                    }
+                    facing = self.direction_index(tox, toy);
+                    break;
+                }
+            }
+            if d <= ARRIVE_EPS {
+                if blocked(tx, ty) {
+                    break;
+                }
+                px = tx;
+                py = ty;
+                i += 1;
+                continue;
+            }
+            if d <= budget {
+                if blocked(tx, ty) {
+                    break;
+                }
+                if !airborne {
+                    match self.slide(px, py, tx, ty, bb) {
+                        Slide::Blocked => break,
+                        Slide::Axis(mx, my) => {
+                            px = mx;
+                            py = my;
+                            facing = self.direction_index(tox, toy);
+                            break;
+                        }
+                        Slide::Same => {}
+                    }
+                }
+                px = tx;
+                py = ty;
+                budget -= d;
+                facing = self.direction_index(tox, toy);
+                i += 1;
+            } else {
+                let (mut nx, mut ny) = (px + ux * budget, py + uy * budget);
+                if !airborne {
+                    match self.slide(px, py, nx, ny, bb) {
+                        Slide::Blocked => {
+                            facing = self.direction_index(tox, toy);
+                            break;
+                        }
+                        Slide::Axis(mx, my) => {
+                            nx = mx;
+                            ny = my;
+                        }
+                        Slide::Same => {}
+                    }
+                }
+                px = nx;
+                py = ny;
+                facing = self.direction_index(tox, toy);
+                break;
+            }
+        }
+        if !airborne {
+            let (qx, qy) = self.keep_off(px, py, keep_r, bb);
+            px = qx;
+            py = qy;
+        }
+        Ok((px, py, i, facing))
+    }
+
     /// movement.advance_unit (grid present, shape on) except the `pos` write:
     /// writes path/facing/moving like before and returns the new position, or
     /// None when the unit stands inside a wall on the ground (or its path is not
@@ -495,94 +590,10 @@ impl GridView {
                bb: bool, airborne: bool, keep_r: f64) -> PyResult<(f64, f64, usize, i64)> {
         let pyh = path.py();
         let (kx, ky) = (intern!(pyh, "x"), intern!(pyh, "y"));
-        let n = path.len();
-        let (mut px, mut py) = (px0, py0);
-        let mut budget = budget0;
-        let mut i = 0usize;
-        let mut facing = -1i64;
-        let blocked = |x: f64, y: f64| !airborne && !self.walkable_point(x, y, bb);
-        while budget > 1e-9 && i < n {
+        self.advance_with(px0, py0, path.len(), |i| {
             let t = path.get_item(i)?;
-            let tx: f64 = t.getattr(kx)?.extract()?;
-            let ty: f64 = t.getattr(ky)?.extract()?;
-            let (tox, toy) = (tx - px, ty - py);
-            let d = hypot(tox, toy);
-            // Vec2.normalized
-            let (ux, uy) = if d < 1e-9 { (0.0, 0.0) } else { (tox / d, toy / d) };
-            if d > ARRIVE_EPS {
-                let m = if d < budget { d } else { budget };
-                let (sx, sy) = (ux * m, uy * m);
-                let (qx, qy) = (px + sx, py + sy);
-                let step_in = self.in_pillar(qx, qy);
-                if step_in || self.in_pillar(tx, ty) {
-                    let alt = if step_in { self.steer(px, py, sx, sy) } else { Some((qx, qy)) };
-                    if let Some((ax, ay)) = alt {
-                        if !blocked(ax, ay) {
-                            px = ax;
-                            py = ay;
-                        }
-                    }
-                    facing = self.direction_index(tox, toy);
-                    break;
-                }
-            }
-            if d <= ARRIVE_EPS {
-                if blocked(tx, ty) {
-                    break;
-                }
-                px = tx;
-                py = ty;
-                i += 1;
-                continue;
-            }
-            if d <= budget {
-                if blocked(tx, ty) {
-                    break;
-                }
-                if !airborne {
-                    match self.slide(px, py, tx, ty, bb) {
-                        Slide::Blocked => break,
-                        Slide::Axis(mx, my) => {
-                            px = mx;
-                            py = my;
-                            facing = self.direction_index(tox, toy);
-                            break;
-                        }
-                        Slide::Same => {}
-                    }
-                }
-                px = tx;
-                py = ty;
-                budget -= d;
-                facing = self.direction_index(tox, toy);
-                i += 1;
-            } else {
-                let (mut nx, mut ny) = (px + ux * budget, py + uy * budget);
-                if !airborne {
-                    match self.slide(px, py, nx, ny, bb) {
-                        Slide::Blocked => {
-                            facing = self.direction_index(tox, toy);
-                            break;
-                        }
-                        Slide::Axis(mx, my) => {
-                            nx = mx;
-                            ny = my;
-                        }
-                        Slide::Same => {}
-                    }
-                }
-                px = nx;
-                py = ny;
-                facing = self.direction_index(tox, toy);
-                break;
-            }
-        }
-        if !airborne {
-            let (qx, qy) = self.keep_off(px, py, keep_r, bb);
-            px = qx;
-            py = qy;
-        }
-        Ok((px, py, i, facing))
+            Ok((t.getattr(kx)?.extract()?, t.getattr(ky)?.extract()?))
+        }, budget0, bb, airborne, keep_r)
     }
 
     /// The whole movement.advance_unit (grid present, shape on), reading and
@@ -774,13 +785,16 @@ impl GridView {
     /// movement.resolve_collisions (units already filtered: not in the air).
     /// Returns the new positions; the caller writes back the changed ones.
     fn resolve_collisions(&self, mut xs: Vec<f64>, mut ys: Vec<f64>, rs: Vec<f64>,
-                          ids: Vec<i64>, bbs: Vec<bool>, iterations: usize)
+                          _ids: Vec<i64>, bbs: Vec<bool>, iterations: usize)
                           -> (Vec<f64>, Vec<f64>) {
         let n = xs.len();
         let kr: Vec<f64> = rs.iter().map(|&r| if WALL_R_MAX < r { WALL_R_MAX } else { r }).collect();
         let mut cells: HashMap<(i64, i64), Vec<usize>, FxBuild> = HashMap::default();
         let mut nb: Vec<usize> = Vec::with_capacity(64);
-        let mut seen: HashSet<(i64, i64), FxBuild> = HashSet::default();
+        // Pairs already handled in this iteration: a bit per (unit, unit) by index
+        // (ids are unique per unit, so index pairs == id pairs).
+        let words = n.div_ceil(64);
+        let mut seen: Vec<u64> = vec![0; n * words];
         for _ in 0..iterations {
             for v in cells.values_mut() {
                 v.clear();
@@ -788,7 +802,7 @@ impl GridView {
             for i in 0..n {
                 cells.entry(cell_key(xs[i], ys[i])).or_default().push(i);
             }
-            seen.clear();
+            seen.iter_mut().for_each(|w| *w = 0);
             for a in 0..n {
                 let (kx, ky) = cell_key(xs[a], ys[a]);
                 nb.clear();
@@ -804,10 +818,12 @@ impl GridView {
                     if b == a {
                         continue;
                     }
-                    let pair = if ids[a] < ids[b] { (ids[a], ids[b]) } else { (ids[b], ids[a]) };
-                    if !seen.insert(pair) {
+                    let (lo, hi) = if a < b { (a, b) } else { (b, a) };
+                    let (wi, bit) = (lo * words + hi / 64, 1u64 << (hi % 64));
+                    if seen[wi] & bit != 0 {
                         continue;
                     }
+                    seen[wi] |= bit;
                     let ddx = xs[b] - xs[a];
                     let ddy = ys[b] - ys[a];
                     let dist = hypot(ddx, ddy);
@@ -1725,6 +1741,8 @@ impl BotHelpers {
     }
 }
 
+mod sim;
+
 #[pymodule]
 fn pokemoba_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_hypot, m)?)?;
@@ -1735,5 +1753,6 @@ fn pokemoba_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<MinionAI>()?;
     m.add_class::<BotHelpers>()?;
     m.add_function(wrap_pyfunction!(obstacle_hits, m)?)?;
+    sim::register(m)?;
     Ok(())
 }
