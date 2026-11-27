@@ -8,7 +8,7 @@
 use pyo3::intern;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::hash::{BuildHasherDefault, Hasher};
 
 /// FxHash (rustc's): fast hasher for integer keys. Used only in maps where
@@ -387,57 +387,22 @@ impl GridView {
             ys[i] = py;
         }
     }
-}
 
-#[inline]
-fn cell_key(x: f64, y: f64) -> (i64, i64) {
-    // SpatialHash._key with cell_size 2.0 (inv = 0.5, exact).
-    ((x * 0.5).floor() as i64, (y * 0.5).floor() as i64)
-}
-
-#[pymethods]
-impl GridView {
-    #[new]
-    fn new(w: usize, h: usize, tiles: Vec<u8>, fine: Vec<u8>, any_t: Vec<u8>,
-           dirs: Vec<(f64, f64)>, steer: Vec<(f64, f64)>) -> PyResult<Self> {
-        if tiles.len() != w * h || any_t.len() != w * h || fine.len() != w * h * RES * RES {
-            return Err(pyo3::exceptions::PyValueError::new_err("GridView: bad buffer sizes"));
-        }
-        // vec._DIR_UNIT = [Vec2(dx, dy).normalized() for DIR_VECTORS]
-        let raw: [(f64, f64); 8] = [(0.0, 1.0), (1.0, 1.0), (1.0, 0.0), (1.0, -1.0),
-                                    (0.0, -1.0), (-1.0, -1.0), (-1.0, 0.0), (-1.0, 1.0)];
-        let mut dir_unit = [(0.0, 0.0); 8];
-        for (i, &(x, y)) in raw.iter().enumerate() {
-            let l = hypot(x, y);
-            dir_unit[i] = (x / l, y / l);
-        }
-        Ok(GridView { w, h, tiles, fine, any_t, dirs, steer, dir_unit })
-    }
-
-    /// direction_index (for tests against vec.direction_index).
-    fn direction_index_py(&self, dx: f64, dy: f64) -> i64 {
-        self.direction_index(dx, dy)
-    }
-
-    /// The waypoint loop of movement.advance_unit (grid present, shape on).
-    /// path: list of Vec2 (read, not modified). Returns (x, y, waypoints
-    /// consumed, last facing or -1). keep_r = min(radius, 0.42) for the final
-    /// _keep_off_walls (skipped in the air).
+    /// The waypoint loop of movement.advance_unit (grid present, shape on) on n
+    /// waypoints read through `wp` (in order, only as far as the loop gets).
     #[allow(clippy::too_many_arguments)]
-    fn advance(&self, px0: f64, py0: f64, path: &Bound<'_, PyList>, budget0: f64,
-               bb: bool, airborne: bool, keep_r: f64) -> PyResult<(f64, f64, usize, i64)> {
-        let pyh = path.py();
-        let (kx, ky) = (intern!(pyh, "x"), intern!(pyh, "y"));
-        let n = path.len();
+    pub(crate) fn advance_with<F>(&self, px0: f64, py0: f64, n: usize, mut wp: F, budget0: f64,
+                                  bb: bool, airborne: bool, keep_r: f64) -> PyResult<(f64, f64, usize, i64)>
+    where
+        F: FnMut(usize) -> PyResult<(f64, f64)>,
+    {
         let (mut px, mut py) = (px0, py0);
         let mut budget = budget0;
         let mut i = 0usize;
         let mut facing = -1i64;
         let blocked = |x: f64, y: f64| !airborne && !self.walkable_point(x, y, bb);
         while budget > 1e-9 && i < n {
-            let t = path.get_item(i)?;
-            let tx: f64 = t.getattr(kx)?.extract()?;
-            let ty: f64 = t.getattr(ky)?.extract()?;
+            let (tx, ty) = wp(i)?;
             let (tox, toy) = (tx - px, ty - py);
             let d = hypot(tox, toy);
             // Vec2.normalized
@@ -518,46 +483,34 @@ impl GridView {
         Ok((px, py, i, facing))
     }
 
-    /// The whole movement.advance_unit (grid present, shape on), reading and
-    /// writing the unit's attributes. Returns False (nothing changed) when the
-    /// unit stands inside a wall on the ground: Python then runs its own path
-    /// (anti-stuck search + loop).
-    fn step_unit(&self, unit: &Bound<'_, PyAny>, dt: f64, vec2: &Bound<'_, PyAny>) -> PyResult<bool> {
+    /// movement.advance_unit (grid present, shape on) except the `pos` write:
+    /// writes path/facing/moving like before and returns the new position, or
+    /// None when the unit stands inside a wall on the ground (or its path is not
+    /// a list): Python then runs its own path for it.
+    fn step_core(&self, unit: &Bound<'_, PyAny>, dt: f64, a: &UnitAttrs) -> PyResult<Option<(f64, f64)>> {
         let py = unit.py();
-        let bb = attr_truthy(unit, intern!(py, "bush_blocks"));
-        let air_z: f64 = match unit.getattr(intern!(py, "air_z")) {
-            Ok(v) => v.extract()?,
-            Err(_) => 0.0,
-        };
-        let (px, py0) = pos_of(unit)?;
-        let ground = air_z <= 0.0;
+        let (bb, px, py0) = (a.bb, a.x, a.y);
+        let ground = a.air_z <= 0.0;
         if ground && !self.walkable_point(px, py0, bb) {
-            return Ok(false);
+            return Ok(None);
         }
         let path_any = unit.getattr(intern!(py, "path"))?;
         let path = match path_any.cast::<PyList>() {
             Ok(l) => l.clone(),
-            Err(_) => return Ok(false),
+            Err(_) => return Ok(None),
         };
-        let keep_r: f64 = match unit.getattr(intern!(py, "radius")) {
-            Ok(v) => {
-                let r: f64 = v.extract()?;
-                if r < WALL_R_MAX { r } else { WALL_R_MAX }
-            }
-            Err(_) => 0.35,
+        let keep_r: f64 = match a.radius {
+            Some(r) => if r < WALL_R_MAX { r } else { WALL_R_MAX },
+            None => 0.35,
         };
-        let kpos = intern!(py, "pos");
         if path.len() == 0 {
             unit.setattr(intern!(py, "moving"), false)?;
             if ground {
-                let (qx, qy) = self.keep_off(px, py0, keep_r, bb);
-                if qx != px || qy != py0 {
-                    unit.setattr(kpos, vec2.call1((qx, qy))?)?;
-                }
+                return Ok(Some(self.keep_off(px, py0, keep_r, bb)));
             }
-            return Ok(true);
+            return Ok(Some((px, py0)));
         }
-        let airborne = air_z > 0.0;
+        let airborne = a.air_z > 0.0;
         let speed: f64 = unit.getattr(intern!(py, "speed"))?.extract()?;
         let (x, y, n, f) = self.advance(px, py0, &path, speed * dt, bb, airborne, keep_r)?;
         if n > 0 {
@@ -566,11 +519,179 @@ impl GridView {
         if f >= 0 {
             unit.setattr(intern!(py, "facing"), f)?;
         }
-        if x != px || y != py0 {
-            unit.setattr(kpos, vec2.call1((x, y))?)?;
-        }
         unit.setattr(intern!(py, "moving"), path.len() > 0)?;
-        Ok(true)
+        Ok(Some((x, y)))
+    }
+}
+
+/// The unit attributes the movement step and the collisions both need, read
+/// once: bush_blocks, air_z (0 if missing), pos, radius (None if missing).
+struct UnitAttrs {
+    bb: bool,
+    air_z: f64,
+    x: f64,
+    y: f64,
+    radius: Option<f64>,
+}
+
+impl UnitAttrs {
+    fn read(u: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let py = u.py();
+        let bb = attr_truthy(u, intern!(py, "bush_blocks"));
+        let air_z: f64 = match u.getattr(intern!(py, "air_z")) {
+            Ok(v) => v.extract()?,
+            Err(_) => 0.0,
+        };
+        let (x, y) = pos_of(u)?;
+        let radius = match u.getattr(intern!(py, "radius")) {
+            Ok(v) => Some(v.extract::<f64>()?),
+            Err(_) => None,
+        };
+        Ok(UnitAttrs { bb, air_z, x, y, radius })
+    }
+}
+
+#[inline]
+fn cell_key(x: f64, y: f64) -> (i64, i64) {
+    // SpatialHash._key with cell_size 2.0 (inv = 0.5, exact).
+    ((x * 0.5).floor() as i64, (y * 0.5).floor() as i64)
+}
+
+#[pymethods]
+impl GridView {
+    #[new]
+    fn new(w: usize, h: usize, tiles: Vec<u8>, fine: Vec<u8>, any_t: Vec<u8>,
+           dirs: Vec<(f64, f64)>, steer: Vec<(f64, f64)>) -> PyResult<Self> {
+        if tiles.len() != w * h || any_t.len() != w * h || fine.len() != w * h * RES * RES {
+            return Err(pyo3::exceptions::PyValueError::new_err("GridView: bad buffer sizes"));
+        }
+        // vec._DIR_UNIT = [Vec2(dx, dy).normalized() for DIR_VECTORS]
+        let raw: [(f64, f64); 8] = [(0.0, 1.0), (1.0, 1.0), (1.0, 0.0), (1.0, -1.0),
+                                    (0.0, -1.0), (-1.0, -1.0), (-1.0, 0.0), (-1.0, 1.0)];
+        let mut dir_unit = [(0.0, 0.0); 8];
+        for (i, &(x, y)) in raw.iter().enumerate() {
+            let l = hypot(x, y);
+            dir_unit[i] = (x / l, y / l);
+        }
+        Ok(GridView { w, h, tiles, fine, any_t, dirs, steer, dir_unit })
+    }
+
+    /// direction_index (for tests against vec.direction_index).
+    fn direction_index_py(&self, dx: f64, dy: f64) -> i64 {
+        self.direction_index(dx, dy)
+    }
+
+    /// The waypoint loop of movement.advance_unit (grid present, shape on).
+    /// path: list of Vec2 (read, not modified). Returns (x, y, waypoints
+    /// consumed, last facing or -1). keep_r = min(radius, 0.42) for the final
+    /// _keep_off_walls (skipped in the air).
+    #[allow(clippy::too_many_arguments)]
+    fn advance(&self, px0: f64, py0: f64, path: &Bound<'_, PyList>, budget0: f64,
+               bb: bool, airborne: bool, keep_r: f64) -> PyResult<(f64, f64, usize, i64)> {
+        let pyh = path.py();
+        let (kx, ky) = (intern!(pyh, "x"), intern!(pyh, "y"));
+        self.advance_with(px0, py0, path.len(), |i| {
+            let t = path.get_item(i)?;
+            Ok((t.getattr(kx)?.extract()?, t.getattr(ky)?.extract()?))
+        }, budget0, bb, airborne, keep_r)
+    }
+
+    /// The whole movement.advance_unit (grid present, shape on), reading and
+    /// writing the unit's attributes. Returns False (nothing changed) when the
+    /// unit stands inside a wall on the ground: Python then runs its own path
+    /// (anti-stuck search + loop).
+    fn step_unit(&self, unit: &Bound<'_, PyAny>, dt: f64, vec2: &Bound<'_, PyAny>) -> PyResult<bool> {
+        let py = unit.py();
+        let a = UnitAttrs::read(unit)?;
+        match self.step_core(unit, dt, &a)? {
+            None => Ok(false),
+            Some((x, y)) => {
+                if x != a.x || y != a.y {
+                    unit.setattr(intern!(py, "pos"), new_vec2(vec2, x, y)?)?;
+                }
+                Ok(true)
+            }
+        }
+    }
+
+    /// World.tick's whole native movement in ONE call: step_units, then (when no
+    /// unit was left to Python) collide_units on the positions in memory, so each
+    /// unit's attributes are read once and its `pos` written at most once.
+    /// Same arithmetic, same order as the two calls. Returns (bad, hits):
+    /// - bad not empty: units Python must step itself (centre inside a wall). The
+    ///   stepped positions are written as step_units does, collisions NOT done:
+    ///   the caller runs advance_unit on those, then collide_units as before.
+    /// - bad empty: collisions done; hits as collide_units returns them.
+    fn step_collide_units(&self, units: &Bound<'_, PyList>, dt: f64, vec2: &Bound<'_, PyAny>,
+                          iterations: usize, obstacles: Vec<(f64, f64, f64)>)
+                          -> PyResult<(Vec<usize>, Vec<usize>)> {
+        let py = units.py();
+        let kpos = intern!(py, "pos");
+        let n = units.len();
+        let mut objs = Vec::with_capacity(n);
+        let mut attrs: Vec<UnitAttrs> = Vec::with_capacity(n);
+        let mut stepped: Vec<(f64, f64)> = Vec::with_capacity(n);
+        let mut bad = Vec::new();
+        for (i, u) in units.iter().enumerate() {
+            let a = UnitAttrs::read(&u)?;
+            match self.step_core(&u, dt, &a)? {
+                Some(p) => stepped.push(p),
+                None => {
+                    bad.push(i);
+                    stepped.push((a.x, a.y));
+                }
+            }
+            attrs.push(a);
+            objs.push(u);
+        }
+        if !bad.is_empty() {
+            for (k, u) in objs.iter().enumerate() {
+                let (x, y) = stepped[k];
+                if x != attrs[k].x || y != attrs[k].y {
+                    u.setattr(kpos, new_vec2(vec2, x, y)?)?;
+                }
+            }
+            return Ok((bad, Vec::new()));
+        }
+        // collide_units on the stepped positions (ground units only).
+        let mut idx: Vec<usize> = Vec::with_capacity(n);
+        let (mut xs, mut ys, mut rs, mut ids, mut bbs) = (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
+        for (k, a) in attrs.iter().enumerate() {
+            if a.air_z > 0.0 {
+                continue;
+            }
+            idx.push(k);
+            xs.push(stepped[k].0);
+            ys.push(stepped[k].1);
+            rs.push(a.radius.ok_or_else(|| pyo3::exceptions::PyAttributeError::new_err("radius"))?);
+            ids.push(objs[k].getattr(intern!(py, "id"))?.extract::<i64>()?);
+            bbs.push(a.bb);
+        }
+        let rads = rs.clone();
+        let (nx, ny) = self.resolve_collisions(xs, ys, rs, ids, bbs, iterations);
+        let mut fin = stepped;
+        for (j, &k) in idx.iter().enumerate() {
+            fin[k] = (nx[j], ny[j]);
+        }
+        for (k, u) in objs.iter().enumerate() {
+            let (x, y) = fin[k];
+            if x != attrs[k].x || y != attrs[k].y {
+                u.setattr(kpos, new_vec2(vec2, x, y)?)?;
+            }
+        }
+        let mut hits = Vec::new();
+        for j in 0..idx.len() {
+            for &(ox, oy, r) in &obstacles {
+                let dx = nx[j] - ox;
+                let dy = ny[j] - oy;
+                let min_d = r + rads[j];
+                if dx * dx + dy * dy < min_d * min_d {
+                    hits.push(idx[j]);
+                    break;
+                }
+            }
+        }
+        Ok((bad, hits))
     }
 
     /// World.tick's loop `for u in movers: advance_unit(u, dt, grid)` in one
@@ -620,7 +741,7 @@ impl GridView {
         let kpos = intern!(py, "pos");
         for (k, u) in objs.iter().enumerate() {
             if nx[k] != x0[k] || ny[k] != y0[k] {
-                u.setattr(kpos, vec2.call1((nx[k], ny[k]))?)?;
+                u.setattr(kpos, new_vec2(vec2, nx[k], ny[k])?)?;
             }
         }
         let mut hits = Vec::new();
@@ -664,13 +785,16 @@ impl GridView {
     /// movement.resolve_collisions (units already filtered: not in the air).
     /// Returns the new positions; the caller writes back the changed ones.
     fn resolve_collisions(&self, mut xs: Vec<f64>, mut ys: Vec<f64>, rs: Vec<f64>,
-                          ids: Vec<i64>, bbs: Vec<bool>, iterations: usize)
+                          _ids: Vec<i64>, bbs: Vec<bool>, iterations: usize)
                           -> (Vec<f64>, Vec<f64>) {
         let n = xs.len();
         let kr: Vec<f64> = rs.iter().map(|&r| if WALL_R_MAX < r { WALL_R_MAX } else { r }).collect();
         let mut cells: HashMap<(i64, i64), Vec<usize>, FxBuild> = HashMap::default();
         let mut nb: Vec<usize> = Vec::with_capacity(64);
-        let mut seen: HashSet<(i64, i64), FxBuild> = HashSet::default();
+        // Pairs already handled in this iteration: a bit per (unit, unit) by index
+        // (ids are unique per unit, so index pairs == id pairs).
+        let words = n.div_ceil(64);
+        let mut seen: Vec<u64> = vec![0; n * words];
         for _ in 0..iterations {
             for v in cells.values_mut() {
                 v.clear();
@@ -678,7 +802,7 @@ impl GridView {
             for i in 0..n {
                 cells.entry(cell_key(xs[i], ys[i])).or_default().push(i);
             }
-            seen.clear();
+            seen.iter_mut().for_each(|w| *w = 0);
             for a in 0..n {
                 let (kx, ky) = cell_key(xs[a], ys[a]);
                 nb.clear();
@@ -694,10 +818,12 @@ impl GridView {
                     if b == a {
                         continue;
                     }
-                    let pair = if ids[a] < ids[b] { (ids[a], ids[b]) } else { (ids[b], ids[a]) };
-                    if !seen.insert(pair) {
+                    let (lo, hi) = if a < b { (a, b) } else { (b, a) };
+                    let (wi, bit) = (lo * words + hi / 64, 1u64 << (hi % 64));
+                    if seen[wi] & bit != 0 {
                         continue;
                     }
+                    seen[wi] |= bit;
                     let ddx = xs[b] - xs[a];
                     let ddy = ys[b] - ys[a];
                     let dist = hypot(ddx, ddy);
@@ -739,6 +865,58 @@ impl SpatialHash {
     fn key(&self, x: f64, y: f64) -> (i64, i64) {
         let inv = 1.0 / self.cell_size;
         ((x * inv).floor() as i64, (y * inv).floor() as i64)
+    }
+}
+
+/// The Vec2 class we may build directly (validated once, see new_vec2).
+static FAST_VEC2: pyo3::sync::PyOnceLock<Py<PyAny>> = pyo3::sync::PyOnceLock::new();
+
+/// True if `cls` is a dataclass whose fields are exactly (x, y) with no
+/// __post_init__: its generated __init__ then only does
+/// object.__setattr__(self, "x", x); object.__setattr__(self, "y", y).
+fn vec2_is_plain(cls: &Bound<'_, PyAny>) -> bool {
+    let py = cls.py();
+    if cls.cast::<pyo3::types::PyType>().is_err() || cls.hasattr(intern!(py, "__post_init__")).unwrap_or(true) {
+        return false;
+    }
+    let Ok(fields) = cls.getattr(intern!(py, "__dataclass_fields__")) else { return false };
+    let Ok(fields) = fields.cast::<PyDict>() else { return false };
+    let keys: Vec<String> = fields.keys().iter().filter_map(|k| k.extract::<String>().ok()).collect();
+    keys == ["x", "y"]
+}
+
+/// vec2(x, y), i.e. a new engine.vec.Vec2. Vec2 is a frozen dataclass, and its
+/// __init__ called from Python costs ~330 ns. For that class we do exactly what
+/// the generated __init__ does, from C: allocate the instance as object.__new__
+/// does, then set x and y (in that order) with the generic setattr, which is
+/// what object.__setattr__ calls. Same object, same __dict__. Any other
+/// callable is just called.
+fn new_vec2<'py>(vec2: &Bound<'py, PyAny>, x: f64, y: f64) -> PyResult<Bound<'py, PyAny>> {
+    let py = vec2.py();
+    let fast = match FAST_VEC2.get(py) {
+        Some(c) => c.bind(py).is(vec2),
+        None => {
+            if vec2_is_plain(vec2) {
+                let _ = FAST_VEC2.set(py, vec2.clone().unbind());
+                FAST_VEC2.get(py).map_or(false, |c| c.bind(py).is(vec2))
+            } else {
+                false
+            }
+        }
+    };
+    if !fast {
+        return vec2.call1((x, y));
+    }
+    unsafe {
+        let tp = vec2.as_ptr() as *mut pyo3::ffi::PyTypeObject;
+        let o = Bound::from_owned_ptr_or_err(py, pyo3::ffi::PyType_GenericAlloc(tp, 0))?;
+        for (k, v) in [(intern!(py, "x"), x), (intern!(py, "y"), y)] {
+            let fv = pyo3::types::PyFloat::new(py, v);
+            if pyo3::ffi::PyObject_GenericSetAttr(o.as_ptr(), k.as_ptr(), fv.as_ptr()) < 0 {
+                return Err(PyErr::fetch(py));
+            }
+        }
+        Ok(o)
     }
 }
 
@@ -1258,7 +1436,7 @@ impl MinionAI {
             match &target {
                 Some(t) => {
                     m.setattr(k_tid, t.getattr(intern!(py, "id"))?)?;
-                    state.set_item(k_leash, self.vec2.bind(py).call1((mx, my))?)?;
+                    state.set_item(k_leash, new_vec2(self.vec2.bind(py), mx, my)?)?;
                 }
                 None => {
                     m.setattr(k_tid, py.None())?;
@@ -1563,6 +1741,8 @@ impl BotHelpers {
     }
 }
 
+mod sim;
+
 #[pymodule]
 fn pokemoba_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_hypot, m)?)?;
@@ -1573,5 +1753,6 @@ fn pokemoba_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<MinionAI>()?;
     m.add_class::<BotHelpers>()?;
     m.add_function(wrap_pyfunction!(obstacle_hits, m)?)?;
+    sim::register(m)?;
     Ok(())
 }

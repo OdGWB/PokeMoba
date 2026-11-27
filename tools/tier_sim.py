@@ -618,7 +618,21 @@ def play(job):
         if tr_:
             s["u_time"] = {k_: round(v_, 1) for k_, v_ in tr_["time"].items() if v_ > 0}
             s["u_switches"] = tr_["switches"]
-    return {"seed": seed, "winner": winner, "timeout": timeout,
+    phi_feat = {}                   # stato a fine partita (o all'orizzonte) per la fitness troncata di cma_tune
+    for t in (0, 1):
+        mine = [p for p in units if p.team == t]
+        tw_ = [x for x in world.structures() if x.team == t and x.alive and x.kind == "tower"]
+        cr_ = [c for c in world.cores() if c.team == t]
+        phi_feat[t] = {"worth": networth(t), "level": sum(p.level for p in mine),
+                       "alive": sum(1 for p in mine if p.alive),
+                       "hp": sum(p.hp / max(1.0, p.max_hp) for p in mine if p.alive),
+                       "kills": sum(stat[p.id]["deaths"] for p in units if p.team != t),
+                       "towers": sum(stat[p.id].get("towers", 0) for p in mine),
+                       "camps": sum(stat[p.id]["camps"] for p in mine),
+                       "cs": sum(stat[p.id].get("cs", 0) for p in mine),
+                       "thp": sum(x.hp / max(1.0, x.max_hp) for x in tw_),
+                       "core": (cr_[0].hp / max(1.0, cr_[0].max_hp)) if cr_ else 0.0}
+    return {"seed": seed, "winner": winner, "timeout": timeout, "phi_feat": phi_feat,
             "early_stop": None if early is None else {"time": early[1], "adv": early[2]},
             "networth": [round(networth(t)) for t in (0, 1)],
             "train": {"vision_stride": match.vision.stride, "minion_stride": match.minion_ai_stride},

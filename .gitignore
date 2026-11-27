@@ -56,5 +56,8 @@ desktop.ini
 CLAUDE.md
 .claude/
 notes.md
+# Storico grafica locale (letto da CLAUDE.md): le due grafie contano
+# dove il filesystem distingue le maiuscole
 docs/stato_grafica.md
+docs/STATO_GRAFICA.md
 screenshots/

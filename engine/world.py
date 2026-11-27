@@ -177,6 +177,17 @@ class World:
             # Stesso ciclo in Rust (advance_unit di ogni unita' in ordine, poi le
             # collisioni); chi ha il centro dentro un muro torna al Python. Le
             # collisioni restituiscono anche chi tocca una torre.
+            if hasattr(nv, "step_collide_units"):
+                # Passo + collisioni in UNA chiamata (attributi letti una volta);
+                # se qualcuno torna al Python, le collisioni si fanno dopo, come sotto.
+                bad, hits = nv.step_collide_units(movers, dt, Vec2, 2, towers)
+                if bad:
+                    for i in bad:
+                        movement.advance_unit(movers[i], dt, grid)
+                    hits = nv.collide_units(movers, Vec2, 2, towers)
+                if towers and hits:
+                    movement.resolve_obstacles(movers, towers, grid, hits)
+                return
             for i in nv.step_units(movers, dt, Vec2):
                 movement.advance_unit(movers[i], dt, grid)
             hits = nv.collide_units(movers, Vec2, 2, towers)
