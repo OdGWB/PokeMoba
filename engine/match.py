@@ -217,6 +217,10 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         # Parametri dell'IA dei bot, uno per squadra (engine/bot_params.py).
         self.bot_params: list[BotParams] = [BotParams(), BotParams()]
         self._move_resume: dict[int, tuple] = {}  # ultimo ricalcolo di un ordine di movimento (dest, pos)
+        # Bersaglio che il giocatore ha mollato di proposito (ordine di movimento) o
+        # che non si riesce a raggiungere: da fermo non lo si reinsegue per un po'.
+        self._chase_skip: dict[int, tuple] = {}   # id Pokemon -> (id bersaglio, fino a)
+        self._chase_prog: dict[int, list] = {}    # id Pokemon -> [id bersaglio, miglior dist, da quando]
         data_dir = Path(__file__).resolve().parent.parent / "data"
         self.types = TypeChart.load(data_dir / "types.json")
         self.item_catalog = ItemCatalog.load(data_dir / "items.json")
@@ -560,11 +564,14 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         if p.order == "attack":
             # Clic su un nemico: lo insegue finché non è a portata, poi attacca.
             t = self.world.get(p.order_target_id) if p.order_target_id is not None else None
-            if self._aa_target_ok(p, t):
+            if self._aa_target_ok(p, t) and not self._chase_stalled(p, t):
                 p.target_id = t.id
                 self._chase_or_hold(p, t, dt)
                 return
-            p.order = "idle"          # morto o sparito nella nebbia: smetti di inseguire
+            if t is not None and getattr(t, "alive", False):
+                self.skip_chase(p, t.id)   # irraggiungibile: da fermo non lo si reinsegue
+            p.order = "idle"          # morto, sparito nella nebbia o irraggiungibile: smetti
+            p.order_target_id = None
             p.idle_anchor = None
             p.target_id = None
             p.stop()
@@ -573,16 +580,31 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         if p.order == "attackmove":
             # Attacco-movimento: verso il punto, attaccando il primo nemico valido
             # che entra nel raggio d'acquisizione (il più vicino al CURSORE).
+            st = self._ai.setdefault(p.id, {})
+            am = st.get("am")                 # [punto dell'ordine, dove ha agganciato]
+            if am is None or am[0] is not p.order_point:
+                am = st["am"] = [p.order_point, None]
+            pt = p.order_point or p.pos
             t = self.world.get(p.target_id) if p.target_id is not None else None
             keep = (self._aa_target_ok(p, t, p.champs_only)
                     and p.pos.dist(t.pos) <= reach + t.radius + AMOVE_EXTRA + AMOVE_DROP_EXTRA)
+            if keep and not self._within_attack(p, t):
+                # Inseguimento a guinzaglio: oltre AMOVE_CHASE_LEASH tile dal punto
+                # d'aggancio (o senza progressi) si molla, anche se il bersaglio scappa.
+                if ((am[1] is not None and p.pos.dist(am[1]) > self.AMOVE_CHASE_LEASH)
+                        or self._chase_stalled(p, t)):
+                    self.skip_chase(p, t.id)
+                    keep = False
             if not keep:
-                t = self._acquire_near_point(p, reach + AMOVE_EXTRA,
-                                             p.order_point or p.pos, p.champs_only)
+                t = self._acquire_near_point(p, reach + AMOVE_EXTRA, pt, p.champs_only,
+                                             self._chase_skipped(p), ahead=pt)
             if t is not None:
+                if am[1] is None or t.id != p.target_id:
+                    am[1] = Vec2(p.pos.x, p.pos.y)
                 p.target_id = t.id
                 self._chase_or_hold(p, t, dt)
                 return
+            am[1] = None
             p.target_id = None
             if p.order_point is not None and p.pos.dist(p.order_point) > 0.5:
                 self._move_towards(p, p.order_point, dt, use_astar=True)
@@ -601,10 +623,19 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
         can_chase = not hold and p.pos.dist(p.idle_anchor) <= IDLE_CHASE_LEASH
         acq = reach + (0.0 if hold else ACQUIRE_EXTRA)
         t = self.world.get(p.target_id) if p.target_id is not None else None
+        skip = self._chase_skipped(p)
+        if t is not None and t.id == skip and not self._within_attack(p, t):
+            t = None
         if not (self._aa_target_ok(p, t) and (self._within_attack(p, t)
                                                or (can_chase and p.pos.dist(t.pos)
                                                    <= acq + t.radius + 1.0))):
-            t = self._acquire_near_point(p, acq, p.pos, False)
+            t = self._acquire_near_point(p, acq, p.pos, False, skip)
+        if (t is not None and st.get("idle_chase") and not self._within_attack(p, t)
+                and self._chase_stalled(p, t)):
+            self.skip_chase(p, t.id)        # non ci arriva (muro, angolo): lascia stare
+            st.pop("idle_chase", None)
+            p.stop()
+            t = None
         if t is not None and (self._within_attack(p, t)
                               or (p.aa_active and p.aa_target_id == t.id)):
             p.target_id = t.id
@@ -634,12 +665,56 @@ class Match(*LINE_MIXINS, BasicAttackMixin, SmiteMixin, ItemEffectsMixin, BotPla
             return False
         return True
 
-    def _acquire_near_point(self, p, radius: float, point, champs_only: bool):
-        """Nemico valido entro `radius` (bordo a bordo) da `p`, il più vicino a `point`."""
+    # --- bersagli mollati / irraggiungibili ----------------------------------------
+    CHASE_SKIP_TIME = 6.0     # s: da fermo non si reinsegue chi si e' mollato
+    CHASE_STALL_TIME = 1.2    # s senza avvicinarsi: il bersaglio e' irraggiungibile
+    CHASE_STALL_GAIN = 0.25   # tile: avvicinamento minimo per dire "sto progredendo"
+
+    def skip_chase(self, p, target_id) -> None:
+        """Il giocatore ha mollato `target_id` (o non si raggiunge): lo si attacca
+        ancora se entra a portata, ma da fermo non lo si insegue piu' per un po'."""
+        if target_id is not None:
+            self._chase_skip[p.id] = (target_id, self.time + self.CHASE_SKIP_TIME)
+
+    def _chase_skipped(self, p):
+        e = self._chase_skip.get(p.id)
+        if e is None:
+            return None
+        if self.time >= e[1]:
+            del self._chase_skip[p.id]
+            return None
+        return e[0]
+
+    def _chase_stalled(self, p, t) -> bool:
+        """True se da CHASE_STALL_TIME secondi `p` non si avvicina a `t` (bersaglio
+        dietro un muro o in un angolo): l'inseguimento non puo' riuscire."""
+        if self._within_attack(p, t):
+            self._chase_prog.pop(p.id, None)
+            return False
+        d = p.pos.dist(t.pos)
+        e = self._chase_prog.get(p.id)
+        now = self.time
+        if (e is None or e[0] != t.id or now - e[3] > 0.25     # inseguimento nuovo/interrotto
+                or d < e[1] - self.CHASE_STALL_GAIN):
+            self._chase_prog[p.id] = [t.id, d, now, now]
+            return False
+        e[3] = now
+        return now - e[2] >= self.CHASE_STALL_TIME
+
+    AMOVE_CHASE_LEASH = 5.0   # tile: l'attacco-movimento non insegue oltre dal punto d'aggancio
+
+    def _acquire_near_point(self, p, radius: float, point, champs_only: bool,
+                            skip_id=None, ahead=None):
+        """Nemico valido entro `radius` (bordo a bordo) da `p`, il più vicino a `point`.
+        `skip_id`: un bersaglio mollato, scartato se non e' gia' a portata d'attacco."""
         best, bd = None, 1e9
         for e in self._combat_hash.query_radius(p.pos.x, p.pos.y, radius + 1.5):
             if e is p or not self._aa_target_ok(p, e, champs_only):
                 continue
+            if e.id == skip_id and not self._within_attack(p, e):
+                continue
+            if ahead is not None and e.pos.dist(ahead) > p.pos.dist(ahead) + 0.5:
+                continue      # alle spalle rispetto alla direzione in cui vai: si ignora
             if p.pos.dist(e.pos) > radius + getattr(e, "radius", 0.0):
                 continue
             d = point.dist(e.pos)
